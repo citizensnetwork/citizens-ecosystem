@@ -9,6 +9,8 @@
 //  wait. SocialInputs, the four contributor kinds and the step-1 copy are
 //  shared with that screen through window.ApplyParts. The kind sits inside
 //  step 1 (issue #143): a new step would break the wizard's Continue count.
+//  Presets (issue #202, onboarding-presets-lib.jsx) add no step either: picking a category starts the Type on the preset's
+//  default, and Care / Recovery gets a note plus a map opt-in toggle inside step 1.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
@@ -125,8 +127,17 @@
     const { submitApplication, go } = window.useApp();
     const [step, setStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
-    const [f, setF] = useState({ orgName: '', kind: 'ministry', location: '', lat: null, lng: null, category: '', bio: '', website: '', socials: {}, noFixedLocation: false, serving: window.CCServing.emptySelection(), servingSummary: '' });
+    const [f, setF] = useState({ orgName: '', kind: window.CCPresets.START_KIND, kindPicked: false, showOnMap: false, location: '', lat: null, lng: null, category: '', bio: '', website: '', socials: {}, noFixedLocation: false, serving: window.CCServing.emptySelection(), servingSummary: '' });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+    // Presets (#202): until the person has chosen a Type themselves, the Type follows the category: its preset's default,
+    // or the starting Type when the category names no preset (so Business, then Market / Expo, is not left on Business).
+    const pickKind = (v) => setF((s) => ({ ...s, kind: v, kindPicked: true }));
+    const pickCategory = (v) => setF((s) => {
+      const next = { ...s, category: v, kind: s.kindPicked ? s.kind : window.CCPresets.autoKindFor(v) };
+      // Care / Recovery has one location question, the map switch, so an earlier "no fixed location" answer does not carry over.
+      if (window.CCPresets.needsExtraReview(v) && s.noFixedLocation) Object.assign(next, { noFixedLocation: false, serving: window.CCServing.emptySelection(), servingSummary: '' });
+      return next;
+    });
     // The serving-areas picker (issue #259) hands back the choice AND its plain-words summary, which the review step shows.
     const setServing = (sel, summary) => setF((s) => ({ ...s, serving: sel, servingSummary: summary || '' }));
     const chosenAreas = window.CCServing.offersPicker(f) && f.serving.areaIds.length > 0;
@@ -148,31 +159,52 @@
         h('h1', { className: 'text-white text-xl mb-1' }, 'Become a Contributor'),
         h('p', { className: 'text-white/85 text-xs leading-relaxed max-w-sm' }, 'Contributors create events & places, broadcast updates, message citizens, and lead Kingdom initiatives across the map.')));
 
-    const cat = window.DATA.getEventCategory(f.category);
+    // The Contributor type list, as in the category grid and the admin card (an events-only lookup left 6 of the 12 types unnamed).
+    const cat = window.DATA.getItemCategory({ type: 'contributor', category: f.category });
     const copy = aboutCopy(f.kind);
+    const preset = window.CCPresets.presetFor(f.category);
+    const extraReview = window.CCPresets.needsExtraReview(f.category);
+    // Care / Recovery opts in to the map (#202): until they turn it on, no address or pin is asked for or stored.
+    const offMap = window.CCPresets.keepsOffMap(f);
+    const hideLocation = f.noFixedLocation || offMap;
+    const presetCopy = window.CCPresets.COPY;
     const steps = [
       {
         title: copy.title, subtitle: 'Tell us who you are and where you serve.',
-        valid: () => f.orgName.trim() && f.category && (f.noFixedLocation || f.location.trim()),
+        valid: () => f.orgName.trim() && f.category && (hideLocation || f.location.trim()),
         node: h(F, null,
           // One row, not a stacked field: on a phone the sticky footer would
           // otherwise cover the MapTiler logo on the map below (Free-plan rule).
           h('div', { className: 'flex items-center gap-3' },
             h('span', { className: 'text-xs font-semibold text-foreground/80 shrink-0' }, 'Type'),
-            h('div', { className: 'flex-1 min-w-0' }, h(KindSelect, { value: f.kind, onChange: (v) => up('kind', v) }))),
+            h('div', { className: 'flex-1 min-w-0' }, h(KindSelect, { value: f.kind, onChange: pickKind }))),
           h(Field, { label: copy.nameLabel, required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: copy.namePlaceholder, 'aria-label': copy.nameLabel })),
-          h(Field, { label: 'Area / location served', required: !f.noFixedLocation, hint: f.noFixedLocation ? undefined : 'Drag the map or use the pin button — the address fills in automatically.' },
-            h('div', { className: 'space-y-2' },
-              !f.noFixedLocation && h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }), placeholder: 'e.g. Eastside, Central District' }),
-              !f.noFixedLocation && h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc, height: 150 }),
-              h(Toggle, {
-                checked: f.noFixedLocation, onChange: setNoFixedLocation,
-                label: "I don't have a fixed physical location",
-                desc: "We're online, mobile, or serve without a permanent office — no map pin needed.",
-              }),
-              // #259: only someone with no fixed location is offered the area picker, and it adds no wizard step
-              window.CCServing.offersPicker(f) && h(window.ServingAreas.Field, { value: f.serving, onChange: setServing }))),
-          h(Field, { label: 'Primary category', required: true, hint: 'This sets your colour & icon across the map.' }, h(CategoryGrid, { value: f.category, onChange: (v) => up('category', v)})) ),
+          h(Field, { label: 'Area / location served', required: !hideLocation, hint: hideLocation ? undefined : 'Drag the map or use the pin button — the address fills in automatically.' },
+            h('div', { role: 'group', 'aria-label': 'Area / location served' },
+              // Always rendered, so a screen reader announces the note when a Care / Recovery category is picked. The switch stays
+              // outside it. It sits above the space-y-2 rows, not in them, so empty it adds no gap (the note carries its own mb-2).
+              h('div', { 'aria-live': 'polite' },
+                extraReview && h('div', { className: 'flex items-start gap-2 p-3 mb-2 rounded-xl bg-accent/60 text-foreground', 'data-testid': 'preset-care-note' },
+                  h(Icon, { name: 'Sparkles', size: 15, className: 'shrink-0 mt-0.5 text-gold-dark' }),
+                  h('p', { className: 'text-xs leading-relaxed' }, presetCopy.careNote))),
+              h('div', { className: 'space-y-2' },
+                extraReview && h(Toggle, { checked: f.showOnMap, onChange: (v) => up('showOnMap', v), label: presetCopy.mapToggleLabel, desc: presetCopy.mapToggleDesc }),
+                !hideLocation && h(Input, { value: f.location, onChange: (e) => setLoc({ address: e.target.value }), placeholder: 'e.g. Eastside, Central District' }),
+                !hideLocation && h(window.LocationPicker, { value: { address: f.location, lat: f.lat, lng: f.lng }, onChange: setLoc, height: 150 }),
+                // Care / Recovery has no "no fixed location" switch: the map switch above is its one location question.
+                !extraReview && h(Toggle, {
+                  checked: f.noFixedLocation, onChange: setNoFixedLocation,
+                  label: "I don't have a fixed physical location",
+                  desc: "We're online, mobile, or serve without a permanent office — no map pin needed.",
+                }),
+                // #259: only someone with no fixed location is offered the area picker, and it adds no wizard step
+                window.CCServing.offersPicker(f) && h(window.ServingAreas.Field, { value: f.serving, onChange: setServing })))),
+          h(Field, {
+            label: 'Primary category', required: true,
+            // The changing sentence sits in an always-rendered live region, so a screen reader hears the Type change.
+            hint: h(F, null, 'This sets your colour & icon across the map.',
+              h('span', { 'aria-live': 'polite' }, preset && !f.kindPicked ? presetCopy.kindMatched(contributorKindLabel(f.kind)) : '')),
+          }, h(CategoryGrid, { value: f.category, onChange: pickCategory })) ),
       },
       // Short bio only (optional), plus Website folded in from the old
       // "Links & socials" step. The multi-network socials, logo and cover are
@@ -191,17 +223,20 @@
               cat && h('span', { className: 'w-10 h-10 rounded-xl flex items-center justify-center', style: { background: cat.hex } }, h(Icon, { name: cat.icon, size: 18, className: 'text-white' })),
               h('div', null,
                 h('p', { className: 'font-bold text-foreground' }, f.orgName || copy.fallbackName),
-                h('p', { className: 'text-xs text-muted-foreground' }, (cat ? cat.name : 'Category') + ' · ' + (f.noFixedLocation ? 'Online / no fixed location' : (f.location || 'Location'))))),
+                h('p', { className: 'text-xs text-muted-foreground' }, (cat ? cat.name : 'Category') + ' · ' + (f.noFixedLocation ? 'Online / no fixed location' : offMap ? presetCopy.reviewNotOnMap : (f.location || 'Location'))))),
             h(ReviewRow, { label: 'Type', value: contributorKindLabel(f.kind) }),
+            // Yes only with the switch on AND a pin (the rule the note below uses, C21); the same fact is not worded twice.
+            extraReview && h(ReviewRow, { label: 'On the map', value: window.CCPresets.mapRowFor(f, window.DATA.hasMapPin(f)) }),
             chosenAreas && h(ReviewRow, { label: window.MapV2Strings.serving.reviewLabel, value: f.servingSummary.replace(/^[^:]*:\s*/, '') }),
             h(ReviewRow, { label: 'About', value: f.bio }),
             f.website && h(ReviewRow, { label: 'Website', value: f.website })),
-          h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
-            h(Icon, { name: 'Sparkles', size: 15, className: 'shrink-0 mt-0.5' }),
+          h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-foreground' },
+            h(Icon, { name: 'Sparkles', size: 15, className: 'shrink-0 mt-0.5 text-gold-dark' }),
             h('p', { className: 'text-xs leading-relaxed' }, // C21: "on the map" only when the wizard has a pin (both coordinates); an online-only listing is in Kingdom Discovery
-              'An admin reviews every application before it goes live ' + window.DATA.listedWhere(window.DATA.hasMapPin(f)) + '. You can add your logo and contact details from your Dashboard while you wait.',
+              'An admin reviews every application before it goes live ' + window.DATA.listedWhere(window.DATA.hasMapPin(f) && !offMap) + '. You can add your logo and contact details from your Dashboard while you wait.',
               // #259: said only when they chose at least one area (the founder's rule), and never "on the map" without a pin (C21)
-              chosenAreas && h('span', { className: 'block mt-1' }, window.MapV2Strings.serving.findableNote)))),
+              chosenAreas && h('span', { className: 'block mt-1' }, window.MapV2Strings.serving.findableNote),
+              extraReview && h('span', { className: 'block mt-1' }, presetCopy.reviewCareNote)))),
       },
     ];
 

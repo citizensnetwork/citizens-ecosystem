@@ -122,7 +122,7 @@ test.describe("on a phone", () => {
     const events = page.getByRole("button", { name: "Events", exact: true });
     await events.tap();
     await expect(events).toHaveAttribute("aria-pressed", "true");
-    await expect(events).toHaveCSS("background-color", "rgb(201, 168, 76)");
+    await expect(events).toHaveCSS("background-color", "rgb(242, 189, 34)");
     const eventIds = new Set(seed.events.map((e) => e.id));
     const shown = await page.locator("[data-explore-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-explore-id")!));
     expect(shown.length).toBeGreaterThan(0);
@@ -157,7 +157,7 @@ test.describe("on a phone", () => {
       }
       expect(label.trim().length, "a category or kind label").toBeGreaterThan(0);
       expect(edge).toBe(chip);
-      expect(edge).not.toBe("rgb(201, 168, 76)");
+      expect(edge).not.toBe("rgb(242, 189, 34)");
       await expect(c).toContainText(/\d+(\.\d)? km|\d+ m|Under 100 m/);
     }
     expect(coloured).toBeGreaterThan(2);

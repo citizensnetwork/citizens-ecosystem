@@ -7,7 +7,7 @@ import { escapeHtml } from "@/lib/email/send";
 import { button, layout, subjectSafe, type Email } from "@/lib/email/templates";
 
 const SIGN_OFF_TEXT = "Connecting the Kingdom — one citizen, one contributor, one need at a time.\nThe Citizens Connect team";
-const GOLD = "#A67C00";
+const GOLD_INK = "#836100"; // the ink of the one gold: gold text and links (the crown gold itself is 1.74:1 on white)
 
 /**
  * The single reminder. Sent once, a week after the listing went live, to an owner who has not answered. It asks;
@@ -26,7 +26,7 @@ export function listingClaimReminderEmail(input: {
       `${input.name} is waiting for you`,
       `<p>A week ago a listing for <strong>${escapeHtml(input.name)}</strong> was added to Citizens Connect for ${email}. ` +
         "It is live, and it is still waiting for you to say whether it is yours.</p>" +
-        `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD}">View the listing</a></p>` +
+        `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD_INK}">View the listing</a></p>` +
         `<p>Sign in with <strong>${email}</strong> (a 6-digit emailed code, or Google) and we will ask you to <strong>Confirm</strong> ` +
         "that it is yours, or tap <strong>Not me</strong> and we will hide it straight away. " +
         "Nothing happens to your account unless you confirm, and this is the only reminder we will send.</p>" +

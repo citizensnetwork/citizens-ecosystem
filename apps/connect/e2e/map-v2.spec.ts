@@ -46,7 +46,7 @@ test.describe("P1-01 Map v2 is the map", () => {
     await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0); // removed at the founder's request (2026-10-12)
     expect(await theme(page)).toBe("light");
     // the token file is really applied: --accent resolves to gold
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#c9a84c");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#f2bd22");
     // a visitor who never chose gets no key written for them
     expect(await stored(page)).toBeNull();
   });
@@ -262,7 +262,7 @@ test.describe("E23 and the 12.3 states", () => {
     const share = page.locator("[data-mv2='sheet']").getByRole("button", { name: "Share" });
     await expect(share).toBeVisible();
     await share.hover();
-    await expect(share).toHaveCSS("border-top-color", "rgb(139, 105, 20)"); // --accent-ink on hover
+    await expect(share).toHaveCSS("border-top-color", "rgb(131, 97, 0)"); // --accent-ink on hover
     await page.mouse.down();
     await expect.poll(() => share.evaluate((e) => getComputedStyle(e).transform)).not.toBe("none"); // pressed: scale(0.97)
     await page.mouse.up();

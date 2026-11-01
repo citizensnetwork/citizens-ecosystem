@@ -79,7 +79,7 @@ describe("CATEGORY_COLORS", () => {
   });
 
   it("uses brand gold for church-services", () => {
-    expect(CATEGORY_COLORS["church-services"]).toBe("#D4AF37");
+    expect(CATEGORY_COLORS["church-services"]).toBe("#F2BD22");
   });
 });
 
