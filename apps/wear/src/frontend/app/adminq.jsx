@@ -227,7 +227,7 @@
       border: '1px solid #efedea',
       borderRadius: 10,
       padding: '9px 11px',
-      fontSize: 12.5,
+      fontSize: 'var(--fs-3)',
       fontWeight: 500,
       outline: 'none',
       background: '#fff',
