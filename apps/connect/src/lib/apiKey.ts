@@ -4,8 +4,10 @@
  *
  * Flow:
  *   1. Extract raw key from either header.
- *   2. Call the `resolve_api_key` SECURITY DEFINER RPC which hashes
- *      the token and looks it up in `public.api_keys`.
+ *   2. Call the `resolve_api_key` SECURITY DEFINER RPC through the
+ *      service-role client. The function is not executable by anon or
+ *      authenticated (migration 200), so a logged-out visitor cannot
+ *      probe keys on `/rest/v1/rpc`.
  *   3. Return `{ owner_id, scopes, rate_limit_per_minute }` on success
  *      or `null` if no key / invalid / disabled.
  *
@@ -14,7 +16,7 @@
  * We never expose the reason for failure to the client.
  */
 
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export interface ApiKeyContext {
   id: string;
@@ -60,7 +62,7 @@ export async function resolveApiKey(
   if (!raw || !raw.startsWith("cck_")) return null;
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data, error } = await supabase.rpc("resolve_api_key", {
       p_raw_key: raw,
     });
