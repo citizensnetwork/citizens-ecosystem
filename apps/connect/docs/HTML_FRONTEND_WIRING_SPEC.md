@@ -2,6 +2,10 @@
 ### Version 1.0 · June 7, 2026
 ### Status: Ready to implement — all decisions locked
 
+> **Note (2026-11-01):** this is the June 2026 plan, kept for history. The design's `supabase-auth.js` reference and the
+> `/auth/callback` cookie route are gone; the live client is `src/frontend/auth-client.js` (browser session in localStorage,
+> sign-in returns to the app root).
+
 ---
 
 ## PURPOSE OF THIS DOCUMENT
