@@ -10,7 +10,8 @@
 //    /                      map (home)         /map → /  (alias)
 //    /discover              Kingdom Exploration list
 //    /explore               Map v2's Discover page (#210; the old map shows Kingdom Exploration there)
-//    /community             Kingdom Projects
+//    /lets                  Let's… gatherings
+//    /community             Kingdom Projects (linked from Let's…, not in the nav)
 //    /e/<uuid>              event              /p/<uuid>   place
 //    /c/<slug>              Contributor        /me         my own profile
 //    /messages[/<uuid>]     inbox [+ thread]   /notifications  /settings
@@ -48,6 +49,7 @@
     home: '/',
     'kingdom-discovery': '/discover',
     explore: '/explore',
+    lets: '/lets',
     community: '/community',
     messages: '/messages',
     notifications: '/notifications',
@@ -200,7 +202,7 @@
     const page = nav && nav.page;
     const p = (nav && nav.params) || {};
     switch (page) {
-      case 'home': case 'kingdom-discovery': case 'explore': case 'community': case 'event': case 'place': return 'public';
+      case 'home': case 'kingdom-discovery': case 'explore': case 'lets': case 'community': case 'event': case 'place': return 'public';
       case 'profile': return p.id || p.slug ? 'public' : 'auth';
       case 'dashboard': return 'contributor';
       case 'admin': return 'admin';
@@ -270,7 +272,7 @@
 
   const BASE_TITLE = 'Citizens Connect';
   const TITLES = {
-    'kingdom-discovery': 'Kingdom Exploration', explore: 'Explore', community: 'Kingdom Projects', messages: 'Messages',
+    'kingdom-discovery': 'Kingdom Exploration', explore: 'Explore', lets: 'Let\'s…', community: 'Kingdom Projects', messages: 'Messages',
     notifications: 'Notifications', settings: 'Settings', apply: 'Become a Contributor',
     onboarding: 'Set up your profile', dashboard: 'Dashboard', admin: 'Admin',
     'intake-upgrade': 'Confirm your listing',

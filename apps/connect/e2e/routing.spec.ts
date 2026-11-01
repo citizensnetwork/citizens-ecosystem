@@ -123,6 +123,7 @@ test.describe("Every public screen has its own URL and survives a reload", () =>
   const routes: [string, string, string][] = [
     ["/", "discover", "the map"],
     ["/discover", "kingdom-discovery", "Kingdom Exploration"],
+    ["/lets", "lets", "Let's…"],
     ["/community", "community", "Kingdom Projects"],
     [`/e/${EVENT_ID}`, "event", "an event"],
     [`/p/${PLACE_ID}`, "place", "a place"],
@@ -140,6 +141,29 @@ test.describe("Every public screen has its own URL and survives a reload", () =>
       expect(path(page)).toBe(url);
     });
   }
+
+  test("Let's lists the starters, keeps Kingdom Projects one tap away, and a starter publishes onto the page", async ({ page }) => {
+    await openDemo(page);
+    await page.goto("/lets");
+    const screen = page.locator('[data-screen="lets"]');
+    await expect(screen).toBeVisible({ timeout: 15_000 });
+    await expect(screen.getByRole("button", { name: "Let's Pray" })).toBeVisible();
+    await expect(screen.getByText("No gatherings yet. Start one above.")).toBeVisible();
+    await screen.getByRole("button", { name: "Kingdom Projects" }).click();
+    await expect(page.locator('[data-screen="community"]')).toBeVisible();
+    expect(path(page)).toBe("/community");
+
+    await page.goto("/lets");
+    await screen.getByRole("button", { name: "Let's Pray" }).click();
+    await expect(page.getByRole("heading", { name: "Create Event" })).toBeVisible();
+    await expect(page.locator("[data-mv2='lets-pick']").getByRole("button", { name: "Let's Pray" })).toHaveAttribute("aria-pressed", "true");
+    await page.getByPlaceholder("e.g. Sunday Glory Service").fill("Station prayer");
+    // The default create layout is the wizard (tweaks.jsx). Continue through it, then publish.
+    for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Continue" }).click();
+    await page.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(page.locator("[data-mv2='lets-card']")).toContainText("Station prayer");
+    expect(path(page)).toBe("/lets");
+  });
 
   test("a link to something the first page of the feed does not hold is fetched by id, with a loading state, not 'not found'", async ({ page }) => {
     await openDemo(page);
@@ -840,7 +864,7 @@ test.describe("Sharing a link", () => {
 
 test.describe("The server serves exactly the route table", () => {
   test("every route returns the app shell with <base href>, and unknown paths keep Next's 404", async ({ request }) => {
-    for (const p of ["/", "/discover", "/map", "/community", "/me", "/messages", `/messages/${EVENT_ID}`, "/notifications", "/settings", "/apply", "/onboarding", "/dashboard", "/dashboard/events", "/admin", "/admin/listings", "/admin/contributors", "/admin/citizens", `/e/${EVENT_ID}`, `/p/${PLACE_ID}`, `/c/${SLUG}`]) {
+    for (const p of ["/", "/discover", "/map", "/lets", "/community", "/me", "/messages", `/messages/${EVENT_ID}`, "/notifications", "/settings", "/apply", "/onboarding", "/dashboard", "/dashboard/events", "/admin", "/admin/listings", "/admin/contributors", "/admin/citizens", `/e/${EVENT_ID}`, `/p/${PLACE_ID}`, `/c/${SLUG}`]) {
       const res = await request.get(p);
       expect(res.status(), p).toBe(200);
       expect(await res.text(), p).toContain('<base href="/"');

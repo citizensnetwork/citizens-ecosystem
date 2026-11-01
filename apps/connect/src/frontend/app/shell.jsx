@@ -13,7 +13,7 @@
     // map's top-right corner — it now lives in the nav on both breakpoints, so
     // moving between the map and the list never moves the controls around you.
     { page: 'kingdom-discovery', label: 'Kingdom Exploration', icon: 'LayoutGrid' },
-    { page: 'community', label: 'Kingdom Projects', icon: 'Lightbulb' },
+    { page: 'lets', label: 'Let\'s…', icon: 'Users' },
     { page: 'messages', label: 'Messages', icon: 'MessageCircle' },
     { page: 'notifications', label: 'Notifications', icon: 'Bell' },
   ];
@@ -63,7 +63,7 @@
     if (extras) {
       const menu = (window.MapV2Strings && window.MapV2Strings.nav && window.MapV2Strings.nav.menu) || {};
       links.push(
-        { p: 'community', label: menu.projects, icon: 'Lightbulb' },
+        { p: 'lets', label: menu.lets, icon: 'Users' },
         { p: 'messages', label: menu.messages, icon: 'MessageCircle', count: unreadMsgs },
         { p: 'notifications', label: menu.alerts, icon: 'Bell', count: unreadNotifs });
     }
@@ -281,6 +281,7 @@
       case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
       // #210: Map v2's Discover page.
       case 'explore': return React.createElement(window.MapV2Discover.Discover);
+      case 'lets': return React.createElement(window.LetsPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);

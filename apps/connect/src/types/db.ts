@@ -74,6 +74,8 @@ export type Event = {
    *  can distinguish editorially-curated events from community ones.
    *  Added in migration 036; force-tagged by a DB trigger in 037. */
   community_contributor?: boolean;
+  /** Let's gathering starter id (issue #313, migration 202). Null on an ordinary event. */
+  lets_starter?: string | null;
   /** Structured discovery tags used by the AI search engine (Phase 1). */
   search_profile?: SearchProfile | null;
   /** Social media handles / URLs for the event or organiser. */

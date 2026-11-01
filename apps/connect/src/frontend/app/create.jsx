@@ -48,6 +48,9 @@
     const { closeCreate, createEvent, createPlace, updateEvent, updatePlace, creationStyle, activeContributor } = app;
     const isEvent = kind === 'event';
     const isEditing = !!editing;
+    const presetStarter = (!isEditing && isEvent && window.LETS && app.createPreset)
+      ? window.LETS.starterById(app.createPreset.letsStarter)
+      : null;
     const [step, setStep] = useState(0);
     // Editing pre-fills from the existing record. An event's location
     // collapses to one field on edit — the DB only ever stored a single
@@ -61,6 +64,7 @@
         location: editing.location || '', address: '',
         coverPhoto: editing.coverPhoto || '', gallery: editing.gallery || [],
         socials: editing.socials || {}, volunteeringEnabled: !!editing.volunteeringEnabled,
+        letsStarter: (window.LETS && window.LETS.starterById(editing.letsStarter)) ? editing.letsStarter : '',
         upcomingDates: [], launchBroadcast: '',
       };
       if (isEditing) return {
@@ -70,30 +74,54 @@
         socials: editing.socials || {}, volunteeringEnabled: !!editing.volunteeringEnabled,
       };
       return isEvent
-        ? { title: '', category: '', description: '', date: '', time: '', endTime: '', location: '', address: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false, upcomingDates: [], launchBroadcast: '' }
+        ? { title: '', category: presetStarter ? presetStarter.category : '', description: '', date: '', time: '', endTime: '', location: '', address: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false, letsStarter: presetStarter ? presetStarter.id : '', upcomingDates: [], launchBroadcast: '' }
         : { name: '', category: '', description: '', address: '', openHours: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false };
     });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
+    const pickStarter = (id) => {
+      const s = window.LETS && window.LETS.starterById(id);
+      if (!s) return;
+      setF((cur) => (cur.letsStarter === id ? { ...cur, letsStarter: '' } : { ...cur, letsStarter: id, category: s.category }));
+    };
+    const pickCategory = (v) => setF((cur) => {
+      const s = window.LETS && window.LETS.starterById(cur.letsStarter);
+      return { ...cur, category: v, letsStarter: s && s.category === v ? cur.letsStarter : '' };
+    });
     const ups = (k, v) => setF((s) => ({ ...s, socials: { ...s.socials, [k]: v } }));
     const [recur, setRecur] = useState('');
     const [publishing, setPublishing] = useState(false);
 
     // Publish/save is async for real users (geocode + DB write). The sheet
     // only closes on success so a failure keeps the form intact. Editing
-    // stays put on close; a fresh create still jumps home to see the new pin.
+    // stays put on close. A Let's gathering returns to Let's…; anything else jumps home to see the new pin.
     const submit = () => {
       if (publishing) return;
       setPublishing(true);
-      const done = (ok) => { setPublishing(false); if (ok) { closeCreate(); if (!isEditing) app.go('home'); } };
+      const done = (ok) => { setPublishing(false); if (ok) { closeCreate(); if (!isEditing) app.go(isEvent && f.letsStarter ? 'lets' : 'home'); } };
       if (isEditing) { if (isEvent) updateEvent(editing.id, f, done); else updatePlace(editing.id, f, done); }
       else { if (isEvent) createEvent(f, done); else createPlace(f, done); }
     };
 
     // ── field sections ──
     const galleryAdd = (v) => up('gallery', [...f.gallery, v]);
+    const letsCopy = (window.MapV2Strings && window.MapV2Strings.lets) || {};
+    const lockedStarter = isEditing && isEvent && window.LETS ? window.LETS.starterById(f.letsStarter) : null;
+    const starterPick = !isEditing && isEvent && window.LETS ? h('div', { 'data-mv2': 'lets-pick' },
+      h('p', { 'data-mv2': 'lets-pick-label', id: 'lets-starters-label' }, letsCopy.start),
+      h('div', { 'data-mv2': 'lets-starters', role: 'group', 'aria-labelledby': 'lets-starters-label' },
+        window.LETS.STARTERS.map((s) => h('button', {
+          key: s.id, type: 'button', 'data-mv2': 'lets-starter', 'data-starter': s.id,
+          'aria-pressed': f.letsStarter === s.id ? 'true' : 'false',
+          onClick: () => pickStarter(s.id),
+        },
+          h(Icon, { name: s.icon, size: 16 }),
+          h('span', null, s.label)))),
+      h('p', { 'data-mv2': 'lets-pick-hint' }, f.letsStarter ? letsCopy.cap : letsCopy.preset)) : null;
     const Basics = h(F, null,
+      starterPick,
+      lockedStarter ? h('p', { 'data-mv2': 'lets-locked' }, lockedStarter.label + '. ' + (letsCopy.locked || '')) : null,
       h(Field, { label: isEvent ? 'Event title' : 'Place name', required: true }, h(Input, { value: isEvent ? f.title : f.name, onChange: (e) => up(isEvent ? 'title' : 'name', e.target.value), placeholder: isEvent ? 'e.g. Sunday Glory Service' : 'e.g. Grace City Café' })),
-      h(Field, { label: 'Category', required: true, hint: 'Sets your colour & icon on the map.' }, h(CatGrid, { list: isEvent ? window.DATA.EVENT_CATEGORIES : window.DATA.PLACE_CATEGORIES, value: f.category, onChange: (v) => up('category', v) })),
+      h(Field, { label: 'Category', required: true, hint: 'Sets your colour & icon on the map.' }, h(CatGrid, { list: isEvent ? window.DATA.EVENT_CATEGORIES : window.DATA.PLACE_CATEGORIES, value: f.category, onChange: (v) => (isEvent ? pickCategory(v) : up('category', v)) })),
       h(Field, { label: 'Description' }, h(Textarea, { value: f.description, rows: 3, onChange: (e) => up('description', e.target.value), placeholder: 'Tell citizens what to expect…' })));
 
     const When = h(F, null,

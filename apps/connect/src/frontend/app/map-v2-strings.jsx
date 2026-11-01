@@ -224,17 +224,35 @@
       loading: 'Loading',
     },
 
-    // Issue #210: the folding navigation (app/map-v2-nav.jsx). Messages, Alerts and Projects live in the
-    // account menu that Profile opens (founder, 2026-10-26), each with its count.
-    nav: {
-      label: 'Main',
-      open: 'Open navigation',
-      openUnread: 'Open navigation, you have unread messages or alerts',
-      close: 'Close navigation',
-      items: { home: 'Home', explore: 'Explore', map: 'Map', profile: 'Profile' },
-      menu: { projects: 'Projects', messages: 'Messages', alerts: 'Alerts' },
-      unread: (n) => n + ' unread',
-    },
+      // Issue #210: the folding navigation (app/map-v2-nav.jsx). Let's, Messages and Alerts live in the
+      // account menu that Profile opens. Kingdom Projects stays at /community, linked from the Let's page.
+      nav: {
+        label: 'Main',
+        open: 'Open navigation',
+        openUnread: 'Open navigation, you have unread messages or alerts',
+        close: 'Close navigation',
+        items: { home: 'Home', explore: 'Explore', map: 'Map', profile: 'Profile' },
+        menu: { lets: 'Let\'s…', messages: 'Messages', alerts: 'Alerts' },
+        unread: (n) => n + ' unread',
+      },
+
+      // Issue #313. The Let's page and the starters on event creation. Starter names are data (window.LETS).
+      lets: {
+        title: 'Let\'s…',
+        sub: 'Gather with people near you',
+        start: 'Start one',
+        happening: 'Happening',
+        empty: 'No gatherings yet. Start one above.',
+        projects: 'Kingdom Projects',
+        projectsHint: 'Ideas, votes and collaboration.',
+        error: 'Could not load gatherings.',
+        retry: 'Try again',
+        signIn: 'Sign in to start one',
+        preset: 'Picks a category for the map.',
+        cap: 'A gathering started here skips the monthly cap.',
+        locked: 'This gathering keeps its starter.',
+        loading: 'Loading gatherings',
+      },
 
     // Issue #210: the map home's category pills and the Explore row (app/map-v2-explore.jsx).
     // One muted colour per group (founder, 2026-10-26); the group names are the pills.

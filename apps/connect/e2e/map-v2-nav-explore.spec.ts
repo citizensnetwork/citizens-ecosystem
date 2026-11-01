@@ -151,15 +151,15 @@ test.describe("on a phone", () => {
     await expect(explore(page)).toBeVisible();
   });
 
-  test("Profile opens the account menu with Projects, Messages and Alerts", async ({ page }) => {
+  test("Profile opens the account menu with Let's, Messages and Alerts", async ({ page }) => {
     await open(page);
     await toggle(page).tap();
     const profile = nav(page).getByRole("button", { name: "Profile", exact: true });
     await profile.tap();
     await expect(profile).toHaveAttribute("aria-expanded", "true");
-    for (const label of ["View Profile", "Projects", "Messages", "Alerts"]) await expect(page.getByRole("button", { name: label })).toBeVisible();
-    await page.getByRole("button", { name: "Projects" }).tap();
-    await expect(page).toHaveURL(/\/community$/);
+    for (const label of ["View Profile", "Let's…", "Messages", "Alerts"]) await expect(page.getByRole("button", { name: label })).toBeVisible();
+    await page.getByRole("button", { name: "Let's…" }).tap();
+    await expect(page).toHaveURL(/\/lets$/);
   });
 
   test("the categories are INSIDE the panel: its title switches to a list of the groups, a pick filters the cards, and the panel never changes height", async ({ page }) => {
