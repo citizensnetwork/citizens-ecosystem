@@ -374,6 +374,54 @@ export function validateSuggestion(
   };
 }
 
+// ── editing a pending suggestion ─────────────────────────────────────────
+
+/**
+ * What an owner may change on a suggestion that is still waiting. Everything else (the category, the
+ * website link, a profile suggestion's field) is the Reader's, and a key outside this list is refused.
+ */
+export const EDITABLE_FIELDS: Record<SuggestionKind, readonly string[]> = {
+  event: ["title", "description", "start", "end", "location"],
+  news: ["title", "body", "post_date"],
+  profile: ["value"],
+};
+
+/**
+ * An owner's edit of a pending suggestion, checked by the SAME rules as a suggestion arriving from the
+ * Reader (`validateSuggestion`): the edit is laid over the stored payload and the whole thing is
+ * validated again, so a rewrite cannot smuggle in a phone number, an http link, a bad date or an unknown
+ * key. The result's payload is what to store.
+ *
+ * The fingerprint in the result is NOT for storing. A stored row keeps the fingerprint of the source item
+ * it came from, so the next daily run still sees that item as "already known" instead of filing it again.
+ *
+ * Moving an event's start moves its end with it (the length is kept), unless the edit sets the end too.
+ */
+export function validateSuggestionEdit(
+  kind: unknown,
+  stored: unknown,
+  edits: unknown,
+  sourceUrl: unknown,
+  now: Date = new Date(),
+): ValidatedSuggestion {
+  if (typeof kind !== "string" || !(SUGGESTION_KINDS as readonly string[]).includes(kind)) return fail("unknown_kind");
+  if (!isPlainObject(stored)) return fail("payload_must_be_an_object");
+  if (!isPlainObject(edits)) return fail("edit_must_be_an_object");
+  const allowed = EDITABLE_FIELDS[kind as SuggestionKind];
+  const keys = Object.keys(edits);
+  if (keys.length === 0) return fail("edit_is_empty");
+  if (keys.some((k) => !allowed.includes(k))) return fail("edit_field_not_allowed");
+
+  const merged: Record<string, unknown> = { ...stored, ...edits };
+  if (kind === "event" && "start" in edits && !("end" in edits) && typeof stored.end === "string") {
+    const was = parseDateTime(stored.start);
+    const oldEnd = parseDateTime(stored.end);
+    const next = parseDateTime(edits.start);
+    if (was && oldEnd && next) merged.end = new Date(next.getTime() + (oldEnd.getTime() - was.getTime())).toISOString();
+  }
+  return validateSuggestion(kind, merged, sourceUrl, now);
+}
+
 /**
  * Events only, only at `events_auto`, and only if it has not started yet. Never a Care / Recovery
  * event (founder decision 2026-10-21, issue #202): those wait for the owner, whatever the level.
