@@ -265,6 +265,17 @@
       chooseCategory: 'Choose a category',
       backToListings: 'Back to the listings',
       categoriesLabel: 'Categories',
+      // C40: the list's own switch. "Where to…" is the intent view of the same rows.
+      listLabel: 'Browse the list',
+      categoriesTab: 'Categories',
+      intentsTab: 'Where to…',
+      intentsLabel: 'Where to',
+      whereTo: (word) => 'Where to ' + word,
+      emptyIntent: (word) => 'Nothing nearby for where to ' + word + '.',
+      intents: {
+        coffee: 'coffee', learn: 'learn', worship: 'worship', run: 'run', reset: 'reset',
+        heal: 'heal', parent: 'parent', chill: 'chill', shop: 'shop', serve: 'serve',
+      },
       lower: 'Lower this panel to see more of the map',
       raise: 'Raise this panel',
       under: 'Under 100 m away',

@@ -105,6 +105,8 @@
     // never does, the panel stays exactly where it is).
     const X = window.MapV2Explore;
     const [pill, setPill] = useState('all');
+    // "Where to…" (C40): a saved set of categories. It replaces the pill while it is on.
+    const [intent, setIntent] = useState(null);
     const [sheet, setSheet] = useState(null);
     const [min, setMin] = useState(false);
     const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a second tap on a pin scrolls to its card again
@@ -114,7 +116,9 @@
     const chosen = useRef({ id: null, type: null });   // the latest choice, so a second tap never reads a render's old one
     const narrow = X.useNarrow();
     const clean = !!(app.nav && app.nav.params && app.nav.params.view === 'map');
-    const pillTest = useMemo(() => (pill !== 'all' ? (m) => X.pillMatches(pill, m) : null), [X, pill]);
+    const pillTest = useMemo(() => (
+      (intent && X.intentOf(intent)) || (pill && pill !== 'all') ? (m) => X.matchesFilter(pill, intent, m) : null
+    ), [X, pill, intent]);
     // The panel's height goes straight onto the screen as a CSS variable (the map's controls and credit sit above it): no re-render.
     // The data is framed again as the panel grows, but never because the person lowered or raised it (the map would jump).
     const onExploreHeight = useCallback((px) => {
@@ -214,7 +218,9 @@
       !clean && React.createElement(X.Explore, {
         hidden: !!sheet,
         markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, reveal,
-        pill, onPill: setPill, ideas: showIdeas, onIdeas: () => setShowIdeas((v) => !v), min, onMin: lower,
+        pill, onPill: (id) => { setIntent(null); setPill(id); },
+        intent, onIntent: (id) => { setPill('all'); setIntent(id); },
+        ideas: showIdeas, onIdeas: () => setShowIdeas((v) => !v), min, onMin: lower,
         onOpen: tapCard, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
       }),
       // a chosen card tapped again opens the expanded sheet (#210: full, its cover and distance, swipe down back to the

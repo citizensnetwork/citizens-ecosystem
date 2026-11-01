@@ -22,10 +22,15 @@ type ExploreApi = {
   GROUP_OF: Record<string, string>;
   PILLS: { id: string; group?: boolean; icon?: string }[];
   groupOf: (m: unknown) => string;
+  INTENTS: { id: string; icon: string; categories: string[] }[];
+  intentOf: (id: string | null) => { id: string; categories: string[] } | null;
+  intentMatches: (id: string, m: unknown) => boolean;
+  matchesFilter: (pill: string | null, intent: string | null, m: unknown) => boolean;
   pillMatches: (pill: string, m: unknown) => boolean;
   rank: (origin: { lat: number; lng: number } | null, markers: Marker[], selectedId: string | null, cap?: number) => Ranked[];
   Pills: React.ComponentType<{ value: string; onChange: (id: string) => void; ideas: boolean; onIdeas: () => void }>;
   Categories: React.ComponentType<{ value: string; ideas: boolean; onPick: (id: string) => void; onIdeas: () => void }>;
+  Intents: React.ComponentType<{ value: string | null; onPick: (id: string) => void }>;
   Explore: React.ComponentType<Record<string, unknown>>;
 };
 type NavLib = {
@@ -97,6 +102,76 @@ describe("category groups (one muted colour per group, founder 2026-10-26)", () 
   it("has one short pill row in the agreed order, with words for each and for Ideas", () => {
     expect(X.PILLS.map((p) => p.id)).toEqual(["all", "worship", "events", "business", "serve", "culture", "learn", "audiences"]);
     for (const id of [...X.PILLS.map((p) => p.id), "ideas"]) expect(S.explore.groups[id], id).toBeTruthy();
+  });
+});
+
+describe("Where to… (C40): each intent is a saved set of existing categories", () => {
+  const MAP: Record<string, string[]> = {
+    coffee: ["hospitality-cafes"],
+    learn: ["education-equipping", "education-training"],
+    worship: ["worship-prayer", "church-services", "conferences-summits", "churches-ministries"],
+    run: ["sport-recreation", "recreation-sport"],
+    reset: ["retreat-healing", "safe-spaces"],
+    heal: ["health-wellness", "care-recovery", "clinic", "rehab-development"],
+    parent: ["marriage-family", "kids"],
+    chill: ["social-gatherings", "arts-culture", "arts-creative"],
+    shop: ["retail-shopping", "markets-expos"],
+    serve: ["outreach-missions", "community-upliftment"],
+  };
+  const wordsOf = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+  const intents = () => S.explore.intents as Record<string, string>;
+  const whereTo = (word: string) => (S.explore.whereTo as (w: string) => string)(word);
+  const emptyIntent = (word: string) => (S.explore.emptyIntent as (w: string) => string)(word);
+
+  it("maps the ten intents onto existing categories, with no category in two intents", () => {
+    expect(X.INTENTS.map((intent) => intent.id)).toEqual(Object.keys(MAP));
+    const seen = new Set<string>();
+    for (const intent of X.INTENTS) {
+      expect(intent.categories, intent.id).toEqual(MAP[intent.id]);
+      expect(intent.categories.length, intent.id).toBeGreaterThan(0);
+      for (const id of intent.categories) {
+        expect(X.GROUP_OF[id], intent.id + " " + id).toBeTruthy();
+        expect(seen.has(id), id).toBe(false);
+        seen.add(id);
+      }
+    }
+    // the spec's two examples, spelled out
+    expect(MAP.coffee).toEqual(["hospitality-cafes"]);
+    expect(MAP.heal).toEqual(expect.arrayContaining(["health-wellness", "care-recovery"]));
+    // serve is not the whole Serve & care group (heal and reset stay separate) and is not disabled
+    expect(MAP.serve).not.toEqual(expect.arrayContaining(["health-wellness", "retreat-healing"]));
+  });
+
+  it("filters a marker by its category, and an intent wins over a pill", () => {
+    const cafe = mk("cafe", 1, { type: "place", category: "hospitality-cafes" });
+    const church = mk("church", 1);
+    const clinic = mk("clinic", 1, { category: "clinic" });
+    const outreach = mk("out", 1, { type: "event", category: "outreach-missions" });
+    expect(X.intentMatches("coffee", cafe)).toBe(true);
+    expect(X.intentMatches("coffee", church)).toBe(false);
+    expect(X.intentMatches("heal", clinic)).toBe(true);
+    expect(X.intentMatches("heal", cafe)).toBe(false);
+    expect(X.intentMatches("serve", outreach)).toBe(true);
+    expect(X.intentMatches("serve", clinic)).toBe(false);
+    expect(X.intentMatches("nope", cafe)).toBe(false);
+    expect(X.intentMatches("coffee", null)).toBe(false);
+    expect(X.intentMatches("coffee", { category: "constructor" })).toBe(false);
+    expect(X.intentOf("coffee")!.categories).toEqual(["hospitality-cafes"]);
+    expect(X.intentOf("nope")).toBeNull();
+    expect(X.matchesFilter("worship", "coffee", cafe)).toBe(true);
+    expect(X.matchesFilter("worship", "coffee", church)).toBe(false);
+    expect(X.matchesFilter("worship", null, church)).toBe(true);
+    expect(X.matchesFilter("events", "nope", mk("ev", 1, { type: "event", category: "kids" }))).toBe(true);
+  });
+
+  it("names each intent in twelve words or fewer, including the empty line", () => {
+    for (const intent of X.INTENTS) {
+      const word = intents()[intent.id];
+      expect(word, intent.id).toBeTruthy();
+      expect(wordsOf(whereTo(word)), intent.id).toBeLessThanOrEqual(12);
+      expect(wordsOf(emptyIntent(word)), intent.id).toBeLessThanOrEqual(12);
+      expect(emptyIntent(word)).toBe("Nothing nearby for where to " + word + ".");
+    }
   });
 });
 
@@ -267,6 +342,52 @@ describe("Explore", () => {
     expect(document.activeElement).toBe(sw);
   });
 
+  it("opens Where to… from the list, filters by that intent, and says so when nothing is near", () => {
+    const onIntent = vi.fn();
+    const onPill = vi.fn();
+    const word = (id: string) => (S.explore.intents as Record<string, string>)[id];
+    const whereTo = (id: string) => (S.explore.whereTo as (w: string) => string)(word(id));
+    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, pill: "all", intent: null, onPill, onIntent, onIdeas: vi.fn(), onOpen: vi.fn(), onSeeAll: vi.fn() }));
+    const sw = screen.getByRole("button", { name: S.explore.title as string });
+    fireEvent.click(sw);
+    const tabs = screen.getByRole("tablist", { name: S.explore.listLabel as string });
+    expect(tabs).toBeTruthy();
+    expect(screen.getByRole("tab", { name: S.explore.categoriesTab as string }).getAttribute("aria-selected")).toBe("true");
+    // the category rows are unchanged until the person asks for intents
+    expect(screen.getByRole("list", { name: S.explore.categoriesLabel as string }).querySelectorAll("[data-mv2='cat']").length).toBe(9);
+    fireEvent.click(screen.getByRole("tab", { name: S.explore.intentsTab as string }));
+    const intents = screen.getByRole("list", { name: S.explore.intentsLabel as string });
+    const rows = [...intents.querySelectorAll("[data-mv2='intent']")];
+    expect(rows.map((r) => r.getAttribute("data-intent-id"))).toEqual(X.INTENTS.map((intent) => intent.id));
+    expect(screen.queryByRole("list", { name: S.explore.categoriesLabel as string })).toBeNull();
+    const serve = rows.find((r) => r.getAttribute("data-intent-id") === "serve")!;
+    expect(serve.hasAttribute("disabled")).toBe(false);
+    expect(serve.textContent).toBe(whereTo("serve"));
+    fireEvent.keyDown(tabs, { key: "ArrowLeft" });
+    expect(screen.getByRole("list", { name: S.explore.categoriesLabel as string })).toBeTruthy();
+    fireEvent.keyDown(tabs, { key: "End" });
+    fireEvent.click(screen.getByRole("button", { name: whereTo("coffee") }));
+    expect(onIntent).toHaveBeenCalledWith("coffee");
+    expect(onPill).not.toHaveBeenCalled();
+    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cards");
+    expect(document.activeElement).toBe(sw);
+  });
+
+  it("reopens on Where to… when an intent is filtering, with that row checked, and is honest when the row is empty", () => {
+    const word = (S.explore.intents as Record<string, string>).parent;
+    render(React.createElement(X.Explore, {
+      markers: [], sources, apiRef, selectedId: null, pill: "all", intent: "parent",
+      onPill: vi.fn(), onIntent: vi.fn(), onIdeas: vi.fn(), onOpen: vi.fn(), onSeeAll: vi.fn(),
+    }));
+    expect(document.querySelector("[data-mv2='explore-filter']")!.textContent).toBe((S.explore.whereTo as (w: string) => string)(word));
+    expect(screen.getByText((S.explore.emptyIntent as (w: string) => string)(word))).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: S.explore.title as string }));
+    expect(screen.getByRole("tab", { name: S.explore.intentsTab as string }).getAttribute("aria-selected")).toBe("true");
+    const parent = document.querySelector("[data-intent-id='parent']")!;
+    expect(parent.getAttribute("aria-pressed")).toBe("true");
+    expect(parent.querySelector("[data-icon='Check']")).toBeTruthy();
+  });
+
   it("goes back from the list on Escape, and the view that is not shown cannot be reached", () => {
     render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, pill: "all", onPill: vi.fn(), onIdeas: vi.fn(), onOpen: vi.fn(), onSeeAll: vi.fn() }));
     const views = () => [...document.querySelectorAll("[data-mv2='explore-view']")].map((v) => [v.getAttribute("data-view"), v.hasAttribute("inert")]);
@@ -412,9 +533,12 @@ describe("the stylesheet and the wiring", () => {
   it("keeps every nav, pill and Explore control at least a thumb's size", () => {
     // every regex character of the selector is escaped (brackets alone is an incomplete escape: CodeQL js/incomplete-sanitization)
     const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    for (const sel of ["[data-mv2='pill']", "[data-mv2='home-search']", "[data-mv2='cat']"]) {
+    for (const sel of ["[data-mv2='pill']", "[data-mv2='home-search']"]) {
       expect(css).toMatch(new RegExp(escapeRe(sel) + " \\{[^}]*min-height: var\\(--hit\\)"));
     }
+    // the category row and the Where to… row share one rule; the list's own tabs are their own
+    expect(css).toMatch(/\[data-mv2='cat'\],\s*\[data-mv2='intent'\] \{[^}]*min-height: var\(--hit\)/);
+    expect(css).toMatch(/\[data-mv2='intent-tab'\] \{[^}]*min-height: var\(--hit\)/);
     // the panel's title line is 36 px (founder, 2026-10-30: more map); each of its two buttons reaches 4 px past its text
     // above and below (the ::after), so a thumb still has 44 px to land on
     expect(light).toMatch(/--explore-head-h: 36px;/);
@@ -448,14 +572,18 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261031a"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261101b"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261101a");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261101b");
+    const home = read("src/frontend/app/home.jsx");
+    expect(home).toContain("X.matchesFilter(pill, intent, m)");
+    expect(home).toContain("onIntent: (id) => { setPill('all'); setIntent(id); }");
+    expect(home).toContain("onPill: (id) => { setIntent(null); setPill(id); }");
   });
 
   it("the folding nav is the only nav: no bottom bar is left in the shell", () => {
