@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { withSitePrefix } from "@/lib/siteUrl";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -15,8 +16,9 @@ export async function GET(request: Request) {
   }
   const next = safeNextPath(rawNext);
 
-  // Use NEXT_PUBLIC_SITE_URL if set (safe, server-configured), otherwise origin
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || origin;
+  // Use NEXT_PUBLIC_SITE_URL if set (safe, server-configured), otherwise origin, plus the app's path prefix
+  // when it is served under one (NEXT_PUBLIC_BASE_PATH; "" today).
+  const siteUrl = withSitePrefix(process.env.NEXT_PUBLIC_SITE_URL || origin);
 
   if (code) {
     const supabase = await createClient();

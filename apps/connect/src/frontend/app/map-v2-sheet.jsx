@@ -843,7 +843,7 @@
       h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
       // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost)
       qr && qrOk && ReactDOM.createPortal(h(window.MapV2QR.Dialog, {
-        url: window.MapV2QR.PUBLIC_ORIGIN + '/c/' + item.slug, name, slug: item.slug, strings: Str.qr, returnFocus: qr.from, onClose: () => setQr(null),
+        url: window.MapV2QR.PUBLIC_ORIGIN + (window.CC_ROUTES ? window.CC_ROUTES.appUrl('/c/' + item.slug) : '/c/' + item.slug), name, slug: item.slug, strings: Str.qr, returnFocus: qr.from, onClose: () => setQr(null),
       }), document.body),
       // rendered into <body>: a position:fixed box inside the sheet would be fixed to the sheet's own transform
       viewer && images[viewer.index] && ReactDOM.createPortal(h(window.MapV2Gallery.Viewer, {

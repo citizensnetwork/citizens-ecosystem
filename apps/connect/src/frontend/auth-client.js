@@ -104,17 +104,20 @@
   // scheme, so Supabase treats it as a relative path on its own domain and the
   // redirect lands on supabase.co/<hostname>?code=…  which 404s.
   //
-  // ALWAYS the site root, never the current path. Every screen has its own URL
+  // ALWAYS the app's root, never the current path. Every screen has its own URL
   // now (/e/<id>, /dashboard/events, ...), and Supabase only returns to a URL on
   // its Redirect URLs allow-list (anything else silently falls back to the Site
   // URL). One fixed, allow-listed target is predictable and cannot be steered by
   // a crafted link. The screen the person was on is kept by the app instead:
   // store.jsx stashes a validated same-origin path in sessionStorage before
   // leaving and restores it after sign-in (routes.jsx safeReturnPath).
+  // "The app's root" is the site root today, and origin + BASE_PATH + "/" once the
+  // app is served under a prefix (config.js has BASE_PATH only then; C39). That
+  // URL has to be on Supabase's allow-list too (https://<domain>/citizens/connect/**).
   function webRedirectUrl() {
     var origin = env.FRONTEND_ORIGIN || window.location.origin;
     if (origin && !/^https?:\/\//i.test(origin)) { origin = "https://" + origin; }
-    return origin + "/";
+    return origin + (typeof env.BASE_PATH === "string" ? env.BASE_PATH : "") + "/";
   }
 
   // Sign in / sign up with Google (OAuth — same call for both).

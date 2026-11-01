@@ -99,6 +99,8 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
   const now = new Date();
+  // A bare ORIGIN on purpose: it is only the Referer for MapTiler's origin-restricted key (publishEvent), not a link
+  // to a page, so it carries no path prefix (C39).
   const origin = (process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin).replace(/\/+$/, "");
 
   const eligibility = new Map<string, Eligibility>();

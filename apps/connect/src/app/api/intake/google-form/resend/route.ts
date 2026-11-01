@@ -12,7 +12,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normaliseEmail } from "@/lib/contributorFields";
-import { sendEmail, siteOrigin } from "@/lib/email/send";
+import { sendEmail } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { isValidUUID } from "@/lib/validation";
 import { readSignedIntake } from "@/lib/intake/signedIntake";
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
 
   const email = await sendEmail({
     to,
-    ...upgradeEmail({ name: row.display_name, origin: siteOrigin(request), rawToken: token.raw, expiresAt: row.expires_at }),
+    ...upgradeEmail({ name: row.display_name, origin: siteBase(request), rawToken: token.raw, expiresAt: row.expires_at }),
   });
   if (email !== "sent") {
     return NextResponse.json(
