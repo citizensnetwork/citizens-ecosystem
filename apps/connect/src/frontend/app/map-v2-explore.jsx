@@ -15,11 +15,12 @@
 //  chosen, the map eases to its pin, and the SECOND tap on the chosen card opens the full listing (home.jsx).
 //  The panel also holds the category choice (founder, 2026-10-30): its title is a switch between the cards and a
 //  compact list of the groups, and a handle lowers it to a title strip so the map's own buttons come back.
+//  That list has a second view, "Where to…" (C40): the same rows, each a saved set of existing categories.
 //  The home screen shows the panel OR the full listing, never both. The row ranks again only when the map settles (moveend),
 //  never per frame, and holds its own state, so a pan never re-renders the map screen. "See all" opens the
 //  Discover page (map-v2-discover.jsx), which draws the SAME card (cardFor) and measures from lastView().
 //
-//  Pure helpers (groupOf, pillMatches, rank, PILLS) are unit-tested in mapV2Explore.test.tsx.
+//  Pure helpers (groupOf, pillMatches, intentMatches, matchesFilter, rank, PILLS, INTENTS) are unit-tested in mapV2Explore.test.tsx.
 //  Styles: assets/map-v2.css sections 4j and 4k (tokens only). Text: MapV2Strings.explore.
 // ════════════════════════════════════════════════════════════════════
 (function () {
@@ -71,6 +72,51 @@
     if (!m) return false;
     if (pill === 'events') return m.type === 'event';
     return groupOf(m) === pill;
+  }
+
+  // "Where to…" (C40): each intent is a saved set of category ids that already belong to a group. No new data.
+  // Serve is outreach and community upliftment until C46 (needs and ways to serve need a migration). It is not
+  // the whole Serve & care group: heal and reset keep their own rows.
+  const INTENTS = [
+    { id: 'coffee', icon: 'Coffee', categories: ['hospitality-cafes'] },
+    { id: 'learn', icon: 'BookOpen', categories: ['education-equipping', 'education-training'] },
+    { id: 'worship', icon: 'Church', categories: ['worship-prayer', 'church-services', 'conferences-summits', 'churches-ministries'] },
+    { id: 'run', icon: 'Footprints', categories: ['sport-recreation', 'recreation-sport'] },
+    { id: 'reset', icon: 'Leaf', categories: ['retreat-healing', 'safe-spaces'] },
+    { id: 'heal', icon: 'HeartPulse', categories: ['health-wellness', 'care-recovery', 'clinic', 'rehab-development'] },
+    { id: 'parent', icon: 'Users', categories: ['marriage-family', 'kids'] },
+    { id: 'chill', icon: 'Smile', categories: ['social-gatherings', 'arts-culture', 'arts-creative'] },
+    { id: 'shop', icon: 'ShoppingBag', categories: ['retail-shopping', 'markets-expos'] },
+    { id: 'serve', icon: 'HandHeart', categories: ['outreach-missions', 'community-upliftment'] },
+  ];
+  // id -> null-prototype set, so a category named "constructor" can never match by accident.
+  const INTENT_SETS = Object.create(null);
+  INTENTS.forEach((intent) => {
+    const set = Object.create(null);
+    intent.categories.forEach((id) => { set[id] = true; });
+    INTENT_SETS[intent.id] = set;
+  });
+
+  /** The intent with this id, or null. */
+  function intentOf(id) {
+    for (let i = 0; i < INTENTS.length; i++) if (INTENTS[i].id === id) return INTENTS[i];
+    return null;
+  }
+
+  /** Does a marker's category belong to this intent? Unknown intents and missing categories do not. */
+  function intentMatches(id, m) {
+    const set = id && Object.prototype.hasOwnProperty.call(INTENT_SETS, id) ? INTENT_SETS[id] : null;
+    if (!set || !m || typeof m.category !== 'string') return false;
+    return Object.prototype.hasOwnProperty.call(set, m.category) && set[m.category] === true;
+  }
+
+  /**
+   * What a card or a pin must pass. An intent wins over the pill (the two are never on together; this is the guard).
+   * With neither, everything passes.
+   */
+  function matchesFilter(pill, intent, m) {
+    if (intentOf(intent)) return intentMatches(intent, m);
+    return pillMatches(pill, m);
   }
 
   /**
@@ -194,10 +240,35 @@
   }
 
   /**
+   * "Where to…" (C40): the same compact rows as the category list, one per saved intent. Choosing one filters to
+   * that intent's categories and leaves the list. A check says which one is on (never the icon colour alone).
+   * Serve stays a normal row: C46 is not built, so it filters to outreach and community upliftment.
+   * props: value (intent id, or null), onPick(id)
+   */
+  function Intents(props) {
+    const words = S().intents || {};
+    const labelOf = S().whereTo;
+    const Icon = window.Icon;
+    return h('ul', { 'data-mv2': 'cats', 'data-list': 'intents', role: 'list', 'aria-label': S().intentsLabel },
+      INTENTS.map((intent) => {
+        const on = props.value === intent.id;
+        const word = words[intent.id] || intent.id;
+        return h('li', { key: intent.id },
+          h('button', {
+            type: 'button', 'data-mv2': 'intent', 'data-intent-id': intent.id,
+            'aria-pressed': on ? 'true' : 'false', onClick: () => props.onPick(intent.id),
+          },
+            Icon ? h(Icon, { name: intent.icon, size: 16 }) : null,
+            h('span', { 'data-mv2': 'cat-name' }, labelOf ? labelOf(word) : word),
+            on && Icon ? h(Icon, { name: 'Check', size: 16 }) : null));
+      }));
+  }
+
+  /**
    * The Explore panel. props: markers (what the map draws), sources ({ events, places, contributors }),
    * apiRef (the map's), selectedId (the chosen listing), reveal ({ id, focus }: a PIN was tapped, so bring its card into
    * view; a card tap sends none, and the row stays exactly where it is), hidden (the full listing is open),
-   * pill + onPill(id) + ideas + onIdeas() (the category choice, which lives in this panel), min + onMin(bool) (the panel
+   * pill + onPill(id) + intent + onIntent(id) + ideas + onIdeas() (the category choice, which lives in this panel), min + onMin(bool) (the panel
    * is lowered to its title strip, so the map's own buttons come back), onOpen(id, type) (a card was tapped),
    * onSeeAll(), onHeight(px).
    *
@@ -208,6 +279,7 @@
     const api = props.apiRef;
     const [view, setView] = useState(() => (api && api.current ? api.current.view() : { centre: null, user: null }));
     const [mode, setMode] = useState('cards');      // 'cards' | 'cats' (the category list)
+    const [list, setList] = useState('groups');    // inside the list: 'groups' | 'intents' ("Where to…")
     const root = useRef(null);
     const switchBtn = useRef(null);
     const views = useRef({});
@@ -330,7 +402,20 @@
 
     const toggleMode = () => {
       if (props.min) { props.onMin(false); return; }
-      setMode((m) => (m === 'cats' ? 'cards' : 'cats'));
+      if (mode === 'cats') { setMode('cards'); return; }
+      // Open on the view that matches what is already filtering the cards.
+      setList(props.intent ? 'intents' : 'groups');
+      setMode('cats');
+    };
+    // The two tabs. Arrow keys move between them and do not wrap; Home and End jump to the ends.
+    const onListKey = (e) => {
+      const key = e.key;
+      if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return;
+      e.preventDefault();
+      const id = (key === 'ArrowRight' || key === 'End') ? 'intents' : 'groups';
+      setList(id);
+      const btn = e.currentTarget.querySelector("[data-list='" + id + "']");
+      if (btn && btn.focus) btn.focus();
     };
     const backToCards = () => {
       setMode('cards');
@@ -339,12 +424,15 @@
     const onKeyDown = (e) => { if (e.key === 'Escape' && mode === 'cats') { e.stopPropagation(); backToCards(); } };
 
     const words = str.groups || {};
+    const intentWord = props.intent && str.intents ? str.intents[props.intent] : '';
     const filter = [];
-    if (props.pill && props.pill !== 'all') filter.push(words[props.pill]);
+    if (intentWord && str.whereTo) filter.push(str.whereTo(intentWord));
+    else if (props.pill && props.pill !== 'all') filter.push(words[props.pill]);
     if (props.ideas) filter.push(words.ideas);
     const picked = rows.find((r) => r.m.id === props.selectedId);
     const cats = mode === 'cats';
 
+    const emptyLine = intentWord && str.emptyIntent ? str.emptyIntent(intentWord) : str.empty;
     const cards = rows.length && Row && Card
       ? h(Row, {
         // Keyed by SLOT, not by listing: a new ranking (the map moved, a pill changed) refills the same card boxes in
@@ -352,7 +440,7 @@
         items: rows, keyOf: (r, i) => 'slot' + i, idPrefix: 'mv2-explore', render: render,
         strings: { label: view.user ? str.label : str.labelCentre },
       })
-      : h('p', { 'data-mv2': 'explore-empty' }, str.empty);
+      : h('p', { 'data-mv2': 'explore-empty' }, emptyLine);
 
     return h('section', {
       ref: root, 'data-mv2': 'explore', 'data-mode': mode, 'data-min': props.min ? '' : undefined,
@@ -375,8 +463,24 @@
       // both views share one box, so the panel is as tall for the list as for the cards (nothing above the map moves)
       h('div', { id: 'mv2-explore-body', 'data-mv2': 'explore-body' },
         h('div', { ref: (el) => { views.current.cards = el; }, 'data-mv2': 'explore-view', 'data-view': 'cards', 'aria-hidden': cats ? 'true' : undefined }, cards),
-        h('div', { ref: (el) => { views.current.cats = el; }, 'data-mv2': 'explore-view', 'data-view': 'cats', inert: '', 'aria-hidden': cats ? undefined : 'true' },
-          h(Categories, { value: props.pill, ideas: props.ideas, onPick: (id) => { props.onPill(id); backToCards(); }, onIdeas: props.onIdeas }))),
+        h('div', { ref: (el) => { views.current.cats = el; }, 'data-mv2': 'explore-view', 'data-view': 'cats', 'data-list': list, inert: '', 'aria-hidden': cats ? undefined : 'true' },
+          h('div', { 'data-mv2': 'list-switch', role: 'tablist', 'aria-label': str.listLabel, onKeyDown: onListKey },
+            h('button', {
+              type: 'button', role: 'tab', id: 'mv2-tab-groups', 'data-mv2': 'intent-tab', 'data-list': 'groups',
+              'aria-selected': list === 'groups' ? 'true' : 'false', 'aria-controls': 'mv2-explore-list',
+              onClick: () => setList('groups'),
+            }, str.categoriesTab),
+            h('button', {
+              type: 'button', role: 'tab', id: 'mv2-tab-intents', 'data-mv2': 'intent-tab', 'data-list': 'intents',
+              'aria-selected': list === 'intents' ? 'true' : 'false', 'aria-controls': 'mv2-explore-list',
+              onClick: () => setList('intents'),
+            }, str.intentsTab)),
+          h('div', {
+            role: 'tabpanel', id: 'mv2-explore-list',
+            'aria-labelledby': list === 'intents' ? 'mv2-tab-intents' : 'mv2-tab-groups',
+          }, list === 'intents'
+            ? h(Intents, { value: props.intent || null, onPick: (id) => { if (props.onIntent) props.onIntent(id); backToCards(); } })
+            : h(Categories, { value: props.pill, ideas: props.ideas, onPick: (id) => { props.onPill(id); backToCards(); }, onIdeas: props.onIdeas })))),
       h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, picked ? str.selectedAnnounce(picked.m.title) : ''));
   }
 
@@ -390,7 +494,7 @@
   const useNarrow = () => useMedia(NARROW_MQ);
 
   window.MapV2Explore = {
-    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, groupOf, pillMatches, rank, useNarrow, indexSources, cardFor, Pills, Categories, Explore,
+    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore,
     lastView: () => lastView,
   };
 })();
