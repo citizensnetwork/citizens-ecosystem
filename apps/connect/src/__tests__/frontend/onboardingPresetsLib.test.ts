@@ -16,10 +16,13 @@ type Preset = { id?: string; label: string; kind: string; extraReview: boolean }
 type Api = {
   PRESETS: Record<string, Preset>;
   CATEGORY_PRESET: Record<string, string>;
+  START_KIND: string;
   presetFor: (c: unknown) => Preset | null;
   defaultKindFor: (c: unknown) => string | null;
+  autoKindFor: (c: unknown) => string;
   needsExtraReview: (c: unknown) => boolean;
   keepsOffMap: (f: unknown) => boolean;
+  mapRowFor: (f: unknown, hasPin: boolean) => string;
   COPY: Record<string, unknown>;
 };
 
@@ -91,5 +94,55 @@ describe("the helpers the wizard calls", () => {
     expect(api.keepsOffMap({ category: "clinic", showOnMap: true })).toBe(false);
     expect(api.keepsOffMap({ category: "churches-ministries", showOnMap: false })).toBe(false);
     expect(api.keepsOffMap(null)).toBe(false);
+  });
+});
+
+// The design spec posted on #202 (2026-11-01): the Type follows the category, the review says one true thing, the copy
+// promises only what is built.
+describe("design spec on #202: the Type follows the category until the person picks one", () => {
+  it("is the preset's default Type, or the starting Type when the category names no preset", () => {
+    expect(api.START_KIND).toBe("ministry");
+    expect(api.autoKindFor("christian-businesses")).toBe("business");
+    expect(api.autoKindFor("clinic")).toBe("organization");
+    // Business, then Market / Expo (no preset): back to the starting Type, not left on Business.
+    expect(api.autoKindFor("markets-expos")).toBe(api.START_KIND);
+    for (const c of ["", null, undefined, "constructor", "__proto__"]) expect(api.autoKindFor(c), String(c)).toBe(api.START_KIND);
+  });
+});
+
+describe("design spec on #202: the review row 'On the map'", () => {
+  const clinic = { category: "clinic" };
+
+  it("says Yes only when the switch is on AND there is a pin", () => {
+    expect(api.mapRowFor({ ...clinic, showOnMap: true }, true)).toBe(api.COPY.reviewMapOn);
+    expect(api.mapRowFor({ ...clinic, showOnMap: true }, false)).toBe(api.COPY.reviewMapNoPin);
+    expect(api.COPY.reviewMapOn).toBe("Yes");
+    expect(api.COPY.reviewMapNoPin).toBe("No");
+  });
+
+  it("with the map off says what is true: no address or pin is stored, whatever hasPin says", () => {
+    expect(api.mapRowFor({ ...clinic, showOnMap: false }, false)).toBe("No. We store no address or pin.");
+    expect(api.mapRowFor(clinic, true)).toBe(api.COPY.reviewMapOff);
+  });
+});
+
+describe("design spec on #202: the copy promises only what is built", () => {
+  it("the Care note does not offer per-item public choice (not built), and says nothing is public before approval", () => {
+    expect(api.COPY.careNote).toBe(
+      "Care and recovery services get an extra look from an admin before anything is public. Nothing of yours is public until they approve it.",
+    );
+    expect(api.COPY.careNote).not.toMatch(/up to you|afterwards/i);
+  });
+
+  it("never calls the listing private (it is public in Kingdom Discovery; only the address and pin are withheld)", () => {
+    for (const key of ["reviewMapOff", "reviewMapNoPin", "reviewNotOnMap"]) expect(String(api.COPY[key]), key).not.toMatch(/private/i);
+    expect(api.COPY.reviewNotOnMap).toBe("Not on the map");
+  });
+
+  it("the admin note is a sentence-case heading plus what to read, and does not name the founder", () => {
+    expect(api.COPY.adminHeading).toBe("Extra review: care or recovery");
+    expect(api.COPY.adminHeading).not.toBe(String(api.COPY.adminHeading).toUpperCase());
+    expect(api.COPY.adminCheck).toBe("Read the story, the website and their reason before you approve. Approve only when you are satisfied.");
+    expect(JSON.stringify(api.COPY)).not.toMatch(/founder/i);
   });
 });

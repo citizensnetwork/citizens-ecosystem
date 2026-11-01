@@ -10,8 +10,8 @@
 //    * Nothing is public before an admin approves, and the discovery routine never auto-publishes for them.
 //  The server is the wall (the apply route and the automation routes enforce the same rules); this file only explains them.
 //
-//  Public surface: window.CCPresets = { PRESETS, CATEGORY_PRESET, presetFor, defaultKindFor, needsExtraReview,
-//  keepsOffMap, COPY }.
+//  Public surface: window.CCPresets = { PRESETS, CATEGORY_PRESET, START_KIND, presetFor, defaultKindFor, autoKindFor,
+//  needsExtraReview, keepsOffMap, mapRowFor, COPY }.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const PRESETS = {
@@ -36,15 +36,21 @@
     'education-equipping': 'education',
   };
 
+  // The Type the wizard starts on, and falls back to when a category names no preset (design spec on #202, change 5).
+  const START_KIND = 'ministry';
+
   const COPY = {
     mapToggleLabel: 'Show my address and pin on the map',
     mapToggleDesc: 'Off by default. Your listing is still found in Kingdom Discovery without it.',
-    careNote: 'Care and recovery services get an extra look from an admin before anything is public. Nothing of yours is public until they approve it, and what you add afterwards is up to you.',
+    // Says only what is built. Restore "and what you add afterwards is up to you" when per-item public choice ships.
+    careNote: 'Care and recovery services get an extra look from an admin before anything is public. Nothing of yours is public until they approve it.',
     reviewMapOn: 'Yes',
-    reviewMapOff: 'No, kept private',
+    reviewMapNoPin: 'No',
+    reviewMapOff: 'No. We store no address or pin.',
+    reviewNotOnMap: 'Not on the map',
     reviewCareNote: 'Because yours is a care or recovery service, an admin takes a closer look before anything is public.',
-    adminBadge: 'CARE / RECOVERY · EXTRA REVIEW',
-    adminCheck: 'Care / Recovery: the founder asked for extra care here. Read the story and the website first, and approve only when you are satisfied.',
+    adminHeading: 'Extra review: care or recovery',
+    adminCheck: 'Read the story, the website and their reason before you approve. Approve only when you are satisfied.',
     kindMatched: (label) => ' We matched your Type to ' + label + '; change it above if that is not right.',
   };
 
@@ -57,6 +63,10 @@
   const needsExtraReview = (category) => { const p = presetFor(category); return !!(p && p.extraReview); };
   /** True while an extra-review applicant has not opted in to the map: no address, no pin, none requested. */
   const keepsOffMap = (form) => !!form && needsExtraReview(form.category) && form.showOnMap !== true;
+  /** The Type the wizard shows until the person picks one: the preset's default, else the starting Type. */
+  const autoKindFor = (category) => defaultKindFor(category) || START_KIND;
+  /** What the review row "On the map" says for an extra-review applicant. Yes only with the map switch on AND a pin. */
+  const mapRowFor = (form, hasPin) => (keepsOffMap(form) ? COPY.reviewMapOff : hasPin ? COPY.reviewMapOn : COPY.reviewMapNoPin);
 
-  window.CCPresets = { PRESETS, CATEGORY_PRESET, presetFor, defaultKindFor, needsExtraReview, keepsOffMap, COPY };
+  window.CCPresets = { PRESETS, CATEGORY_PRESET, START_KIND, presetFor, defaultKindFor, autoKindFor, needsExtraReview, keepsOffMap, mapRowFor, COPY };
 })();
