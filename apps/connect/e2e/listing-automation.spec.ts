@@ -769,7 +769,7 @@ test.describe("Suggestions tab: editing before publishing", () => {
     await expect(c.getByRole("alert")).toHaveCount(0);
   });
 
-  test("if saving is not switched on yet (migration 198 not applied), the card says so, stops offering Save, and Publish still works", async ({ page }) => {
+  test("if saving is not switched on yet (migration 199 not applied), the card says so, stops offering Save, and Publish still works", async ({ page }) => {
     const db = seed({ editRefusal: "edit_unavailable" });
     await openOwner(page, db);
     const c = card(page, "event");

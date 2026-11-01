@@ -1,8 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════
---  Rollback-only probe for migration 198 (edit_listing_suggestion). Run AFTER the apply, in the SQL editor.
+--  Rollback-only probe for migration 199 (edit_listing_suggestion). Run AFTER the apply, in the SQL editor.
 --  Synthetic users only. Ends with RAISE EXCEPTION so NOTHING persists.
 --  The error text is one PASS or FAIL per line. Nothing here names a real person.
---  NOT a live apply. Do not run this against production until migration 198 is applied.
+--  NOT a live apply. Do not run this against production until migration 199 is applied.
 --
 --  It checks: anon cannot execute; a stranger, a viewer and a pending editor get not_found; the owner and an
 --  active editor can change the payload of a PENDING suggestion; ONLY the payload changes (the fingerprint, kind,
@@ -26,13 +26,13 @@ declare
   n int;
 begin
   insert into auth.users (id, email) values
-    (owner, 'probe198-owner@probe.example'),
-    (editor, 'probe198-editor@probe.example'),
-    (viewer, 'probe198-viewer@probe.example'),
-    (waiting, 'probe198-waiting@probe.example'),
-    (stranger, 'probe198-stranger@probe.example');
+    (owner, 'probe199-owner@probe.example'),
+    (editor, 'probe199-editor@probe.example'),
+    (viewer, 'probe199-viewer@probe.example'),
+    (waiting, 'probe199-waiting@probe.example'),
+    (stranger, 'probe199-stranger@probe.example');
 
-  update public.profiles set role = 'contributor', contributor_status = 'approved', contributor_hidden = false, contributor_slug = 'probe198-owner' where id = owner;
+  update public.profiles set role = 'contributor', contributor_status = 'approved', contributor_hidden = false, contributor_slug = 'probe199-owner' where id = owner;
   update public.profiles set role = 'citizen', contributor_status = 'not_applied' where id in (editor, viewer, waiting, stranger);
 
   insert into public.team_memberships (contributor_id, member_id, role, status, invited_by) values

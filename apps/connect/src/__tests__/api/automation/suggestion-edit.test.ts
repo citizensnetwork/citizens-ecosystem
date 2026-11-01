@@ -47,7 +47,7 @@ const req = (body: unknown, id = SUG, raw?: string) =>
     { params: Promise.resolve({ id }) },
   );
 
-/** What mig 198's edit_listing_suggestion promises, so the route is exercised against the same contract. */
+/** What mig 199's edit_listing_suggestion promises, so the route is exercised against the same contract. */
 function databaseFunction(_name: string, args: { _id: string; _payload: Row }) {
   const row = state.listing_suggestions.find((r) => r.id === args._id);
   if (!row || row.contributor_id !== caller?.id) return { data: { success: false, reason: "not_found" }, error: null };
@@ -191,7 +191,7 @@ describe("PATCH /api/automation/suggestions/[id]: only a waiting suggestion", ()
   });
 });
 
-describe("PATCH /api/automation/suggestions/[id]: before migration 198 is applied", () => {
+describe("PATCH /api/automation/suggestions/[id]: before migration 199 is applied", () => {
   it("answers 503 edit_unavailable, stores nothing, and touches nothing else", async () => {
     rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "Could not find the function public.edit_listing_suggestion" } });
     const res = await req({ edits: { title: "Changed" } });

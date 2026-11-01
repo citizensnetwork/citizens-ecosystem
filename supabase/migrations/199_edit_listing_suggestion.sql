@@ -1,12 +1,12 @@
 -- ════════════════════════════════════════════════════════════════════
---  198_edit_listing_suggestion: let the owner (or an active editor) change the text of a
+--  199_edit_listing_suggestion: let the owner (or an active editor) change the text of a
 --  listing suggestion that is still waiting, without publishing it.
 --
 --  NOT APPLIED. This file is a PROPOSAL in a draft pull request. It is applied only on the
 --  founder's yes in chat naming this file, with a pre-apply git tag pushed first and the
---  security advisor checked afterwards (0 ERROR, no unexpected new finding). Number 198 is
---  the next free one after live head 197 (checked 2026-10-25); take the next free number
---  from a fresh `list_migrations` at apply time.
+--  security advisor checked afterwards (0 ERROR, no unexpected new finding). Number 199 is
+--  free between 198 (intake upgrade) and 200 (lock anon security-definer execute); take the
+--  next free number from a fresh `list_migrations` at apply time.
 --
 --  WHY. Since migration 181 the owner can only READ a suggestion (listing_suggestions has a
 --  SELECT grant and nothing else), and every decision goes through decide_listing_suggestion().
@@ -105,6 +105,6 @@ revoke all on function public.edit_listing_suggestion(uuid, jsonb) from public, 
 grant execute on function public.edit_listing_suggestion(uuid, jsonb) to authenticated;
 
 comment on function public.edit_listing_suggestion(uuid, jsonb) is
-  'Mig 198: the owner, or an active editor of that listing, replaces the payload of a PENDING listing suggestion. Changes only payload (the fingerprint stays the source item''s identity, so the Reader still sees it as already known). Content rules live in lib/automation/suggestions.ts and are applied by PATCH /api/automation/suggestions/[id] before this is called. A stranger gets not_found. Authenticated EXECUTE is by design.';
+  'Mig 199: the owner, or an active editor of that listing, replaces the payload of a PENDING listing suggestion. Changes only payload (the fingerprint stays the source item''s identity, so the Reader still sees it as already known). Content rules live in lib/automation/suggestions.ts and are applied by PATCH /api/automation/suggestions/[id] before this is called. A stranger gets not_found. Authenticated EXECUTE is by design.';
 
 commit;

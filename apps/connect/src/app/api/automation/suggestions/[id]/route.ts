@@ -11,14 +11,14 @@
  *   3. only a pending suggestion can change                                    -> 409 not_pending
  *   4. the edit is laid over the stored payload and checked by the SAME rules as a suggestion from
  *      the Reader (`validateSuggestionEdit` -> `validateSuggestion`)            -> 422 <reason>
- *   5. the write is `edit_listing_suggestion()` (mig 198), a SECURITY DEFINER function that re-checks
+ *   5. the write is `edit_listing_suggestion()` (mig 199), a SECURITY DEFINER function that re-checks
  *      owner-or-editor and pending, and changes ONLY `payload`. There is no service-role client here.
  *
  * The row's fingerprint is never touched (the database function cannot touch it): it stays the
  * identity of the source item, so the next Reader run still sees that item as already known.
  *
  * Response: `{ ok: true, payload, warnings }` with the payload exactly as stored (cleaned), or
- * `{ error: reason }`. If mig 198 is not applied yet the function does not exist and this answers
+ * `{ error: reason }`. If mig 199 is not applied yet the function does not exist and this answers
  * 503 `edit_unavailable`; nothing else is affected.
  */
 

@@ -1,7 +1,7 @@
 // @vitest-environment node
 /**
- * Mig 198 (edit a waiting listing suggestion): the static twin of its rollback-only probe
- * (docs/audit/probes/198_edit_listing_suggestion.probe.sql). A real database cannot run in CI, so this
+ * Mig 199 (edit a waiting listing suggestion): the static twin of its rollback-only probe
+ * (docs/audit/probes/199_edit_listing_suggestion.probe.sql). A real database cannot run in CI, so this
  * pins the promises the migration's own comments make: one SECURITY DEFINER function, hardened the way
  * migs 165/166/181/193 taught us, that changes ONLY the payload of a PENDING suggestion for its owner or
  * an active editor, and gives the table no new privilege.
@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const FILE = join(process.cwd(), "../..", "supabase/migrations/198_edit_listing_suggestion.sql");
+const FILE = join(process.cwd(), "../..", "supabase/migrations/199_edit_listing_suggestion.sql");
 
 /** The migration with `-- …` comments removed, so a word in a comment never satisfies a check. */
 const sql = readFileSync(FILE, "utf8").replace(/--[^\n]*/g, "");
@@ -23,7 +23,7 @@ const bodyStart = start!.index + open.index + tag.length;
 const header = sql.slice(start!.index, start!.index + open.index).replace(/\s+/g, " ").toLowerCase().trim();
 const body = sql.slice(bodyStart, sql.indexOf(tag, bodyStart)).replace(/\s+/g, " ").toLowerCase().trim();
 
-describe("mig 198: edit_listing_suggestion", () => {
+describe("mig 199: edit_listing_suggestion", () => {
   it("is one function, SECURITY DEFINER with an empty search_path, and CREATE OR REPLACE restates both", () => {
     expect(flat.match(/create or replace function/g)).toHaveLength(1);
     expect(header).toContain("(_id uuid, _payload jsonb)");
