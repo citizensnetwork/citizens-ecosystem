@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { gateV1 } from "@/lib/v1Gate";
 import { isValidUUID } from "@/lib/validation";
 import { attachCoHostIds } from "@/lib/events/cohosts";
+import { missingLetsColumn } from "@/lib/events/letsColumn";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export async function GET(
 
   const supabase = await createClient();
 
-  const { data: event, error } = await supabase
+  let { data: event, error } = await supabase
     .from("events")
     .select(
       [
@@ -65,12 +66,32 @@ export async function GET(
         "created_by",
         "created_at",
         "community_contributor",
+        "lets_starter",
       ].join(","),
     )
     .eq("id", id)
     .eq("status", "published")
     .eq("visibility", "public")
     .maybeSingle();
+
+  if (error && missingLetsColumn(error)) {
+    const retry = await supabase
+      .from("events")
+      .select(
+        [
+          "id", "title", "description", "date", "end_time", "location", "category", "image_url",
+          "website_url", "instagram_url", "facebook_url", "tiktok_url", "youtube_url", "x_url",
+          "linkedin_url", "whatsapp_url", "max_attendees", "latitude", "longitude", "created_by",
+          "created_at", "community_contributor",
+        ].join(","),
+      )
+      .eq("id", id)
+      .eq("status", "published")
+      .eq("visibility", "public")
+      .maybeSingle();
+    event = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     return NextResponse.json({ error: "Failed to fetch event" }, { status: 500 });

@@ -451,6 +451,8 @@ describe("the folding nav", () => {
     expect(N.currentOf({ page: "kingdom-discovery", params: {} })).toBe("explore");
     expect(N.currentOf({ page: "explore", params: {} })).toBe("explore"); // #210 part 3: the Discover page
     expect(N.currentOf({ page: "messages", params: {} })).toBe("profile");
+    expect(N.currentOf({ page: "lets", params: {} })).toBe("profile");
+    expect(N.currentOf({ page: "community", params: {} })).toBe("profile");
     expect(N.currentOf({ page: "profile", params: {} })).toBe("profile");
     expect(N.currentOf({ page: "profile", params: { id: "x" } })).toBe("");
     expect(N.currentOf({ page: "event", params: { id: "x" } })).toBe("");

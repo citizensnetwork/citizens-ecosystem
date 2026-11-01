@@ -3,8 +3,8 @@
 //  ------------------------------------------------------------------
 //  On a phone the navigation folds into ONE round frosted button with a gold ring, bottom centre. A tap
 //  opens the bar: Home (the map with the Explore row), Explore (the Discover page), Map (the same map,
-//  clean: no pills, no row) and Profile (the account menu, which also lists Projects, Messages and
-//  Alerts with their counts; founder, 2026-10-26). The open bar dims the map a little, and folds itself
+//  clean: no pills, no row) and Profile (the account menu, which also lists Let's, Messages and
+//  Alerts with their counts). Kingdom Projects stays at /community, linked from the Let's page. The open bar dims the map a little, and folds itself
 //  back after IDLE_MS without a touch, a click or a key, or on a tap outside, Escape or Back.
 //  The folded button shows a small dot (and says so in its name) when anything is unread.
 //
@@ -27,7 +27,7 @@
     { id: 'profile', icon: 'User' },
   ];
   // Screens that now live under Profile's menu light up Profile.
-  const UNDER_PROFILE = ['messages', 'notifications', 'community', 'settings', 'dashboard', 'admin'];
+  const UNDER_PROFILE = ['messages', 'notifications', 'lets', 'community', 'settings', 'dashboard', 'admin'];
 
   /** Which item a screen belongs to: 'home' | 'explore' | 'map' | 'profile', or '' (an event or place page). */
   function currentOf(nav) {

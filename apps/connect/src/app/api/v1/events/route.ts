@@ -30,6 +30,7 @@ import { createClient } from "@/lib/supabase/server";
 import { gateV1 } from "@/lib/v1Gate";
 import { isValidUUID } from "@/lib/validation";
 import { acceptedCohostEventIds, attachCoHostIds, createdByOrIn } from "@/lib/events/cohosts";
+import { missingLetsColumn } from "@/lib/events/letsColumn";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -166,6 +167,8 @@ export async function GET(request: Request) {
         "created_at",
         "community_contributor",
         "volunteer_openings",
+        // Issue #313. Omitted on the retry below when migration 202 is not applied yet.
+        "lets_starter",
       ].join(","),
       // `count: 'exact'` dropped on the public listing to stop scanning
       // the full filtered set on every poll. Consumers use page advance
@@ -174,19 +177,58 @@ export async function GET(request: Request) {
     .eq("status", "published")
     .eq("visibility", "public");
 
+  const letsOnly = url.searchParams.get("lets") === "1";
   if (category) query = query.eq("category", category);
   if (from) query = query.gte("date", from);
   if (to) query = query.lte("date", to);
   if (createdBy) query = query.or(createdByOrIn(createdBy, cohostedIds));
+  if (letsOnly) query = query.not("lets_starter", "is", null);
   if (hasProximity) {
     query = query
       .not("latitude", "is", null)
       .not("longitude", "is", null);
   }
 
-  const { data, error } = await query
+  let { data, error } = await query
     .order("date", { ascending: true })
     .range(preFetchOffset, preFetchOffset + preFetchLimit - 1);
+
+  // Migration 202 is not applied yet. A Let's-only request is empty (there
+  // is nothing to list). The ordinary feed retries without the new column
+  // so the map keeps working.
+  if (error && missingLetsColumn(error)) {
+    if (letsOnly) {
+      return NextResponse.json(
+        {
+          data: [],
+          meta: { limit, offset: effectiveOffset, has_more: false, approximate: false },
+        },
+        { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } },
+      );
+    }
+    let again = supabase
+      .from("events")
+      .select(
+        [
+          "id", "title", "description", "date", "end_time", "location", "category", "image_url",
+          "website_url", "instagram_url", "facebook_url", "tiktok_url", "youtube_url", "x_url",
+          "linkedin_url", "whatsapp_url", "latitude", "longitude", "created_by", "created_at",
+          "community_contributor", "volunteer_openings",
+        ].join(","),
+      )
+      .eq("status", "published")
+      .eq("visibility", "public");
+    if (category) again = again.eq("category", category);
+    if (from) again = again.gte("date", from);
+    if (to) again = again.lte("date", to);
+    if (createdBy) again = again.or(createdByOrIn(createdBy, cohostedIds));
+    if (hasProximity) again = again.not("latitude", "is", null).not("longitude", "is", null);
+    const retry = await again
+      .order("date", { ascending: true })
+      .range(preFetchOffset, preFetchOffset + preFetchLimit - 1);
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     console.error("[v1/events]", error);

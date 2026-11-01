@@ -254,6 +254,8 @@
       lng: typeof r.longitude === 'number' ? r.longitude : null,
       tags: [], upcomingDates: [],
       createdAt: r.created_at || '',
+      // Issue #313. Empty unless the row carries a known Let's starter.
+      letsStarter: (window.LETS && window.LETS.starterById(r.lets_starter)) ? r.lets_starter : '',
     };
   }
 
@@ -590,6 +592,7 @@
     const [nav, setNav] = useState(boot.current.nav);
     const [createKind, setCreateKind] = useState(null); // null | 'event' | 'place'
     const [createEditing, setCreateEditing] = useState(null); // null | the existing event/place object being edited
+    const [createPreset, setCreatePreset] = useState(null); // null | { letsStarter } for a fresh Let's event
     const [creationStyle, setCreationStyle] = useState('sheet'); // sheet | modal | side  (tweakable)
     const [bubbleStyle, setBubbleStyle] = useState('speech'); // speech | tag | minimal (tweakable)
 
@@ -859,8 +862,13 @@
     }, []);
     // openCreate(kind) opens a blank create sheet; openCreate(kind, record)
     // opens the same sheet pre-filled to edit that record.
-    const openCreate = useCallback((kind, record) => { setCreateEditing(record || null); setCreateKind(kind); }, []);
-    const closeCreate = useCallback(() => { setCreateKind(null); setCreateEditing(null); }, []);
+    // openCreate('event', null, { letsStarter }) presets a Let's gathering.
+    const openCreate = useCallback((kind, record, preset) => {
+      setCreateEditing(record || null);
+      setCreatePreset(record ? null : (preset || null));
+      setCreateKind(kind);
+    }, []);
+    const closeCreate = useCallback(() => { setCreateKind(null); setCreateEditing(null); setCreatePreset(null); }, []);
 
     // ── Settle the screen the ADDRESS named against who the person is ─────────
     //  Only for screens reached by URL (a deep link, a refresh, Back/Forward): in-app
@@ -1222,6 +1230,7 @@
           coverPhoto: form.coverPhoto || '',
           gallery: form.gallery || [], broadcast: null, website: form.website || activeContributor.website,
           socials: form.socials || {}, upcomingDates: form.upcomingDates || [], tags: form.tags || [],
+          letsStarter: (window.LETS && window.LETS.starterById(form.letsStarter)) ? form.letsStarter : '',
           mapX: form.mapX || 48, mapY: form.mapY || 50,
         };
         setEvents((prev) => [ev, ...prev]);
@@ -1254,6 +1263,7 @@
             longitude: geo ? geo.lng : null,
             ...window.DATA.socialsToRow(socials, 'event'),
           };
+          if (window.LETS && window.LETS.starterById(form.letsStarter)) row.lets_starter = form.letsStarter;
           const { data, error } = await window.CC_SUPABASE.from('events').insert(row).select('*').single();
           if (error) throw error;
           setEvents((prev) => [adaptEvent(data), ...prev]);
@@ -1262,7 +1272,14 @@
           finish(true, data);
         } catch (e) {
           console.warn('[createEvent]', e);
-          toast('Could not publish the event — please try again.', 'red');
+          const msg = String((e && (e.message || e.details)) || '');
+          if (msg.indexOf('lets_event_rate_limited') !== -1) {
+            toast('You can start four Let\'s gatherings in 30 days.', 'gold');
+          } else if (msg.indexOf('community_event_rate_limited') !== -1) {
+            toast('You can share one community event in 30 days.', 'gold');
+          } else {
+            toast('Could not publish the event — please try again.', 'red');
+          }
           finish(false);
         }
       })();
@@ -3156,7 +3173,7 @@
       isPendingApplicant: role === 'citizen' && contributorStatus === 'pending',
       unreadNotifs, unreadMsgs, toasts, toast,
       pendingListing, clearPendingListing, snoozePendingListing, askAboutListing,
-      createKind, createEditing, openCreate, closeCreate, updateAvatar,
+      createKind, createEditing, createPreset, openCreate, closeCreate, updateAvatar,
       updateEvent, setEventStatus, updatePlace, setPlaceStatus,
       updateContributorProfile, addCoverPhoto, deleteCoverPhoto, updateCoverPhotoCaption,
       newsPosts, createNewsPost, updateNewsPost, deleteNewsPost,

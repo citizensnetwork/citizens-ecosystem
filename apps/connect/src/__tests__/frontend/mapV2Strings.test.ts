@@ -26,7 +26,7 @@ function collect(node: unknown, path: string, out: { path: string; text: string 
 
 describe("the strings file", () => {
   it("has the pin, sheet and time groups, the serving-areas groups, and no empty string", () => {
-    expect(Object.keys(S).sort()).toEqual(["card", "discover", "explore", "nav", "online", "pin", "report", "serving", "sheet", "time"]);
+    expect(Object.keys(S).sort()).toEqual(["card", "discover", "explore", "lets", "nav", "online", "pin", "report", "serving", "sheet", "time"]);
     const all: { path: string; text: string }[] = [];
     collect(S, "", all);
     expect(all.length).toBeGreaterThan(60);
@@ -49,7 +49,8 @@ describe("the strings file", () => {
       // sentence case: no capitalised word after the first word of a sentence.
       // A capital after . ! ? starts the next sentence (the report copy is two sentences).
       // "Sample name" and "View Full Profile" are the sample argument and one existing label.
-      const cleaned = s.text.replace(/Sample name|View Full Profile/g, "name");
+      // Kingdom Projects is the existing proper name of that screen (issue #313 keeps it reachable).
+      const cleaned = s.text.replace(/Sample name|View Full Profile|Kingdom Projects/g, "name");
       const rest = cleaned.split(/(?<=[.!?])\s+/).map((sentence) => sentence.split(/\s+/).slice(1).join(" ")).join(" ");
       expect(rest, `${s.path}: ${s.text}`).not.toMatch(/\b[A-Z][a-z]+\b(?<!\bMon|\bTue|\bWed|\bThu|\bFri|\bSat|\bSun)/);
     }
