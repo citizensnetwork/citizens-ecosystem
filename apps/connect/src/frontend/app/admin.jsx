@@ -61,6 +61,13 @@
         app.status === 'pending' && app.previouslyRemovedAt && h('div', { className: 'mt-3 flex items-start gap-2 p-3 rounded-xl bg-[#FEF3C7] text-[#92400E]', 'data-testid': 'previously-removed' },
           h(Icon, { name: 'Flag', size: 14, className: 'shrink-0 mt-0.5' }),
           h('p', { className: 'text-xs leading-relaxed' }, 'Previously removed by an admin on ' + fmt(app.previouslyRemovedAt) + '. Check why before you approve this one.')),
+        // Care / Recovery (#202, founder decision 2026-10-21): they list with EXTRA admin review.
+        app.status === 'pending' && window.CCPresets.needsExtraReview(app.category) && h('div', { className: 'mt-3 flex items-start gap-2 p-3 rounded-xl bg-[#FEF3C7] text-[#92400E]', 'data-testid': 'extra-review' },
+          // A shield, not the flag: the flag stays with the warning about THIS applicant (previously removed); this is the procedure.
+          h(Icon, { name: 'ShieldCheck', size: 14, className: 'shrink-0 mt-0.5' }),
+          h('div', null,
+            h('p', { className: 'text-xs font-semibold mb-0.5' }, window.CCPresets.COPY.adminHeading),
+            h('p', { className: 'text-xs leading-relaxed' }, window.CCPresets.COPY.adminCheck))),
         h('p', { className: 'text-xs text-muted-foreground mt-3 leading-relaxed' }, app.bio),
         h('div', { className: 'mt-3 p-3 bg-muted/60 rounded-xl' },
           h('p', { className: 'text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1' }, 'Why they want to contribute'),
@@ -354,7 +361,7 @@
             }, hidden ? 'HIDDEN' : 'LIVE')),
           h('div', { className: 'flex items-center gap-x-3 gap-y-0.5 mt-0.5 flex-wrap text-[10px] text-muted-foreground' },
             kind && h('span', null, kind.label),
-            row.contributor_slug && h('a', { href: '/c/' + row.contributor_slug, target: '_blank', rel: 'noopener noreferrer', className: 'text-gold-dark hover:underline' }, '/c/' + row.contributor_slug),
+            row.contributor_slug && h('a', { href: window.CC_ROUTES ? window.CC_ROUTES.appUrl('/c/' + row.contributor_slug) : '/c/' + row.contributor_slug, target: '_blank', rel: 'noopener noreferrer', className: 'text-gold-dark hover:underline' }, '/c/' + row.contributor_slug),
             row.auto_update_level && h('span', { className: 'flex items-center gap-1', 'data-automation': row.auto_update_level },
               h(Icon, { name: 'Sparkles', size: 9 }),
               'Automatic updates: ' + ({ off: 'Off', suggest: 'Suggest', events_auto: 'Auto events' }[row.auto_update_level] || row.auto_update_level) +

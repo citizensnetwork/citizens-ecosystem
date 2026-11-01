@@ -1,4 +1,4 @@
-import type { Page, Route } from "@playwright/test";
+import { expect, type Locator, type Page, type Route } from "@playwright/test";
 // One fixture generator for the measurement scripts and these specs (a plain .mjs;
 // `allowJs` lets the typecheck read it).
 import { makeSeed, smallSeed } from "../../scripts/map-v2/fixtures.mjs";
@@ -60,6 +60,108 @@ export async function openMap(page: Page, path = "/", min = 1) {
   );
 }
 
+/**
+ * Wait until the home screen has stopped rearranging itself: the map is not moving, every pin sits where it will stay, and the
+ * Explore row has ranked its cards and shown their distances (it ranks once, when the map first says where it is). A slow
+ * machine (CI) does all of this AFTER the pins first appear, so a spec that measures a point on bare map, or presses a card,
+ * straight after openMap() can find a pin or a different card under its finger. Call this before measuring or pressing.
+ */
+export async function mapSettled(page: Page) {
+  await page.waitForFunction(
+    () => {
+      const w = window as unknown as { __ccMap?: { isMoving(): boolean }; __settle?: { sig: string; at: number } };
+      if (!w.__ccMap || w.__ccMap.isMoving()) return false;
+      const pins = [...document.querySelectorAll(".maplibregl-marker")]
+        .map((e) => { const r = e.getBoundingClientRect(); return `${Math.round(r.x)},${Math.round(r.y)}`; })
+        .join("|");
+      const explore = document.querySelector("[data-mv2='explore']");
+      const cards = explore ? [...explore.querySelectorAll("[data-explore-id]")].map((e) => e.getAttribute("data-explore-id")).join(",") : "";
+      // the row shows a distance on every card once it knows where the map is
+      if (explore && cards && !/\d\s?(km|m)\b/.test(explore.textContent ?? "")) return false;
+      // the panel's own height and the first card's width too: web fonts arriving late (a slow runner) resize the text, and with it the
+      // panel and the open map above it, which moves the pins a moment after everything looked still
+      const panel = Math.round(explore ? explore.getBoundingClientRect().height : 0);
+      const card1 = Math.round(explore?.querySelector("[data-explore-id]")?.getBoundingClientRect().width ?? 0);
+      const sig = `${pins}#${cards}#${panel}#${card1}#${document.fonts ? document.fonts.status : ""}`;
+      const now = performance.now();
+      if (!w.__settle || w.__settle.sig !== sig) { w.__settle = { sig, at: now }; return false; }
+      return now - w.__settle.at > 500;
+    },
+    undefined,
+    { polling: 100, timeout: 20_000 },
+  );
+}
+
+/**
+ * Issue #210: a pin no longer opens the sheet. It scrolls the Explore row to its card and outlines it; the CARD opens
+ * the sheet. This does both. The pin is pressed by a DOM click, because the row can cover a pin near the foot of the
+ * screen (a spec that centres the map on a pin puts it right behind the row); the card is then pressed for real,
+ * by a mouse or, with `how: "tap"`, by a touch tap, so the gesture that opens the sheet is a real one.
+ */
+export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
+  await mapSettled(page);
+  const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"][data-selected] [data-mv2='card2']`);
+  // a closed sheet leaves its card outlined; pressing the pin again would toggle that off, so press it only when needed
+  if (!(await card.count())) await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
+  await card.waitFor({ state: "visible", timeout: 10_000 });
+  // the row glides the card to its start; press it once it has stopped
+  await page.waitForFunction(
+    (sel) => {
+      const el = document.querySelector(sel);
+      if (!el) return false;
+      const w = window as unknown as { __mv2x?: number };
+      const x = el.getBoundingClientRect().left;
+      const still = w.__mv2x === x;
+      w.__mv2x = x;
+      return still;
+    },
+    `[data-mv2='explore'] [data-explore-id="${id}"] [data-mv2='card2']`,
+    { polling: 100, timeout: 5_000 },
+  );
+  if (how === "tap") await card.tap();
+  else await card.click();
+}
+
+/**
+ * #210 part 2: a card opens the EXPANDED sheet (full only; swipe down goes back to the row). The half / peek sheet is
+ * what a pin opens on the clean map (the nav's Map), so a spec about snap states, the handle or the scroll hand-off
+ * switches to that map first (no Explore row, no pills; the map and its pins stay as they are) and presses the pin.
+ * The switch is an in-app navigation: call toCleanMap before measuring history.length.
+ */
+export async function toCleanMap(page: Page) {
+  await page.evaluate(() => (window as unknown as { __cc: { go: (p: string, q: object) => void } }).__cc.go("home", { view: "map" }));
+  await page.locator("[data-mv2='explore']").waitFor({ state: "detached", timeout: 10_000 });
+}
+export async function openPinSheet(page: Page, id: string, how: "click" | "tap" = "click") {
+  if (await page.locator("[data-mv2='explore']").count()) await toCleanMap(page);
+  const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
+  if (how === "tap") await pin.tap({ force: true });
+  else await pin.click({ force: true });
+}
+
+/**
+ * A point on BARE map for a two-finger gesture: in the open map between the top bar and the Explore row (#210), on a
+ * line where nothing but the map canvas sits for `span` px either side of the centre. A touch that starts on a pin or
+ * an overlay is not the map's, and the home now frames its pins in exactly that open middle.
+ */
+export async function bareMapPoint(page: Page, span = 120): Promise<{ x: number; y: number }> {
+  await mapSettled(page);
+  const pt = await page.evaluate((half) => {
+    const x = window.innerWidth / 2;
+    const top = document.querySelector("[data-mv2='home-top']")?.getBoundingClientRect().bottom ?? 0;
+    const row = document.querySelector("[data-mv2='explore']")?.getBoundingClientRect().top ?? window.innerHeight;
+    const bare = (px: number, py: number) => !!document.elementFromPoint(px, py)?.classList.contains("maplibregl-canvas");
+    for (let y = Math.round(top + 30); y < row - 30; y += 6) {
+      let ok = true;
+      for (let dx = -half; dx <= half && ok; dx += 10) ok = bare(x + dx, y) && bare(x + dx, y - 22) && bare(x + dx, y + 22);
+      if (ok) return { x, y };
+    }
+    return null;
+  }, span);
+  if (!pt) throw new Error("no bare stretch of map for a two-finger gesture");
+  return pt;
+}
+
 /** An SVG that stands in for a contributor photo (same origin, so the app's CSP draws it). */
 export const fixtureImageUrl = (n: number) => `http://localhost:3100/fixture-img/${n}.svg`;
 const fixtureSvg = (n: number) =>
@@ -110,4 +212,36 @@ export async function mockContributorDetail(
     });
   });
   return { calls: () => calls };
+}
+
+/**
+ * Wait until `locator` (a control inside the Map v2 sheet) has stopped moving, then return its box.
+ * The sheet slides up, and its content (the detail request, the gallery, the follower count) can still change the layout
+ * after it is visible; a tap aimed at a box measured mid-move lands beside the button. So the sheet must have no running
+ * animation or transition, and the box must agree with itself over `samples` consecutive looks `gapMs` apart. On a slow
+ * machine the first quiet moment can be a pause before the next frame, hence several looks and not two. Measure again
+ * right before EVERY tap: a toast or a label change can move things between two taps.
+ */
+export async function stillBox(page: Page, locator: Locator, { samples = 4, gapMs = 60 } = {}) {
+  const sheet = page.locator("[data-mv2='sheet']");
+  await expect
+    .poll(
+      async () => {
+        const running = await sheet.evaluate((el) => el.getAnimations({ subtree: true }).filter((a) => a.playState === "running").length);
+        if (running > 0) return 99;
+        let prev = await locator.boundingBox();
+        let worst = 0;
+        for (let i = 0; i < samples; i++) {
+          await page.waitForTimeout(gapMs);
+          const next = await locator.boundingBox();
+          if (!prev || !next) return 99;
+          worst = Math.max(worst, Math.abs(prev.x - next.x) + Math.abs(prev.y - next.y) + Math.abs(prev.width - next.width) + Math.abs(prev.height - next.height));
+          prev = next;
+        }
+        return worst;
+      },
+      { message: "the control never stopped moving", timeout: 20_000 },
+    )
+    .toBeLessThan(0.5);
+  return (await locator.boundingBox())!;
 }

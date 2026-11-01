@@ -18,7 +18,8 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail, siteOrigin } from "@/lib/email/send";
+import { sendEmail } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 import { listingClaimReminderEmail } from "@/lib/email/listingClaimTemplates";
 import { REMINDER_AFTER_DAYS } from "@/lib/listingClaim";
 
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "read_failed" }, { status: 500 });
   }
 
-  const origin = siteOrigin(request);
+  const origin = siteBase(request);
   const tally = { due: (data ?? []).length, sent: 0, skipped: 0, failed: 0 };
 
   for (const row of (data ?? []) as Due[]) {

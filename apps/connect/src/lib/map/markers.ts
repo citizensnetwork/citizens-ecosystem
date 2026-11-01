@@ -89,8 +89,8 @@ export function createCategoryMarkerEl(
   const icon = getCategoryIcon(cat);
   // Events read as GOLD (places are black) so type is instant; the category is
   // still conveyed by the glyph and the category-tinted pulse (--cc-pulse-color).
-  const borderColor = overrideColor ?? "#C9A84C";
-  const pulseColor = CATEGORY_HEX[cat] ?? "#C9A84C";
+  const borderColor = overrideColor ?? "#F2BD22";
+  const pulseColor = CATEGORY_HEX[cat] ?? "#F2BD22";
   const size = Math.round(BASE_SIZE * temporal.scale);
   const iconSize = Math.round(size * 0.48);
 
@@ -145,8 +145,8 @@ export function createCustomMarkerEl(
   // createCategoryMarkerEl) so type is instant on the map; the category is
   // carried by the category-tinted pulse (--cc-pulse-color), not the ring.
   // A quick-tool override colour still wins for the ring + dot when set.
-  const ringColor = options.overrideColor ?? "#C9A84C";
-  const categoryPulse = CATEGORY_HEX[category ?? "church-services"] ?? "#C9A84C";
+  const ringColor = options.overrideColor ?? "#F2BD22";
+  const categoryPulse = CATEGORY_HEX[category ?? "church-services"] ?? "#F2BD22";
 
   // Profile photo marker
   if (markerType === "profile" && creatorAvatarUrl) {
@@ -212,7 +212,7 @@ export function createCustomMarkerEl(
 
   // Custom icon with color
   if (markerType === "icon" && options.markerIcon) {
-    const fillColor = options.markerColor ?? "#C9A84C";
+    const fillColor = options.markerColor ?? "#F2BD22";
     const iconSvg = getEventCategoryIcon(options.markerIcon as EventCategory);
     const iconSize = Math.round(size * 0.48);
 
@@ -288,7 +288,7 @@ export function createPlaceMarkerEl(
         height:18px;
         padding:0 4px;
         border-radius:10px;
-        background:${isHighRated ? "#C9A84C" : "#111"};
+        background:${isHighRated ? "#F2BD22" : "#111"};
         color:${isHighRated ? "#111" : "#fff"};
         border:1.5px solid #fff;
         font-size:10px;
@@ -309,8 +309,8 @@ export function createPlaceMarkerEl(
       height:18px;
       border-radius:50%;
       background:#111;
-      color:#C9A84C;
-      border:1.5px solid #C9A84C;
+      color:#F2BD22;
+      border:1.5px solid #F2BD22;
       font-size:11px;
       font-weight:700;
       display:flex;
@@ -333,7 +333,7 @@ export function createPlaceMarkerEl(
   // Places read as BLACK (events are gold). Category still drives the pulse
   // tint and the icon colour when a place-category filter highlights it.
   const pulseColor =
-    (category ? PLACE_CATEGORY_HEX[category as PlaceCategory] : undefined) ?? "#C9A84C";
+    (category ? PLACE_CATEGORY_HEX[category as PlaceCategory] : undefined) ?? "#F2BD22";
   const dotColor = options?.highlightColor ?? "#111";
 
   const el = document.createElement("div");

@@ -13,8 +13,8 @@
 //    * Honest (C21): the words are "Online or no fixed place", never "on the map".
 //    * The sheet uses ONE useBackGuard entry (Back, Escape and Close all end it); a tap on a row navigates FIRST, then closes.
 //    * One 200 ms fade when the button first appears; reduced motion makes it a jump (the token collapses to 0). Nothing loops.
-//  Behind ONE constant, MapV2.onlineGlobe (ONLINE_GLOBE_ON in map-v2-lib.jsx) and the Map v2 flag: off, this file draws nothing
-//  and asks for nothing, so Map v2 is exactly as it was.
+//  Behind ONE constant, MapV2.onlineGlobe (ONLINE_GLOBE_ON in map-v2-lib.jsx): off, this file draws nothing
+//  and asks for nothing, so the map is exactly as it was.
 //
 //  Pieces: createWatcher (the pure "when do we ask" logic, unit-tested), Globe (the button among the controls and the sheet),
 //  OnlineSheet (the list). Text: MapV2Strings.online. Styles: assets/map-v2.css, [data-mv2='globe'] and [data-mv2='online-sheet'].
@@ -33,8 +33,8 @@
   const WIDE_MQ = '(min-width: 768px) and (pointer: fine)';
   const LEVEL_ORDER = { suburb: 0, place: 1, province: 2 };
 
-  /** Is the globe allowed at all: Map v2 on AND the one constant. */
-  const globeOn = () => !!(window.isMapV2 && window.isMapV2() && window.MapV2 && window.MapV2.onlineGlobe);
+  /** Is the globe allowed at all: the one constant. */
+  const globeOn = () => !!(window.MapV2 && window.MapV2.onlineGlobe);
 
   // ── when do we ask? (pure: a test feeds it a stand-in map, clock and fetcher) ──
   /**

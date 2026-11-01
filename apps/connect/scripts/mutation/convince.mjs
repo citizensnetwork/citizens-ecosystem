@@ -36,7 +36,7 @@ const LIB = "src/frontend/app/convince-lib.jsx";
 const ROW = "src/frontend/app/convince.jsx";
 const PROFILES = "src/frontend/app/profiles.jsx";
 const PAGES = "src/frontend/app/pages.jsx";
-const CARD = "src/frontend/app/entity-card.jsx";
+const SHEET = "src/frontend/app/map-v2-sheet.jsx";
 const ROUTE = "src/app/api/notifications/preferences/route.ts";
 const TYPES = "src/types/db.ts";
 const SQL = "../../supabase/migrations/191_friends_considering.sql";
@@ -76,7 +76,7 @@ const MUTANTS = [
   { id: "page-note-logic-inverted", kind: "e2e", tests: E2E, edits: [{ file: PROFILES, find: "share_considering === false);", replace: "share_considering === true);" }] },
   { id: "page-title-lost", kind: "e2e", tests: E2E, edits: [{ file: PROFILES, find: "eventTitle: ev.title,", replace: "eventTitle: '',"}] },
   { id: "settings-wrong-key", kind: "e2e", tests: E2E, edits: [{ file: PAGES, find: "toggleNotif('share_considering', v)", replace: "toggleNotif('share_consider', v)" }] },
-  { id: "sheet-row-removed", kind: "e2e", tests: E2E, edits: [{ file: CARD, find: "const convince = isSheet && isEvent && realUser &&", replace: "const convince = false && isEvent && realUser &&" }] },
+  { id: "sheet-row-removed", kind: "e2e", tests: E2E, edits: [{ file: SHEET, find: "const convince = isEvent && realUser &&", replace: "const convince = false && isEvent && realUser &&" }] },
   // ── the API route and the types
   { id: "route-key-dropped", kind: "unit", tests: UNIT_ROUTE, edits: [{ file: ROUTE, find: '  "share_considering",\n', replace: "" }] },
   { id: "types-key-dropped", kind: "unit", tests: UNIT_ROUTE, edits: [{ file: TYPES, find: '  | "share_considering";', replace: ";" }] },

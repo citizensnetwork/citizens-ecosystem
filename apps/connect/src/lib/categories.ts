@@ -45,7 +45,7 @@ export const CATEGORY_LABELS_SHORT: Record<EventCategory, string> = {
 /** Hex colour per category — used for calendar, map markers, badges. */
 export const CATEGORY_HEX: Record<EventCategory, string> = {
   "worship-prayer": "#B8860B",
-  "church-services": "#D4AF37",
+  "church-services": "#F2BD22",
   "outreach-missions": "#1ABC9C",
   "markets-expos": "#F39C12",
   "sport-recreation": "#2ECC71",
@@ -211,7 +211,7 @@ export const PLACE_CATEGORY_DESCRIPTIONS: Record<PlaceCategory, string> = {
 
 /** Hex colour per place category. */
 export const PLACE_CATEGORY_HEX: Record<PlaceCategory, string> = {
-  "churches-ministries": "#D4AF37",
+  "churches-ministries": "#F2BD22",
   "hospitality-cafes": "#8B4513",
   "recreation-sport": "#2ECC71",
   "media-broadcasting": "#9B59B6",
@@ -269,7 +269,7 @@ export const CONTRIBUTOR_TYPES: readonly {
   hex: string;
   icon: string;
 }[] = [
-  { value: "churches-ministries", label: "Church", hex: "#D4AF37", icon: "Church" },
+  { value: "churches-ministries", label: "Church", hex: "#F2BD22", icon: "Church" },
   { value: "outreach-missions", label: "Outreach / Mission", hex: "#1ABC9C", icon: "Globe" },
   { value: "markets-expos", label: "Market / Expo", hex: "#F39C12", icon: "Store" },
   { value: "christian-businesses", label: "Business", hex: "#A67C00", icon: "Store" },
@@ -287,6 +287,19 @@ const CONTRIBUTOR_TYPE_SLUGS: ReadonlySet<string> = new Set(CONTRIBUTOR_TYPES.ma
 
 export function isContributorType(value: unknown): value is ContributorType {
   return typeof value === "string" && CONTRIBUTOR_TYPE_SLUGS.has(value);
+}
+
+/**
+ * The Care / Recovery Contributor types (founder decision 2026-10-21, issue #202). They MAY list, with EXTRA
+ * admin review: they opt in to the map (the apply route keeps a pin and an address off unless the applicant says
+ * otherwise) and the discovery routine never auto-publishes for them. This list is the `care_recovery` preset's
+ * categories in `config/onboarding-presets.json`; a test keeps the two equal, and `onboarding-presets-lib.jsx`
+ * carries the browser's copy.
+ */
+export const EXTRA_REVIEW_CONTRIBUTOR_TYPES: readonly ContributorType[] = ["retreat-healing", "clinic", "rehab-development"];
+
+export function needsExtraReview(category: unknown): boolean {
+  return typeof category === "string" && (EXTRA_REVIEW_CONTRIBUTOR_TYPES as readonly string[]).includes(category);
 }
 
 /**

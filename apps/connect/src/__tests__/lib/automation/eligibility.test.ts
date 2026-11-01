@@ -33,6 +33,14 @@ describe("contributorEligibility: the one rule the three machine routes share", 
     expect(contributorEligibility({ ...ok, contributor_hidden: true, auto_update_level: "off" })).toEqual({ reason: "contributor_not_eligible" });
   });
 
+  it("a Care / Recovery Contributor at 'events_auto' is served as 'suggest': nothing of theirs is auto-published (#202)", () => {
+    for (const contributor_category of ["retreat-healing", "clinic", "rehab-development"]) {
+      expect(contributorEligibility({ ...ok, auto_update_level: "events_auto", contributor_category }), contributor_category).toEqual({ level: "suggest" });
+    }
+    expect(contributorEligibility({ ...ok, auto_update_level: "events_auto", contributor_category: "churches-ministries" })).toEqual({ level: "events_auto" });
+    expect(contributorEligibility({ ...ok, auto_update_level: "off", contributor_category: "clinic" })).toEqual({ reason: "consent_off" });
+  });
+
   it("ELIGIBLE_LEVELS is every level except 'off'", () => {
     expect([...ELIGIBLE_LEVELS].sort()).toEqual(AUTO_UPDATE_LEVELS.filter((l) => l !== "off").sort());
   });

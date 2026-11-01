@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
-import { touchSession, tapTouch } from "./support/touch";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, stillBox, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
+import { touchSession, tapTouch, throttleCpu } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
 //  Save on the sheet and the saved list in Settings (tracker P2-04; migration 183, applied).
@@ -29,7 +29,7 @@ async function pick(page: Page, seed: ReturnType<typeof seed0>, kind: Kind, inde
       ? { id: seed.places[index].id, lng: seed.places[index].longitude, lat: seed.places[index].latitude }
       : { id: seed.events[index].id, lng: seed.events[index].longitude, lat: seed.events[index].latitude };
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [t.lng, t.lat]);
-  await page.locator(`.maplibregl-marker[data-cc-id="${t.id}"]`).click({ force: true });
+  await openPinSheet(page, t.id);
   await expect(sheet(page)).toBeVisible();
   return t;
 }
@@ -37,6 +37,7 @@ async function pick(page: Page, seed: ReturnType<typeof seed0>, kind: Kind, inde
 async function open(page: Page, kind: Kind, index: number, tweak?: (seed: ReturnType<typeof seed0>) => void) {
   const seed = seed0();
   if (tweak) tweak(seed);
+  await throttleCpu(page);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed);
   await openMap(page, "/?map=v2", 8);
@@ -45,15 +46,6 @@ async function open(page: Page, kind: Kind, index: number, tweak?: (seed: Return
 
 const actionBtn = (page: Page, re: RegExp) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: re });
 
-/** The sheet slides up after it becomes visible. A tap taken mid-slide misses the button. */
-async function waitUntilStill(page: Page, locator: ReturnType<Page["locator"]>) {
-  await expect.poll(async () => {
-    const a = await locator.boundingBox();
-    await page.waitForTimeout(50);
-    const b = await locator.boundingBox();
-    return a && b ? Math.abs(a.y - b.y) + Math.abs(a.x - b.x) : 99;
-  }).toBeLessThan(1);
-}
 const saveBtn = (page: Page) => actionBtn(page, /^Saved?$/);
 const followBtn = (page: Page) => actionBtn(page, /^Follow(ing)?$/);
 const goTo = (page: Page, p: string) => page.evaluate((x) => (window as unknown as { __cc: { go: (p: string) => void } }).__cc.go(x), p);
@@ -67,22 +59,21 @@ test.describe("P2-04 Save on the sheet", () => {
     await expect(btn).toHaveCount(1);
     await expect(btn).toHaveText("Save");
     await expect(btn).not.toHaveAttribute("data-on", /.*/);
-    await waitUntilStill(page, btn);
-    const box = (await btn.boundingBox())!;
+    const box = await stillBox(page, btn);
     expect(box.height).toBeGreaterThanOrEqual(44);
     expect(box.width).toBeGreaterThanOrEqual(44);
     const histBefore = await page.evaluate(() => history.length);
     const cdp = await touchSession(page);
-    const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const centreOf = (b: { x: number; y: number; width: number; height: number }) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
 
-    await tapTouch(cdp, centre);
+    await tapTouch(cdp, centreOf(await stillBox(page, btn)));
     await expect(btn).toHaveText("Saved");
     await expect(btn).toHaveAttribute("data-on", "");
     await expect(page.getByText("Saved Fixture Fellowship 1. Only you can see this.")).toBeVisible();
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
     expect(await page.evaluate(() => history.length)).toBe(histBefore);
 
-    await tapTouch(cdp, centre);
+    await tapTouch(cdp, centreOf(await stillBox(page, btn)));
     await expect(btn).toHaveText("Save");
     await expect(btn).not.toHaveAttribute("data-on", /.*/);
     await expect(page.getByText("Removed Fixture Fellowship 1 from your saved list")).toBeVisible();
@@ -111,19 +102,22 @@ test.describe("P2-04 Save on the sheet", () => {
     expect(b.y + b.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   });
 
-  test("a Place gets Save in the action row (and keeps its card's Follow); an Event gets neither Save nor a second Follow", async ({ page }) => {
+  test("a Place gets Follow and Save in the action row; an Event gets Connect and Consider there, and neither Save nor Follow", async ({ page }) => {
     await open(page, "place", 0);
     await expect(saveBtn(page)).toHaveCount(1);
-    await expect(followBtn(page)).toHaveCount(0);
-    await expect(page.locator("[data-mv2='card']").getByRole("button", { name: /^Follow$/ })).toHaveCount(1);
+    await expect(followBtn(page)).toHaveCount(1);
+    await expect(page.locator("[data-mv2='card']").getByRole("button", { name: /^Follow(ing)?$/ })).toHaveCount(0);
     await saveBtn(page).click();
     await expect(saveBtn(page)).toHaveText("Saved");
     await expect(page.getByText(/^Saved .*Only you can see this\.$/)).toBeVisible();
 
-    // an Event: its bookmark is Consider, on the card
+    // an Event: its bookmark is Consider, and what it asks of a person is Connect: both pills in the same row
     await pick(page, seed0(), "event", 0);
     await expect(saveBtn(page)).toHaveCount(0);
     await expect(followBtn(page)).toHaveCount(0);
+    const row = page.locator("[data-mv2='actions'] [data-mv2='action']");
+    await expect(row.filter({ hasText: /^Connect(ed)?$/ })).toHaveCount(1);
+    await expect(row.filter({ hasText: /^Consider(ing)?$/ })).toHaveCount(1);
   });
 
   test("a signed-out visitor on the real site is asked to sign in, and nothing flips (control: demo mode flips)", async ({ page }) => {

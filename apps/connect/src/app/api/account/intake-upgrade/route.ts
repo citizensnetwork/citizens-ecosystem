@@ -16,7 +16,7 @@ import { checkRateLimit, RATE_LIMITS } from "@/lib/rate-limit";
 import { hasMapPin } from "@/lib/contributorFields";
 import { hashUpgradeToken, UPGRADE_TOKEN_RE } from "@/lib/intake/upgradeToken";
 import { sendOwnerWelcome, settleFlaggedUpgrade } from "@/lib/intake/upgradeSideEffects";
-import { siteOrigin } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -108,7 +108,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       status: "confirmed",
       slug: row.listing_slug ?? null,
-      url: row.listing_slug ? `${siteOrigin(request)}/c/${row.listing_slug}` : null,
+      url: row.listing_slug ? `${siteBase(request)}/c/${row.listing_slug}` : null,
     });
   }
 
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
       onMap,
       request,
     });
-    const origin = siteOrigin(request);
+    const origin = siteBase(request);
     return NextResponse.json({
       status: "confirmed",
       slug: row.slug,

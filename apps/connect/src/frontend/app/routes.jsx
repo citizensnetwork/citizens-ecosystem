@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  Citizens Connect — route table (pure; no React, no DOM)
+//  Citizens Connect — route table (pure; no React, no DOM; the one outside input is BASE_PATH, below)
 //
 //  The ONE place that knows which URL belongs to which screen. store.jsx
 //  (history, deep links, titles, the sign-in return path) and the server
@@ -9,6 +9,7 @@
 //
 //    /                      map (home)         /map → /  (alias)
 //    /discover              Kingdom Exploration list
+//    /explore               Map v2's Discover page (#210; the old map shows Kingdom Exploration there)
 //    /community             Kingdom Projects
 //    /e/<uuid>              event              /p/<uuid>   place
 //    /c/<slug>              Contributor        /me         my own profile
@@ -21,6 +22,13 @@
 //
 //  A URL grants nothing: `accessFor` only says what a screen NEEDS, and the
 //  store enforces it (the real wall stays RLS + the server-side admin/RPC checks).
+//
+//  Every path in this file is APP-RELATIVE: it is what the table above shows, whether
+//  the app is served from the site root (today) or from a prefix on a shared domain
+//  (NEXT_PUBLIC_BASE_PATH=/citizens/connect, C39). `stripBase` and `withBase` are the
+//  two crossings between that and the address bar, and are no-ops with an empty base.
+//  BASE_PATH is the one read of config.js's BASE_PATH key (written by @citizens/frontend-build
+//  only when a prefix is set); `appUrl` is `withBase` bound to it.
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -39,6 +47,7 @@
   const STATIC_PATHS = {
     home: '/',
     'kingdom-discovery': '/discover',
+    explore: '/explore',
     community: '/community',
     messages: '/messages',
     notifications: '/notifications',
@@ -191,7 +200,7 @@
     const page = nav && nav.page;
     const p = (nav && nav.params) || {};
     switch (page) {
-      case 'home': case 'kingdom-discovery': case 'community': case 'event': case 'place': return 'public';
+      case 'home': case 'kingdom-discovery': case 'explore': case 'community': case 'event': case 'place': return 'public';
       case 'profile': return p.id || p.slug ? 'public' : 'auth';
       case 'dashboard': return 'contributor';
       case 'admin': return 'admin';
@@ -225,9 +234,43 @@
     return r.ok ? r.canonical : null;
   }
 
+  /**
+   * Address-bar path → app-relative path (what navFromPath, pathFor and safeReturnPath speak).
+   * `base` is '' (the site root) or a prefix such as "/citizens/connect". The bare prefix, with
+   * or without a trailing slash, is the app's front door, '/'. Returns null for a path outside
+   * the prefix, a lookalike such as /citizens/connectx included, and for a non-string. With an
+   * empty base the path comes back unchanged. Never throws.
+   */
+  function stripBase(pathname, base) {
+    if (typeof pathname !== 'string') return null;
+    if (!base) return pathname;
+    if (pathname === base || pathname === base + '/') return '/';
+    return pathname.indexOf(base + '/') === 0 ? pathname.slice(base.length) : null;
+  }
+
+  /**
+   * App-relative path (a `?query` or `#hash` may follow it) → the path for the address bar or a
+   * link. '/' becomes the bare prefix, not prefix + '/': Next redirects the slash form to the bare
+   * one, and a redirect on every home link is a wasted round trip. A string that is not a plain
+   * app path (no leading '/', or '//') is returned untouched, so a stray absolute URL is never
+   * glued onto the prefix. With an empty base the path comes back unchanged.
+   */
+  function withBase(path, base) {
+    if (!base || typeof path !== 'string' || path.charAt(0) !== '/' || path.charAt(1) === '/') return path;
+    const rest = path.slice(1);
+    return base + (rest === '' || rest.charAt(0) === '?' || rest.charAt(0) === '#' ? rest : path);
+  }
+
+  // The prefix this build is served under: '' (no key in config.js) is the site root, and a mobile build
+  // (bundled at the shell's root). A value that is not a path starting with a single '/' is ignored.
+  const rawBase = window.__CC_ENV && typeof window.__CC_ENV.BASE_PATH === 'string' ? window.__CC_ENV.BASE_PATH : '';
+  const BASE_PATH = /^\/[^/]/.test(rawBase) ? rawBase.replace(/\/+$/, '') : '';
+  /** An app-relative path as an address-bar or link path for this build (see withBase). */
+  const appUrl = (path) => withBase(path, BASE_PATH);
+
   const BASE_TITLE = 'Citizens Connect';
   const TITLES = {
-    'kingdom-discovery': 'Kingdom Exploration', community: 'Kingdom Projects', messages: 'Messages',
+    'kingdom-discovery': 'Kingdom Exploration', explore: 'Explore', community: 'Kingdom Projects', messages: 'Messages',
     notifications: 'Notifications', settings: 'Settings', apply: 'Become a Contributor',
     onboarding: 'Set up your profile', dashboard: 'Dashboard', admin: 'Admin',
     'intake-upgrade': 'Confirm your listing',
@@ -247,6 +290,7 @@
 
   window.CC_ROUTES = {
     pathFor, navFromPath, safeReturnPath, accessFor, isEntityRoute, titleFor,
+    stripBase, withBase, appUrl, BASE_PATH,
     DASHBOARD_TABS, ADMIN_TABS, PREFIXES, PAGES, isUuid, isSlug,
   };
 })();

@@ -1,6 +1,6 @@
 {
-  "schema_version": 2,
-  "status": "DRAFT for review. Not wired into the wizard. No database changes required or applied. Platform facts re-verified 2026-10-15 against migrations 037, 173 and 180 and the live database.",
+  "schema_version": 3,
+  "status": "Contributor presets are read by the Apply wizard (issue #202): they pick the default Type and, for Care / Recovery, the extra-review and map opt-in rules. Event presets are not wired. No database changes. Platform facts re-verified 2026-10-15 against migrations 037, 173 and 180 and the live database.",
   "owner_docs": ["apps/connect/docs/routines/daily-routine.md", "apps/connect/V1_SCOPE.md"],
 
   "notes": [
@@ -63,12 +63,13 @@
   "listing_policy": {
     "citizen_event": "Goes live immediately. Rate limit (migration 037) and report/flag path apply.",
     "self_serve": "Contributor applies at once but waits for admin approval (D-12, migration 180); nothing is public until approved. Founder can hide.",
-    "self_serve_flagged": "Same approval gate as self_serve (D-12), so an admin sees these listings before they go public. OPEN DECISION for founder: whether Care/Recovery and child-facing Education need a further hold or review step beyond that approval. Safeguarding fields are required either way. Discovery routine must never auto-publish these."
+    "self_serve_flagged": "Same approval gate as self_serve (D-12), so an admin sees these listings before they go public. DECIDED 2026-10-21 for Care / Recovery (extra_admin_review): they MAY list, with EXTRA admin review; they opt in to the map and choose per item what is public; nothing is public before approval; the discovery routine never auto-publishes them. Child-facing Education is still an OPEN DECISION (extra_admin_review stays false). Safeguarding fields are required either way."
   },
 
   "presets": {
     "congregation_ministry": {
       "label": "Congregation / Ministry",
+      "default_kind": "ministry",
       "creates": { "contributor": true, "place": "optional" },
       "allowed_hosts": ["contributor"],
       "location_modes": ["fixed", "roaming", "online"],
@@ -82,6 +83,7 @@
 
     "business_retail": {
       "label": "Business / Retail",
+      "default_kind": "business",
       "creates": { "contributor": true, "place": "optional" },
       "allowed_hosts": ["contributor"],
       "location_modes": ["fixed", "online", "roaming"],
@@ -95,6 +97,7 @@
 
     "media_creative": {
       "label": "Media / Creative",
+      "default_kind": "organization",
       "creates": { "contributor": true, "place": "optional" },
       "allowed_hosts": ["contributor"],
       "location_modes": ["fixed", "online", "roaming"],
@@ -108,6 +111,7 @@
 
     "outreach_npo": {
       "label": "Outreach / Non-profit",
+      "default_kind": "organization",
       "creates": { "contributor": true, "place": "optional" },
       "allowed_hosts": ["contributor"],
       "location_modes": ["fixed", "roaming", "online"],
@@ -121,6 +125,7 @@
 
     "care_recovery": {
       "label": "Care / Recovery",
+      "default_kind": "organization",
       "creates": { "contributor": true, "place": "optional" },
       "allowed_hosts": ["contributor"],
       "location_modes": ["fixed"],
@@ -128,6 +133,8 @@
       "planned_capabilities": ["booking"],
       "extra_fields": ["programme_types", "capacity", "referral_required", "safeguarding_contact"],
       "required_extra": ["safeguarding_contact"],
+      "extra_admin_review": true,
+      "map_opt_in": true,
       "listing": "self_serve_flagged",
       "wizard_steps": ["basics", "story", "location_hours", "safeguarding", "links", "review"],
       "gallery_rule": "No photos of identifiable clients or minors without documented consent.",
@@ -136,6 +143,7 @@
 
     "education": {
       "label": "Education",
+      "default_kind": "organization",
       "creates": { "contributor": true, "place": "optional" },
       "allowed_hosts": ["contributor"],
       "location_modes": ["fixed", "roaming", "online"],
@@ -213,6 +221,19 @@
       "christian-businesses": "business_retail",
       "safe-spaces": "care_recovery"
     }
+  },
+
+  "contributor_categories": {
+    "status": "Used by the Apply wizard (issue #202). The 12 Contributor types (CONTRIBUTOR_TYPES in src/lib/categories.ts) that name a preset. A type not listed here (markets-expos, sport-recreation, social-gatherings) offers no preset and the wizard behaves as before.",
+    "churches-ministries": "congregation_ministry",
+    "outreach-missions": "outreach_npo",
+    "christian-businesses": "business_retail",
+    "arts-culture": "media_creative",
+    "media-broadcasting": "media_creative",
+    "retreat-healing": "care_recovery",
+    "clinic": "care_recovery",
+    "rehab-development": "care_recovery",
+    "education-equipping": "education"
   },
 
   "fallback_preset": {
