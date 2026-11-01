@@ -131,7 +131,7 @@
               border: 'none',
               background: 'none',
               outline: 'none',
-              fontSize: 13.5,
+              fontSize: 'var(--fs-3)',
               fontWeight: 500,
               color: '#1a1a1a',
             },

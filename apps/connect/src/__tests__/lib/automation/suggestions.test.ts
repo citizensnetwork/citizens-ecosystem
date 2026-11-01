@@ -9,6 +9,7 @@ import {
   scrubPersonalContact,
   sourceDomain,
   validateSuggestion,
+  validateSuggestionEdit,
   type EventPayload,
 } from "@/lib/automation/suggestions";
 
@@ -310,5 +311,95 @@ describe("validateSuggestion: profile updates", () => {
 describe("sources", () => {
   it("only website, YouTube and calendar are readable in Phase 1/2 (Meta and TikTok need the page owner to connect an account)", () => {
     expect([...READABLE_SOURCE_KINDS].sort()).toEqual(["calendar", "website", "youtube"]);
+  });
+});
+
+describe("validateSuggestionEdit: an owner's edit passes the same rules as a suggestion from the Reader", () => {
+  const stored = validateSuggestion("event", goodEvent, SRC, NOW);
+  if (!stored.ok || stored.kind !== "event") throw new Error("expected an event");
+  const storedEvent = stored.payload;
+
+  it("lays the edit over the stored payload, validates the whole, and returns the normalised payload", () => {
+    const r = validateSuggestionEdit(
+      "event",
+      storedEvent,
+      { title: "  Sunday  Celebration (new venue) ", location: "The Hall, 4 Main Road" },
+      SRC,
+      NOW,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok || r.kind !== "event") throw new Error("expected an event");
+    expect(r.payload).toMatchObject({
+      title: "Sunday Celebration (new venue)",
+      location: "The Hall, 4 Main Road",
+      description: "Join us for worship.",
+      category: "church-services",
+      website_url: "https://www.church.example/sunday",
+    });
+  });
+
+  it("applies every rule a suggestion from the Reader faces", () => {
+    const bad = (edits: Record<string, unknown>) => validateSuggestionEdit("event", storedEvent, edits, SRC, NOW);
+    expect(bad({ title: "  " })).toEqual({ ok: false, reason: "event_title_required" });
+    expect(bad({ title: "ab" })).toEqual({ ok: false, reason: "event_title_required" });
+    expect(bad({ start: "2026-10-12 18:00" })).toEqual({ ok: false, reason: "event_start_invalid" });
+    expect(bad({ start: "2035-01-01T10:00:00Z" })).toEqual({ ok: false, reason: "event_start_out_of_range" });
+    const pii = bad({ description: "Ring Pastor Joe on 082 123 4567 or joe@home.example" });
+    if (!pii.ok || pii.kind !== "event") throw new Error("expected an event");
+    expect(pii.payload.description).toBe("Ring Pastor Joe on [removed] or [removed]");
+    expect(pii.warnings.join(" ")).toMatch(/removed/);
+  });
+
+  it("refuses a field the owner may not change (the category, the link, an unknown key) and an empty or non-object edit", () => {
+    for (const edits of [{ category: "youth" }, { website_url: "https://x.example/" }, { status: "published" }, { title: "Fine", created_by: "x" }]) {
+      expect(validateSuggestionEdit("event", storedEvent, edits, SRC, NOW), JSON.stringify(edits)).toEqual({ ok: false, reason: "edit_field_not_allowed" });
+    }
+    expect(validateSuggestionEdit("event", storedEvent, {}, SRC, NOW)).toEqual({ ok: false, reason: "edit_is_empty" });
+    for (const e of [null, "x", 5, [], undefined]) {
+      expect(validateSuggestionEdit("event", storedEvent, e, SRC, NOW), String(e)).toEqual({ ok: false, reason: "edit_must_be_an_object" });
+    }
+    expect(validateSuggestionEdit("poll", storedEvent, { title: "x" }, SRC, NOW)).toEqual({ ok: false, reason: "unknown_kind" });
+    expect(validateSuggestionEdit("event", null, { title: "Fine" }, SRC, NOW)).toEqual({ ok: false, reason: "payload_must_be_an_object" });
+    expect(validateSuggestionEdit("event", storedEvent, { title: "Fine" }, "http://insecure.example", NOW)).toEqual({ ok: false, reason: "source_url_must_be_https" });
+  });
+
+  it("moving the start moves the end with it, keeping the length, unless the edit sets the end too", () => {
+    const moved = validateSuggestionEdit("event", storedEvent, { start: "2026-10-18T09:00:00+02:00" }, SRC, NOW);
+    if (!moved.ok || moved.kind !== "event") throw new Error("expected an event");
+    expect(moved.payload.start).toBe("2026-10-18T07:00:00.000Z");
+    expect(moved.payload.end).toBe("2026-10-18T09:00:00.000Z"); // still two hours
+    expect(moved.warnings).toEqual([]);
+
+    const both = validateSuggestionEdit("event", storedEvent, { start: "2026-10-18T09:00:00+02:00", end: "2026-10-18T12:00:00+02:00" }, SRC, NOW);
+    if (!both.ok || both.kind !== "event") throw new Error("expected an event");
+    expect(both.payload.end).toBe("2026-10-18T10:00:00.000Z");
+
+    const noEnd = validateSuggestionEdit("event", { ...storedEvent, end: null }, { start: "2026-10-18T09:00:00+02:00" }, SRC, NOW);
+    if (!noEnd.ok || noEnd.kind !== "event") throw new Error("expected an event");
+    expect(noEnd.payload.end).toBeNull();
+  });
+
+  it("works for a news post and a profile update, with the same refusals", () => {
+    const news = validateSuggestion("news", { title: "New building opens", body: "We open on Sunday.", link: "https://www.church.example/n/1", post_date: "2026-10-03" }, SRC, NOW);
+    if (!news.ok) throw new Error("expected news");
+    const n = validateSuggestionEdit("news", news.payload, { body: "We open on Sunday at 9." }, SRC, NOW);
+    if (!n.ok || n.kind !== "news") throw new Error("expected news");
+    expect(n.payload).toMatchObject({ title: "New building opens", body: "We open on Sunday at 9.", link: "https://www.church.example/n/1" });
+    expect(validateSuggestionEdit("news", news.payload, { body: "" }, SRC, NOW)).toEqual({ ok: false, reason: "news_body_required" });
+    expect(validateSuggestionEdit("news", news.payload, { link: "https://other.example/" }, SRC, NOW)).toEqual({ ok: false, reason: "edit_field_not_allowed" });
+
+    const prof = validateSuggestion("profile", { field: "website_url", value: "https://www.church.example/" }, SRC, NOW);
+    if (!prof.ok) throw new Error("expected profile");
+    const p = validateSuggestionEdit("profile", prof.payload, { value: "https://church.example/about" }, SRC, NOW);
+    if (!p.ok || p.kind !== "profile") throw new Error("expected profile");
+    expect(p.payload).toEqual({ field: "website_url", value: "https://church.example/about" });
+    expect(validateSuggestionEdit("profile", prof.payload, { value: "javascript:alert(1)" }, SRC, NOW)).toEqual({ ok: false, reason: "profile_value_invalid" });
+    expect(validateSuggestionEdit("profile", prof.payload, { field: "bio", value: "x" }, SRC, NOW)).toEqual({ ok: false, reason: "edit_field_not_allowed" });
+  });
+
+  it("returns a fingerprint that is a function of the edited text, which is why the caller must keep the stored one", () => {
+    const edited = validateSuggestionEdit("event", storedEvent, { title: "A completely different title" }, SRC, NOW);
+    if (!edited.ok || !stored.ok) throw new Error("expected ok");
+    expect(edited.fingerprint).not.toBe(stored.fingerprint);
   });
 });

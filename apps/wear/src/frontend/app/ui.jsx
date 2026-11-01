@@ -491,7 +491,7 @@
               border: '1px solid #efedea',
               borderRadius: 12,
               padding: '10px 12px',
-              fontSize: 12.5,
+              fontSize: 'var(--fs-3)',
               fontWeight: 500,
               outline: 'none',
               background: '#fff',
