@@ -71,6 +71,7 @@ supabase/.branches/
 /public/app/
 /public/vendor/
 /public/maplibre-loader.mjs
+/public/icons/
 
 .vercel
 .env*

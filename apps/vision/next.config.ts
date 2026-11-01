@@ -15,6 +15,46 @@ if (rawBasePath !== "" && rawBasePath !== "/" && rawBasePath.replace(/\/$/, "") 
 }
 const basePath = rawBasePath === "" || rawBasePath === "/" ? "" : BASE_PATH;
 
+// The addresses that existed before the shared domain keep working while the prefix is on: the bare "/" goes to the
+// prefix, and "/api/*" is REWRITTEN (never redirected). The rule is packages/ecosystem's oldAddressRules("vision",
+// basePath); like the base path above it is copied here, and src/__tests__/basePath.test.ts fails if the copy and the
+// package ever disagree. Both lists are empty when the prefix is unset, so today's behaviour is untouched. Next
+// refuses a `basePath: false` rewrite to an internal path, so the "/api" destination is this app's own production
+// address (HUB_ORIGIN_VISION overrides it): one extra hop into the same project.
+type OldRedirect = { source: string; destination: string; basePath: false; permanent: boolean };
+type OldRewrite = { source: string; destination: string; basePath: false };
+
+/** HUB_ORIGIN_VISION when set (a bare origin), otherwise this app's production address. */
+function ownOrigin(): string {
+  const raw = (process.env.HUB_ORIGIN_VISION ?? "").trim();
+  if (raw === "") return "https://citizens-ecosystem-vision.vercel.app";
+  let url: URL | undefined;
+  try {
+    url = new URL(raw);
+  } catch {
+    url = undefined;
+  }
+  const loopback = url !== undefined && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  const schemeOk = url !== undefined && (url.protocol === "https:" || (url.protocol === "http:" && loopback));
+  const bare = url !== undefined && url.pathname === "/" && url.search === "" && url.hash === "" && url.username === "" && url.password === "";
+  if (url === undefined || !schemeOk || !bare) {
+    throw new Error(
+      `[ecosystem] HUB_ORIGIN_VISION=${JSON.stringify(raw)} is not valid: use a bare origin such as ` +
+        `"https://example.vercel.app" (https only; http only for localhost), with no path, query or login.`,
+    );
+  }
+  return url.origin;
+}
+
+function oldAddressRules(): { redirects: OldRedirect[]; rewrites: OldRewrite[] } {
+  if (!basePath) return { redirects: [], rewrites: [] };
+  return {
+    redirects: [{ source: "/", basePath: false, destination: basePath, permanent: false }],
+    rewrites: [{ source: "/api/:path*", basePath: false, destination: `${ownOrigin()}${basePath}/api/:path*` }],
+  };
+}
+const oldAddress = oldAddressRules();
+
 const nextConfig: NextConfig = {
   // Spread, so an unset value leaves the config exactly as it was (no `basePath` key at all). Next then prefixes
   // the "/" redirect, the headers, public/ files, _next and /api with it.
@@ -36,7 +76,11 @@ const nextConfig: NextConfig = {
   // compiles into public/. `/` is the app.
   redirects: async () => [
     { source: "/", destination: "/index.html", permanent: false },
+    // Old address: the bare "/" goes to the prefix (empty until NEXT_PUBLIC_BASE_PATH is set).
+    ...oldAddress.redirects,
   ],
+  // Old address: "/api/*" (absent until NEXT_PUBLIC_BASE_PATH is set).
+  ...(basePath ? { rewrites: async () => oldAddress.rewrites } : {}),
   headers: async () => [
     {
       // `/:path*`, NOT `/(.*)`: under a basePath Next prefixes the pattern, and `/citizens/vision/(.*)` needs a slash
