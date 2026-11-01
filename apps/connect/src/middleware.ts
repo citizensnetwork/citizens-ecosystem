@@ -1,25 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isContributor } from "@/lib/profiles/capabilities";
-
-/** Routes (and everything under them) that a contributor with `bio_setup_required = true` is
- *  allowed to hit before completing setup. Everything else redirects to the app root. */
-const BIO_SETUP_ALLOW = [
-  "/logout",
-  "/api/contributor/setup",
-  "/api/auth",
-  "/auth",
-];
-
-/**
- * Connect has no /login or /contributor/setup page: the app is one static page that draws its
- * own screens, so both gate redirects go to the app root "/". The root therefore has to be
- * allowed or the redirect would loop. It is matched EXACTLY and kept out of the prefix list
- * above, because `startsWith("/" + "/")` would also admit any path that begins with "//".
- */
-function bioSetupAllows(pathname: string): boolean {
-  return pathname === "/" || BIO_SETUP_ALLOW.some((p) => pathname === p || pathname.startsWith(p + "/"));
-}
 
 /**
  * CORS for `/api/*` lives HERE (not next.config.ts static headers) because the
@@ -53,34 +33,6 @@ function withCors(res: NextResponse, origin: string | null): NextResponse {
   res.headers.set("Access-Control-Allow-Credentials", "true");
   res.headers.set("Vary", "Origin");
   return res;
-}
-
-/**
- * Build a redirect response that carries every cookie currently set on
- * `supabaseResponse`. Required because `supabase.auth.signOut()` sets
- * `Set-Cookie: sb-*=; Max-Age=0` on `supabaseResponse` via our
- * `cookies.setAll` callback — returning a fresh `NextResponse.redirect(...)`
- * would discard those headers and leave stale auth cookies in the browser,
- * defeating force-reauth (audit: middleware-and-session, Finding #1).
- */
-function redirectWithCookies(target: URL, supabaseResponse: NextResponse): NextResponse {
-  const res = NextResponse.redirect(target);
-  supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
-  return res;
-}
-
-/**
- * The app root as a redirect target: the one page that always exists. The URL is cloned from the
- * request, so when the app is served under a prefix (NEXT_PUBLIC_BASE_PATH, e.g. /citizens/connect)
- * NextURL puts the prefix back on serialising and the person stays inside the app. `reauth=1` is
- * kept as a hint that the sign-out was forced by us (the old /login page read it).
- */
-function appRootUrl(request: NextRequest, opts: { reauth?: boolean } = {}): URL {
-  const root = request.nextUrl.clone();
-  root.pathname = "/";
-  root.search = "";
-  if (opts.reauth) root.searchParams.set("reauth", "1");
-  return root;
 }
 
 export async function middleware(request: NextRequest) {
@@ -124,72 +76,14 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh the session so it doesn't expire
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Post-auth role / bio-setup enforcement (Batch E).
-  if (
-    user &&
-    !pathname.startsWith("/_next") &&
-    !pathname.startsWith("/api/auth") &&
-    !pathname.startsWith("/auth")
-  ) {
-    // force_reauth_at / bio_setup_required are private profile columns
-    // (migs 176/177) — read through the caller-row-only RPC.
-    const { data: profile, error: profileErr } = await supabase
-      .rpc("get_my_profile_private")
-      .select("force_reauth_at, bio_setup_required, role")
-      .maybeSingle();
-
-    // Fail-closed on transient DB error: we cannot prove the session
-    // is valid, so force a re-login. Logged so a degraded gate is
-    // visible in production logs.
-    if (profileErr) {
-      console.warn("[middleware] profile lookup failed", profileErr);
-      await supabase.auth.signOut();
-      return redirectWithCookies(appRootUrl(request, { reauth: true }), supabaseResponse);
-    }
-
-    // Force-reauth gate: a role change stamped force_reauth_at (DB trigger).
-    // Compare against the access-token `iat`. If the JWT predates the
-    // bump — or we cannot establish an iat at all — sign out and send
-    // to the app root. Fail-closed on parse errors.
-    if (profile?.force_reauth_at) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      let iatMs: number | null = null;
-      if (accessToken) {
-        const parts = accessToken.split(".");
-        if (parts.length === 3) {
-          try {
-            const payloadJson = Buffer.from(parts[1], "base64url").toString("utf8");
-            const payload = JSON.parse(payloadJson) as { iat?: number };
-            if (typeof payload.iat === "number") {
-              iatMs = payload.iat * 1000;
-            }
-          } catch {
-            iatMs = null;
-          }
-        }
-      }
-      const reauthMs = new Date(profile.force_reauth_at).getTime();
-      // Fail-closed: if we can't verify iat, treat the JWT as stale.
-      if (iatMs === null || reauthMs > iatMs) {
-        await supabase.auth.signOut();
-        return redirectWithCookies(appRootUrl(request, { reauth: true }), supabaseResponse);
-      }
-    }
-
-    // Bio-setup gate: freshly promoted contributors must supply their
-    // minimum public profile before accessing the rest of the app.
-    if (
-      profile?.bio_setup_required &&
-      isContributor(profile) &&
-      !bioSetupAllows(pathname)
-    ) {
-      return NextResponse.redirect(appRootUrl(request));
-    }
-  }
+  // Refresh the session so it doesn't expire. That is all the middleware does for pages. The force
+  // re-login and bio-setup gates that used to follow were retired on 2026-11-01 (founder decision A,
+  // RESUME_HERE S17): no real session reaches them (the app keeps its session in localStorage and
+  // sends a Bearer token to /api, which is skipped above), and roles are read from the database on
+  // every request, so a changed role takes effect at once without a sign-out. The columns
+  // `force_reauth_at` and `bio_setup_required` and the trigger that stamps them stay until a
+  // migration drops them.
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }

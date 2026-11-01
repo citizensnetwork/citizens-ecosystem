@@ -5,8 +5,8 @@
  * Required:  display_name (1..120)
  * Optional:  contact_email / website_url / bio (<=500)
  *
- * On success, clears `profiles.bio_setup_required` so middleware stops
- * redirecting to /contributor/setup.
+ * On success, clears `profiles.bio_setup_required`. Nothing enforces that flag any more (the
+ * middleware gate was retired on 2026-11-01); it stays as a record of whether setup was done.
  */
 
 import { NextResponse, type NextRequest } from "next/server";

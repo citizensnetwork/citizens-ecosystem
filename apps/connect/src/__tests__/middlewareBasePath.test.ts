@@ -3,30 +3,27 @@
  * The middleware when Connect is served under /citizens/connect (NEXT_PUBLIC_BASE_PATH, C39 PR B).
  *
  * Next strips the base path from `request.nextUrl.pathname` before the middleware runs, so the
- * code's own checks (`startsWith("/api")`, BIO_SETUP_ALLOW) keep seeing app-relative paths. The other
- * middleware test fakes the request; this one uses the REAL NextRequest/NextResponse with
- * `nextConfig.basePath`, so the premise itself is pinned, and the redirects it issues keep the prefix
- * (NextURL puts it back when serialising).
- *
- * Every redirect the middleware issues lands on the app root, the one page that exists (Connect has no
- * /login and no /contributor/setup); the last block pins that against next.config.ts's own list of served paths.
+ * code's own check (`startsWith("/api")`) keeps seeing app-relative paths. The other middleware test
+ * fakes the request; this one uses the REAL NextRequest/NextResponse with `nextConfig.basePath`, so
+ * the premise itself is pinned. The middleware no longer redirects anyone (the force re-login and
+ * bio-setup gates were retired, founder decision A of 2026-11-01), so a page request under the prefix
+ * just refreshes the session and passes through.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
-import nextConfig from "../../next.config";
 
 const mockGetUser = vi.fn();
-const mockGetSession = vi.fn();
-const mockSignOut = vi.fn();
-const mockMaybeSingle = vi.fn();
 
+// Only getUser exists: a profile read, a table read or a sign-out would throw and fail the test.
 vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({
-    auth: { getUser: mockGetUser, getSession: mockGetSession, signOut: mockSignOut },
+    auth: { getUser: mockGetUser },
     from: () => {
       throw new Error("middleware must not read public.profiles directly");
     },
-    rpc: () => ({ select: () => ({ maybeSingle: mockMaybeSingle }) }),
+    rpc: () => {
+      throw new Error("middleware must not read the caller's private profile any more");
+    },
   })),
 }));
 
@@ -42,18 +39,10 @@ function req(path: string, opts: { base?: string; method?: string; origin?: stri
   });
 }
 
-const contributorNeedingSetup = {
-  data: { force_reauth_at: null, bio_setup_required: true, role: "contributor" },
-  error: null,
-};
-
 beforeEach(() => {
   // reset (not just clear): a queued mockResolvedValueOnce a test never consumed must not leak into the next one
-  for (const m of [mockGetUser, mockGetSession, mockSignOut, mockMaybeSingle]) m.mockReset();
+  mockGetUser.mockReset();
   mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
-  mockGetSession.mockResolvedValue({ data: { session: null }, error: null });
-  mockSignOut.mockResolvedValue({ error: null });
-  mockMaybeSingle.mockResolvedValue({ data: null, error: null });
 });
 
 describe("the premise: Next hands the middleware an app-relative path", () => {
@@ -96,118 +85,19 @@ describe("/api under the prefix", () => {
   });
 });
 
-describe("the bio-setup gate under the prefix (BIO_SETUP_ALLOW is app-relative)", () => {
-  it("lets a contributor who still has setup to do reach the app root (the redirect target, so no loop)", async () => {
+describe("page routes under the prefix", () => {
+  it("refreshes the session and passes the request through with no redirect, signed in or not, with or without the prefix", async () => {
     const { middleware } = await import("@/middleware");
-    for (const [path, base] of [["/", BASE], ["", BASE], ["/", ""]] as const) {
-      mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
-      mockMaybeSingle.mockResolvedValueOnce(contributorNeedingSetup);
-      const res = await middleware(req(path, { base }));
-      expect(res.headers.get("location"), `${base}${path}`).toBeNull();
-      expect(res.headers.get("x-middleware-next"), `${base}${path}`).toBe("1");
+    let calls = 0;
+    for (const [path, base] of [["/dashboard", BASE], ["/", BASE], ["", BASE], ["/dashboard", ""]] as const) {
+      for (const user of [null, { id: "u1" }]) {
+        mockGetUser.mockResolvedValueOnce({ data: { user }, error: null });
+        const res = await middleware(req(path, { base }));
+        calls += 1;
+        expect(res.headers.get("location"), `${base}${path}`).toBeNull();
+        expect(res.headers.get("x-middleware-next"), `${base}${path}`).toBe("1");
+      }
     }
+    expect(mockGetUser).toHaveBeenCalledTimes(calls);
   });
-
-  it("lets them reach the other allow-listed paths, and nothing that only shares a prefix", async () => {
-    const { middleware } = await import("@/middleware");
-    // /login and /contributor/setup used to be allowed because they were the redirect targets; they are not pages any more.
-    for (const [path, allowed] of [
-      ["/logout", true],
-      ["/login", false],
-      ["/contributor/setup", false],
-      ["/contributor/setupx", false],
-      ["//dashboard", false],
-    ] as const) {
-      mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
-      mockMaybeSingle.mockResolvedValueOnce(contributorNeedingSetup);
-      const res = await middleware(req(path));
-      expect(res.headers.get("location") === null, path).toBe(allowed);
-    }
-  });
-
-  it("sends them to the app root from anywhere else, and the redirect keeps the prefix", async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
-    mockMaybeSingle.mockResolvedValueOnce(contributorNeedingSetup);
-    const { middleware } = await import("@/middleware");
-    const res = await middleware(req("/dashboard"));
-    expect(res.status).toBe(307);
-    // Under a prefix Next writes the app root as the bare prefix (the app's front door), not with a trailing slash.
-    expect(res.headers.get("location")).toBe(`${SITE}${BASE}`);
-  });
-
-  it("without a prefix the same redirect has none", async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
-    mockMaybeSingle.mockResolvedValueOnce(contributorNeedingSetup);
-    const { middleware } = await import("@/middleware");
-    const res = await middleware(req("/dashboard", { base: "" }));
-    expect(res.headers.get("location")).toBe(`${SITE}/`);
-  });
-});
-
-describe("the force-reauth redirect under the prefix", () => {
-  it("signs out and sends the person to the app root with reauth=1, inside the prefix", async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
-    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { middleware } = await import("@/middleware");
-    const res = await middleware(req("/dashboard"));
-    warn.mockRestore();
-    expect(mockSignOut).toHaveBeenCalledTimes(1);
-    expect(res.headers.get("location")).toBe(`${SITE}${BASE}?reauth=1`);
-  });
-});
-
-describe("every redirect lands on a page the app serves", () => {
-  // next.config.ts's rewrites are the list of paths that return the app (index.html); a path outside it is Next's 404.
-  const escapeRegExp = (literal: string) => literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const matches = (source: string, path: string) =>
-    new RegExp("^" + source.split(/:[A-Za-z]+/).map(escapeRegExp).join("[^/]+") + "$").test(path);
-  const served = async (path: string) =>
-    ((await nextConfig.rewrites!()) as { source: string }[]).some((r) => matches(r.source, path));
-
-  it("knows which paths are served: the root and the screens are, the old /login and /contributor/setup are not", async () => {
-    expect(await served("/")).toBe(true);
-    expect(await served("/dashboard")).toBe(true);
-    expect(await served("/login")).toBe(false);
-    expect(await served("/contributor/setup")).toBe(false);
-    expect(await served("/events")).toBe(false);
-  });
-
-  const target = (res: Response, base: string) => {
-    const loc = new URL(res.headers.get("location") ?? "");
-    expect(loc.origin).toBe(SITE);
-    expect(loc.pathname === base || loc.pathname.startsWith(`${base}/`), `${loc.pathname} stays inside ${base || "the site"}`).toBe(true);
-    return loc.pathname.slice(base.length) || "/"; // the bare prefix is the app root
-  };
-
-  for (const base of [BASE, ""]) {
-    it(`profile-lookup failure, stale session and bio-setup all end on a served page (prefix "${base}")`, async () => {
-      const { middleware } = await import("@/middleware");
-      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-      const paths: string[] = [];
-
-      // 1. the profile cannot be read: fail closed
-      mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
-      mockMaybeSingle.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
-      paths.push(target(await middleware(req("/dashboard/events", { base })), base));
-
-      // 2. the token predates force_reauth_at
-      mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
-      mockGetSession.mockResolvedValueOnce({ data: { session: null }, error: null });
-      mockMaybeSingle.mockResolvedValueOnce({
-        data: { force_reauth_at: new Date().toISOString(), bio_setup_required: false, role: "citizen" },
-        error: null,
-      });
-      paths.push(target(await middleware(req("/e/abc", { base })), base));
-
-      // 3. a new contributor who has not finished setup
-      mockGetUser.mockResolvedValueOnce({ data: { user: { id: "u1" } }, error: null });
-      mockMaybeSingle.mockResolvedValueOnce(contributorNeedingSetup);
-      paths.push(target(await middleware(req("/admin/contributors", { base })), base));
-      warn.mockRestore();
-
-      expect(paths).toEqual(["/", "/", "/"]);
-      for (const path of paths) expect(await served(path), path).toBe(true);
-    });
-  }
 });
