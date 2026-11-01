@@ -1,7 +1,7 @@
 /**
  * Migration 202 is a proposal. It is not applied here. These checks pin the
  * Let's cap, the category lock, the empty search_path, and the anon revoke
- * so a later edit cannot quietly drop them. 201 stays free for issue #314.
+ * so a later edit cannot quietly drop them. 201 is 201_open_to_collaborate.sql.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -19,7 +19,7 @@ function starterIds(source: string): string[] {
 describe("migration 202 (not applied)", () => {
   it("is 202, and 201 is not taken by this change", () => {
     expect(existsSync(join(root, "supabase/migrations/202_lets_gatherings.sql"))).toBe(true);
-    expect(existsSync(join(root, "supabase/migrations/201_open_to_collaborate.sql"))).toBe(false);
+    expect(existsSync(join(root, "supabase/migrations/201_open_to_collaborate.sql"))).toBe(true);
     expect(sql).toMatch(/NOT APPLIED/);
     expect(sql).toMatch(/Do not apply/);
   });
