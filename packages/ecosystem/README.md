@@ -6,7 +6,7 @@ be served from **one domain, one path per app**:
 ```
 https://<domain>/citizens/connect
 https://<domain>/citizens/vision
-https://<domain>/citizens/wear        (learn, play, move ... follow, see "Coming soon")
+https://<domain>/citizens/wear        (learn, play, move, impact ... follow, see "Coming soon")
 ```
 
 This package is the single place that knows those paths. Each app's
@@ -18,21 +18,21 @@ as [`@citizens/frontend-build`](../frontend-build/README.md)).
 
 ## API
 
-| Export                        | What it is                                                                                                                                                                    |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `APP_SLUGS`                   | The apps that exist in this repo: `connect`, `vision`, `wear`. A slug is a public URL segment, so never rename one casually.                                                  |
-| `PATH_ROOT`                   | `/citizens`.                                                                                                                                                                  |
-| `BASE_PATH_ENV`               | `NEXT_PUBLIC_BASE_PATH`, the env var an app's Vercel project sets.                                                                                                            |
-| `appPath(slug)`               | `/citizens/<slug>`. Throws on an unknown slug.                                                                                                                                |
-| `resolveBasePath(slug, raw)`  | `''` (site root) or exactly `appPath(slug)`. Unset, blank and `/` mean the site root; one trailing slash is forgiven; **anything else throws**, including another app's path. |
-| `basePathFromEnv(slug, env?)` | `resolveBasePath` for `process.env` (or the env you pass).                                                                                                                    |
-| `SITE_ORIGIN`                 | `https://219.co.za`, the shared domain (no trailing slash).                                                                                                                   |
-| `COMING_SOON`                 | Apps planned but not built: `learn`, `play`, `move`, each with a public `label` and one-line `summary`. A slug here is never in `APP_SLUGS` (the tests fail if it is).        |
-| `PRODUCTION_ORIGINS`          | Each built app's own production address, `https://citizens-ecosystem-<app>.vercel.app`.                                                                                       |
-| `appOrigin(slug, env?)`       | `HUB_ORIGIN_<SLUG>` when set (a bare origin; https, or http for localhost), otherwise the production address. Throws on a path, query, login or other scheme.                 |
-| `originEnvName(slug)`         | `HUB_ORIGIN_CONNECT`, `HUB_ORIGIN_VISION`, `HUB_ORIGIN_WEAR`.                                                                                                                 |
-| `OLD_HOSTS`                   | Hosts an app used to answer on before the shared domain (Connect: `citizenscentral.co.za` and `www.citizenscentral.co.za`).                                                   |
-| `oldAddressRules(slug, base)` | The redirects and rewrites an app adds to its `next.config` while it is under its prefix (see "Old addresses"). Both lists are empty when `base` is `''`.                     |
+| Export                        | What it is                                                                                                                                                                       |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_SLUGS`                   | The apps that exist in this repo: `connect`, `vision`, `wear`. A slug is a public URL segment, so never rename one casually.                                                     |
+| `PATH_ROOT`                   | `/citizens`.                                                                                                                                                                     |
+| `BASE_PATH_ENV`               | `NEXT_PUBLIC_BASE_PATH`, the env var an app's Vercel project sets.                                                                                                               |
+| `appPath(slug)`               | `/citizens/<slug>`. Throws on an unknown slug.                                                                                                                                   |
+| `resolveBasePath(slug, raw)`  | `''` (site root) or exactly `appPath(slug)`. Unset, blank and `/` mean the site root; one trailing slash is forgiven; **anything else throws**, including another app's path.    |
+| `basePathFromEnv(slug, env?)` | `resolveBasePath` for `process.env` (or the env you pass).                                                                                                                       |
+| `SITE_ORIGIN`                 | `https://219.co.za`, the shared domain (no trailing slash).                                                                                                                      |
+| `COMING_SOON`                 | Apps planned but not built: `learn`, `play`, `move`, `impact`, each with a public `label` and one-line `summary`. A slug here is never in `APP_SLUGS` (the tests fail if it is). |
+| `PRODUCTION_ORIGINS`          | Each built app's own production address, `https://citizens-ecosystem-<app>.vercel.app`.                                                                                          |
+| `appOrigin(slug, env?)`       | `HUB_ORIGIN_<SLUG>` when set (a bare origin; https, or http for localhost), otherwise the production address. Throws on a path, query, login or other scheme.                    |
+| `originEnvName(slug)`         | `HUB_ORIGIN_CONNECT`, `HUB_ORIGIN_VISION`, `HUB_ORIGIN_WEAR`.                                                                                                                    |
+| `OLD_HOSTS`                   | Hosts an app used to answer on before the shared domain (Connect: `citizenscentral.co.za` and `www.citizenscentral.co.za`).                                                      |
+| `oldAddressRules(slug, base)` | The redirects and rewrites an app adds to its `next.config` while it is under its prefix (see "Old addresses"). Both lists are empty when `base` is `''`.                        |
 
 ## How an app uses it
 
@@ -123,7 +123,8 @@ a bad `HUB_ORIGIN_*`. Wear's `next.config.js` calls the package directly.
 
 ## Coming soon
 
-`COMING_SOON` reserves `/citizens/learn`, `/citizens/play` and `/citizens/move`
+`COMING_SOON` reserves `/citizens/learn`, `/citizens/play`, `/citizens/move` and
+`/citizens/impact`
 for a "coming soon" page on the front door. When one of them is built, **move**
 its entry to `APP_SLUGS`: the front door then proxies to it instead of showing
 the page. The two lists must never share a slug; the tests fail if they do. The

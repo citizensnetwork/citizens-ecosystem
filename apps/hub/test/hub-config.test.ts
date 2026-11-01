@@ -174,6 +174,7 @@ describe('hubHeaders', () => {
       '/citizens/learn',
       '/citizens/play',
       '/citizens/move',
+      '/citizens/impact',
       '/citizens/unknown',
       '/citizens/learn/extra',
       '/robots.txt',

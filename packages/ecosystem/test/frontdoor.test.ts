@@ -20,8 +20,24 @@ describe('SITE_ORIGIN', () => {
 });
 
 describe('COMING_SOON', () => {
-  it('reserves learn, play and move, in that order', () => {
-    expect(COMING_SOON.map((app) => app.slug)).toEqual(['learn', 'play', 'move']);
+  it('reserves learn, play, move and impact, in that order', () => {
+    expect(COMING_SOON.map((app) => app.slug)).toEqual(['learn', 'play', 'move', 'impact']);
+  });
+
+  it('describes Learn as courses, teachers and all learning material (the founder’s words, 2026-11-01)', () => {
+    const learn = COMING_SOON.find((app) => app.slug === 'learn');
+    expect(learn?.label).toBe('Citizens Learn');
+    for (const word of ['Christian', 'courses', 'teachers', 'learning material']) {
+      expect(learn?.summary, word).toContain(word);
+    }
+  });
+
+  it('reserves Impact with VISION.md’s line: community change proposed, agreed, funded and launched (founder, 2026-11-01)', () => {
+    const impact = COMING_SOON.find((app) => app.slug === 'impact');
+    expect(impact?.label).toBe('Citizens Impact');
+    for (const word of ['proposed', 'agreed', 'funded', 'officially launched', 'community needs']) {
+      expect(impact?.summary, word).toContain(word);
+    }
   });
 
   it('never overlaps the built apps, so a slug is either proxied or a coming-soon page', () => {

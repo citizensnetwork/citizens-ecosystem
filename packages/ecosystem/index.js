@@ -47,7 +47,8 @@ const COMING_SOON = Object.freeze([
   Object.freeze({
     slug: 'learn',
     label: 'Citizens Learn',
-    summary: 'Discovery of Christian educational, equipping and training organisations.',
+    summary:
+      'Find Christian courses, teachers and all learning material, from educational, equipping and training organisations.',
   }),
   Object.freeze({
     slug: 'play',
@@ -60,6 +61,12 @@ const COMING_SOON = Object.freeze([
     label: 'Citizens Move',
     summary:
       'Active events for individuals and families: community runs, hikes, prayer walks, archery, soccer, paddling, cycling and car runs.',
+  }),
+  Object.freeze({
+    slug: 'impact',
+    label: 'Citizens Impact',
+    summary:
+      'Where community change is proposed, agreed, funded and officially launched, uniting large financial role players and organisations in addressing community needs.',
   }),
 ]);
 
