@@ -29,17 +29,19 @@ const graph = {
     'packages/connect-client': ['wear'],
     'packages/config': ['wear'],
     'packages/ui': [],
-    'packages/braces-patched': ['connect', 'vision', 'wear'],
+    'packages/ecosystem': ['connect', 'vision', 'wear', 'hub'],
+    'packages/braces-patched': ['connect', 'vision', 'wear', 'hub'],
   },
   affectedByApp: {
     connect: ['connect'],
     vision: ['vision'],
     wear: ['wear'],
+    hub: ['hub'],
   },
 };
 
-const none = { connect: 'skip', vision: 'skip', wear: 'skip' };
-const all = { connect: 'build', vision: 'build', wear: 'build' };
+const none = { connect: 'skip', vision: 'skip', wear: 'skip', hub: 'skip' };
+const all = { connect: 'build', vision: 'build', wear: 'build', hub: 'build' };
 
 function expectActions(files, expected, workspace = graph) {
   for (const app of APPS) {
@@ -66,46 +68,37 @@ describe('docs and per-app decisions', () => {
   });
 
   it('builds only the app whose code changed', () => {
-    expectActions(['apps/connect/src/a.ts'], { connect: 'build', vision: 'skip', wear: 'skip' });
-    expectActions(['apps/vision/src/a.ts'], { connect: 'skip', vision: 'build', wear: 'skip' });
-    expectActions(['apps/wear/package.json'], { connect: 'skip', vision: 'skip', wear: 'build' });
+    const only = (app) => ({ ...none, [app]: 'build' });
+    expectActions(['apps/connect/src/a.ts'], only('connect'));
+    expectActions(['apps/vision/src/a.ts'], only('vision'));
+    expectActions(['apps/wear/package.json'], only('wear'));
+    expectActions(['apps/hub/src/pages/citizens/index.tsx'], only('hub'));
     expectActions(['apps/connect/src/a.ts', 'apps/vision/src/b.ts'], {
+      ...none,
       connect: 'build',
       vision: 'build',
-      wear: 'skip',
     });
   });
 
   it('ignores docs mixed into another app and still skips the untouched app', () => {
     expectActions(['README.md', 'apps/vision/src/a.ts', 'apps/vision/docs/pic.png'], {
-      connect: 'skip',
+      ...none,
       vision: 'build',
-      wear: 'skip',
     });
   });
 
   it('builds every dependent of a shared package and skips the rest', () => {
-    expectActions(['packages/utils/src/index.ts'], {
-      connect: 'skip',
-      vision: 'skip',
-      wear: 'build',
-    });
-    expectActions(['packages/frontend-build/index.js'], all);
+    expectActions(['packages/utils/src/index.ts'], { ...none, wear: 'build' });
+    // The front door has no frontend of its own, so frontend-build never rebuilds it.
+    expectActions(['packages/frontend-build/index.js'], { ...all, hub: 'skip' });
     expectActions(['packages/ui/src/index.ts'], none);
     expectActions(['packages/braces-patched/index.js'], all);
-    expectActions(['packages/config/eslint-preset.mjs'], {
-      connect: 'skip',
-      vision: 'skip',
-      wear: 'build',
-    });
+    expectActions(['packages/ecosystem/index.js'], all);
+    expectActions(['packages/config/eslint-preset.mjs'], { ...none, wear: 'build' });
   });
 
   it('builds when a code path is renamed into docs', () => {
-    expectActions(['apps/connect/src/a.ts', 'docs/a.md'], {
-      connect: 'build',
-      vision: 'skip',
-      wear: 'skip',
-    });
+    expectActions(['apps/connect/src/a.ts', 'docs/a.md'], { ...none, connect: 'build' });
   });
 
   it('does not treat a lookalike path as an app or a package', () => {
@@ -230,7 +223,7 @@ describe('git diff parsing', () => {
       'apps/connect/src/old.ts',
       'docs/new.md',
     ]);
-    expectActions(parsed.files, { connect: 'build', vision: 'build', wear: 'skip' });
+    expectActions(parsed.files, { ...none, connect: 'build', vision: 'build' });
   });
 
   it('treats an empty diff as no files and a broken diff as unreadable', () => {
@@ -254,6 +247,7 @@ describe('workspace graph', () => {
       },
     },
     { dir: 'packages/config', pkg: { name: '@citizens/config' } },
+    { dir: 'packages/ecosystem', pkg: { name: '@citizens/ecosystem' } },
     {
       dir: 'packages/utils',
       pkg: {
@@ -315,6 +309,13 @@ describe('workspace graph', () => {
         },
       },
     },
+    {
+      app: 'hub',
+      pkg: {
+        name: 'citizens-hub',
+        devDependencies: { '@citizens/ecosystem': 'workspace:*' },
+      },
+    },
   ];
   const rootPackage = { pnpm: { overrides: { braces: 'link:./packages/braces-patched' } } };
 
@@ -327,11 +328,18 @@ describe('workspace graph', () => {
     assert.deepEqual(built.packageApps['packages/connect-client'], ['wear']);
     assert.deepEqual(built.packageApps['packages/config'], ['wear']);
     assert.deepEqual(built.packageApps['packages/ui'], []);
-    assert.deepEqual(built.packageApps['packages/braces-patched'], ['connect', 'vision', 'wear']);
+    assert.deepEqual(built.packageApps['packages/ecosystem'], ['hub']);
+    assert.deepEqual(built.packageApps['packages/braces-patched'], [
+      'connect',
+      'vision',
+      'wear',
+      'hub',
+    ]);
     assert.deepEqual(built.affectedByApp, {
       connect: ['connect'],
       vision: ['vision'],
       wear: ['wear'],
+      hub: ['hub'],
     });
   });
 
@@ -346,11 +354,12 @@ describe('workspace graph', () => {
           pkg: { name: 'citizens-vision', dependencies: { 'citizens-connect': 'workspace:*' } },
         },
         { app: 'wear', pkg: { name: '@citizens/wear' } },
+        { app: 'hub', pkg: { name: 'citizens-hub' } },
       ],
     });
     assert.equal(built.ok, true);
     assert.deepEqual(built.affectedByApp.connect, ['connect', 'vision']);
-    expectActions(['apps/connect/src/a.ts'], { connect: 'build', vision: 'build', wear: 'skip' }, built);
+    expectActions(['apps/connect/src/a.ts'], { ...none, connect: 'build', vision: 'build' }, built);
   });
 
   it('fails closed when the graph is ambiguous', () => {
@@ -401,14 +410,25 @@ describe('workspace graph', () => {
     assert.deepEqual(live.packageApps['packages/utils'], ['connect', 'vision', 'wear']);
     assert.deepEqual(live.packageApps['packages/db'], ['wear']);
     assert.deepEqual(live.packageApps['packages/connect-client'], ['wear']);
-    assert.deepEqual(live.packageApps['packages/config'], ['wear']);
+    assert.deepEqual(live.packageApps['packages/config'], ['wear', 'hub']);
     assert.deepEqual(live.packageApps['packages/ui'], []);
-    assert.deepEqual(live.packageApps['packages/braces-patched'], ['connect', 'vision', 'wear']);
+    assert.deepEqual(live.packageApps['packages/braces-patched'], [
+      'connect',
+      'vision',
+      'wear',
+      'hub',
+    ]);
+    // The front door builds from the registry, so a registry change must redeploy it (and the apps that read it).
+    assert.deepEqual(live.packageApps['packages/ecosystem'], ['connect', 'vision', 'wear', 'hub']);
     assert.deepEqual(live.affectedByApp, graph.affectedByApp);
 
-    expectActions(['packages/utils/src/index.ts'], all, live);
-    expectActions(['packages/frontend-build/index.js'], all, live);
+    // frontend-build and utils feed the three frontends, not the front door.
+    const threeApps = { ...all, hub: 'skip' };
+    expectActions(['packages/utils/src/index.ts'], threeApps, live);
+    expectActions(['packages/frontend-build/index.js'], threeApps, live);
     expectActions(['packages/braces-patched/lib/parse.js'], all, live);
+    expectActions(['packages/ecosystem/index.js'], all, live);
+    expectActions(['apps/hub/next.config.js'], { ...none, hub: 'build' }, live);
   });
 });
 
@@ -477,6 +497,10 @@ describe('git orchestration', () => {
 });
 
 describe('vercel.json', () => {
+  it('lists the front door among the apps', () => {
+    assert.deepEqual(APPS, ['connect', 'vision', 'wear', 'hub']);
+  });
+
   it('points each app at the script and leaves Connect in Frankfurt', () => {
     for (const app of APPS) {
       const file = JSON.parse(readFileSync(join(repoRoot, 'apps', app, 'vercel.json'), 'utf8'));
@@ -486,8 +510,10 @@ describe('vercel.json', () => {
     assert.deepEqual(connect.regions, ['fra1']);
     const vision = JSON.parse(readFileSync(join(repoRoot, 'apps/vision/vercel.json'), 'utf8'));
     const wear = JSON.parse(readFileSync(join(repoRoot, 'apps/wear/vercel.json'), 'utf8'));
+    const hub = JSON.parse(readFileSync(join(repoRoot, 'apps/hub/vercel.json'), 'utf8'));
     assert.equal(vision.regions, undefined);
     assert.equal(wear.regions, undefined);
+    assert.equal(hub.regions, undefined);
   });
 });
 
@@ -519,11 +545,13 @@ describe('command against a real git checkout', () => {
       mkdirSync(join(repo, 'apps', 'connect', 'src'), { recursive: true });
       mkdirSync(join(repo, 'apps', 'vision'), { recursive: true });
       mkdirSync(join(repo, 'apps', 'wear'), { recursive: true });
+      mkdirSync(join(repo, 'apps', 'hub'), { recursive: true });
       mkdirSync(join(repo, 'packages', 'utils'), { recursive: true });
       mkdirSync(join(repo, 'docs'), { recursive: true });
       writeFileSync(join(repo, 'package.json'), '{}\n');
       writeFileSync(join(repo, 'apps/connect/package.json'), '{"name":"citizens-connect"}\n');
       writeFileSync(join(repo, 'apps/vision/package.json'), '{"name":"citizens-vision"}\n');
+      writeFileSync(join(repo, 'apps/hub/package.json'), '{"name":"citizens-hub"}\n');
       writeFileSync(
         join(repo, 'apps/wear/package.json'),
         '{"name":"@citizens/wear","dependencies":{"@citizens/utils":"workspace:*"}}\n',

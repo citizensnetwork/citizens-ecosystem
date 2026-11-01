@@ -521,10 +521,43 @@ test.describe("The server serves the app under the prefix and nowhere else", () 
     expect((await request.get(`${BASE}/api/v1/does-not-exist`)).status()).toBe(404);
   });
 
-  test("the site root is not the app: the old root addresses are 404 here (the front door and old-address rules are PR C)", async ({ request }) => {
-    for (const p of ["/", "/discover", `/e/${EVENT_ID}`, `/c/${SLUG}`, "/dashboard", "/config.js", "/assets/map-v2.css", "/api/v1/events"]) {
+  test("the site root is not the app: the old root addresses are 404 here, except the two the old-address rules forward (C39 PR C)", async ({ request }) => {
+    for (const p of ["/discover", `/e/${EVENT_ID}`, `/c/${SLUG}`, "/dashboard", "/config.js", "/assets/map-v2.css"]) {
       expect((await request.get(p)).status(), p).toBe(404);
     }
+    // The bare root goes to the prefix (temporary, same host) ...
+    const root = await request.get("/", { maxRedirects: 0 });
+    expect(root.status()).toBe(307);
+    expect(root.headers()["location"]).toBe(BASE);
+    // ... and /api is passed on to the prefixed route (never redirected): same answer as the prefixed address.
+    const viaRoot = await request.get("/api/v1/does-not-exist", { maxRedirects: 0 });
+    expect(viaRoot.status()).toBe(404);
+    expect(viaRoot.status()).toBe((await request.get(`${BASE}/api/v1/does-not-exist`)).status());
+  });
+
+  test("the old Connect host (www.citizenscentral.co.za): pages are forwarded to 219.co.za with the query kept, /api is not redirected", async ({ request }) => {
+    const OLD = { host: "www.citizenscentral.co.za" };
+    for (const [from, to] of [
+      ["/", BASE],
+      [`/c/${SLUG}`, `${BASE}/c/${SLUG}`],
+      ["/dashboard", `${BASE}/dashboard`],
+      [`/index.html?c=${SLUG}`, `${BASE}/index.html?c=${SLUG}`],
+    ] as const) {
+      const res = await request.get(from, { headers: OLD, maxRedirects: 0 });
+      expect(res.status(), from).toBe(308);
+      expect(res.headers()["location"], from).toBe(`https://219.co.za${to}`);
+    }
+    // The Apps Script intake POSTs here: it must reach the route (401 with no signature, 503 when no secret is set), never a redirect.
+    const post = await request.post("/api/intake/google-form", { headers: OLD, data: {}, maxRedirects: 0 });
+    expect([401, 503], `status ${post.status()}`).toContain(post.status());
+    // A phone app's CORS pre-flight is answered by the app's own middleware on the second hop.
+    const preflight = await request.fetch("/api/events", {
+      method: "OPTIONS",
+      headers: { ...OLD, origin: "capacitor://localhost", "access-control-request-method": "GET" },
+      maxRedirects: 0,
+    });
+    expect(preflight.status()).toBe(204);
+    expect(preflight.headers()["access-control-allow-origin"]).toBe("capacitor://localhost");
   });
 
   test("the generated config.js says where the app lives, and the app's static files are under the prefix", async ({ request }) => {
