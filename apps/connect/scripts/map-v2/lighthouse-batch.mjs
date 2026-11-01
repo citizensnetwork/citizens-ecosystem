@@ -1,7 +1,7 @@
 // Lighthouse, several runs per variant, interleaved, with medians (tracker section 8A, R4).
 //
 //   node scripts/map-v2/lighthouse-batch.mjs --tool-dir <dir> --chrome <chrome.exe> --out <dir> [--runs 5] label=url [label=url ...]
-//   e.g. ... --runs 5 default=https://www.citizenscentral.co.za/ optout=https://www.citizenscentral.co.za/?map=v1
+//   e.g. ... --runs 5 production=https://www.citizenscentral.co.za/ preview=https://<preview>.vercel.app/   (?map=v1 no longer selects an old map)
 //
 // Local tool, not shipped, not a test. Lighthouse is NOT a repo dependency and is never added to one:
 //   1. Ask the founder before downloading it (a download needs their yes each time).

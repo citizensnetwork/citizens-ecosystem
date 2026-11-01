@@ -63,9 +63,10 @@
   //    spec §01). It keeps Wear's own gold rather than --gold-crown on purpose:
   //    one crown across the whole ecosystem. `size` is the WIDTH; the height
   //    follows the PNG's 642×347 ratio. Root-absolute src: pages load from
-  //    /index.html or /dashboard. The ?v= defeats the service worker's
+  //    /index.html or /dashboard (and from /citizens/connect/... when served under a prefix, C39: routes.jsx's
+  //    appUrl adds it). The ?v= defeats the service worker's
   //    cache-first static cache if the file is ever replaced.
-  const CROWN_SRC = '/assets/citizens-crown.png?v=20261003a';
+  const CROWN_SRC = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/citizens-crown.png?v=20261003a');
   function CrownMark({ size = 46 }) {
     return h('img', {
       src: CROWN_SRC, alt: '', width: size, height: Math.round((size * 347) / 642),
@@ -94,7 +95,7 @@
       h(CrownMark, { size: 72 }),
       h('div', {
         className: 'spin',
-        style: { width: 24, height: 24, borderRadius: '50%', border: '2.5px solid rgba(212,175,55,0.25)', borderTopColor: '#D4AF37' },
+        style: { width: 24, height: 24, borderRadius: '50%', border: '2.5px solid rgba(242,189,34,0.25)', borderTopColor: '#F2BD22' },
       }));
   }
 

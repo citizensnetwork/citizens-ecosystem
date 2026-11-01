@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<!-- Pinch zoom (WCAG 1.4.4). The viewport does not limit scale: Wear has no native shell.
+     Text controls use at least --fs-3 so iOS does not zoom the page on focus. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Citizens Wear</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -126,6 +129,8 @@
     overscroll-behavior: none;
   }
   input, textarea, select, button { font-family: inherit; }
+  /* iOS zooms a focused field under 16px. --fs-3 (18px) is the smallest type token at or above that floor. */
+  input, textarea, select { font-size: var(--fs-3); }
   button { cursor: pointer; }
   a { color: inherit; }
   button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {

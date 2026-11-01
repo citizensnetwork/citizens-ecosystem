@@ -1,18 +1,11 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Connect — Map v2 foundations (tracker docs/MAP_UX_TRACKER.md)
 //  ------------------------------------------------------------------
-//  Everything Map v2 adds sits behind ONE flag, default ON (founder D15,
-//  2026-10-13; MAP_V2_NEXT_PHASE_HANDOFF R2). It is the escape hatch for a
-//  release or two:
-//    ?map=v1   turns it off and remembers that on this device (`cc_map_v2` = 'v1')
-//    ?map=v2   turns it on again and forgets the choice (back to the default)
-//  A device only stores a value when it differs from DEFAULT_ON; a stored value
-//  always wins over the default. Rollback for everyone is DEFAULT_ON = false.
-//  With the flag off nothing here touches the page: no stylesheet is requested,
-//  no attribute is set. The flag is read when this file
-//  LOADS (the third app script, before the store boots), so it is captured
-//  before the router's arrival `replaceState` can rewrite the address bar;
-//  the stored value then survives the URL being rewritten by go().
+//  Map v2 is THE map. The old map and its `?map=v1` escape hatch were deleted
+//  (issue #179, R6): there is no flag, no `window.isMapV2`, and no rollback by
+//  constant. A link or a bookmark that still says `?map=v1` (or `?map=v2`) is
+//  harmless: nothing reads the query, and the device's old `cc_map_v2` choice is
+//  forgotten on load (LEGACY_FLAG_KEY), so a stale 'v1' can never linger.
 //
 //  Also here: the motion constants (mirrored by assets/map-v2.css, a unit test
 //  keeps the two equal), prefersReducedMotion(), and the map look, which
@@ -22,8 +15,8 @@
 //  The tilt (tracker R8, founder decision D17): Map v2's main map is drawn at ONE fixed
 //  oblique angle, PITCH degrees, whatever a person does with two fingers or a right-drag
 //  (zoom and rotation are untouched). PITCH = 0 is the rollback: MapLibre's own defaults
-//  (flat to start with, a person may tilt it), as before. It applies to the main map only
-//  and only while Map v2 is on; the old map and the address picker stay flat.
+//  (flat to start with, a person may tilt it), as before. It applies to the main map only;
+//  the address picker stays flat.
 //
 //  Also: countBucket(n), the rounded-down public count ("100+") that is never shown below 100
 //  (tracker P2-08: a small ministry is not shown with a low number).
@@ -31,16 +24,18 @@
 //  Also: trapFocus(root) and lockBehind(), shared by the QR dialog and the photo
 //  viewer (issue #223). The news reader keeps its own copy until it moves over.
 //
-//  Public surface: window.isMapV2(), window.MapV2.
+//  Public surface: window.MapV2.
 // ════════════════════════════════════════════════════════════════════
 (function () {
-  const FLAG_KEY = 'cc_map_v2';
+  // Where the retired `?map=v1` opt-out (and the old `?map=v2` opt-in) stored a choice; cleared on mount.
+  const LEGACY_FLAG_KEY = 'cc_map_v2';
   // Where the retired Map look control stored a choice; cleared on mount so a
   // tester's old "Light"/"Dark" can never pin the look against their phone.
   const LEGACY_THEME_KEY = 'cc_map_theme';
   // Bump the ?v= whenever assets/map-v2.css changes: the service worker is
-  // cache-first for same-origin static files.
-  const CSS_HREF = '/assets/map-v2.css?v=20261025a';
+  // cache-first for same-origin static files. Root-absolute, plus the path prefix when the app is served under one
+  // (/citizens/connect, C39): routes.jsx loads first and owns it.
+  const CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/map-v2.css?v=20261101a');
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
@@ -52,7 +47,6 @@
 
   const doc = typeof document !== 'undefined' ? document : null;
   const store = () => { try { return window.localStorage || null; } catch { return null; } };
-  const read = (k) => { try { const s = store(); return s ? s.getItem(k) : null; } catch { return null; } };
   const write = (k, v) => { try { const s = store(); if (s) { if (v === null) s.removeItem(k); else s.setItem(k, v); } } catch { /* private mode or blocked storage: the setting lasts this page only */ } };
 
   // ── The tilt ──────────────────────────────────────────────────────
@@ -75,28 +69,10 @@
     return step.toLocaleString('en-US') + '+';
   }
 
-  // ── The flag ──────────────────────────────────────────────────────
-  // Map v2 is the default (D15). Set false to take everyone back to the old map
-  // in one line (a device with a stored choice keeps it).
-  const DEFAULT_ON = true;
+  // ── The globe ─────────────────────────────────────────────────────
   // The "Online in this area" globe (issue #259, founder's option 3): one button among the map's controls, only when Contributors
-  // with no fixed place serve the area in view. false takes it away in one line (no button, no request): Map v2 is then exactly as it was.
+  // with no fixed place serve the area in view. false takes it away in one line (no button, no request): the map is then exactly as it was.
   const ONLINE_GLOBE_ON = true;
-  let on = DEFAULT_ON;
-  function resolveFlag() {
-    let q = null;
-    try { q = new URLSearchParams(window.location.search).get('map'); } catch { /* no location (tests) */ }
-    if (q === 'v2' || q === 'v1') {
-      // Store only what differs from the default, so a later change of default reaches this device.
-      write(FLAG_KEY, (q === 'v2') === DEFAULT_ON ? null : q);
-      on = q === 'v2';
-    } else {
-      const stored = read(FLAG_KEY);
-      on = stored === 'v2' ? true : stored === 'v1' ? false : DEFAULT_ON;
-    }
-  }
-  resolveFlag();
-  const isMapV2 = () => on;
 
   // ── Dialogs over the sheet (issue #223) ───────────────────────────
   // The news reader's trap stays inside MapV2News.Reader. These two are the
@@ -184,23 +160,24 @@
   // 'light' or 'dark': what is actually drawn.
   const resolvedTheme = () => (systemPrefersDark() ? 'dark' : 'light');
   function applyTheme() {
-    if (!on || !doc || !doc.documentElement) return;
+    if (!doc || !doc.documentElement) return;
     doc.documentElement.setAttribute('data-theme', resolvedTheme());
     try { window.dispatchEvent(new Event('cc-map-theme')); } catch { /* old webview */ }
   }
 
-  // ── Stylesheet (flag on only) ─────────────────────────────────────
+  // ── Stylesheet ───────────────────────────────────────────────────────────────────────────────────────
   const api = {
-    isOn: isMapV2, motion: MOTION, dur, prefersReducedMotion, resolvedTheme, PITCH, countBucket,
+    motion: MOTION, dur, prefersReducedMotion, resolvedTheme, PITCH, countBucket,
     trapFocus, lockBehind,
-    // the globe is on only with Map v2 on AND the constant (read when this file loads, like the flag itself)
-    get onlineGlobe() { return on && ONLINE_GLOBE_ON; },
+    // the globe is on only while the constant says so (read when this file loads)
+    get onlineGlobe() { return ONLINE_GLOBE_ON; },
     // true once assets/map-v2.css has loaded (or failed: never block the map on it)
     styleReady: false,
-    FLAG_KEY, CSS_HREF,
+    CSS_HREF,
   };
   function mount() {
-    if (!on || !doc || !doc.head) return;
+    if (!doc || !doc.head) return;
+    write(LEGACY_FLAG_KEY, null);
     write(LEGACY_THEME_KEY, null);
     applyTheme();
     try {
@@ -224,6 +201,5 @@
     else mount();
   }
 
-  window.isMapV2 = isMapV2;
   window.MapV2 = Object.assign(window.MapV2 || {}, api);
 })();

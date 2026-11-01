@@ -7,6 +7,10 @@
     "VERCEL_URL",
     "NEXT_PUBLIC_VERCEL_URL",
     "NEXT_PUBLIC_SITE_URL",
+    "NEXT_PUBLIC_BASE_PATH",
+    "HUB_ORIGIN_CONNECT",
+    "HUB_ORIGIN_VISION",
+    "HUB_ORIGIN_WEAR",
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "SUPABASE_SERVICE_ROLE_KEY",
@@ -52,6 +56,10 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**", "public/**", "mobile-dist/**"]
+    },
+    "@citizens/ecosystem#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
     },
     "@citizens/frontend-build#build": {
       "dependsOn": ["^build"],

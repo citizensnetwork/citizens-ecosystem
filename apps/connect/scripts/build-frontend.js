@@ -7,10 +7,10 @@
  *
  * The pipeline itself lives in @citizens/frontend-build (ecosystem Step 4),
  * consumed as a workspace package (workspace:* → packages/frontend-build, see
- * its README). This file only supplies Connect's configuration: screen load
- * order, env-var mapping, the mobile API base, and which CDN scripts must match
- * the lockfile. esbuild is passed in from HERE so the output is built with this
- * app's own pinned esbuild version.
+ * its README). This file only supplies Connect's configuration: the screen load order
+ * here, and in ./frontend-config.js the env-var mapping (the mobile API base and public
+ * web address included) and which CDN scripts must match the lockfile. esbuild is passed
+ * in from HERE so the output is built with this app's own pinned esbuild version.
  *
  * Run automatically before `next build` via the package.json build script.
  * The generated config.js is gitignored — it must be re-generated on every
@@ -22,6 +22,11 @@
  *   NEXT_PUBLIC_MAPTILER_KEY
  *   NEXT_PUBLIC_MAPTILER_STYLE   (optional, defaults to 'streets-v2')
  *   NEXT_PUBLIC_API_BASE_URL     (optional, defaults to '' = same origin)
+ *
+ * Mobile build only (`--mobile`, see docs/MOBILE_LAUNCH_RUNBOOK.md); all optional:
+ *   MOBILE_API_BASE_URL          (defaults to the live production alias)
+ *   MOBILE_PUBLIC_ORIGIN         (public web origin for shared + QR links; https only)
+ *   MOBILE_PUBLIC_BASE_PATH      ('' or e.g. /citizens/connect; the web prefix of that site)
  */
 'use strict';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -32,6 +37,10 @@ const fs = require('fs');
 const esbuild = require('esbuild');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { buildFrontend } = require('@citizens/frontend-build');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { basePathFromEnv } = require('@citizens/ecosystem');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const frontendConfig = require('./frontend-config');
 
 // `next dev`/`next build` load .env.local themselves, but this script runs
 // as a PLAIN node process (a separate step before `next build` in the
@@ -91,41 +100,22 @@ buildFrontend({
   rootDir: path.join(__dirname, '..'),
   mobile: process.argv.includes('--mobile'),
 
+  // '' until the Vercel project sets NEXT_PUBLIC_BASE_PATH=/citizens/connect
+  // (see packages/ecosystem/README.md before setting it). Read AFTER
+  // loadDotEnvLocal above, so a local .env.local value counts too.
+  basePath: basePathFromEnv('connect'),
+
   // Every screen module, in the exact dependency order the old
   // <script type="text/babel"> tags loaded them (later files reference
   // `window.X` set by earlier ones).
   appFileOrder: [
-    'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'saved-lib.jsx', 'cohost-lib.jsx', 'moments-lib.jsx', 'convince-lib.jsx', 'serving-areas-lib.jsx', 'data.jsx', 'store.jsx', 'ui.jsx', 'report.jsx', 'listing-claim.jsx', 'auth.jsx', 'cohosts.jsx', 'moments.jsx', 'convince.jsx', 'map-v2-strings.jsx', 'serving-areas.jsx', 'map-v2-time.jsx', 'map-v2-qr.jsx', 'map-v2-pins.jsx', 'map.jsx',
-    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-card.jsx', 'map-v2-nearby.jsx', 'map-v2-online.jsx', 'map-v2-sheet.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
+    'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'saved-lib.jsx', 'cohost-lib.jsx', 'moments-lib.jsx', 'convince-lib.jsx', 'serving-areas-lib.jsx', 'onboarding-presets-lib.jsx', 'data.jsx', 'store.jsx', 'ui.jsx', 'report.jsx', 'listing-claim.jsx', 'auth.jsx', 'cohosts.jsx', 'moments.jsx', 'convince.jsx', 'map-v2-strings.jsx', 'serving-areas.jsx', 'map-v2-time.jsx', 'map-v2-qr.jsx', 'map-v2-pins.jsx', 'map.jsx',
+    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-card.jsx', 'map-v2-row.jsx', 'map-v2-nearby.jsx', 'map-v2-online.jsx', 'map-v2-sheet.jsx', 'map-v2-explore.jsx', 'map-v2-nav.jsx', 'map-v2-discover.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
     'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx', 'intake-upgrade.jsx',
     'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
   ],
 
-  envGlobalName: '__CC_ENV',
-  configVars: [
-    { key: 'SUPABASE_URL', env: 'NEXT_PUBLIC_SUPABASE_URL' },
-    { key: 'SUPABASE_ANON_KEY', env: 'NEXT_PUBLIC_SUPABASE_ANON_KEY' },
-    {
-      // Web: '' = same origin (standard Vercel topology). Mobile: FORCED
-      // absolute production URL — a store build must never point at a
-      // localhost fallback (addendum §B6).
-      key: 'API_BASE_URL',
-      env: 'NEXT_PUBLIC_API_BASE_URL',
-      mobileEnv: 'MOBILE_API_BASE_URL',
-      mobileDefault: 'https://citizens-connect.vercel.app',
-    },
-    { key: 'MAPTILER_KEY', env: 'NEXT_PUBLIC_MAPTILER_KEY' },
-    { key: 'MAPTILER_STYLE', env: 'NEXT_PUBLIC_MAPTILER_STYLE', defaultValue: 'streets-v2' },
-  ],
-  mobileRequiredKeys: ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'MAPTILER_KEY'],
-  mobileMissingLabel: 'Supabase/MapTiler',
-
-  // index.html loads supabase-js from jsDelivr, where OSV-Scanner can't see
-  // it. The build fails unless the tag pins the exact lockfile version with an
-  // SRI hash matching the installed package's bytes — the same job
-  // assertMaplibreVendorInSync does for the vendored map runtime.
-  // React/ReactDOM can't be listed: npm React is 19 (no UMD build) while the
-  // page loads the 18.3.1 UMD from unpkg — their hashes are hand-verified
-  // (see index.html). Same split Vision already uses.
-  sriPackages: ['@supabase/supabase-js'],
+  // The config.js env-var mapping and the CDN pins live in ./frontend-config.js
+  // (their own file so a test can run the real configuration into a temp directory).
+  ...frontendConfig,
 });

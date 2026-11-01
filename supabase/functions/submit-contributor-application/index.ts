@@ -15,7 +15,7 @@
 //   RESEND_API_KEY, RESEND_FROM
 //   CONTRIBUTOR_REVIEW_SECRET
 //   ADMIN_REVIEW_EMAIL (default: citizensnetworkpbo@gmail.com)
-//   PUBLIC_SITE_URL (default: https://citizensconnect.app)
+//   PUBLIC_SITE_URL (default: https://www.citizenscentral.co.za; no trailing slash)
 
 import { serve } from "std/http";
 import { createClient } from "@supabase/supabase-js";
@@ -42,8 +42,7 @@ interface ApplicationPayload {
 
 const ADMIN_EMAIL =
   Deno.env.get("ADMIN_REVIEW_EMAIL") ?? "citizensnetworkpbo@gmail.com";
-const SITE_URL =
-  Deno.env.get("PUBLIC_SITE_URL") ?? "https://citizensconnect.app";
+const SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") ?? "https://www.citizenscentral.co.za").replace(/\/+$/, "");
 
 serve(async (req) => {
   if (req.method !== "POST") {

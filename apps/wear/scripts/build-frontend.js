@@ -25,11 +25,16 @@
 const path = require('path');
 const esbuild = require('esbuild');
 const { buildFrontend } = require('@citizens/frontend-build');
+const { basePathFromEnv } = require('@citizens/ecosystem');
 
 buildFrontend({
   esbuild,
   rootDir: path.join(__dirname, '..'),
   mobile: process.argv.includes('--mobile'),
+
+  // '' until the Vercel project sets NEXT_PUBLIC_BASE_PATH=/citizens/wear
+  // (see packages/ecosystem/README.md before setting it).
+  basePath: basePathFromEnv('wear'),
 
   // Every screen module, in the exact dependency order the old
   // <script type="text/babel"> tags loaded them (later files reference
@@ -64,11 +69,13 @@ buildFrontend({
     {
       // Web: '' = same origin (standard Vercel topology). Mobile: FORCED
       // absolute production URL — a store build must never point at a
-      // localhost fallback.
+      // localhost fallback. The default is the team's own production alias (the
+      // project's only domain today); once Wear is served at 219.co.za, build with
+      // MOBILE_API_BASE_URL=https://219.co.za/citizens/wear.
       key: 'API_BASE_URL',
       env: 'NEXT_PUBLIC_API_BASE_URL',
       mobileEnv: 'MOBILE_API_BASE_URL',
-      mobileDefault: 'https://citizens-wear.vercel.app',
+      mobileDefault: 'https://citizens-ecosystem-wear.vercel.app',
     },
   ],
   mobileRequiredKeys: ['SUPABASE_URL', 'SUPABASE_ANON_KEY'],

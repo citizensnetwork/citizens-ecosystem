@@ -1,4 +1,14 @@
 const path = require('path');
+const { basePathFromEnv, oldAddressRules } = require('@citizens/ecosystem');
+
+// Where this app is served on the shared domain: '' (NEXT_PUBLIC_BASE_PATH unset, as today) is the site root,
+// '/citizens/wear' serves everything under that prefix. Do NOT set it in a Vercel project yet: read
+// packages/ecosystem/README.md ("Rollout rule").
+const basePath = basePathFromEnv('wear');
+
+// The addresses that existed before the shared domain (a bare "/", and "/api/*" for installed phone builds and
+// server-to-server callers). Both lists are empty when basePath is '', so nothing changes until the prefix is set.
+const oldAddress = oldAddressRules('wear', basePath);
 
 const SUPABASE_HOST = 'xyiajtrvhlxaeplsiajj.supabase.co';
 
@@ -40,6 +50,13 @@ function contentSecurityPolicy() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Spread, so an unset value leaves the config exactly as it was (no `basePath` key at all). Next then prefixes
+  // the "/" redirect, the headers, public/ files, _next and /api with it.
+  ...(basePath ? { basePath } : {}),
+  // Do not let `next dev` write Next.js's agent-rules block into AGENTS.md. It does so whenever it detects an AI coding
+  // agent, so every agent session left the file modified (and a new one in apps that have none). `false` also removes
+  // the block if it is there. See apps/connect/RESUME_HERE.md, C38.
+  agentRules: false,
   reactStrictMode: true,
   transpilePackages: ['@citizens/connect-client', '@citizens/db'],
   // Pin the workspace root so Next doesn't mistakenly pick up a stray
@@ -51,8 +68,14 @@ const nextConfig = {
   // scripts/build-frontend.js) at the bare root — Next does not serve
   // public/index.html at "/" by itself. Same pattern as Citizens Connect.
   async redirects() {
-    return [{ source: '/', destination: '/index.html', permanent: false }];
+    return [
+      { source: '/', destination: '/index.html', permanent: false },
+      // Old address: the bare "/" goes to the prefix. Empty until NEXT_PUBLIC_BASE_PATH is set.
+      ...oldAddress.redirects,
+    ];
   },
+  // Old address: "/api/*" is served by the prefixed route. Absent until NEXT_PUBLIC_BASE_PATH is set.
+  ...(basePath ? { rewrites: async () => oldAddress.rewrites } : {}),
   // Defence-in-depth HTTP security headers. These apply to every response
   // served by the Next.js app (static + dynamic). The CSP below is the last
   // layer against injected script; `src/lib/csp.test.ts` pins it to the real

@@ -17,6 +17,15 @@
   // The route table (routes.jsx) is the one place that knows which URL belongs to
   // which screen; nothing here writes a path string by hand.
   const ROUTES = window.CC_ROUTES;
+  // The app may be served under a prefix on a shared domain (/citizens/connect, C39); the route table
+  // only knows APP-RELATIVE paths. These two are the only crossings in this file, so nothing below
+  // adds or removes the prefix by hand. Both are no-ops when no prefix is configured.
+  //   appPath()  the address bar's path as the table sees it ('/e/<id>'), or null outside the prefix
+  //   appUrl(p)  an app-relative path as the address-bar / link path ('/citizens/connect/e/<id>')
+  const appPath = () => ROUTES.stripBase(window.location.pathname, ROUTES.BASE_PATH);
+  const appUrl = ROUTES.appUrl;
+  // appPath() plus the query string: the form safeReturnPath takes; null outside the prefix.
+  const appHere = () => { const p = appPath(); return p === null ? null : p + window.location.search; };
   const HOME_NAV = { page: 'home', params: {} };
   // JSON-safe copy of a nav for history.state (pushState structured-clones it).
   const plainNav = (n) => {
@@ -26,7 +35,7 @@
   // the history.state we stamped on this entry if it is a reload of a screen we opened.
   function readBootRoute() {
     try {
-      const r = ROUTES.navFromPath(window.location.pathname, window.location.search);
+      const r = ROUTES.navFromPath(appPath(), window.location.search);
       const st = window.history && window.history.state;
       return { ...r, state: st && st.cc ? st : null };
     } catch (e) {
@@ -42,7 +51,7 @@
   const RETURN_MAX_AGE_MS = 60 * 60 * 1000;
   function stashReturnPath() {
     try {
-      const path = ROUTES.safeReturnPath(window.location.pathname + window.location.search);
+      const path = ROUTES.safeReturnPath(appHere());
       if (path && path !== '/') sessionStorage.setItem(RETURN_KEY, JSON.stringify({ p: path, t: Date.now() }));
       else sessionStorage.removeItem(RETURN_KEY);
     } catch (e) { /* storage blocked: we just land on the map after sign-in */ }
@@ -666,10 +675,16 @@
 
     // toasts
     const [toasts, setToasts] = useState([]);
-    const toast = useCallback((msg, kind = 'gold') => {
+    // `action` ({ label, onClick }) adds a button to the toast, which then stays for 6 s (others for 3.2 s) so it can be
+    // reached; pressing it runs onClick and dismisses the toast.
+    const toast = useCallback((msg, kind = 'gold', action) => {
       const id = uid('t');
-      setToasts((t) => [...t, { id, msg, kind }]);
-      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
+      const dismiss = () => setToasts((t) => t.filter((x) => x.id !== id));
+      const act = action && action.label && typeof action.onClick === 'function'
+        ? { label: action.label, onClick: () => { dismiss(); action.onClick(); } }
+        : null;
+      setToasts((t) => [...t, { id, msg, kind, action: act }]);
+      setTimeout(dismiss, act ? 6000 : 3200);
     }, []);
 
     // Pages that write real data on a real account — a genuine guest (browsing
@@ -721,7 +736,7 @@
     const writeHistory = useCallback((next, replace) => {
       if (!canHistory()) return;
       const path = pathOf(next);
-      const url = path !== null ? path : window.location.pathname + window.location.search;
+      const url = path !== null ? appUrl(path) : window.location.pathname + window.location.search;
       try {
         const cur = window.history.state;
         const onGuard = !!(cur && cur.cc && cur.guard);
@@ -887,7 +902,7 @@
     // was on when they tapped sign-in (stashReturnPath). A deep link in the address bar wins.
     const restoreReturnPath = useCallback(() => {
       const rt = takeReturnPath();
-      if (!rt || window.location.pathname !== '/' || navRef.current.page !== 'home') return;
+      if (!rt || appPath() !== '/' || navRef.current.page !== 'home') return;
       const r = ROUTES.navFromPath(rt, '');
       if (!r.ok || sameNav(r.nav, HOME_NAV)) return;
       commitNav(r.nav, true, true);
@@ -961,11 +976,14 @@
     const submitApplication = useCallback((form, done) => {
       const finish = (ok) => { if (done) done(ok); };
       const kind = contributorKindValue(form.kind);
+      // Care / Recovery opts in to the map (#202): no address or pin unless they turned it on. The server enforces the same.
+      const offMap = window.CCPresets.keepsOffMap(form);
+      const noPin = !!form.noFixedLocation || offMap;
       const app = {
         id: 'app-mine', name: form.orgName, photo: (realUser && realUser.avatarUrl) || '',
         kind: kind, bio: form.bio, category: form.category, weeklyEvents: 1, status: 'pending',
-        submittedAt: today(), location: form.noFixedLocation ? '' : form.location,
-        lat: form.noFixedLocation ? null : form.lat, lng: form.noFixedLocation ? null : form.lng,
+        submittedAt: today(), location: noPin ? '' : form.location,
+        lat: noPin ? null : form.lat, lng: noPin ? null : form.lng,
         noFixedLocation: !!form.noFixedLocation,
         website: form.website, socials: form.socials || {}, applicantName: (realUser && realUser.name) || '', isMine: true,
       };
@@ -987,7 +1005,7 @@
           // exactly that. Skip geocoding entirely for a "no fixed location"
           // contributor — there's no address to resolve, and the server
           // nulls physical_* regardless of what's sent here.
-          const geo = form.noFixedLocation
+          const geo = noPin
             ? null
             : (typeof form.lat === 'number' && typeof form.lng === 'number')
               ? { lat: form.lat, lng: form.lng }
@@ -1000,7 +1018,8 @@
               contributor_category: form.category,
               bio: form.bio,
               no_fixed_location: !!form.noFixedLocation,
-              physical_address: form.noFixedLocation ? null : form.location,
+              show_on_map: form.showOnMap === true,
+              physical_address: noPin ? null : form.location,
               physical_latitude: geo ? geo.lat : null,
               physical_longitude: geo ? geo.lng : null,
               website_url: form.website || null,
@@ -1886,6 +1905,15 @@
       go('messages', { convId: id });
     }, [conversations, realUser, go, toast]);
 
+    // A genuine guest (Supabase is configured, nobody is signed in) has nowhere to keep a follow, a save, a consider or a
+    // connect: say so, with a "Sign in" button on the toast, BEFORE any optimistic flip (issue #201), instead of flipping a
+    // heart that is gone on the next refresh. Demo mode (no CC_AUTH at all) keeps its local-only toggle.
+    const guestCannot = useCallback((message) => {
+      if (realUser || !window.CC_AUTH) return false;
+      toast(message, 'gold', { label: 'Sign in', onClick: showSignIn });
+      return true;
+    }, [realUser, toast, showSignIn]);
+
     // Connect (attending) and Consider (considering) are two states of ONE rsvps
     // row, so they're mutually exclusive. Each toggle updates the UI optimistically,
     // then (for a real signed-in user on a real event) writes through to the API
@@ -1894,6 +1922,7 @@
     // so a state transition clears the other side first — clearing 'considering' via
     // the consider endpoint (not rsvp DELETE) so we don't log a false cancellation.
     const toggleConnect = useCallback((eventId) => {
+      if (guestCannot('Sign in to connect.')) return;
       const wasConnected = connected.has(eventId);
       const wasConsidering = considering.has(eventId);
       setConnected((prev) => { const n = new Set(prev); wasConnected ? n.delete(eventId) : n.add(eventId); return n; });
@@ -1920,9 +1949,10 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [connected, considering, realUser, toast]);
+    }, [connected, considering, realUser, toast, guestCannot]);
 
     const toggleConsider = useCallback((eventId) => {
+      if (guestCannot("Sign in to show you're considering it.")) return;
       const wasConnected = connected.has(eventId);
       const wasConsidering = considering.has(eventId);
       setConsidering((prev) => { const n = new Set(prev); wasConsidering ? n.delete(eventId) : n.add(eventId); return n; });
@@ -1949,15 +1979,7 @@
           toast('Could not save — please try again.', 'red');
         }
       })();
-    }, [connected, considering, realUser, toast]);
-
-    // A genuine guest (Supabase is configured, nobody is signed in) has nowhere to keep a follow or a save: say so, instead
-    // of flipping a heart that is gone on the next refresh. Demo mode (no CC_AUTH at all) keeps its local-only toggle.
-    const guestCannot = useCallback((message) => {
-      if (realUser || !window.CC_AUTH) return false;
-      toast(message, 'gold');
-      return true;
-    }, [realUser, toast]);
+    }, [connected, considering, realUser, toast, guestCannot]);
 
     const toggleFollow = useCallback((orgId, name) => {
       if (guestCannot('Sign in to follow.')) return;
@@ -2112,7 +2134,7 @@
             body: JSON.stringify({
               title: form.title,
               body: form.description,
-              page_url: window.location.origin + '/community',
+              page_url: window.location.origin + appUrl('/community'),
               tier: form.tier,
               vote_threshold: form.voteThreshold,
               category: form.category || undefined,
@@ -2675,7 +2697,7 @@
       // 1) Real events — set as soon as they arrive (do NOT wait on bubbles).
       (async () => {
         try {
-          const res = await fetch(base + '/api/v1/events?limit=100');
+          const res = await fetch(base + DATA.eventsFeedPath());
           if (!res.ok) return;
           const json = await res.json();
           const adapted = ((json && json.data) || []).map(adaptEvent);
@@ -2821,7 +2843,11 @@
       const path = pathOf(n || navRef.current);
       if (path === null) { toast('This page has no shareable link yet.', 'red'); return; }
       const isNative = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
-      const url = (isNative ? 'https://www.citizenscentral.co.za' : window.location.origin) + path;
+      // The web link carries the prefix when the app is served under one (appUrl). The native shell is bundled
+      // at its own root, so its link is the public site's address from the mobile build's config.js
+      // (PUBLIC_ORIGIN + PUBLIC_BASE_PATH; today's https://www.citizenscentral.co.za until a build sets them).
+      const url = ROUTES.publicUrl(path, { native: isNative, webOrigin: window.location.origin });
+      if (url === null) { toast('This page has no shareable link yet.', 'red'); return; }
       try {
         if (navigator.share && /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent)) { await navigator.share({ url }); return; }
       } catch (e) {
@@ -2931,7 +2957,7 @@
           } catch (err) { /* the entry just keeps its flag */ }
         }
         let next = state && state.nav && ROUTES.PAGES.indexOf(state.nav.page) !== -1 ? state.nav : null;
-        if (!next) next = ROUTES.navFromPath(window.location.pathname, window.location.search).nav;
+        if (!next) next = ROUTES.navFromPath(appPath(), window.location.search).nav;
         navRef.current = next;
         setNav(next);
         scrollTop();
@@ -2977,7 +3003,7 @@
       const b = boot.current;
       let disarm = () => {};
       if (canHistory()) {
-        const here = b.legacy || !b.ok ? b.canonical : window.location.pathname + window.location.search + window.location.hash;
+        const here = b.legacy || !b.ok ? appUrl(b.canonical) : window.location.pathname + window.location.search + window.location.hash;
         try {
           // A reload while an overlay's guard entry was on top: the overlay is gone, so
           // the entry becomes an ordinary one (the stamp below carries no guard flag).
@@ -2993,7 +3019,7 @@
               // nothing (an unknown /c/<slug> falls back to the map: no listing to put it under).
               if (histIdx.current !== 0 || !cur || cur.idx !== 0 || !ROUTES.isEntityRoute(navRef.current)) return;
               const listing = window.location.pathname + window.location.search + window.location.hash;
-              window.history.replaceState({ cc: 1, idx: 0, nav: HOME_NAV }, '', '/');
+              window.history.replaceState({ cc: 1, idx: 0, nav: HOME_NAV }, '', appUrl('/'));
               window.history.pushState({ cc: 1, idx: 1, nav: plainNav(navRef.current) }, '', listing);
               histIdx.current = 1;
             } catch (e) { /* the listing simply stays the first entry */ }

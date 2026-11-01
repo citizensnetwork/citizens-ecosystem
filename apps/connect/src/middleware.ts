@@ -1,17 +1,5 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isContributor } from "@/lib/profiles/capabilities";
-
-/** Routes that a contributor with `bio_setup_required = true` is allowed to
- *  hit before completing setup. Everything else redirects to /contributor/setup. */
-const BIO_SETUP_ALLOW = [
-  "/contributor/setup",
-  "/logout",
-  "/login",
-  "/api/contributor/setup",
-  "/api/auth",
-  "/auth",
-];
 
 /**
  * CORS for `/api/*` lives HERE (not next.config.ts static headers) because the
@@ -44,20 +32,6 @@ function withCors(res: NextResponse, origin: string | null): NextResponse {
   res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.headers.set("Access-Control-Allow-Credentials", "true");
   res.headers.set("Vary", "Origin");
-  return res;
-}
-
-/**
- * Build a redirect response that carries every cookie currently set on
- * `supabaseResponse`. Required because `supabase.auth.signOut()` sets
- * `Set-Cookie: sb-*=; Max-Age=0` on `supabaseResponse` via our
- * `cookies.setAll` callback — returning a fresh `NextResponse.redirect(...)`
- * would discard those headers and leave stale auth cookies in the browser,
- * defeating force-reauth (audit: middleware-and-session, Finding #1).
- */
-function redirectWithCookies(target: URL, supabaseResponse: NextResponse): NextResponse {
-  const res = NextResponse.redirect(target);
-  supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
   return res;
 }
 
@@ -102,83 +76,14 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh the session so it doesn't expire
-  const { data: { user } } = await supabase.auth.getUser();
-
-  // Post-auth role / bio-setup enforcement (Batch E).
-  if (
-    user &&
-    !pathname.startsWith("/_next") &&
-    !pathname.startsWith("/api/auth") &&
-    !pathname.startsWith("/auth")
-  ) {
-    // force_reauth_at / bio_setup_required are private profile columns
-    // (migs 176/177) — read through the caller-row-only RPC.
-    const { data: profile, error: profileErr } = await supabase
-      .rpc("get_my_profile_private")
-      .select("force_reauth_at, bio_setup_required, role")
-      .maybeSingle();
-
-    // Fail-closed on transient DB error: we cannot prove the session
-    // is valid, so force a re-login. Logged so a degraded gate is
-    // visible in production logs.
-    if (profileErr) {
-      console.warn("[middleware] profile lookup failed", profileErr);
-      await supabase.auth.signOut();
-      const loginUrl = request.nextUrl.clone();
-      loginUrl.pathname = "/login";
-      loginUrl.search = "";
-      loginUrl.searchParams.set("reauth", "1");
-      return redirectWithCookies(loginUrl, supabaseResponse);
-    }
-
-    // Force-reauth gate: admin bumped force_reauth_at after a role change.
-    // Compare against the access-token `iat`. If the JWT predates the
-    // bump — or we cannot establish an iat at all — sign out and send
-    // to /login. Fail-closed on parse errors.
-    if (profile?.force_reauth_at) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      let iatMs: number | null = null;
-      if (accessToken) {
-        const parts = accessToken.split(".");
-        if (parts.length === 3) {
-          try {
-            const payloadJson = Buffer.from(parts[1], "base64url").toString("utf8");
-            const payload = JSON.parse(payloadJson) as { iat?: number };
-            if (typeof payload.iat === "number") {
-              iatMs = payload.iat * 1000;
-            }
-          } catch {
-            iatMs = null;
-          }
-        }
-      }
-      const reauthMs = new Date(profile.force_reauth_at).getTime();
-      // Fail-closed: if we can't verify iat, treat the JWT as stale.
-      if (iatMs === null || reauthMs > iatMs) {
-        await supabase.auth.signOut();
-        const loginUrl = request.nextUrl.clone();
-        loginUrl.pathname = "/login";
-        loginUrl.search = "";
-        loginUrl.searchParams.set("reauth", "1");
-        return redirectWithCookies(loginUrl, supabaseResponse);
-      }
-    }
-
-    // Bio-setup gate: freshly promoted contributors must supply their
-    // minimum public profile before accessing the rest of the app.
-    if (
-      profile?.bio_setup_required &&
-      isContributor(profile) &&
-      !BIO_SETUP_ALLOW.some((p) => pathname === p || pathname.startsWith(p + "/"))
-    ) {
-      const setupUrl = request.nextUrl.clone();
-      setupUrl.pathname = "/contributor/setup";
-      setupUrl.search = "";
-      return NextResponse.redirect(setupUrl);
-    }
-  }
+  // Refresh the session so it doesn't expire. That is all the middleware does for pages. The force
+  // re-login and bio-setup gates that used to follow were retired on 2026-11-01 (founder decision A,
+  // RESUME_HERE S17): no real session reaches them (the app keeps its session in localStorage and
+  // sends a Bearer token to /api, which is skipped above), and roles are read from the database on
+  // every request, so a changed role takes effect at once without a sign-out. The columns
+  // `force_reauth_at` and `bio_setup_required` and the trigger that stamps them stay until a
+  // migration drops them.
+  await supabase.auth.getUser();
 
   return supabaseResponse;
 }

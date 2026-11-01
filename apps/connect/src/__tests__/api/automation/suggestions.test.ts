@@ -158,6 +158,35 @@ describe("POST /api/automation/suggestions: storing", () => {
     expect(state.listing_suggestions).toHaveLength(1);
   });
 
+  // "Already known" must survive the owner's decision: a dismissed or published row keeps its fingerprint,
+  // so the next daily run counts the same item as a duplicate instead of filing it again.
+  it("an item the owner DISMISSED is not suggested again by the next run", async () => {
+    await POST(req(event()));
+    state.listing_suggestions[0].status = "dismissed";
+    const res = await POST(req(event()));
+    expect((await res.json()).results[0].status).toBe("duplicate");
+    expect(state.listing_suggestions).toHaveLength(1);
+    expect(state.listing_suggestions[0].status).toBe("dismissed");
+  });
+
+  it("an item the owner PUBLISHED, or that was published for them, is not suggested again either", async () => {
+    await POST(req(event()));
+    for (const status of ["published", "auto_published", "superseded"]) {
+      state.listing_suggestions[0].status = status;
+      expect((await (await POST(req(event()))).json()).results[0].status, status).toBe("duplicate");
+    }
+    expect(state.listing_suggestions).toHaveLength(1);
+  });
+
+  it("a pending row whose text the owner rewrote keeps its source fingerprint, so the unchanged source item is still a duplicate", async () => {
+    await POST(req(event()));
+    state.listing_suggestions[0].payload = { ...(state.listing_suggestions[0].payload as Row), title: "Sunday Celebration (new venue)" };
+    const res = await POST(req(event()));
+    expect((await res.json()).results[0].status).toBe("duplicate");
+    expect(state.listing_suggestions).toHaveLength(1);
+    expect((state.listing_suggestions[0].payload as Row).title).toBe("Sunday Celebration (new venue)");
+  });
+
   it("stores only the allow-listed fields and scrubs personal contact details, with a warning", async () => {
     const res = await POST(req(event({ description: "Call 082 123 4567 or mail me@home.example", created_by: "x", status: "cancelled", attendees: ["a"] })));
     const body = await res.json();
@@ -252,6 +281,19 @@ describe("POST /api/automation/suggestions: automatic publishing is for future e
 
   it("a PAST event never auto-publishes: it waits for approval", async () => {
     const res = await POST(req(event({ start: past() })));
+    expect((await res.json()).results[0].status).toBe("pending");
+    expect(state.events).toHaveLength(0);
+  });
+
+  it("a Care / Recovery Contributor's event waits for them, even at events_auto (#202)", async () => {
+    state.profiles = [profile({ auto_update_level: "events_auto", contributor_category: "clinic" })];
+    const res = await POST(req(event()));
+    expect((await res.json()).results[0].status).toBe("pending");
+    expect(state.events).toHaveLength(0);
+  });
+
+  it("a care-recovery event from any Contributor waits for the owner, even at events_auto (#202)", async () => {
+    const res = await POST(req(event({ category: "care-recovery" })));
     expect((await res.json()).results[0].status).toBe("pending");
     expect(state.events).toHaveLength(0);
   });

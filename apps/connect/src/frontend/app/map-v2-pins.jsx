@@ -1,13 +1,12 @@
 // ════════════════════════════════════════════════════════════════════
-//  Citizens Connect — Map v2 pins (tracker P1-04). Used by map.jsx ONLY when
-//  window.isMapV2() is true; with the flag off this file is never called.
+//  Citizens Connect — Map v2 pins (tracker P1-04), drawn by map.jsx.
 //  ------------------------------------------------------------------
-//  What changes against v1 (docs/MAP_UX_TRACKER.md §8 P1-04, decisions D8):
+//  What changed against the old map (docs/MAP_UX_TRACKER.md §8 P1-04, decisions D8):
 //    · Contributor: a 48 px circle on a tail. BELOW the photo zoom (15) it shows
 //      the category glyph on the category colour (founder's map-layering.md: no
 //      pictures at mid zoom); AT AND ABOVE it, its logo (a small category
 //      glyph badge keeps a non-colour cue). The SELECTED pin always shows its logo.
-//    · Place and Event keep their v1 shapes (circle / rounded rectangle with a
+//    · Place and Event kept the old shapes (circle / rounded rectangle with a
 //      nub): a venue, a gathering and an organisation stay distinguishable (Q2).
 //    · Every pin is a real control: role=button, tabindex=0, aria-label
 //      "{name}, {category}", Enter / Space, a visible focus ring, a 44 px hit area.
@@ -134,7 +133,7 @@
     return svg;
   }
 
-  // Place / Event / Idea keep their v1 silhouettes; the hairline is a wider dark stroke under the
+  // Place / Event / Idea keep the old silhouettes; the hairline is a wider dark stroke under the
   // white one, and the glyph colour is picked per fill. Geometry mirrors map.jsx pinSvg.
   function shapeSvg({ shape, hex, glyph, selected }) {
     const svg = document.createElementNS(NS, 'svg');

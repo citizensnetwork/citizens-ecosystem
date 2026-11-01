@@ -14,6 +14,11 @@
 | **Vision**  | [`apps/vision`](apps/vision)   | Impact intelligence back-office for organisations — reach, engagement, goals. | Next.js (API-only) + standalone HTML frontend (desktop)                 |
 | **Wear**    | [`apps/wear`](apps/wear)       | Kingdom fashion social platform — brands, posts, stories, DMs.                | Next.js (API-only) + standalone HTML frontend                           |
 
+The **front door**, [`apps/hub`](apps/hub), is not a product. It will own the shared domain (`219.co.za`):
+it serves the `/citizens` landing page and the coming-soon pages, and proxies `/citizens/<app>` to each app above
+([`packages/ecosystem`](packages/ecosystem) is the one list of those paths). The move is staged and off until the
+cutover in [`apps/connect/docs/CUTOVER_219.md`](apps/connect/docs/CUTOVER_219.md).
+
 All three share **one Supabase project** (one `auth.users`, per-app Postgres schemas
 `public` / `vision` / `wear`) governed by
 [`apps/connect/docs/SHARED_DB_CONTRACT.md`](apps/connect/docs/SHARED_DB_CONTRACT.md),
@@ -26,8 +31,10 @@ apps/
   connect/         Citizens Connect (incl. android/ + ios/ Capacitor shells)
   vision/          Citizens Vision
   wear/            Citizens Wear
+  hub/             Citizens hub: the front door of the shared domain (/citizens landing page, coming-soon pages, proxy to each app)
 packages/
   frontend-build/  @citizens/frontend-build — shared esbuild static-frontend pipeline
+  ecosystem/       @citizens/ecosystem — where each app lives on the shared domain (/citizens/<app>)
   connect-client/  @citizens/connect-client — typed client for Connect's /api/v1
   db/              @citizens/db — Wear store contract + memory reference impl
   ui/              @citizens/ui — design tokens (Wear)

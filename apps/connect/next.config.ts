@@ -15,11 +15,93 @@ const FRONTEND_IMG_CDN    = "https://images.unsplash.com";
 
 // First path segments of the frontend's single-segment screens (see rewrites() below).
 const APP_PAGES = [
-  "map", "discover", "community", "me", "messages", "notifications",
+  "map", "discover", "explore", "community", "me", "messages", "notifications",
   "settings", "apply", "onboarding", "dashboard", "admin",
 ];
 
+// Where this app is served on the shared domain: "" (NEXT_PUBLIC_BASE_PATH unset, as today) is the site root,
+// "/citizens/connect" serves everything under that prefix. Do NOT set it in a Vercel project yet: read
+// packages/ecosystem/README.md ("Rollout rule"). The rule is packages/ecosystem's resolveBasePath. This file
+// cannot import it (see the note at the top), so it is copied here, and
+// src/__tests__/frontend/basePath.test.ts fails if the copy and the package ever disagree.
+const BASE_PATH = "/citizens/connect";
+const rawBasePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").trim();
+if (rawBasePath !== "" && rawBasePath !== "/" && rawBasePath.replace(/\/$/, "") !== BASE_PATH) {
+  throw new Error(
+    `[ecosystem] NEXT_PUBLIC_BASE_PATH=${JSON.stringify(rawBasePath)} is not valid for "connect": ` +
+      `leave it unset to serve from the site root, or set it to exactly "${BASE_PATH}".`,
+  );
+}
+const basePath = rawBasePath === "" || rawBasePath === "/" ? "" : BASE_PATH;
+
+// The addresses that existed before the shared domain keep working while the prefix is on. The rule is packages/
+// ecosystem's oldAddressRules("connect", basePath); like the base path above it is copied here, and
+// src/__tests__/frontend/basePath.test.ts fails if the copy and the package ever disagree. Both lists are empty
+// when the prefix is unset, so today's behaviour is untouched.
+//   - www.citizenscentral.co.za (and the bare name): every page path, "/" included, is redirected permanently to
+//     the same path on 219.co.za, query kept (printed QR codes /c/<slug>, /index.html?c=<slug>, /dashboard ...).
+//     "/api", "/_next" and an already prefixed "/citizens/..." path are left out of that redirect.
+//   - any host: the bare "/" goes to the prefix, and "/api/*" is REWRITTEN (never redirected: the Apps Script intake
+//     POSTs there and a redirect can turn a POST into a GET). Next refuses a `basePath: false` rewrite to an
+//     internal path, so the destination is this app's own production address: one extra hop into the same project.
+const SITE_ORIGIN = "https://219.co.za";
+const OLD_HOSTS_PATTERN = "(?:citizenscentral\\.co\\.za|www\\.citizenscentral\\.co\\.za)";
+type OldRedirect = {
+  source: string; destination: string; basePath: false; permanent: boolean;
+  has?: { type: "host"; value: string }[];
+};
+type OldRewrite = { source: string; destination: string; basePath: false };
+
+/** HUB_ORIGIN_CONNECT when set (a bare origin), otherwise this app's production address. */
+function ownOrigin(): string {
+  const raw = (process.env.HUB_ORIGIN_CONNECT ?? "").trim();
+  if (raw === "") return "https://citizens-ecosystem-connect.vercel.app";
+  let url: URL | undefined;
+  try {
+    url = new URL(raw);
+  } catch {
+    url = undefined;
+  }
+  const loopback = url !== undefined && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  const schemeOk = url !== undefined && (url.protocol === "https:" || (url.protocol === "http:" && loopback));
+  const bare = url !== undefined && url.pathname === "/" && url.search === "" && url.hash === "" && url.username === "" && url.password === "";
+  if (url === undefined || !schemeOk || !bare) {
+    throw new Error(
+      `[ecosystem] HUB_ORIGIN_CONNECT=${JSON.stringify(raw)} is not valid: use a bare origin such as ` +
+        `"https://example.vercel.app" (https only; http only for localhost), with no path, query or login.`,
+    );
+  }
+  return url.origin;
+}
+
+function oldAddressRules(): { redirects: OldRedirect[]; rewrites: OldRewrite[] } {
+  if (!basePath) return { redirects: [], rewrites: [] };
+  const has = [{ type: "host" as const, value: OLD_HOSTS_PATTERN }];
+  return {
+    redirects: [
+      { source: "/", has, basePath: false, destination: `${SITE_ORIGIN}${basePath}`, permanent: true },
+      {
+        source: "/:path((?!api(?:/|$)|_next(?:/|$)|citizens(?:/|$)).+)",
+        has,
+        basePath: false,
+        destination: `${SITE_ORIGIN}${basePath}/:path`,
+        permanent: true,
+      },
+      { source: "/", basePath: false, destination: basePath, permanent: false },
+    ],
+    rewrites: [{ source: "/api/:path*", basePath: false, destination: `${ownOrigin()}${basePath}/api/:path*` }],
+  };
+}
+const oldAddress = oldAddressRules();
+
 const nextConfig: NextConfig = {
+  // Spread, so an unset value leaves the config exactly as it was (no `basePath` key at all). Next then prefixes
+  // rewrites, headers, public/ files, _next and /api with it; the explicit rewrites below need no change.
+  ...(basePath ? { basePath } : {}),
+  // Do not let `next dev` write Next.js's agent-rules block into AGENTS.md. It does so whenever it detects an AI coding
+  // agent, so every agent session left the file modified (and a new one in apps that have none). `false` also removes
+  // the block if it is there. See apps/connect/RESUME_HERE.md, C38.
+  agentRules: false,
   // Must be the MONOREPO root, not this app's own directory — pnpm hoists
   // Next's own compiled submodules (e.g. next/dist/compiled/source-map) up to
   // the workspace root's node_modules. Scoping this to apps/connect makes
@@ -50,6 +132,9 @@ const nextConfig: NextConfig = {
   // right screen, so a refresh keeps you where you were and a link can be shared.
   // (index.html loads its scripts through <base href="/">, so a nested path such as
   // /e/<id> cannot break them; that is why /c/<slug> used to have to REDIRECT.)
+  // Under a basePath every source below is served under the prefix (/citizens/connect/e/<id>), the build
+  // writes <base href="/citizens/connect/"> instead, and the frontend (routes.jsx stripBase / withBase,
+  // C39 PR B) converts between the address bar and the app-relative paths of this table.
   //
   // The list is EXPLICIT on purpose, and must never become a catch-all: that would
   // shadow /api/*, /auth/*, /_next/* and every static file. An unknown path keeps
@@ -71,13 +156,20 @@ const nextConfig: NextConfig = {
       // Token is required. A bare /upgrade is not a screen and stays a 404.
       toApp("/upgrade/:token"),
       toApp("/upgrade/:token/decline"),
+      // Old address: "/api/*" (empty until NEXT_PUBLIC_BASE_PATH is set).
+      ...oldAddress.rewrites,
     ];
   },
+  // Old addresses (empty until NEXT_PUBLIC_BASE_PATH is set); see oldAddressRules above.
+  ...(basePath ? { redirects: async () => oldAddress.redirects } : {}),
 
   async headers() {
     return [
       {
-        source: "/(.*)",
+        // `/:path*`, NOT `/(.*)`: under a basePath Next prefixes the pattern, and `/citizens/connect/(.*)` needs a
+        // slash after the prefix, so the bare `/citizens/connect` (the app's front door) got no headers at all.
+        // `/:path*` matches the bare prefix too. Pinned by src/__tests__/frontend/basePath.test.ts.
+        source: "/:path*",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },

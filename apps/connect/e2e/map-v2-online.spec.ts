@@ -96,18 +96,19 @@ test.describe("the globe on a phone (real touch)", () => {
     await expect(page.locator("[data-mv2='globe-host']")).toHaveCount(0);
   });
 
-  test("a globe appears with a count, among the map's controls, at least 44 px, one labelled button", async ({ page }) => {
+  test("a globe appears with a count, among the map's controls, the size of the map's own buttons (36 px), one labelled button, and it stays when the zoom buttons hide", async ({ page }) => {
     await openAtPretoria(page, { [PTA]: TWO });
     await expect(globe(page)).toHaveCount(1);
     await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area: 3 listings");
     await expect(globe(page).locator("[data-mv2='globe-count']")).toHaveText("3");
     const b = (await globe(page).boundingBox())!;
-    expect(b.width).toBeGreaterThanOrEqual(43.5);
-    expect(b.height).toBeGreaterThanOrEqual(43.5);
+    expect(b.width).toBeGreaterThanOrEqual(35.5);
+    expect(b.height).toBeGreaterThanOrEqual(35.5);
     // it sits in the bottom-right control stack, in the same column as the zoom buttons, above them
     const zoomIn = (await page.locator(".maplibregl-ctrl-zoom-in").boundingBox())!;
     expect(Math.abs(b.x - zoomIn.x)).toBeLessThanOrEqual(2);
     expect(b.y).toBeLessThan(zoomIn.y);
+    await expect(globe(page)).toBeVisible();
   });
 
   test("a real tap on the globe opens the list; a real tap on Close ends it; Back ends it too and stays in the app", async ({ page }) => {
@@ -259,20 +260,5 @@ test.describe("looks and settings", () => {
     await expect(sheet(page)).toBeVisible();
     const bg = await sheet(page).evaluate((e) => getComputedStyle(e).backgroundColor);
     expect(bg).not.toBe("rgb(255, 255, 255)"); // the dark sheet, not the light one
-  });
-});
-
-test.describe("flag off keeps the map exactly as it was", () => {
-  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
-  test("on the old map (?map=v1) there is no globe, no stylesheet rule and NO request for areas", async ({ page }) => {
-    const { api, extra } = installOnlineApi({ [PTA]: TWO });
-    await mockMapNetwork(page, seed0(), extra);
-    await page.goto("/?map=v1");
-    await page.waitForSelector('[data-screen="discover"]', { timeout: 20_000 });
-    await page.waitForFunction(() => !!(window as unknown as { __ccMap?: unknown }).__ccMap, undefined, { timeout: 20_000 });
-    await jump(page, PRETORIA.lng, PRETORIA.lat, 11);
-    await page.waitForTimeout(900);
-    await expect(globe(page)).toHaveCount(0);
-    expect(api.requests).toEqual([]);
   });
 });

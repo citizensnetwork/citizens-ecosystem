@@ -73,6 +73,7 @@ import {
 } from '@/lib/intake/googleForm';
 import { gateIntakeRequest } from '@/lib/intake/gate';
 import { createListingUser, pendingListingMessage, registerListingClaim } from '@/lib/listingClaim';
+import { withSitePrefix } from '@/lib/siteUrl';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -197,6 +198,8 @@ export async function POST(request: Request) {
     /\/+$/,
     '',
   );
+  // `origin` stays a bare origin for the MapTiler Referer below; every link we hand out starts at `linkBase`.
+  const linkBase = withSitePrefix(origin);
 
   if (!fields.noFixedLocation) {
     const geocoded = body.geocoded as { lat?: unknown; lng?: unknown } | undefined;
@@ -226,7 +229,7 @@ export async function POST(request: Request) {
     {
       claimEmail: fields.claimEmail,
       userMetadata: { full_name: fields.displayName, created_via: 'google_form' },
-      origin,
+      origin: linkBase,
     },
     // An existing citizen confirms an upgrade of their own account. Admin Create keeps the alias attach.
     { existingCitizen: 'defer' },
@@ -243,7 +246,7 @@ export async function POST(request: Request) {
       return respondWhenEmailExists({
         admin,
         email: fields.claimEmail,
-        origin,
+        origin: linkBase,
         fields,
         images,
         warnings: upgradeWarnings,
@@ -331,7 +334,7 @@ export async function POST(request: Request) {
       return fail(
         409,
         'listing_pending',
-        pendingListingMessage(fields.claimEmail, claim.existingSlug, origin),
+        pendingListingMessage(fields.claimEmail, claim.existingSlug, linkBase),
       );
     }
     return fail(500, 'claim_ledger_failed');
@@ -394,7 +397,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     success: true,
     slug: result.slug,
-    url: `${origin}/c/${result.slug}`,
+    url: `${linkBase}/c/${result.slug}`,
     warnings,
     on_map: hasMapPin({
       no_fixed_location: fields.noFixedLocation,

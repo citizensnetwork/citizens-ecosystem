@@ -72,11 +72,10 @@
   // neighbourhood scale). The selected pin keeps its label at every zoom
   // (CSS `.cc-pin-label.is-selected`).
   const ZOOM_LABELS = 15;
-  // Map v2 (flag ?map=v2, founder D8): a Contributor pin shows its LOGO at and above this zoom and its
+  // Map v2 (founder D8): a Contributor pin shows its LOGO at and above this zoom and its
   // category glyph below it; the selected pin always shows its logo. The founder's map-layering.md says no
   // pictures in the mid tier. Tuned inside 13-15 (tracker E6); starts where the name labels start.
   const ZOOM_PHOTO = 15;
-  const v2On = () => !!(window.isMapV2 && window.isMapV2() && window.MapV2Pins && window.MapV2Strings);
 
   function coordsFor(m) {
     if (typeof m.lng === 'number' && typeof m.lat === 'number' && (m.lng !== 0 || m.lat !== 0)) {
@@ -200,16 +199,7 @@
     }).join('');
   }
 
-  // ── Pin content builder ─────────────────────────────────────────────
-  //  Returns the INNER node (a position:relative wrapper holding the pulse
-  //  ring, the pin shape, the broadcast bubble and the selected label).
-  //
-  //  The OUTER element handed to MapLibre is built (and kept) by the render
-  //  loop and is NEVER replaced — MapLibre adds its `maplibregl-marker` class
-  //  (which carries `position:absolute`) once at construction and anchors the
-  //  pin to its lng/lat with a transform. Replacing that element on every
-  //  re-render dropped the class → the pin fell to `position:static` and
-  //  drifted on zoom/pan. So on reuse we swap only this inner content.
+  // ── Pin glyphs ──────────────────────────────────────────────────────
   // Default glyph per entity type, for the (common) rows that carry no
   // category yet — honest and type-specific rather than a generic drop pin.
   const FALLBACK_ICON = Object.assign(Object.create(null),
@@ -227,202 +217,59 @@
     return FALLBACK_ICON[m.type] || 'MapPin';
   }
 
-  // One floating SVG badge: the category's own glyph, in the category's own
-  // colour, on the shape that says what kind of thing this is —
-  //   place       → circle
-  //   event       → rounded rectangle with a locating nub
-  //   contributor → circle with a second, category-coloured halo ring
-  //   idea        → circle (gold)
-  // Drawn as a real <svg> (not stacked divs) so the white outline traces the
-  // whole silhouette and the drop-shadow follows its alpha — that shadow is
-  // what makes it read as floating above the map rather than printed on it.
-  function pinSvg({ shape, hex, icon, selected }) {
-    const ns = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(ns, 'svg');
-    const glyph = lucideInner(icon);
-    let w, h, body, gx, gy, gsize;
-
-    if (shape === 'event') {
-      // Events read very slightly LARGER than places (founder ask): an event is
-      // a moment you can still turn up to, so it should carry marginally more
-      // weight than the venue it happens in. 40x32 against a place's 30px
-      // circle — noticeable side by side, never shouty.
-      w = selected ? 48 : 40;
-      h = selected ? 38 : 32;
-      const nub = 7, r = 9, cx = w / 2, pad = 2;      // pad leaves room for the stroke
-      const W = w + pad * 2, H = h + nub + pad * 2;
-      const x0 = pad, y0 = pad, x1 = pad + w, y1 = pad + h, ncx = pad + cx;
-      body = '<path d="M' + (x0 + r) + ' ' + y0 + ' H' + (x1 - r) +
-        ' A' + r + ' ' + r + ' 0 0 1 ' + x1 + ' ' + (y0 + r) +
-        ' V' + (y1 - r) + ' A' + r + ' ' + r + ' 0 0 1 ' + (x1 - r) + ' ' + y1 +
-        ' H' + (ncx + 5) + ' L' + ncx + ' ' + (y1 + nub) + ' L' + (ncx - 5) + ' ' + y1 +
-        ' H' + (x0 + r) + ' A' + r + ' ' + r + ' 0 0 1 ' + x0 + ' ' + (y1 - r) +
-        ' V' + (y0 + r) + ' A' + r + ' ' + r + ' 0 0 1 ' + (x0 + r) + ' ' + y0 + ' Z"' +
-        ' fill="' + hex + '" stroke="#ffffff" stroke-width="2.5" stroke-linejoin="round"/>';
-      gsize = Math.round(h * 0.58);
-      gx = pad + cx - gsize / 2;
-      gy = pad + h / 2 - gsize / 2;
-      w = W; h = H;
-    } else {
-      // Contributor > event > place, by design: an organisation is a permanent
-      // anchor (and the pin that survives furthest out — see ZOOM_GATES), an
-      // event is time-bound, a place is the smallest unit.
-      const d = shape === 'contributor' ? (selected ? 46 : 38) : (selected ? 38 : 30);
-      const pad = shape === 'contributor' ? 3 : 2;
-      const W = d + pad * 2, c = pad + d / 2;
-      body = '';
-      if (shape === 'contributor') {
-        // outer halo ring — the one visual difference from a Place circle,
-        // so the two never read as the same thing at a glance.
-        body += '<circle cx="' + c + '" cy="' + c + '" r="' + (d / 2 + 1.25) + '" fill="none" stroke="' + hex + '" stroke-opacity="0.45" stroke-width="2"/>';
-      }
-      body += '<circle cx="' + c + '" cy="' + c + '" r="' + (d / 2 - 1.25) + '" fill="' + hex + '" stroke="#ffffff" stroke-width="2.5"/>';
-      gsize = Math.round(d * 0.46);
-      gx = c - gsize / 2;
-      gy = c - gsize / 2;
-      w = W; h = W;
-    }
-
-    // Stable hook for tests/inspection: which pin shape a marker actually got.
-    // Cheap, and it makes "did every entity type render on the map?" assertable
-    // instead of eyeballed.
-    svg.setAttribute('data-cc-pin', shape);
-    svg.setAttribute('width', String(w));
-    svg.setAttribute('height', String(h));
-    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
-    svg.setAttribute('aria-hidden', 'true');
-    svg.style.cssText = 'display:block;overflow:visible;filter:drop-shadow(0 3px 5px rgba(0,0,0,.32));transition:all .15s;';
-    svg.innerHTML = body + (glyph
-      ? '<g transform="translate(' + gx + ' ' + gy + ') scale(' + (gsize / 24) + ')" fill="none" stroke="#ffffff"' +
-        ' stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' + glyph + '</g>'
-      : '');
-    return svg;
-  }
-
-  function buildPinInner(m, cat, opts) {
-    const selected = opts.selected;
-    const isIdea = m.type === 'idea';
-    const fill = isIdea ? '#C9A84C' : (cat ? cat.hex : '#C9A84C');
-    const icon = pinIcon(m, cat);
-
-    const inner = document.createElement('div');
-    inner.style.cssText = 'position:relative;line-height:0;';
-
-    // live / busy pulse ring (behind the pin)
-    if (m.isLive || m.isBusy) {
-      const ring = document.createElement('span');
-      const c = m.isLive ? '#ef4444' : fill;
-      const sz = m.isLive ? 16 : 14;
-      ring.className = 'cc-pin-pulse';
-      ring.style.cssText = 'position:absolute;left:50%;top:50%;width:' + sz + 'px;height:' + sz +
-        'px;margin:-' + (sz / 2) + 'px 0 0 -' + (sz / 2) + 'px;border-radius:50%;background:' + c + ';';
-      inner.appendChild(ring);
-    }
-
-    let pin;
-    if (m.type === 'contributor' && m.profilePhoto) {
-      // The one case a flat SVG can't carry: a Contributor's own logo. Same
-      // circular silhouette as the SVG badge, drawn as DOM so the photo keeps
-      // its onerror fallback — a broken logo URL degrades to the category
-      // glyph rather than leaving a dead image on the map.
-      //
-      // An organisation's LOGO sits whole (object-fit: contain) on a white
-      // disc, with the category colour as the ring only: a wide wordmark used
-      // to be cropped to its middle and a transparent PNG took on the category
-      // colour behind it. An Individual's PHOTO of themselves still fills the
-      // circle, as before.
-      const d = selected ? 46 : 38;
-      const isPhoto = m.kind === 'individual';
-      pin = document.createElement('span');
-      pin.setAttribute('data-cc-pin', 'contributor-logo');
-      pin.style.cssText = 'display:flex;align-items:center;justify-content:center;width:' + d + 'px;height:' + d +
-        'px;border-radius:50%;transition:all .15s;' + (isPhoto
-        ? 'background:' + fill + ';box-shadow:0 0 0 2px ' + fill + '73, 0 3px 5px rgba(0,0,0,.32);'
-        : 'box-sizing:border-box;background:#fff;border:2.5px solid ' + fill + ';box-shadow:0 0 0 1.5px #fff, 0 3px 5px rgba(0,0,0,.32);');
-      const img = document.createElement('img');
-      img.src = m.profilePhoto;
-      img.alt = '';
-      img.style.cssText = isPhoto
-        ? 'width:calc(100% - 5px);height:calc(100% - 5px);border-radius:50%;object-fit:cover;display:block;border:2px solid #fff;box-sizing:border-box;'
-        : 'width:100%;height:100%;padding:2px;border-radius:50%;object-fit:contain;display:block;box-sizing:border-box;';
-      img.onerror = () => {
-        pin.style.boxShadow = 'none';
-        pin.style.background = 'transparent';
-        pin.style.border = 'none';
-        pin.replaceChildren(pinSvg({ shape: 'contributor', hex: fill, icon, selected }));
-      };
-      pin.appendChild(img);
-    } else {
-      pin = pinSvg({
-        shape: isIdea ? 'idea' : m.type === 'event' ? 'event' : m.type === 'contributor' ? 'contributor' : 'place',
-        hex: fill, icon, selected,
-      });
-    }
-    inner.appendChild(pin);
-
-    // broadcast bubble (above the pin). Capped width with a clean one-line
-    // ellipsis: the text child needs `min-width:0` for the ellipsis to engage
-    // inside the flex row, and the bubble itself sizes to its content up to the
-    // cap, so short updates stay small instead of stretching into a long bar.
-    if (m.broadcast && m.broadcast.message) {
-      const b = document.createElement('div');
-      b.className = 'cc-pin-bubble';
-      b.style.cssText = 'position:absolute;left:50%;bottom:100%;margin-bottom:10px;' +
-        'transform:translateX(-50%);max-width:188px;width:max-content;display:flex;align-items:center;gap:5px;' +
-        'background:#fff;border:1px solid rgba(201,168,76,.3);border-radius:14px 14px 14px 4px;' +
-        'padding:5px 9px;box-shadow:0 6px 16px rgba(0,0,0,.16);';
-      const dot = document.createElement('span');
-      dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:#C9A84C;flex:0 0 auto;';
-      const txt = document.createElement('span');
-      txt.style.cssText = 'flex:0 1 auto;min-width:0;font-size:10px;line-height:1.3;font-weight:600;color:#0A0908;' +
-        'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-      txt.textContent = m.broadcast.message;
-      b.appendChild(dot); b.appendChild(txt);
-      // Dismiss × — only for real (dismissible) bubbles with a handler wired.
-      if (m.broadcast.bubbleId && opts.onDismissBubble) {
-        const x = document.createElement('button');
-        x.textContent = '×';
-        x.setAttribute('aria-label', 'Dismiss update');
-        x.style.cssText = 'flex:0 0 auto;margin-left:2px;width:15px;height:15px;line-height:13px;' +
-          'border:none;border-radius:50%;background:rgba(0,0,0,.06);color:#0A0908;font-size:13px;' +
-          'cursor:pointer;padding:0;';
-        x.addEventListener('click', (e) => {
-          e.stopPropagation();
-          opts.onDismissBubble(m.broadcast.bubbleId, m.id);
-        });
-        b.appendChild(x);
-      }
-      inner.appendChild(b);
-    }
-
-    // ── title label (below the pin) ──────────────────────────────────
-    //  Was a tiny 10px pill in a hard white capsule with a gold border — the
-    //  founder's words: "the font is odd, and the white labeling around it is
-    //  extremely compact and odd". It is now a bolder, larger, properly-spaced
-    //  name FLOATING on a fuzzy white mist: a blurred white blob sits behind
-    //  the text (`.cc-pin-label-mist`, an actual `filter: blur()`, not a box)
-    //  so the label separates from whatever the basemap is doing underneath
-    //  without drawing a border around itself. Styles live in index.html so
-    //  the zoom gate can toggle them with one attribute instead of touching
-    //  every marker. Labels appear from ZOOM_LABELS up; the selected pin keeps
-    //  its own at any zoom.
-    if (m.title) {
-      const l = document.createElement('div');
-      l.className = 'cc-pin-label' + (selected ? ' is-selected' : '');
-      const mist = document.createElement('span');
-      mist.className = 'cc-pin-label-mist';
-      const txt = document.createElement('span');
-      txt.className = 'cc-pin-label-text';
-      txt.textContent = m.title;
-      l.appendChild(mist);
-      l.appendChild(txt);
-      inner.appendChild(l);
-    }
-
-    return inner;
-  }
-
   // ── The map component ──────────────────────────────────────────────
+  // The "frame the data" fallback keeps pins clear of what sits over the map. Off the home screen: 70 px all round. On Map v2's home
+  // (#210): measured, not guessed: below its top bar and pills, above the Explore row and the folding nav.
+  const FRAME_GAP = 40;
+  function framePadding(el) {
+    const home = el && el.closest ? el.closest("[data-mv2='home']") : null;
+    if (!home) return 70;
+    const box = el.getBoundingClientRect();
+    // the folding nav lives in the shell, outside the home screen: look for it in the document
+    const reach = (sel, fromTop, root) => {
+      const o = (root || home).querySelector(sel);
+      if (!o || o.hidden) return 0;
+      const r = o.getBoundingClientRect();
+      if (!r.height) return 0;
+      return fromTop ? Math.max(0, r.bottom - box.top) : Math.max(0, box.bottom - r.top);
+    };
+    const top = FRAME_GAP + reach("[data-mv2='home-top']", true);
+    const bottom = FRAME_GAP + Math.max(reach("[data-mv2='explore']", false), reach("[data-mv2='nav-toggle']", false, document));
+    const h = box.height || el.clientHeight || 0;
+    // never ask for more padding than the map is tall (MapLibre would refuse to fit at all)
+    if (h && top + bottom > h * 0.8) return 70;
+    return { top, bottom, left: FRAME_GAP, right: FRAME_GAP };
+  }
+
+  // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
+  function frameData(mp, items, el) {
+    const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
+    let outermost = Infinity;   // the lowest gate among the types actually present
+    items.forEach(({ m, coords }) => {
+      b.extend(coords);
+      const gate = ZOOM_GATES[m.type];
+      outermost = Math.min(outermost, gate === undefined ? 0 : gate);
+    });
+    const pad = framePadding(el);
+    mp.fitBounds(b, { padding: pad, maxZoom: 13, duration: 0 });
+    // Data spread across the whole country frames out past every gate and
+    // would open on a blank map. Never zoom out further than the point where
+    // at least one type of pin is still drawn — and centre on THOSE pins, not
+    // on the middle of the data (which can be an empty stretch of country,
+    // with the pins that are drawn cropped off the edge).
+    if (mp.getZoom() < outermost) {
+      const shown = new window.maplibregl.LngLatBounds();
+      items.forEach(({ m, coords }) => {
+        const gate = ZOOM_GATES[m.type];
+        if ((gate === undefined ? 0 : gate) <= outermost) shown.extend(coords);
+      });
+      // centred in what is left visible between the overlays (Map v2's home, #210), not in the middle of the screen,
+      // which there is the top edge of the Explore row
+      const dy = typeof pad === 'object' ? (pad.top - pad.bottom) / 2 : 0;
+      mp.easeTo({ center: shown.getCenter(), zoom: outermost, offset: [0, dy], duration: 0 });
+    }
+  }
+
   function StylizedMap({ markers, filterCategory, selectedId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
@@ -442,6 +289,12 @@
     const bandRef = useRef('all');           // last band reported upward
     const selectedRef = useRef(selectedId);
     selectedRef.current = selectedId;
+    // Map v2 (#210): who wants to hear that the view settled (the Explore row ranks by it), and where the person is
+    // once the browser has told us. Plain refs: a pan never re-renders the map screen.
+    const viewSubs = useRef(new Set());
+    const userLocRef = useRef(null);
+    const framedItemsRef = useRef([]);       // what "frame the data" last framed, so #210's row can ask for it again
+    const tellView = React.useCallback(() => { viewSubs.current.forEach((fn) => { try { fn(); } catch { /* one listener must not stop the rest */ } }); }, []);
 
     // Applies the zoom gates to markers already on the map. Runs on every zoom
     // frame, so it does nothing but flip a `display` (and one attribute for the
@@ -453,7 +306,7 @@
       const z = mp.getZoom();
       const el = containerRef.current;
       if (el) el.setAttribute('data-cc-labels', z >= ZOOM_LABELS ? '1' : '0');
-      if (el && v2On()) el.setAttribute('data-cc-photo', z >= ZOOM_PHOTO ? '1' : '0');
+      if (el) el.setAttribute('data-cc-photo', z >= ZOOM_PHOTO ? '1' : '0');
       markerObjs.current.forEach((mk) => {
         const w = mk.getElement();
         if (!w) return;
@@ -467,7 +320,7 @@
       }
     }, []);
 
-    // Map v2, when the map goes idle (never per frame): load the logos that are about to show (zoom >=
+    // When the map goes idle (never per frame): load the logos that are about to show (zoom >=
     // ZOOM_PHOTO, inside the viewport + 20 %), put "+N" on overlapping pins, and hide colliding labels.
     const layoutV2 = React.useCallback(() => {
       const mp = mapRef.current;
@@ -495,14 +348,14 @@
 
       function init() {
         if (mapRef.current || !containerRef.current) return; // unmounted/remounted while waiting
-        // Map v2 draws the base for the look chosen now (light unless the person picked otherwise).
-        let styleTheme = v2On() ? window.MapV2.resolvedTheme() : 'light';
-        const style = v2On() ? styleUrlFor(styleTheme) : styleUrl();
+        // The base follows the phone's look, as it is now.
+        let styleTheme = window.MapV2.resolvedTheme();
+        const style = styleUrlFor(styleTheme);
         if (!style) { console.warn('[map] MAPTILER_KEY missing — set it in config.js'); return; }
-        // Map v2's fixed tilt (R8, D17): ONE oblique angle, whatever the fingers do. min = max = the angle pins the camera,
+        // The fixed tilt (R8, D17): ONE oblique angle, whatever the fingers do. min = max = the angle pins the camera,
         // touchPitch is the two-finger vertical drag, pitchWithRotate the vertical part of a right-drag; zoom and rotation
-        // are untouched. MapV2.PITCH = 0 (or the old map) passes none of this: MapLibre's own defaults, as before.
-        const tilt = v2On() && window.MapV2.PITCH > 0 ? window.MapV2.PITCH : 0;
+        // are untouched. MapV2.PITCH = 0 passes none of this: MapLibre's own defaults.
+        const tilt = window.MapV2.PITCH > 0 ? window.MapV2.PITCH : 0;
         const map = new window.maplibregl.Map({
           container: containerRef.current,
           style,
@@ -512,9 +365,14 @@
           ...(tilt ? { pitch: tilt, minPitch: tilt, maxPitch: tilt, touchPitch: false, pitchWithRotate: false } : {}),
         });
         map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-        map.addControl(new window.maplibregl.GeolocateControl({
+        const geo = new window.maplibregl.GeolocateControl({
           positionOptions: { enableHighAccuracy: true }, trackUserLocation: true,
-        }), 'bottom-right');
+        });
+        map.addControl(geo, 'bottom-right');
+        // Map v2 (#210): the view settled, or the person's position arrived. Never per frame.
+        const onLocatedV2 = (e) => { if (e && e.coords) { userLocRef.current = { lat: e.coords.latitude, lng: e.coords.longitude }; tellView(); } };
+        map.on('moveend', tellView);
+        geo.on('geolocate', onLocatedV2);
         // Once the user pans/zooms by hand, stop auto-framing the data.
         const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
         map.on('dragstart', onUserMove);
@@ -524,14 +382,13 @@
         // lets a spec (or the console) jumpTo an exact zoom instead of
         // keyboard-stepping toward it. Read-only by convention; cleared on unmount.
         window.__ccMap = map;
-        if (v2On()) { try { window.dispatchEvent(new Event('cc-map-ready')); } catch { /* old webview */ } }   // the "Online in this area" globe waits for this (#259)
+        try { window.dispatchEvent(new Event('cc-map-ready')); } catch { /* old webview */ }   // the "Online in this area" globe waits for this (#259)
         setMapReady(true);
         // Density gates follow the zoom, including the programmatic flyTo /
         // fitBounds below, so the first frame is already correct.
         map.on('zoom', applyZoomGates);
         map.on('load', applyZoomGates);
-        // The look changed (the Map look control, or the phone's own setting while on "Match my phone"): swap the
-        // base style on the same map; the DOM pins are untouched.
+        // The phone's own look changed (light/dark): swap the base style on the same map; the DOM pins are untouched.
         const onTheme = () => {
           const t = window.MapV2.resolvedTheme();
           if (t === styleTheme) return;
@@ -539,12 +396,12 @@
           const u = styleUrlFor(t);
           if (u) map.setStyle(u);
         };
-        if (v2On()) window.addEventListener('cc-map-theme', onTheme);
+        window.addEventListener('cc-map-theme', onTheme);
         // 'idle' fires after every discrete render (a programmatic pan fires it each frame), so the work is
         // debounced: it runs once the map has been quiet for 150 ms, never while it is being moved.
         let idleTimer = null;
-        const onIdleV2 = v2On() ? () => { clearTimeout(idleTimer); idleTimer = setTimeout(layoutV2, 150); } : null;
-        if (onIdleV2) map.on('idle', onIdleV2);
+        const onIdleV2 = () => { clearTimeout(idleTimer); idleTimer = setTimeout(layoutV2, 150); };
+        map.on('idle', onIdleV2);
         applyZoomGates();
 
         // MapLibre sizes its canvas once, from the container's dimensions at
@@ -568,6 +425,7 @@
         const isNativeMap = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
         const positionOpts = { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 };
         const onLocated = (coords) => {
+          if (mapRef.current === map) onLocatedV2({ coords });
           if (mapRef.current !== map || userMovedRef.current) return;
           userMovedRef.current = true;
           map.flyTo({ center: [coords.longitude, coords.latitude], zoom: 12, duration: 0 });
@@ -588,7 +446,10 @@
           if (ro) ro.disconnect();
           map.off('zoom', applyZoomGates);
           map.off('load', applyZoomGates);
-          if (onIdleV2) { map.off('idle', onIdleV2); clearTimeout(idleTimer); }
+          map.off('idle', onIdleV2);
+          clearTimeout(idleTimer);
+          map.off('moveend', tellView);
+          geo.off('geolocate', onLocatedV2);
           window.removeEventListener('cc-map-theme', onTheme);
           markerObjs.current.forEach((mk) => mk.remove());
           markerObjs.current.clear();
@@ -603,7 +464,7 @@
         stopWaiting();
         if (cleanupInner) cleanupInner();
       };
-    }, [applyZoomGates, layoutV2]);
+    }, [applyZoomGates, layoutV2, tellView]);
 
     // (re)render pins whenever inputs change. Zoom gating is NOT done here (it
     // is applyZoomGates, per zoom frame), so this only needs to run on
@@ -617,7 +478,7 @@
       const items = [];
       markers.forEach((m) => { const c = coordsFor(m); if (c) items.push({ m, coords: c }); });
 
-      // Map v2: one upsert per pin. Selecting a pin only toggles a class on the pin that is already there
+      // One upsert per pin. Selecting a pin only toggles a class on the pin that is already there
       // (so the 200 ms scale can animate and a tap does not rebuild every marker); a pin is rebuilt only when
       // what it shows changes (its signature). The marker's outer element is still never replaced.
       function upsertPinV2(m, cat, coords, anchor, dim, selected) {
@@ -626,7 +487,7 @@
         const label = P.ariaLabelFor(m, catLabel, S.pin);
         const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, !!m.isLive, !!m.isBusy,
           m.broadcast ? m.broadcast.message + '|' + m.broadcast.bubbleId : '', catLabel].join('');
-        const fill = m.type === 'idea' ? '#C9A84C' : (cat ? cat.hex : '#C9A84C');
+        const fill = m.type === 'idea' ? '#F2BD22' : (cat ? cat.hex : '#F2BD22');
         const build = () => P.build(m, { lucideInner, icon: pinIcon(m, cat), hex: fill, strings: S.pin, onDismissBubble: onDismissBubbleRef.current });
         let mk = markerObjs.current.get(m.id);
         if (mk && mk._ccAnchor === anchor) {
@@ -655,47 +516,17 @@
       }
 
       // ── individual pins — show them all ──
-      const useV2 = v2On();
       const seenPins = new Set();
       items.forEach(({ m, coords }) => {
         seenPins.add(m.id);
         const cat = window.DATA.getItemCategory(m);
-        const dim = !!(filterCategory && m.category !== filterCategory && m.type !== 'idea');
+        // Map v2's pills (#210) pass a test per marker (a group, or "Events"); the old map passes one category id.
+        const passes = typeof filterCategory === 'function' ? filterCategory(m) : m.category === filterCategory;
+        const dim = !!(filterCategory && !passes && m.type !== 'idea');
         const selected = selectedId === m.id;
-        // Event badges carry a locating nub, so they hang from their point
-        // ('bottom'); every other pin is a symmetric badge centred on it.
-        const anchor = (m.type === 'event' || (useV2 && m.type === 'contributor')) ? 'bottom' : 'center';
-        if (useV2) { upsertPinV2(m, cat, coords, anchor, dim, selected); return; }
-        const inner = buildPinInner(m, cat, { selected, onDismissBubble: onDismissBubbleRef.current });
-        const existing = markerObjs.current.get(m.id);
-        // Reuse the marker (and its MapLibre-owned outer element) whenever the
-        // anchor is unchanged — swap ONLY the inner content so the
-        // `maplibregl-marker` class + absolute positioning survive. The anchor
-        // is fixed at construction, so an anchor change forces a rebuild or
-        // the pin would render off its coordinate.
-        if (existing && existing._ccAnchor === anchor) {
-          const wrap = existing.getElement();
-          wrap.style.opacity = dim ? '0.3' : '';
-          wrap.replaceChildren(inner);
-          existing.setLngLat(coords);
-        } else {
-          if (existing) existing.remove();
-          const wrap = document.createElement('div');
-          wrap.style.cssText = 'cursor:pointer;line-height:0;';
-          if (dim) wrap.style.opacity = '0.3';
-          wrap.appendChild(inner);
-          wrap.addEventListener('click', (e) => {
-            e.stopPropagation();
-            onSelectRef.current && onSelectRef.current(m.id, m.type);
-          });
-          const mk = new window.maplibregl.Marker({ element: wrap, anchor }).setLngLat(coords).addTo(mp);
-          mk._ccAnchor = anchor;
-          markerObjs.current.set(m.id, mk);
-        }
-        const mk = markerObjs.current.get(m.id);
-        // Remembered on the Marker (not read back out of the DOM) so the
-        // per-zoom-frame gate is a plain property read.
-        if (mk) { mk._ccType = m.type; mk._ccId = m.id; }
+        // Event and Contributor badges hang from their point ('bottom'); every other pin is centred on it.
+        const anchor = (m.type === 'event' || m.type === 'contributor') ? 'bottom' : 'center';
+        upsertPinV2(m, cat, coords, anchor, dim, selected);
       });
       // drop markers whose item is gone
       markerObjs.current.forEach((mk, id) => {
@@ -703,50 +534,59 @@
       });
 
       // National fit-to-data — the FALLBACK when geolocation is denied/unavailable.
-      if (!userMovedRef.current && items.length) {
-        const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
-        let outermost = Infinity;   // the lowest gate among the types actually present
-        items.forEach(({ m, coords }) => {
-          b.extend(coords);
-          const gate = ZOOM_GATES[m.type];
-          outermost = Math.min(outermost, gate === undefined ? 0 : gate);
-        });
-        mp.fitBounds(b, { padding: 70, maxZoom: 13, duration: 0 });
-        // Data spread across the whole country frames out past every gate and
-        // would open on a blank map. Never zoom out further than the point where
-        // at least one type of pin is still drawn — and centre on THOSE pins, not
-        // on the middle of the data (which can be an empty stretch of country,
-        // with the pins that are drawn cropped off the edge).
-        if (mp.getZoom() < outermost) {
-          const shown = new window.maplibregl.LngLatBounds();
-          items.forEach(({ m, coords }) => {
-            const gate = ZOOM_GATES[m.type];
-            if ((gate === undefined ? 0 : gate) <= outermost) shown.extend(coords);
-          });
-          mp.jumpTo({ center: shown.getCenter(), zoom: outermost });
-        }
-      }
+      framedItemsRef.current = items;
+      if (!userMovedRef.current && items.length) frameData(mp, items, containerRef.current);
       // New/rebuilt markers start un-gated; bring them in line with the zoom
       // they were actually added at.
       applyZoomGates();
-      if (useV2) layoutV2();
+      layoutV2();
     }, [markers, filterCategory, selectedId, applyZoomGates, layoutV2, mapReady]);
 
     // Map v2: the sheet tells the map how much of it the sheet covers; the map eases the selected pin into the
     // middle of what is left visible (tracker E5: about 27 % from the top with the sheet at 46 %). An imperative
     // call rather than props, so a sheet opening never re-renders the whole map screen a second time; one frame
     // later, so the first paint belongs to the sheet's header. Reduced motion makes it a jump.
+    // #210: a card tapped on the home screen sends `minZoom` too, so the pin it jumps to is close enough to be seen
+    // (a person zoomed out over the province would otherwise land on the same blur they started from).
     useEffect(() => {
       if (!apiRef) return undefined;
       apiRef.current = {
-        focusSelected(padding) {
+        focusSelected(padding, minZoom) {
           requestAnimationFrame(() => {
             const mp = mapRef.current;
             const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
             if (!mp || !mk || !padding) return;
             userMovedRef.current = true;   // the "frame the data" fallback must never undo this
-            mp.easeTo({ center: mk.getLngLat(), padding, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+            const to = { center: mk.getLngLat(), padding, duration: window.MapV2.dur('slow'), essential: true };
+            if (Number.isFinite(minZoom) && mp.getZoom() < minZoom) to.zoom = minZoom;   // never a zoom: undefined (easeTo reads it as NaN)
+            mp.easeTo(to, { originalEvent: {} });
           });
+        },
+        // #210: where the map is looking and where the person is (null until known), and a way to hear when it settles.
+        // "Looking" is the middle of the OPEN map, between the top bar and the Explore row, not the canvas centre
+        // (on the home that is the top edge of the row, far from the pins the person is looking at when zoomed out).
+        view() {
+          const mp = mapRef.current;
+          const el = containerRef.current;
+          if (!mp) return { centre: null, user: userLocRef.current };
+          const pad = framePadding(el);
+          let c = mp.getCenter();
+          if (typeof pad === 'object' && el && el.clientHeight) {
+            c = mp.unproject([el.clientWidth / 2, pad.top + (el.clientHeight - pad.top - pad.bottom) / 2]);
+          }
+          return { centre: { lat: c.lat, lng: c.lng }, user: userLocRef.current };
+        },
+        onView(fn) {
+          viewSubs.current.add(fn);
+          return () => viewSubs.current.delete(fn);
+        },
+        // #210: the Explore row measured itself after the first framing; frame again so no pin starts behind it.
+        // Only while the person has not taken the map, and never past their own position (that wins).
+        reframe() {
+          const mp = mapRef.current;
+          const items = framedItemsRef.current;
+          if (!mp || userMovedRef.current || !items || !items.length) return;
+          frameData(mp, items, containerRef.current);
         },
       };
       return () => { apiRef.current = null; };
@@ -869,7 +709,7 @@
       // fixed center pin (the map moves under it, not the other way round)
       h('div', { className: 'absolute left-1/2 top-1/2 pointer-events-none', style: { transform: 'translate(-50%, -100%)', filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.35))' } },
         h('svg', { width: 28, height: 36, viewBox: '0 0 30 38' },
-          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#C9A84C' }),
+          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#F2BD22' }),
           h('circle', { cx: 15, cy: 15, r: 6, fill: '#fff' }))),
       h('button', {
         type: 'button', onClick: useMyLocation, disabled: busy === 'locate',

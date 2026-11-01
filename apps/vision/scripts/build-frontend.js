@@ -30,10 +30,16 @@ const path = require('path');
 const esbuild = require('esbuild');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { buildFrontend } = require('@citizens/frontend-build');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { basePathFromEnv } = require('@citizens/ecosystem');
 
 buildFrontend({
   esbuild,
   rootDir: path.join(__dirname, '..'),
+
+  // '' until the Vercel project sets NEXT_PUBLIC_BASE_PATH=/citizens/vision
+  // (see packages/ecosystem/README.md before setting it).
+  basePath: basePathFromEnv('vision'),
 
   // Every screen module, in dependency order (later files reference
   // `window.*` globals set by earlier ones).

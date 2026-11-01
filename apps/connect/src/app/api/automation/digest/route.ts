@@ -27,7 +27,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { hasScope } from "@/lib/apiKey";
 import { gateV1 } from "@/lib/v1Gate";
-import { sendEmail, siteOrigin } from "@/lib/email/send";
+import { sendEmail } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 import { suggestionsDigestEmail } from "@/lib/email/automationTemplates";
 import { contributorEligibility } from "@/lib/automation/eligibility";
 
@@ -87,7 +88,7 @@ export async function POST(request: Request) {
     byContributor.set(row.contributor_id, list);
   }
 
-  const origin = siteOrigin(request);
+  const origin = siteBase(request);
   const skipped: Record<string, number> = {};
   const skip = (reason: string) => void (skipped[reason] = (skipped[reason] ?? 0) + 1);
   let sent = 0;

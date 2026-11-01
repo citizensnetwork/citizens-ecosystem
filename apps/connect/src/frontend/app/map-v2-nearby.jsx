@@ -65,16 +65,23 @@
 
   /**
    * The list. `rows` come from the sheet already described:
-   * [{ id, type, name, meta, photo, item, kind, openState }]. Each row is a listing card.
+   * [{ id, type, name, meta, photo, item, kind, openState }]. Each row is a listing card, laid out as one
+   * sideways row (map-v2-row.jsx). There are never more than MAX_ROWS, so nothing is hidden and there is no "See all".
+   * The sheet gives this component a key per listing, so a new listing starts again at the first card.
    */
   function List({ rows, strings, onPick }) {
     const Card = window.MapV2Card;
-    if (!rows || !rows.length || !Card) return null;
+    const Row = window.MapV2Row;
+    if (!rows || !rows.length || !Card || !Row) return null;
     return h('section', { 'data-mv2': 'nearby', 'aria-labelledby': 'mv2-nearby-title' },
       h('h3', { id: 'mv2-nearby-title', 'data-mv2': 'near-title' }, strings.title),
       h('p', { 'data-mv2': 'near-hint' }, strings.hint),
-      h('ul', { 'data-mv2': 'list', role: 'list' }, rows.map((r) => h('li', { key: r.type + ':' + r.id },
-        h(Card, {
+      h(Row.Row, {
+        items: rows,
+        idPrefix: 'mv2-near',
+        strings: strings.row,
+        keyOf: (r) => r.type + ':' + r.id,
+        render: (r) => h(Card, {
           variant: 'listing',
           item: r.item,
           kind: r.kind,
@@ -85,7 +92,8 @@
           idPrefix: 'mv2-near-' + r.type + '-' + r.id,
           onClick: () => onPick(r.id, r.type),
           'data-near': '',
-        })))));
+        }),
+      }));
   }
 
   window.MapV2Nearby = { MAX_ROWS, MAX_METERS, metersBetween, rank, distanceText, List };

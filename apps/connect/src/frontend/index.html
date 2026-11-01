@@ -24,6 +24,7 @@
      404. next.config.ts rewrites an explicit list of paths here, never a catch-all. -->
 <base href="/" />
 <title>Citizens Connect</title>
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -62,12 +63,12 @@
           card: 'rgba(255,255,255,0.82)', 'card-foreground': '#0A0908',
           popover: 'rgba(255,255,255,0.97)',
           primary: '#0A0908', 'primary-foreground': '#FFFFFF',
-          secondary: '#C9A84C', 'secondary-foreground': '#0A0908',
+          secondary: '#F2BD22', 'secondary-foreground': '#0A0908',
           muted: '#EDE8DC', 'muted-foreground': '#7A7060',
-          accent: '#F2E8CC', 'accent-foreground': '#0A0908',
-          border: 'rgba(201,168,76,0.22)',
+          accent: '#FBF1CC', 'accent-foreground': '#0A0908',
+          border: 'rgba(242,189,34,0.22)',
           destructive: '#c0392b',
-          gold: '#C9A84C', 'gold-light': '#E8D48B', 'gold-dark': '#8B6914',
+          gold: '#F2BD22', 'gold-light': '#FCDD6C', 'gold-dark': '#836100',
         },
         fontFamily: {
           sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'sans-serif'],
@@ -83,11 +84,13 @@
 
 <style>
   :root {
-    --gold:#C9A84C; --gold-light:#E8D48B; --gold-dark:#8B6914; --map-bg:#EDE5D4;
-    /* Crown mark gold, straight from the brand's logo pack (#D4AF37) — used
-       on the landing/auth screen so the crown, wordmark and slogan read as
-       one signature gold, distinct from the app's in-product --gold ramp. */
-    --gold-crown:#D4AF37; --gold-crown-light:#E9CE72; --gold-crown-dark:#9C7A1D;
+    /* THE gold (founder, 2026-10-31): the crown logo's own colour, sampled from the logo (#F2BD22). One fill gold; the
+       other values are its roles, never a second gold: --gold-light and --gold-deep are the gradient stops (light and
+       amber, never brown), --gold-dark is the INK for gold text, rings and icons (plain gold on white is 1.74:1).
+       Same values as Map v2's --accent and --accent-ink (its own stylesheet); a unit test keeps the two in step. */
+    --gold:#F2BD22; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#EDE5D4;
+    /* the crown mark's old, separate gold: now the same gold (kept so nothing that reads them breaks) */
+    --gold-crown:var(--gold); --gold-crown-light:var(--gold-light); --gold-crown-dark:var(--gold-dark);
   }
   * { -webkit-tap-highlight-color: transparent; }
   html, body, #root { height: 100%; }
@@ -111,29 +114,29 @@
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
   }
-  .gold-gradient { background: linear-gradient(135deg,#E8D48B 0%,#C9A84C 50%,#8B6914 100%); }
-  .gold-text {
-    background: linear-gradient(135deg,#E8D48B 0%,#C9A84C 55%,#8B6914 100%);
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .crown-gold-text {
-    background: linear-gradient(135deg,var(--gold-crown-light) 0%,var(--gold-crown) 55%,var(--gold-crown-dark) 100%);
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
+  /* A gold fill: light, then the crown, then amber (no brown end stop). Its label is NEAR-BLACK, never white:
+     white on these stops is 1.5 to 2.3:1, near-black is 8.8 to 14.9:1. The rules after it make that true for every
+     existing `text-white` on a gold fill (the shared Button, avatars, the hero cards, badges) without touching them. */
+  .gold-gradient { background: linear-gradient(135deg,var(--gold-light) 0%,var(--gold) 55%,var(--gold-deep) 100%); }
+  .gold-gradient, .bg-gold, .bg-secondary { color: var(--accent-contrast, #0A0908); }
+  .gold-gradient.text-white, .bg-gold.text-white, .bg-secondary.text-white,
+  .gold-gradient [class*="text-white"], .bg-gold [class*="text-white"], .bg-secondary [class*="text-white"] { color: var(--accent-contrast, #0A0908); }
+  /* Gold TEXT is the ink: a vivid gold on white or cream is 1.5 to 1.7:1. The gradient-filled text classes keep
+     their names and are now flat ink; `text-gold` (small icons, labels, the required star) reads as the ink too. */
+  .gold-text, .crown-gold-text { color: var(--gold-dark); background: none; -webkit-text-fill-color: currentColor; }
+  :root .text-gold { color: var(--gold-dark); }
+  /* a gold border that marks focus on an input is the ink too (3:1 or more), not the vivid gold (1.74:1) */
+  :root [class*="focus:border-gold"]:focus, :root [class*="focus-within:border-gold"]:focus-within { border-color: var(--gold-dark); }
 
   .scrollbar-none::-webkit-scrollbar { display: none; }
   .scrollbar-none { scrollbar-width: none; }
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(201,168,76,0.3); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,0.6); }
+  ::-webkit-scrollbar-thumb { background: rgba(242,189,34,0.4); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(242,189,34,0.7); }
 
   /* animations */
   @keyframes pinPulse { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(2.4);opacity:0} }
-  /* real-map marker pulse ring (MapLibre DOM markers) */
-  .cc-pin-pulse { animation: pinPulse 2s ease-out infinite; pointer-events:none; }
 
   /* The map container must FILL its positioned parent. maplibre-gl.css sets
      `.maplibregl-map { position: relative }`, which has the same specificity
@@ -147,38 +150,6 @@
      (Measured in the local browser harness, not theorised.) */
   .cc-map { position: absolute; inset: 0; }
 
-  /* ── Map pin labels ──────────────────────────────────────────────────
-     A pin's name floats on a fuzzy white MIST rather than sitting in a
-     hard capsule: `.cc-pin-label-mist` is a real blurred white blob, so
-     the label lifts off a busy basemap with no border and no box edge,
-     and the name itself is set in the app's own type at a readable
-     weight (the old label was 10px in a 1px-bordered pill).
-     Visibility is a single attribute on the map container so zooming
-     never touches the markers themselves — see map.jsx ZOOM_LABELS. */
-  .cc-pin-label {
-    position:absolute; left:50%; top:100%; transform:translateX(-50%);
-    margin-top:7px; max-width:200px; padding:1px 6px;
-    display:block; pointer-events:none; isolation:isolate;
-    opacity:0; transition:opacity .18s ease;
-  }
-  .cc-pin-label-mist {
-    position:absolute; inset:-4px -9px; border-radius:999px;
-    background:#fff; opacity:.7; filter:blur(6px);
-  }
-  .cc-pin-label-text {
-    position:relative; display:block;
-    font-family:'Plus Jakarta Sans', ui-sans-serif, sans-serif;
-    font-size:12px; font-weight:800; letter-spacing:.005em; line-height:1.25;
-    color:#171310; text-align:center;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    text-shadow:0 0 3px rgba(255,255,255,.95), 0 0 7px rgba(255,255,255,.85);
-  }
-  .cc-map[data-cc-labels="1"] .cc-pin-label { opacity:1; }
-  /* The selected pin is always named, at any zoom. */
-  .cc-pin-label.is-selected { opacity:1; }
-  .cc-pin-label.is-selected .cc-pin-label-mist { opacity:.8; }
-  .cc-pin-label.is-selected .cc-pin-label-text { font-size:12.5px; }
-  @media (prefers-reduced-motion: reduce) { .cc-pin-label { transition:none; } }
   /* MapLibre overrides â€” keep our glass overlays above the canvas, mute default chrome */
   /* 74 px: above the phone's bottom navigation, and low enough that the © credit sits below the bottom-left
      zoom hint instead of under it (the hint dropped to the credit's height when the Map Key was removed). */
@@ -212,7 +183,7 @@
   [data-screen] { height: 100%; }
 </style>
 <!-- Report dialog. Both maps: Map v2's stylesheet stays behind the flag. -->
-<link href="assets/report.css?v=20261019e" rel="stylesheet" />
+<link href="assets/report.css?v=20261026a" rel="stylesheet" />
 <link href="assets/listing-claim.css?v=20261021a" rel="stylesheet" />
 </head>
 <body>
@@ -243,51 +214,56 @@
 <script src="auth-client.js?v=20261003a"></script>
 
 <script type="text/babel" src="app/icons.jsx?v=20260826c"></script>
-<script type="text/babel" src="app/routes.jsx?v=20261004a"></script>
-<script type="text/babel" src="app/map-v2-lib.jsx?v=20261026a"></script>
+<script type="text/babel" src="app/routes.jsx?v=20261026c"></script>
+<script type="text/babel" src="app/map-v2-lib.jsx?v=20261031a"></script>
 <script type="text/babel" src="app/saved-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/cohost-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/moments-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/convince-lib.jsx?v=20261018a"></script>
 <script type="text/babel" src="app/serving-areas-lib.jsx?v=20261022b"></script>
-<script type="text/babel" src="app/data.jsx?v=20261025a"></script>
-<script type="text/babel" src="app/store.jsx?v=20261022a"></script>
-<script type="text/babel" src="app/ui.jsx?v=20261017a"></script>
-<script type="text/babel" src="app/report.jsx?v=20261019e"></script>
+<script type="text/babel" src="app/onboarding-presets-lib.jsx?v=20261101a"></script>
+<script type="text/babel" src="app/data.jsx?v=20261027a"></script>
+<script type="text/babel" src="app/store.jsx?v=20261031a"></script>
+<script type="text/babel" src="app/ui.jsx?v=20261031b"></script>
+<script type="text/babel" src="app/report.jsx?v=20261026a"></script>
 <script type="text/babel" src="app/listing-claim.jsx?v=20261021a"></script>
 <script type="text/babel" src="app/auth.jsx?v=20261003a"></script>
 <script type="text/babel" src="app/cohosts.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/moments.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/convince.jsx?v=20261018a"></script>
-<script type="text/babel" src="app/map-v2-strings.jsx?v=20261025a"></script>
+<script type="text/babel" src="app/map-v2-strings.jsx?v=20261030a"></script>
 <script type="text/babel" src="app/serving-areas.jsx?v=20261022a"></script>
 <script type="text/babel" src="app/map-v2-time.jsx?v=20261025a"></script>
 <script type="text/babel" src="app/map-v2-qr.jsx?v=20261019f"></script>
-<script type="text/babel" src="app/map-v2-pins.jsx?v=20261010d"></script>
-<script type="text/babel" src="app/map.jsx?v=20261022b"></script>
-<script type="text/babel" src="app/entity-card.jsx?v=20261018a"></script>
+<script type="text/babel" src="app/map-v2-pins.jsx?v=20261026a"></script>
+<script type="text/babel" src="app/map.jsx?v=20261031a"></script>
+<script type="text/babel" src="app/entity-card.jsx?v=20261031a"></script>
 <script type="text/babel" src="app/map-v2-gallery.jsx?v=20261019f"></script>
 <script type="text/babel" src="app/map-v2-news.jsx?v=20261019a"></script>
-<script type="text/babel" src="app/map-v2-card.jsx?v=20261025a"></script>
-<script type="text/babel" src="app/map-v2-nearby.jsx?v=20261025a"></script>
-<script type="text/babel" src="app/map-v2-online.jsx?v=20261022b"></script>
-<script type="text/babel" src="app/map-v2-sheet.jsx?v=20261025a"></script>
-<script type="text/babel" src="app/home.jsx?v=20261022b"></script>
+<script type="text/babel" src="app/map-v2-card.jsx?v=20261026b"></script>
+<script type="text/babel" src="app/map-v2-row.jsx?v=20261025b"></script>
+<script type="text/babel" src="app/map-v2-nearby.jsx?v=20261025b"></script>
+<script type="text/babel" src="app/map-v2-online.jsx?v=20261026a"></script>
+<script type="text/babel" src="app/map-v2-sheet.jsx?v=20261030a"></script>
+<script type="text/babel" src="app/map-v2-explore.jsx?v=20261031a"></script>
+<script type="text/babel" src="app/map-v2-nav.jsx?v=20261026c"></script>
+<script type="text/babel" src="app/map-v2-discover.jsx?v=20261030a"></script>
+<script type="text/babel" src="app/home.jsx?v=20261031b"></script>
 <script type="text/babel" src="app/kingdom-discovery.jsx?v=20261002b"></script>
-<script type="text/babel" src="app/apply.jsx?v=20261022a"></script>
+<script type="text/babel" src="app/apply.jsx?v=20261101a"></script>
 <script type="text/babel" src="app/pending-application.jsx?v=20261022a"></script>
-<script type="text/babel" src="app/admin.jsx?v=20261015a"></script>
+<script type="text/babel" src="app/admin.jsx?v=20261101a"></script>
 <script type="text/babel" src="app/dashboard.jsx?v=20261022a"></script>
 <script type="text/babel" src="app/automation.jsx?v=20261004a"></script>
 <script type="text/babel" src="app/insights.jsx?v=20260615b"></script>
 <script type="text/babel" src="app/create.jsx?v=20260826c"></script>
 <script type="text/babel" src="app/messages.jsx?v=20261019d"></script>
-<script type="text/babel" src="app/profiles.jsx?v=20261019d"></script>
+<script type="text/babel" src="app/profiles.jsx?v=20261026a"></script>
 <script type="text/babel" src="app/pages.jsx?v=20261018a"></script>
 <script type="text/babel" src="app/intake-upgrade.jsx?v=20261025a"></script>
 <script type="text/babel" src="app/tweaks-panel.jsx?v=20260615b"></script>
 <script type="text/babel" src="app/tweaks.jsx?v=20260826c"></script>
-<script type="text/babel" src="app/shell.jsx?v=20261004a"></script>
+<script type="text/babel" src="app/shell.jsx?v=20261031a"></script>
 <script type="text/babel" src="app/app.jsx?v=20260615b"></script>
 </body>
 </html>

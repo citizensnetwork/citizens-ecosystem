@@ -6,7 +6,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { intakeUpgradeFlagEmail, intakeUpgradeEmail, ownerWelcomeEmail } from "@/lib/email/templates";
-import { adminNotifyEmail, sendEmail, siteOrigin } from "@/lib/email/send";
+import { adminNotifyEmail, sendEmail } from "@/lib/email/send";
+import { siteBase } from "@/lib/siteUrl";
 import { hasMapPin } from "@/lib/contributorFields";
 import { intakeImagePaths, upgradeLinks } from "@/lib/intake/upgradeToken";
 
@@ -80,7 +81,7 @@ export async function sendOwnerWelcome(input: {
   onMap: boolean;
   request: Request;
 }): Promise<"sent" | "failed" | "skipped"> {
-  const origin = siteOrigin(input.request);
+  const origin = siteBase(input.request);
   if (!input.to) return "skipped";
   return sendEmail({
     to: input.to,

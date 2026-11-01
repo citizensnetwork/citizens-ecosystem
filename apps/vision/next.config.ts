@@ -1,6 +1,68 @@
 import type { NextConfig } from "next";
 
+// Where this app is served on the shared domain: "" (NEXT_PUBLIC_BASE_PATH unset, as today) is the site root,
+// "/citizens/vision" serves everything under that prefix. Do NOT set it in a Vercel project yet: read
+// packages/ecosystem/README.md ("Rollout rule"). The rule is packages/ecosystem's resolveBasePath. Next 16
+// compiles next.config.ts to CommonJS and Node 22 then fails on a runtime import (Connect's next.config.ts hit
+// it), so the rule is copied here and src/__tests__/basePath.test.ts fails if the copy and the package disagree.
+const BASE_PATH = "/citizens/vision";
+const rawBasePath = (process.env.NEXT_PUBLIC_BASE_PATH ?? "").trim();
+if (rawBasePath !== "" && rawBasePath !== "/" && rawBasePath.replace(/\/$/, "") !== BASE_PATH) {
+  throw new Error(
+    `[ecosystem] NEXT_PUBLIC_BASE_PATH=${JSON.stringify(rawBasePath)} is not valid for "vision": ` +
+      `leave it unset to serve from the site root, or set it to exactly "${BASE_PATH}".`,
+  );
+}
+const basePath = rawBasePath === "" || rawBasePath === "/" ? "" : BASE_PATH;
+
+// The addresses that existed before the shared domain keep working while the prefix is on: the bare "/" goes to the
+// prefix, and "/api/*" is REWRITTEN (never redirected). The rule is packages/ecosystem's oldAddressRules("vision",
+// basePath); like the base path above it is copied here, and src/__tests__/basePath.test.ts fails if the copy and the
+// package ever disagree. Both lists are empty when the prefix is unset, so today's behaviour is untouched. Next
+// refuses a `basePath: false` rewrite to an internal path, so the "/api" destination is this app's own production
+// address (HUB_ORIGIN_VISION overrides it): one extra hop into the same project.
+type OldRedirect = { source: string; destination: string; basePath: false; permanent: boolean };
+type OldRewrite = { source: string; destination: string; basePath: false };
+
+/** HUB_ORIGIN_VISION when set (a bare origin), otherwise this app's production address. */
+function ownOrigin(): string {
+  const raw = (process.env.HUB_ORIGIN_VISION ?? "").trim();
+  if (raw === "") return "https://citizens-ecosystem-vision.vercel.app";
+  let url: URL | undefined;
+  try {
+    url = new URL(raw);
+  } catch {
+    url = undefined;
+  }
+  const loopback = url !== undefined && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
+  const schemeOk = url !== undefined && (url.protocol === "https:" || (url.protocol === "http:" && loopback));
+  const bare = url !== undefined && url.pathname === "/" && url.search === "" && url.hash === "" && url.username === "" && url.password === "";
+  if (url === undefined || !schemeOk || !bare) {
+    throw new Error(
+      `[ecosystem] HUB_ORIGIN_VISION=${JSON.stringify(raw)} is not valid: use a bare origin such as ` +
+        `"https://example.vercel.app" (https only; http only for localhost), with no path, query or login.`,
+    );
+  }
+  return url.origin;
+}
+
+function oldAddressRules(): { redirects: OldRedirect[]; rewrites: OldRewrite[] } {
+  if (!basePath) return { redirects: [], rewrites: [] };
+  return {
+    redirects: [{ source: "/", basePath: false, destination: basePath, permanent: false }],
+    rewrites: [{ source: "/api/:path*", basePath: false, destination: `${ownOrigin()}${basePath}/api/:path*` }],
+  };
+}
+const oldAddress = oldAddressRules();
+
 const nextConfig: NextConfig = {
+  // Spread, so an unset value leaves the config exactly as it was (no `basePath` key at all). Next then prefixes
+  // the "/" redirect, the headers, public/ files, _next and /api with it.
+  ...(basePath ? { basePath } : {}),
+  // Do not let `next dev` write Next.js's agent-rules block into AGENTS.md. It does so whenever it detects an AI coding
+  // agent, so every agent session left the file modified (and a new one in apps that have none). `false` also removes
+  // the block if it is there. See apps/connect/RESUME_HERE.md, C38.
+  agentRules: false,
   experimental: {
     webpackBuildWorker: false,
   },
@@ -14,10 +76,17 @@ const nextConfig: NextConfig = {
   // compiles into public/. `/` is the app.
   redirects: async () => [
     { source: "/", destination: "/index.html", permanent: false },
+    // Old address: the bare "/" goes to the prefix (empty until NEXT_PUBLIC_BASE_PATH is set).
+    ...oldAddress.redirects,
   ],
+  // Old address: "/api/*" (absent until NEXT_PUBLIC_BASE_PATH is set).
+  ...(basePath ? { rewrites: async () => oldAddress.rewrites } : {}),
   headers: async () => [
     {
-      source: "/(.*)",
+      // `/:path*`, NOT `/(.*)`: under a basePath Next prefixes the pattern, and `/citizens/vision/(.*)` needs a slash
+      // after the prefix, so the bare `/citizens/vision` got no headers. `/:path*` matches it too (same as Wear).
+      // Pinned by src/__tests__/basePath.test.ts.
+      source: "/:path*",
       headers: [
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "X-Frame-Options", value: "DENY" },

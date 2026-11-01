@@ -1,6 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { useOldMap } from "./support/app-hooks";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  The map look (tracker P1-12; founder, D1 as revised 2026-10-12): it
@@ -89,21 +88,12 @@ test.describe("P1-12 the map look follows the phone", () => {
     );
     const pin = page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`);
     await expect(pin.locator("[data-mv2='label-text']")).toHaveCSS("color", "rgb(247, 244, 238)"); // --pin-label (dark)
-    await pin.click({ force: true });
+    await openListing(page, c.id);
     const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet).toHaveCSS("background-color", "rgb(26, 23, 20)");
     await expect(sheet.locator("[data-mv2='name']")).toHaveCSS("color", "rgb(247, 244, 238)");
     await expect(pin.locator("[data-mv2='logo-wrap']")).toHaveCSS("background-color", "rgb(255, 255, 255)");
     // the gold action keeps its near-black label
     await expect(sheet.getByRole("link", { name: "Directions" })).toHaveCSS("color", "rgb(10, 9, 8)");
-  });
-
-  test("flag off: no look is applied, even on a dark phone", async ({ page }) => {
-    await useOldMap(page);
-    await page.emulateMedia({ colorScheme: "dark" });
-    const seed = smallSeed(FIXED_NOW) as Seed;
-    await mockMapNetwork(page, seed);
-    await openMap(page, "/", 8);
-    expect(await theme(page)).toBeNull();
   });
 });

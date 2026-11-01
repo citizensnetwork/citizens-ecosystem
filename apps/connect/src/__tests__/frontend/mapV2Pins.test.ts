@@ -51,7 +51,7 @@ describe("glyph colour on a category fill", () => {
 
   it("picks white on a dark fill and near-black on a light one", () => {
     expect(P.glyphColor("#212121")).toBe("#FFFFFF");
-    expect(P.glyphColor("#D4AF37")).toBe("#0A0908"); // gold: white would be 2.1:1
+    expect(P.glyphColor("#F2BD22")).toBe("#0A0908"); // the crown gold: white would be 1.7:1
     expect(P.glyphColor("#2ECC71")).toBe("#0A0908");
   });
 

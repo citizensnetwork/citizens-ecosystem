@@ -24,8 +24,11 @@ import { createServiceClient } from "../_shared/client.ts";
 import { sendEmail, escapeHtml } from "../_shared/email.ts";
 import { verify, reviewPayload } from "../_shared/hmac.ts";
 
-const SITE_URL =
-  Deno.env.get("PUBLIC_SITE_URL") ?? "https://citizensconnect.app";
+// The public web address that the links in our emails start from, with no trailing slash. Set the
+// Edge Function secret PUBLIC_SITE_URL to the app's own address: https://www.citizenscentral.co.za
+// while Connect is served at the site root, https://219.co.za/citizens/connect after the 219.co.za
+// cutover (CUTOVER_219.md). The default is today's live address, never a domain nobody here owns.
+const SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") ?? "https://www.citizenscentral.co.za").replace(/\/+$/, "");
 
 interface ReviewPayload {
   application_id: string;
@@ -250,7 +253,7 @@ async function performReviewAsService(
       type: "contributor_approved",
       title: "You're an approved Contributor!",
       body: "Welcome! You can now create public events and places.",
-      data: { url: "/profile/contributor" },
+      data: { url: "/dashboard/profile" },
     });
 
     // Discard any unused preflight state.
@@ -291,7 +294,7 @@ async function performReviewAsService(
       type: "contributor_rejected",
       title: "Contributor application update",
       body: input.reason,
-      data: { url: "/contributor/apply" },
+      data: { url: "/apply" },
     });
     return { success: true };
   }
@@ -305,7 +308,7 @@ function jsonResp(body: unknown, status = 200): Response {
 }
 
 function approvedEmail(displayName: string, slug: string): string {
-  const profileUrl = slug ? `${SITE_URL}/c/${slug}` : `${SITE_URL}/profile`;
+  const profileUrl = slug ? `${SITE_URL}/c/${slug}` : `${SITE_URL}/dashboard/profile`;
   return `<!doctype html><html><body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#111;">
     <h2 style="color:#b8901a;margin:0 0 16px;">Welcome, Contributor!</h2>
     <p>Hi ${escapeHtml(displayName)},</p>
@@ -325,7 +328,7 @@ function rejectedEmail(displayName: string, reason: string): string {
     <p style="background:#faf9f6;border-left:3px solid #b8901a;padding:12px;margin:16px 0;">${escapeHtml(reason)}</p>
     <p>You can address the points above and submit a new application whenever you're ready. We'll gladly take another look.</p>
     <p style="margin:24px 0;">
-      <a href="${SITE_URL}/contributor/apply" style="display:inline-block;background:#fff;color:#111;padding:12px 20px;border:1px solid #ddd;border-radius:6px;text-decoration:none;font-weight:600;">Re-apply</a>
+      <a href="${SITE_URL}/apply" style="display:inline-block;background:#fff;color:#111;padding:12px 20px;border:1px solid #ddd;border-radius:6px;text-decoration:none;font-weight:600;">Re-apply</a>
     </p>
   </body></html>`;
 }

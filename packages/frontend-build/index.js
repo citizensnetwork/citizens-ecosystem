@@ -58,6 +58,62 @@ const NPM_CDN_URL_RE =
   /^https:\/\/(?:unpkg\.com|cdn\.jsdelivr\.net\/npm)\/((?:@[^/@]+\/)?[^/@]+)(?:@([^/]*))?(\/[^?#]*)?$/;
 const EXACT_VERSION_RE = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
 const DEVELOPMENT_BUILD_RE = /\.development\.(?:min\.)?js(?:[?#]|$)/;
+/**
+ * A final base path such as "/citizens/connect": lower-case segments of letters,
+ * digits and inner hyphens, no trailing slash. The value lands in an HTML
+ * attribute and in config.js, so nothing else (quotes, dots, "//") is accepted.
+ */
+const BASE_PATH_RE = /^\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
+/** The page's `<base href="/">` tag, as the frontends write it. */
+const BASE_HREF_RE = /(<base\s+href=")\/("[^>]*>)/i;
+/**
+ * A public https origin such as "https://219.co.za": https only, a lower-case DNS name with at
+ * least one dot, and nothing after the host (no port, path, query, fragment, userinfo or trailing
+ * slash). The last label must start with a letter, so a bare IP address never passes. Every label
+ * is bounded and ends in a literal dot, so the pattern cannot backtrack badly.
+ */
+const HTTPS_ORIGIN_RE =
+  /^https:\/\/(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+/** The longest host name DNS allows. */
+const MAX_HOST_LENGTH = 253;
+
+/** True for a final, non-empty base path such as "/citizens/connect" (see BASE_PATH_RE). */
+function isBasePath(value) {
+  return typeof value === 'string' && BASE_PATH_RE.test(value);
+}
+
+/** True for a public https origin such as "https://219.co.za" (see HTTPS_ORIGIN_RE). */
+function isHttpsOrigin(value) {
+  return (
+    typeof value === 'string' &&
+    value.length <= 'https://'.length + MAX_HOST_LENGTH &&
+    HTTPS_ORIGIN_RE.test(value)
+  );
+}
+
+/** The `validate` kinds a ConfigVar may name, and what each one tells a person who got it wrong. */
+const VALIDATORS = Object.freeze({
+  'https-origin': {
+    ok: isHttpsOrigin,
+    expected:
+      'an https origin such as "https://219.co.za" (lower-case host; no port, path, query, credentials or trailing slash)',
+  },
+  'base-path': {
+    ok: isBasePath,
+    expected:
+      'a path such as "/citizens/connect" (lower-case letters, digits and hyphens; no trailing slash), or empty',
+  },
+});
+
+/** Throw unless `basePath` is '' (the site root) or a final base path (see BASE_PATH_RE). */
+function assertBasePath(basePath) {
+  if (basePath === '') return;
+  if (typeof basePath !== 'string' || !BASE_PATH_RE.test(basePath)) {
+    throw new TypeError(
+      `[frontend-build] options.basePath must be '' or a path like "/citizens/connect" (got ${JSON.stringify(basePath)})`,
+    );
+  }
+}
 
 /** First 10 hex chars of the content's SHA-256 — the content-hash used in filenames. */
 function hashOf(content) {
@@ -364,8 +420,18 @@ function buildAuthClient({ esbuild, srcDir, dest }) {
  * their declared production twins. A raw capacitor-bridge.js tag (kept in
  * the source for no-build dev) is dropped: the raw file is never copied to
  * the output, so it would only 404 next to the hashed bridge.
+ *
+ * With a `basePath` ("/citizens/connect") the page's `<base href="/">` becomes
+ * `<base href="/citizens/connect/">`, so every relative script, style and vendor
+ * URL resolves under the prefix whatever deep path served the page. A page
+ * without a `<base>` tag is left alone: its relative URLs already resolve
+ * against the directory it was served from.
  */
-function rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFile }) {
+function rewriteIndexHtml(
+  html,
+  { bundleFile, authClientFile, capacitorBridgeFile, basePath = '' },
+) {
+  assertBasePath(basePath);
   html = html.replace(/^\s*<script src="https:\/\/unpkg\.com\/@babel\/standalone[^\n]*\n/m, '');
   html = html.replace(/^\s*<script src="capacitor-bridge\.js(?:\?v=[^"]*)?"><\/script>\n?/gm, '');
   html = swapProductionTwins(html);
@@ -383,6 +449,9 @@ function rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFil
     return `<script src="app/${bundleFile}"></script>\n`;
   });
 
+  if (basePath)
+    html = html.replace(BASE_HREF_RE, (_tag, open, close) => `${open}${basePath}/${close}`);
+
   return html;
 }
 
@@ -392,16 +461,46 @@ function rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFil
  *    mobile API base is FORCED absolute; a store build must never point at a
  *    localhost/local-config fallback.
  *  - otherwise → env[env] || local[key] || defaultValue || ''.
+ *  - a var marked `mobileOnly` is left out of a web build entirely, so adding one never
+ *    changes a web config.js.
  * Key order in the result follows `configVars` order (JSON.stringify keeps it).
+ *
+ * A var with `validate` ("https-origin" or "base-path") must resolve to an empty value or one of
+ * that shape, whichever source it came from, or this throws naming the key and the env var: the
+ * value is written into config.js and into links people share, so a typo fails the build instead
+ * of shipping.
+ *
+ * With a `basePath` on a web build ("/citizens/connect"), the app is served
+ * under that prefix, so:
+ *  - an empty API_BASE_URL becomes the prefix (the frontends call
+ *    `API_BASE_URL + '/api/...'`, and the API now lives under the prefix too);
+ *    an API_BASE_URL set on purpose is never overridden;
+ *  - BASE_PATH is added as the LAST key, for the frontend's own path handling.
+ * Without a basePath, or on a mobile build (bundled at the shell's root), the
+ * result is exactly what it was before this option existed.
  */
-function resolveConfigValues({ mobile, configVars, env, local }) {
+function resolveConfigValues({ mobile, configVars, env, local, basePath = '' }) {
+  assertBasePath(basePath);
   const cfg = {};
   for (const v of configVars) {
+    if (v.mobileOnly && !mobile) continue;
+    let source;
     if (mobile && v.mobileEnv !== undefined) {
+      source = v.mobileEnv;
       cfg[v.key] = env[v.mobileEnv] || v.mobileDefault || '';
     } else {
+      source = v.env;
       cfg[v.key] = env[v.env] || local[v.key] || v.defaultValue || '';
     }
+    if (v.validate !== undefined && cfg[v.key] !== '' && !VALIDATORS[v.validate].ok(cfg[v.key])) {
+      throw new TypeError(
+        `[frontend-build] ${v.key} (${source}) must be ${VALIDATORS[v.validate].expected}, got ${JSON.stringify(String(cfg[v.key]).slice(0, 120))}`,
+      );
+    }
+  }
+  if (basePath && !mobile) {
+    if (cfg.API_BASE_URL === '') cfg.API_BASE_URL = basePath;
+    cfg.BASE_PATH = basePath;
   }
   return cfg;
 }
@@ -457,6 +556,19 @@ function assertOptions(options) {
       '[frontend-build] options.sriPackages must be an array of npm package names (e.g. ["react", "@supabase/supabase-js"])',
     );
   }
+  if (options.basePath !== undefined) assertBasePath(options.basePath);
+  for (const v of configVars) {
+    if (v.validate !== undefined && !Object.hasOwn(VALIDATORS, v.validate)) {
+      throw new TypeError(
+        `[frontend-build] configVars "${v.key}": validate must be one of ${Object.keys(VALIDATORS).join(', ')} (got ${JSON.stringify(v.validate)})`,
+      );
+    }
+    if (v.mobileOnly && typeof v.mobileEnv !== 'string') {
+      throw new TypeError(
+        `[frontend-build] configVars "${v.key}": a mobileOnly var needs a mobileEnv name to read`,
+      );
+    }
+  }
 }
 
 /**
@@ -479,20 +591,37 @@ function buildFrontend(options) {
     mobileRequiredKeys = [],
     mobileMissingLabel = 'required',
     sriPackages = [],
+    basePath = '',
     env = process.env,
     log = console.log,
     warn = console.warn,
   } = options;
+
+  // A store build is bundled at the native shell's own root: no prefix applies.
+  const webBasePath = mobile ? '' : basePath;
+  if (mobile && basePath) {
+    warn(
+      `[build-frontend] basePath ${basePath} ignored: a mobile build is bundled at the shell's root.`,
+    );
+  }
 
   const dest = mobile ? mobileDir : publicDir;
   const special = new Set([...DEFAULT_SPECIAL_FILES, ...extraSpecialFiles]);
   const srcLabel = path.relative(rootDir, srcDir).split(path.sep).join('/');
 
   // Fail fast, before anything is written: CDN pins/hashes vs the lockfile,
-  // and no development build may survive the production-twin swap.
+  // no development build may survive the production-twin swap, and every
+  // validated config value must be well-formed (a bad value never leaves a
+  // half-built output directory behind).
   const html = fs.readFileSync(path.join(srcDir, 'index.html'), 'utf8');
   const sriVerified = verifyCdnIntegrity(html, { rootDir, packages: sriPackages });
   assertNoDevelopmentScripts(swapProductionTwins(html));
+  // config.js. Web: API_BASE_URL is empty when the frontend is served from the
+  // same domain as the API (the standard Vercel deployment topology). Mobile:
+  // absolute production API base, env-first with local-config fallback for the
+  // non-forced values (mobile bundles are built locally, not on Vercel).
+  const local = mobile ? readLocalConfig(srcDir, envGlobalName) : {};
+  const config = resolveConfigValues({ mobile, configVars, env, local, basePath: webBasePath });
 
   cleanHashedOutputs(dest);
   copyDir(srcDir, dest, special);
@@ -502,7 +631,12 @@ function buildFrontend(options) {
 
   fs.writeFileSync(
     path.join(dest, 'index.html'),
-    rewriteIndexHtml(html, { bundleFile, authClientFile, capacitorBridgeFile }),
+    rewriteIndexHtml(html, {
+      bundleFile,
+      authClientFile,
+      capacitorBridgeFile,
+      basePath: webBasePath,
+    }),
   );
 
   if (sriVerified.length > 0) {
@@ -515,12 +649,6 @@ function buildFrontend(options) {
   log(`[build-frontend] Compiled auth-client.js → ${authClientFile}`);
   log(`[build-frontend] Bundled Capacitor plugins → ${capacitorBridgeFile}`);
 
-  // config.js. Web: API_BASE_URL is empty when the frontend is served from the
-  // same domain as the API (the standard Vercel deployment topology). Mobile:
-  // absolute production API base, env-first with local-config fallback for the
-  // non-forced values (mobile bundles are built locally, not on Vercel).
-  const local = mobile ? readLocalConfig(srcDir, envGlobalName) : {};
-  const config = resolveConfigValues({ mobile, configVars, env, local });
   if (mobile && mobileRequiredKeys.some((k) => !config[k])) {
     warn(
       `[build-frontend] WARNING: mobile config is missing ${mobileMissingLabel} values — set NEXT_PUBLIC_* env vars or fill src/frontend/config.js before shipping.`,
@@ -530,6 +658,13 @@ function buildFrontend(options) {
   log(
     `[build-frontend] Generated ${path.basename(dest)}/config.js (API_BASE_URL=${config.API_BASE_URL || "'' (same-origin)"})`,
   );
+  if (webBasePath)
+    log(`[build-frontend] Base path ${webBasePath} (index.html <base>, config.js BASE_PATH)`);
+  const mobileOnlyKeys = configVars.filter((v) => v.mobileOnly).map((v) => v.key);
+  if (mobile && mobileOnlyKeys.length > 0)
+    log(
+      `[build-frontend] Mobile-only config: ${mobileOnlyKeys.map((k) => `${k}=${config[k] || "'' (none)"}`).join(', ')}`,
+    );
 
   return { dest, bundleFile, authClientFile, capacitorBridgeFile, config, sriVerified };
 }
@@ -538,6 +673,8 @@ module.exports = {
   DEFAULT_SPECIAL_FILES,
   buildFrontend,
   hashOf,
+  isBasePath,
+  isHttpsOrigin,
   renderConfigJs,
   resolveConfigValues,
   rewriteIndexHtml,

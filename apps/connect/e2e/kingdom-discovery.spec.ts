@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { goTo, mapReady, setRoleAndGo } from "./support/app-hooks";
+import { openListing } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Connect v1 golden path (founder decision D-12): a self-serve Contributor
@@ -99,9 +100,8 @@ async function applyAsContributor(page: Page) {
 
   await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);
   await page.getByPlaceholder("e.g. Eastside, Central District").fill("Church Square, Pretoria");
-  // One of the 12 Contributor types (not an event category) — a NEW slug,
-  // so the whole path below runs on it.
-  await page.getByRole("button", { name: "Retreat / Healing" }).click();
+  // One of the 12 Contributor types with no onboarding preset, so the wizard asks for the address as before.
+  await page.getByRole("button", { name: "Market / Expo" }).click();
   await page.getByRole("button", { name: "Continue" }).click();
 
   // "Your story" step — bio/website are optional, skip straight through.
@@ -173,10 +173,10 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     const marker = page.locator(".maplibregl-marker");
     await expect(marker).toHaveCount(1, { timeout: 15_000 });
 
-    // ── Click the pin → the bottom sheet every pin opens (Map v2, the default
+    // ── The pin → its card in the Explore row (#210) → the bottom sheet (Map v2, the default
     //     since D15; it used to jump straight to the full page), and its
     //     "View Full Profile" button is the way in to the Contributor's profile ──
-    await marker.click();
+    await openListing(page, (await marker.getAttribute("data-cc-id"))!);
     const preview = page.locator("[data-mv2='sheet']");
     await expect(preview).toBeVisible({ timeout: 10_000 });
     await expect(preview.getByText(ORG_NAME).first()).toBeVisible();

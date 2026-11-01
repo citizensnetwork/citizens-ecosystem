@@ -1,14 +1,15 @@
 // ════════════════════════════════════════════════════════════════════
 //  Citizens Connect — Map v2 bottom sheet (tracker P1-06 to P1-11)
 //  ------------------------------------------------------------------
-//  ONE sheet for a Contributor, a Place and an Event (founder D9). A Contributor
-//  gets the full treatment (header, actions, Events | News | Gallery); a Place or
-//  an Event shows its existing EntityCard body inside the same container.
+//  ONE sheet for a Contributor, a Place and an Event (founder D9). All three have the same header and the same row
+//  of action pills; a Contributor then has Events | News | Gallery, and a Place or an Event has its description and a
+//  plain list of facts (ListingBody; founder 2026-10-30: no white box, no second Follow button).
 //
 //  Three snap states, all `transform: translateY` on a box that is always the
 //  full height, so a drag animates nothing but transform:
-//    peek  a header strip (avatar, name, category · open state, chevron, close)
-//    half  46 % of the viewport (dvh): header and the action row
+//    peek  a header strip (avatar, name, category · open state, chevron, close); nothing below it is drawn
+//    half  40 % of the viewport (dvh, founder 2026-10-30: a little lower, more map): header, ONE row of actions
+//          (it scrolls sideways) and then the tab bar or the facts, at the same height for every listing
 //    full  90 % minus the top safe area: the content scrolls, and only here
 //  Opens at HALF (the reference's behaviour), drag is 1:1 with the pointer, and on
 //  release snaps by velocity (>= 0.5 px/ms) else to the nearest state; a flick down
@@ -26,6 +27,17 @@
 //                                      moves the sheet (the scroll hand-off)
 //  touch-action is read when a touch starts, so the scroller carries data-top while its
 //  scrollTop is 0 and a scroll listener keeps that current.
+//
+//  EXPANDED (#210, `expanded`): opened from an Explore card, the sheet opens at FULL and has no half or peek: a
+//  swipe down (a flick, or released past a quarter of its height) or X closes it back to the row, where the card
+//  is still outlined and gets focus back. The header sits at the top of the content, so it scrolls with the items:
+//  a 16:9 cover (a neutral tile with the category icon when there is none), the name, the category chip in its
+//  GROUP colour and the distance (`view`, where the map was looking when the card was tapped, with the row's own
+//  words, so the sheet says what the card said). A pin on the clean map still opens the half sheet described above.
+//
+//  TABS: Events, News, Gallery (founder's order, #210), then Today while a Moment is live; only tabs with content.
+//  A sideways swipe on the tab block (touch or pen) moves one tab; a swipe that STARTS on a sideways row (News)
+//  is the row's, wherever it goes, so the row scrolls. Taps and the arrow keys switch as before.
 //
 //  BACK (founder D6): one useBackGuard entry, registered by this component's
 //  mount (right after the tap or key press that opened it). Back, Escape and the
@@ -50,6 +62,10 @@
   const WIDE_MQ = '(min-width: 768px) and (pointer: fine)';
   const RECENT_MAX = 10;      // past events listed under Recent
   const TOP_PX = 1;           // the content counts as "at the top" below this scrollTop (fractional offsets on dense screens)
+  const COLLAPSE_AT = 0.25;   // expanded: released lower than this share of its height = back to the Explore row
+  const SWIPE_PX = 48;        // a sideways swipe this long on the tab block moves one tab...
+  const SWIPE_RATIO = 1.5;    // ...when it is this much more sideways than vertical
+  const ROW_SEL = "[data-mv2='hrow'] [data-layout='row']";   // a sideways row: a swipe that starts on it is the row's
 
   const S = () => window.MapV2Strings.sheet;
   const T = () => window.MapV2Time;
@@ -131,6 +147,19 @@
         : (initialsOf(name) || glyph));
   }
 
+  // #210: the expanded sheet's 16:9 cover, in the card's own media box; a neutral tile with the category icon when
+  // there is no picture or it fails to load (so every expanded sheet starts with the same shape).
+  function Cover({ src, icon }) {
+    const [bad, setBad] = useState(false);
+    useEffect(() => setBad(false), [src]);
+    const url = window.UI.safeUrl(src);
+    const Icon = window.Icon;
+    return url && !bad
+      ? h('span', { 'data-mv2': 'card-media', 'data-cover': '' },
+        h('img', { src: url, alt: '', decoding: 'async', onError: () => setBad(true), 'data-mv2': 'card-photo' }))
+      : h('span', { 'data-mv2': 'card-media', 'data-cover': '', 'data-tile': '', 'aria-hidden': 'true' }, h(Icon, { name: icon, size: 40 }));
+  }
+
   function Action({ icon, label, href, onClick, external, primary, on }) {
     const Icon = window.Icon;
     const kids = [h(Icon, { key: 'i', name: icon, size: 16, fill: on ? 'currentColor' : 'none' }), h('span', { key: 't' }, label)];
@@ -164,24 +193,86 @@
       loadingMore && h('span', { 'data-mv2': 'tab', 'data-skeleton': '', 'aria-hidden': 'true' }, ' '));
   }
 
+  // ── a Place's or an Event's body ─────────────────────────────────
+  //  (#210, founder 2026-10-30) A Place and an Event follow the Contributor's rules. Their description reads as a bio does
+  //  (three lines, and not at half), their facts are a plain list, and what a person DOES with the listing (Follow, Connect,
+  //  Save, Share ...) is the one action row above, in the same pills. No white box, no second Follow button. The organiser
+  //  and the co-hosts are links to their own profiles; the socials, the counts and, for an upcoming event, the Convince
+  //  note follow. `data-card` and `data-entity-card` keep the hooks the card had.
+  function ListingBody({ item, type, org, go, onClose }) {
+    const { realUser, myProfileMeta, user, toast, contributors } = window.useApp();
+    const Str = S();
+    const Icon = window.Icon;
+    const U = window.EntityCardUtils || {};
+    const isEvent = type === 'event';
+    const facts = [];
+    const where = isEvent ? item.location : item.address;
+    if (where) facts.push({ key: 'loc', icon: 'MapPin', text: where });
+    if (isEvent && item.date && U.fmtDate) facts.push({ key: 'date', icon: 'Calendar', text: U.fmtDate(item.date) + (item.time ? ' · ' + item.time : '') });
+    if (!isEvent && item.openHours) facts.push({ key: 'hours', icon: 'Clock', text: item.openHours });
+    if (isEvent) facts.push({ key: 'counts', icon: 'Users', text: Str.counts((item.connectCount || 0).toLocaleString(), (item.considerCount || 0).toLocaleString()) });
+    const bucket = !isEvent && window.UI.followerBucket ? window.UI.followerBucket(item.followerCount) : '';
+    if (bucket) facts.push({ key: 'fol', icon: 'Heart', text: Str.followers(bucket) });
+
+    const orgName = (org && org.name) || item.organizerName || '';
+    // to the organiser's own page: navigate first, then close, so the sheet's history entry is replaced (see BACK, above)
+    const toProfile = (pid) => () => { go('profile', { id: pid }); onClose(); };
+    const organiser = orgName
+      ? h('li', { key: 'org', 'data-mv2': 'fact' },
+        org
+          ? h('button', { type: 'button', 'data-mv2': 'fact-link', onClick: toProfile(org.id) },
+            h('span', null, Str.by + ' ', h('b', null, orgName)), h(Icon, { name: 'BadgeCheck', size: 16 }), h(Icon, { name: 'ChevronRight', size: 18 }))
+          : h('span', { 'data-mv2': 'fact-line' }, h('span', null, Str.by + ' ', h('b', null, orgName))))
+      : null;
+    // P2-09: an event two Contributors run together names the others who ACCEPTED the invitation, each a link
+    const coHosts = isEvent && Array.isArray(item.coHostIds) ? item.coHostIds.map((cid) => contributors.find((c) => c.id === cid)).filter(Boolean) : [];
+    const coHostLine = coHosts.length
+      ? h('li', { key: 'co', 'data-mv2': 'fact' },
+        h('span', { 'data-cohosts': '', 'data-mv2': 'fact-line' }, Str.with + ' ',
+          coHosts.map((c, i) => h(React.Fragment, { key: c.id },
+            i > 0 ? ', ' : null,
+            h('button', { type: 'button', 'data-cohost': c.id, 'data-mv2': 'fact-inline', onClick: toProfile(c.id) }, c.name)))))
+      : null;
+    // Convince (FEAT-04): the note under Consider and, when a mutual friend is considering, the Friends considering row.
+    // Both need a signed-in person and a real, upcoming event.
+    // (their text is drawn for a light surface, so they keep one under them in either look)
+    const convince = isEvent && realUser && window.CCConvince && window.CCConvince.eligibleEvent(item)
+      ? h('div', { 'data-mv2': 'convince' },
+        h(window.ConsiderNote, { shared: !(myProfileMeta && myProfileMeta.notificationPrefs && myProfileMeta.notificationPrefs.share_considering === false), onOpenSettings: () => go('settings') }),
+        h(window.FriendsConsidering, { sb: window.CC_SUPABASE, eventId: item.id, eventTitle: item.title, me: realUser.id, myName: realUser.nameIsFallback ? '' : (user && user.name) || '', authedFetch: window.authedFetch, toast }))
+      : null;
+    const socials = item.socials ? h('div', { 'data-mv2': 'socials' }, h(window.UI.SocialLinks, { socials: item.socials, variant: 'compact' })) : null;
+    const rows = facts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
+    return h('div', { 'data-mv2': 'card', 'data-entity-card': type },
+      item.description ? h('p', { 'data-mv2': 'bio' }, item.description) : null,
+      (rows.length || organiser || coHostLine) ? h('ul', { 'data-mv2': 'facts', role: 'list' }, rows, organiser, coHostLine) : null,
+      socials,
+      convince);
+  }
+
   // ── the sheet ────────────────────────────────────────────────────
-  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick }) {
+  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view }) {
     const app = window.useApp();
     const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, savedContributors, savedPlaces, toggleSave, realUser } = app;
+    // Place and Event actions (#210, founder 2026-10-30): the same pills as a Contributor's, so the sheet speaks one way
+    const { followedPlaces, togglePlaceFollow, connected, toggleConnect, considering, toggleConsider, startConversationWith } = app;
     const Str = S();
     const wide = useWide();
     const root = useRef(null);
     const scroller = useRef(null);
     const tabbed = useRef(null);
     const title = useRef(null);
-    const [snap, setSnap] = useState('half');
+    const opensAt = expanded ? 'full' : 'half';
+    const [snap, setSnap] = useState(opensAt);
     const [tab, setTab] = useState(null);
+    const [enter, setEnter] = useState(null);       // 'next' | 'prev': the side a newly chosen tab's panel slides in from
     const [viewer, setViewer] = useState(null);     // { index, from }
     const [evSort, setEvSort] = useState(null);     // 'upcoming' | 'recent' | null (null = Upcoming when there is any, else Recent)
     const [qr, setQr] = useState(null);             // { from }: the QR code dialog (Contributor only)
     const [reading, setReading] = useState(null);   // { id, from }: the news reader (one post, one dialog)
-    const [announce, setAnnounce] = useState(Str.snapMessage.half);
+    const [announce, setAnnounce] = useState(Str.snapMessage[opensAt]);
     const dragState = useRef(null);
+    const swipeState = useRef(null);
     const justDragged = useRef(false);
     const lastPadding = useRef(null);
     const snapRef = useRef(snap);
@@ -260,13 +351,23 @@
       return out;
     }, [item, detail.data, isContributor]);
 
-    // A different pin: start again at half, on the first tab, scrolled to the top (not on the first mount:
-    // nothing to reset, and every state update here is another render on the way to the header).
+    // #210: how far the listing is, from where the map was looking when its card was tapped, in the Explore row's words
+    const distance = useMemo(() => {
+      const N = window.MapV2Nearby;
+      const from = view && (view.user || view.centre);
+      if (!expanded || !N || !from || !item || typeof item.lat !== 'number' || typeof item.lng !== 'number') return '';
+      const meters = N.metersBetween(from, item);
+      const words = window.MapV2Strings.explore;
+      return Number.isFinite(meters) ? N.distanceText(meters, view.user ? words : words.centre) : '';
+    }, [expanded, view, item]);
+
+    // A different pin: start again where this sheet opened, on the first tab, scrolled to the top (not on the first
+    // mount: nothing to reset, and every state update here is another render on the way to the header).
     const lastId = useRef(id);
     useEffect(() => {
       if (lastId.current === id) return;
       lastId.current = id;
-      setSnap('half'); setTab(null); setViewer(null); setEvSort(null); setQr(null); setReading(null);
+      setSnap(opensAt); setTab(null); setEnter(null); setViewer(null); setEvSort(null); setQr(null); setReading(null);
       if (scroller.current) scroller.current.scrollTop = 0;
     }, [id]);
 
@@ -285,11 +386,11 @@
       if (snap !== 'full' && scroller.current && scroller.current.scrollTop) scroller.current.scrollTop = 0;
     }, [snap]);
 
-    // Focus moves into the sheet; it goes back to the pin on close (keyboard users).
+    // Focus moves into the sheet; it goes back to the pin, or the Explore card (#210), that opened it on close (keyboard users).
     const opener = useRef(null);
     useEffect(() => {
       const a = document.activeElement;
-      if (a && a.getAttribute && a.getAttribute('data-cc-id')) opener.current = a;
+      if (a && a.getAttribute && (a.getAttribute('data-cc-id') || (a.closest && a.closest('[data-explore-id]')))) opener.current = a;
       return () => {
         const o = opener.current;
         if (o && o.isConnected) o.focus({ preventScroll: true });
@@ -298,7 +399,10 @@
     useEffect(() => { if (title.current) title.current.focus({ preventScroll: true }); }, [id]);
 
     // A press that is still going when the sheet unmounts must not leave listeners on the document.
-    useEffect(() => () => { const d = dragState.current; if (d && d.end) d.end(); }, []);
+    useEffect(() => () => {
+      const d = dragState.current; if (d && d.end) d.end();
+      const s = swipeState.current; if (s && s.end) s.end();
+    }, []);
 
     // Escape closes at once (an open photo viewer or news reader takes the key first: it listens in the capture phase).
     useEffect(() => {
@@ -307,9 +411,10 @@
       return () => document.removeEventListener('keydown', onKey);
     }, [onClose]);
 
-    // Tell the map how much of it the sheet covers, so the selected pin clears it (tracker E5).
+    // Tell the map how much of it the sheet covers, so the selected pin clears it (tracker E5). Not the expanded sheet
+    // (#210): it covers the whole map, and the person's map and Explore panel must be exactly as they left them on close.
     useEffect(() => {
-      if (!onOccupy) return undefined;
+      if (!onOccupy || expanded) return undefined;
       let pad;
       if (wide) pad = { top: 0, right: 0, bottom: 0, left: cssLen('calc(var(--sheet-panel-w) + 2 * var(--space-3))') };
       else if (snap === 'peek') pad = { top: 0, right: 0, left: 0, bottom: cssLen('var(--sheet-peek-h)') };
@@ -320,7 +425,7 @@
     }, [snap, wide, id]);
     useEffect(() => () => { if (onOccupy) onOccupy(null); }, []);
 
-    const lastSnap = useRef('half');
+    const lastSnap = useRef(opensAt);
     useEffect(() => {
       if (lastSnap.current === snap) return;
       lastSnap.current = snap;
@@ -352,7 +457,9 @@
       const order = ['full', 'half', 'peek'];     // top to bottom
       const at = order.indexOf(d.from);
       let target;
-      if (Math.abs(v) >= FLICK) {
+      // expanded (#210): full is the only state, so down means back to the Explore row
+      if (expanded) target = v >= FLICK || (v > -FLICK && y > m.fullH * COLLAPSE_AT) ? 'close' : 'full';
+      else if (Math.abs(v) >= FLICK) {
         const next = at + (v > 0 ? 1 : -1);
         if (next > 2) target = 'close';
         else target = order[Math.max(0, next)];
@@ -376,7 +483,10 @@
       if (handoff && (e.pointerType === 'mouse' || scroller.current.scrollTop >= TOP_PX)) return;
       // samples are the pointer's own y with its time, from the press on: a fast flick may reach us as one coalesced
       // move, and a speed needs two points in time
-      dragState.current = { id: e.pointerId, startY: e.clientY, baseY: 0, active: false, handoff, from: snapRef.current, samples: [{ t: e.timeStamp, y: e.clientY }], m: null };
+      // sideways: a press on the tab block (not on a sideways row) may become a tab swipe; it stops being a drag
+      // the moment it moves further sideways than down
+      const sideways = !!tabbed.current && tabbed.current.contains(t) && !(t.closest && t.closest(ROW_SEL));
+      dragState.current = { id: e.pointerId, startX: e.clientX, startY: e.clientY, baseY: 0, active: false, handoff, sideways, from: snapRef.current, samples: [{ t: e.timeStamp, y: e.clientY }], m: null };
       // The pointer leaves the sheet the moment it moves up past its top edge, so the move / up / cancel
       // events are followed on the document for as long as this press lasts (not on the sheet itself, and
       // not with a pointer capture taken at press time: that would swallow the click on the buttons inside).
@@ -399,6 +509,9 @@
         const dy = e.clientY - d.startY;
         // an upward move on content at its top belongs to the content (the browser scrolls it): let this press go
         if (d.handoff && dy <= -DRAG_START_PX) { if (d.end) d.end(); dragState.current = null; return; }
+        // a sideways move on the tab block belongs to the tab swipe (below)
+        const dx = e.clientX - d.startX;
+        if (d.sideways && Math.abs(dx) >= DRAG_START_PX && Math.abs(dx) > Math.abs(dy)) { if (d.end) d.end(); dragState.current = null; return; }
         if (Math.abs(dy) < DRAG_START_PX) return;
         d.active = true;
         d.m = metrics();
@@ -426,7 +539,7 @@
     const org = !isContributor && item.organizerId ? contributors.find((c) => c.id === item.organizerId) : null;
     const name = item.title || item.name || '';
     const cat = window.DATA.getItemCategory(Object.assign({}, item, { type }));
-    const hex = cat ? cat.hex : '#C9A84C';
+    const hex = cat ? cat.hex : '#F2BD22';
     const catLabel = cat ? cat.name : ((isContributor && window.MapV2Strings.pin.kind[item.kind]) || window.MapV2Strings.pin.type[type]);
     const avatarSrc = isContributor ? item.profilePhoto : org && org.profilePhoto;
     const avatarName = isContributor ? name : org && org.name;
@@ -439,30 +552,75 @@
     const tel = type === 'place' ? telUrl(item.phone) : '';
     const email = isContributor ? mailUrl(item.contactEmail) : '';
 
+    // #210: Events, News, Gallery in the founder's order; Today (a live Moment, which is rare and short-lived) follows
+    // them, so it never moves the three named tabs
     const tabs = [];
     if (orgEvents.length || recentEvents.length) tabs.push({ id: 'events', label: Str.tabs.events });
     if (posts.length) tabs.push({ id: 'news', label: Str.tabs.news });
-    if (moments.length) tabs.push({ id: 'today', label: Str.tabs.today });
     if (images.length) tabs.push({ id: 'gallery', label: Str.tabs.gallery });
+    if (moments.length) tabs.push({ id: 'today', label: Str.tabs.today });
     const loadingMore = isContributor && detail.status === 'loading';
     const active = tabs.some((t) => t.id === tab) ? tab : (tabs[0] && tabs[0].id);
+    const tabAt = (tid) => tabs.findIndex((t) => t.id === tid);
     // A different tab, while the bar is stuck: pull the block back to the top of the scroller before the new
     // panel renders (instant, so a shorter panel cannot leave you looking at what follows). The same tab leaves the scroll.
     const pickTab = (next) => {
-      if (next !== active && tabbed.current && scroller.current) {
+      if (next === active) return;
+      if (tabbed.current && scroller.current) {
         const d = tabbed.current.getBoundingClientRect().top - scroller.current.getBoundingClientRect().top;
         if (d < 0) scroller.current.scrollTop += d;
       }
+      setEnter(tabAt(next) > tabAt(active) ? 'next' : 'prev');
       setTab(next);
+    };
+    // A sideways swipe on the tab block moves one tab (no wrap). Touch and pen only: a mouse drag selects text.
+    // Followed on the document, like the drag, so a finger that leaves the block still counts.
+    const onSwipeDown = (e) => {
+      if (e.pointerType === 'mouse' || !e.isPrimary || tabs.length < 2) return;
+      if (e.target.closest && e.target.closest(ROW_SEL)) return;
+      const prev = swipeState.current;
+      if (prev && prev.end) prev.end();
+      const s = { id: e.pointerId, x: e.clientX, y: e.clientY };
+      const end = () => {
+        document.removeEventListener('pointerup', onUp, true);
+        document.removeEventListener('pointercancel', end, true);
+        if (swipeState.current === s) swipeState.current = null;
+      };
+      const onUp = (ev) => {
+        if (ev.pointerId !== s.id) return;
+        end();
+        const dx = ev.clientX - s.x;
+        const dy = ev.clientY - s.y;
+        if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < SWIPE_RATIO * Math.abs(dy)) return;
+        const next = tabs[tabAt(active) + (dx < 0 ? 1 : -1)];
+        if (next) pickTab(next.id);
+      };
+      s.end = end;
+      swipeState.current = s;
+      document.addEventListener('pointerup', onUp, true);
+      // a vertical swipe the browser takes over for scrolling ends here: never a tab change
+      document.addEventListener('pointercancel', end, true);
     };
 
     // ── actions ─────────────────────────────────────────────────────
+    // One row of the same pills for a Contributor, a Place and an Event (founder, 2026-10-30): Directions first, then the
+    // one thing a person does with the listing (Follow, or Connect for an event), then Save (Consider for an event), Share,
+    // and the listing's own links. The card's own gradient Follow button and its white box are gone.
     const actions = [];
     if (dir) actions.push(h(Action, { key: 'dir', icon: 'Navigation', label: Str.directions, href: dir, external: true, primary: true }));
-    // P2-04: Follow, for a Contributor that is not you (a Place and an Event show their card's own Follow / Consider)
+    // P2-04: Follow, for a Contributor that is not you
     const following = isContributor && followedOrgs.has(item.id);
     if (isContributor && !(realUser && realUser.id === item.id)) {
       actions.push(h(Action, { key: 'follow', icon: 'Heart', label: following ? Str.following : Str.follow, on: following, onClick: () => toggleFollow(item.id, name) }));
+    }
+    // a Place is followed the way it always was (the card's Follow), an Event is Connected to
+    if (type === 'place') {
+      const on = followedPlaces.has(item.id);
+      actions.push(h(Action, { key: 'follow', icon: 'Heart', label: on ? Str.following : Str.follow, on, onClick: () => togglePlaceFollow(item.id, name) }));
+    }
+    if (type === 'event') {
+      const on = connected.has(item.id);
+      actions.push(h(Action, { key: 'connect', icon: on ? 'Check' : 'CalendarCheck', label: on ? Str.connected : Str.connect, on, onClick: () => toggleConnect(item.id) }));
     }
     // P2-04: Save, a PRIVATE bookmark for a Contributor (not you) or a Place; an Event keeps its Consider bookmark. Never counted,
     // never shown to the listing: the only trace is the person's own list in Settings.
@@ -471,10 +629,18 @@
       const saved = (saveKind === 'place' ? savedPlaces : savedContributors).has(item.id);
       actions.push(h(Action, { key: 'save', icon: 'Bookmark', label: saved ? Str.saved : Str.save, on: saved, onClick: () => toggleSave(saveKind, item.id, name) }));
     }
+    if (type === 'event') {
+      const on = considering.has(item.id);
+      actions.push(h(Action, { key: 'consider', icon: 'Bookmark', label: on ? Str.considering : Str.consider, on, onClick: () => toggleConsider(item.id) }));
+    }
     actions.push(h(Action, { key: 'share', icon: 'Share2', label: Str.share, onClick: () => shareLink({ page: navTarget(type), params: { id } }) }));
     if (site) actions.push(h(Action, { key: 'web', icon: 'Globe', label: Str.website, href: site, external: true }));
     if (tel) actions.push(h(Action, { key: 'tel', icon: 'Phone', label: Str.call, href: tel }));
     if (email && !site) actions.push(h(Action, { key: 'mail', icon: 'Mail', label: Str.email, href: email }));
+    // a Place or an Event can be written to through its organiser, when the organiser is a Contributor in the directory
+    if (!isContributor && org) {
+      actions.push(h(Action, { key: 'msg', icon: 'MessageCircle', label: Str.message, onClick: () => startConversationWith(org.name, org.profilePhoto, true, org.id) }));
+    }
     // P2-06: the QR code is a tool for printing, not a first-glance action: it sits at the bottom of the content, so the
     // action row stays at the height it had and half still shows the header, the actions and the first tab
     // (only for a slug the router itself would resolve: nothing odd from the data ever reaches a printed code)
@@ -495,7 +661,7 @@
     // ── body ────────────────────────────────────────────────────────
     let body;
     if (!isContributor) {
-      body = h('div', { 'data-mv2': 'card' }, h(window.EntityCard, { item: Object.assign({}, item, { type }), layout: 'sheet' }));
+      body = h(ListingBody, { item, type, org, go, onClose });
     } else {
       const bio = item.bio ? h('p', { 'data-mv2': 'bio' }, item.bio) : null;
       let panel = null;
@@ -530,11 +696,18 @@
             : h('p', { key: 'none', 'data-mv2': 'sort-none' }, Str.eventsSort.noneRecent));
         panel = [sortBar, list];
       } else if (active === 'news') {
-        panel = h('ul', { 'data-mv2': 'list', role: 'list' }, posts.map((p) => {
-          const ago = T().postedAgo(p.createdAt || p.date, now);
-          const img = p.image && window.UI.safeUrl(p.image);
-          return h('li', { key: p.id },
-            h(window.MapV2Card, {
+        // The newest posts in one sideways row; "See all" opens the whole list in place (map-v2-row.jsx). Keyed by listing,
+        // so a different Contributor starts again at the first card, collapsed.
+        panel = h(window.MapV2Row.Row, {
+          key: 'news:' + id,
+          items: posts,
+          idPrefix: 'mv2-news',
+          strings: Str.news.row,
+          keyOf: (p) => p.id,
+          render: (p) => {
+            const ago = T().postedAgo(p.createdAt || p.date, now);
+            const img = p.image && window.UI.safeUrl(p.image);
+            return h(window.MapV2Card, {
               variant: img ? 'image' : 'text',
               title: p.title,
               excerpt: p.body,
@@ -545,8 +718,9 @@
               onClick: (e) => setReading({ id: p.id, from: e.currentTarget }),
               'data-news': '',
               'aria-haspopup': 'dialog',
-            }));
-        }));
+            });
+          },
+        });
       } else if (active === 'today') {
         panel = h('ul', { 'data-mv2': 'list', role: 'list' }, moments.map((m) => {
           const ago = T().postedAgo(m.created_at, now);
@@ -567,10 +741,12 @@
       const noContent = !tabs.length && !loadingMore;
       // The bar and the panel are one block. The bar sticks inside it; the hairline is the block's end.
       // Bio stays above. A notice or the empty state stays outside, so a listing with no tabs has no hairline.
-      const tabBlock = (tabs.length > 0 || loadingMore) && h('div', { 'data-mv2': 'tabbed', ref: tabbed },
+      const tabBlock = (tabs.length > 0 || loadingMore) && h('div', { 'data-mv2': 'tabbed', ref: tabbed, onPointerDown: onSwipeDown },
         h(Tabs, { tabs, active, onPick: pickTab, loadingMore, label: Str.tabsLabel }),
+        // keyed by tab, so a newly chosen panel slides in from the side it was swiped or tapped from (--dur-*: none under reduced motion)
         tabs.length > 0 && h('div', {
-          id: 'mv2-panel', role: 'tabpanel', 'aria-labelledby': 'mv2-tab-' + active, tabIndex: 0, 'data-mv2': 'panel',
+          key: active, id: 'mv2-panel', role: 'tabpanel', 'aria-labelledby': 'mv2-tab-' + active, tabIndex: 0, 'data-mv2': 'panel',
+          'data-enter': enter || undefined,
         }, panel),
         loadingMore && !tabs.length && h(window.MapV2Gallery.GridSkeleton, { label: Str.gallery.loading }));
       body = h('div', null,
@@ -611,12 +787,17 @@
     // P2-08: the follower count, only from 100 up and rounded down ("100+"); nothing at all below that, nothing at peek
     const followers = isContributor && !peek && detail.data && detail.data.followers != null ? window.MapV2.countBucket(detail.data.followers) : '';
     const Icon = window.Icon;
-    return h('section', {
-      ref: root, 'data-mv2': 'sheet', 'data-snap': wide ? 'panel' : snap, 'data-wide': wide ? '1' : undefined,
-      role: 'dialog', 'aria-label': Str.dialogLabel(name), 'aria-modal': 'false',
-      onPointerDown,
-    },
-      h('div', { 'data-mv2': 'grab' },
+    const closeBtn = h('button', { type: 'button', 'data-mv2': 'icon-btn', 'aria-label': Str.close, onClick: onClose }, h(Icon, { name: 'X', size: 20 }));
+    const sub = [
+      state && h('span', { key: 'state', 'data-mv2': 'state', 'data-status': state.status }, ' · ' + state.text),
+      followers && h('span', { key: 'fol', 'data-mv2': 'followers' }, ' · ' + Str.followers(followers)),
+    ];
+    // #210 expanded: a fixed bar (the grab bar to the eye, X to a thumb), then the header at the top of the content
+    const group = expanded && window.MapV2Explore ? window.MapV2Explore.groupOf(item) : '';
+    const grab = expanded
+      ? h('div', { 'data-mv2': 'grab' },
+        h('div', { 'data-mv2': 'xbar' }, !wide && h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }), closeBtn))
+      : h('div', { 'data-mv2': 'grab' },
         !wide && h('button', {
           type: 'button', 'data-mv2': 'handle', 'aria-label': snap === 'full' ? Str.collapse : Str.expand, onClick: cycle,
         }, h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' })),
@@ -624,22 +805,46 @@
           h(Avatar, { src: avatarSrc, name: avatarName, hex, size: peek ? 'peek' : 'half', glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: peek ? 18 : 24 }) }),
           h('div', { 'data-mv2': 'titles' },
             h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
-            h('p', { 'data-mv2': 'sub' }, catLabel,
-              state && h('span', { 'data-mv2': 'state', 'data-status': state.status }, ' · ' + state.text),
-              followers && h('span', { 'data-mv2': 'followers' }, ' · ' + Str.followers(followers)))),
+            h('p', { 'data-mv2': 'sub' }, catLabel, sub)),
           peek && h('button', { type: 'button', 'data-mv2': 'icon-btn', 'aria-label': Str.expand, onClick: cycle }, h(Icon, { name: 'ChevronUp', size: 20 })),
-          h('button', { type: 'button', 'data-mv2': 'icon-btn', 'aria-label': Str.close, onClick: onClose }, h(Icon, { name: 'X', size: 20 })))),
+          closeBtn));
+    // the chip is the Explore card's own (map-v2-card.jsx): the group's dot and outline, the category's words.
+    // Then the facts: how far, open or starting, followers.
+    const facts = [];
+    if (expanded) {
+      if (distance) facts.push(h('span', { key: 'd', 'data-mv2': 'distance' }, distance));
+      if (state) facts.push(h('span', { key: 's', 'data-mv2': 'state', 'data-status': state.status }, state.text));
+      if (followers) facts.push(h('span', { key: 'f', 'data-mv2': 'followers' }, Str.followers(followers)));
+    }
+    const xhead = expanded && h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
+      h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
+      h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
+      h('p', { 'data-mv2': 'xmeta' },
+        h('span', { 'data-mv2': 'card-chip' },
+          h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
+          h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
+        facts.length > 0 && h('span', { 'data-mv2': 'sub' },
+          facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), []))));
+    return h('section', {
+      ref: root, 'data-mv2': 'sheet', 'data-snap': wide ? 'panel' : snap, 'data-wide': wide ? '1' : undefined,
+      'data-expanded': expanded ? '' : undefined,
+      role: 'dialog', 'aria-label': Str.dialogLabel(name), 'aria-modal': 'false',
+      onPointerDown,
+    },
+      grab,
       h('div', { ref: scroller, 'data-mv2': 'scroller' },
+        xhead,
         h('div', { 'data-mv2': 'actions' }, actions),
         body,
-        N && nearRows.length > 0 && h(N.List, { rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
+        N && nearRows.length > 0 && h(N.List, { key: type + ':' + id, rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
         qrAction,
         reportAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),
       h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
-      // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost)
+      // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost;
+      // the phone app has no web origin of its own, so its build supplies the public site's address, see CC_ROUTES.publicUrl)
       qr && qrOk && ReactDOM.createPortal(h(window.MapV2QR.Dialog, {
-        url: window.MapV2QR.PUBLIC_ORIGIN + '/c/' + item.slug, name, slug: item.slug, strings: Str.qr, returnFocus: qr.from, onClose: () => setQr(null),
+        url: window.CC_ROUTES.publicUrl('/c/' + item.slug, { native: !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform()), webOrigin: window.MapV2QR.PUBLIC_ORIGIN }), name, slug: item.slug, strings: Str.qr, returnFocus: qr.from, onClose: () => setQr(null),
       }), document.body),
       // rendered into <body>: a position:fixed box inside the sheet would be fixed to the sheet's own transform
       viewer && images[viewer.index] && ReactDOM.createPortal(h(window.MapV2Gallery.Viewer, {

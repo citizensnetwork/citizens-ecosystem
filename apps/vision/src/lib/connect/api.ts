@@ -119,7 +119,10 @@ function buildUrl(path: string, query?: Record<string, QueryValue>): string {
   if (!BASE_URL) {
     throw new ConnectApiError("CONNECT_API_BASE_URL is not configured", 500);
   }
-  const url = new URL(path, BASE_URL);
+  // Join, do not resolve: `new URL("/api/v1/events", "https://host/citizens/connect")` is
+  // "https://host/api/v1/events" (an absolute path replaces the base's path), which would silently drop the
+  // /citizens/connect prefix CONNECT_API_BASE_URL carries once Connect is served under it (C39).
+  const url = new URL(BASE_URL.replace(/\/+$/, "") + path);
   if (query) {
     for (const [key, value] of Object.entries(query)) {
       if (value !== undefined && value !== null && value !== "") {
