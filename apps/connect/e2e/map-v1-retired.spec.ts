@@ -13,7 +13,7 @@ const stored = (page: Page) => page.evaluate(() => localStorage.getItem("cc_map_
 /** The map a person gets today: Map v2's stylesheet applied, its pins (controls, not bare SVG), its sheet on a tap. */
 async function expectTheOneMap(page: Page, pageErrors: string[]) {
   expect(await theme(page)).not.toBeNull();
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#c9a84c");
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#f2bd22");
   expect(await page.locator(".maplibregl-marker[role='button']").count()).toBeGreaterThanOrEqual(8);
   await expect(page.locator('[data-cc-pin="contributor-logo"]')).toHaveCount(0); // the old logo pin
   expect(await page.evaluate(() => typeof (window as unknown as { isMapV2?: unknown }).isMapV2)).toBe("undefined");

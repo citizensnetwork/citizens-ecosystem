@@ -21,7 +21,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const VALID_PERIODS = [30, 90, 180, 365];
-const GOLD = rgb(0.788, 0.659, 0.298); // #C9A84C
+const GOLD = rgb(0.949, 0.741, 0.133); // #F2BD22, the crown gold: rules and lines only
+const GOLD_INK = rgb(0.514, 0.380, 0); // #836100, gold TEXT (vivid gold on white paper is 1.74:1)
 const INK = rgb(0.04, 0.035, 0.03); // #0A0908
 const MUTED = rgb(0.48, 0.44, 0.38); // #7A7060
 
@@ -115,7 +116,7 @@ export async function GET(
   const line = (gap = 16) => { y -= gap; };
 
   // Header
-  text("CITIZENS CONNECT", { size: 9, bold: true, color: GOLD });
+  text("CITIZENS CONNECT", { size: 9, bold: true, color: GOLD_INK });
   line(20);
   text("Funder Impact Report", { size: 22, bold: true });
   line(18);
@@ -135,7 +136,7 @@ export async function GET(
     ["Volunteer applications", `${volunteers.length} received · ${volunteersApproved} approved`],
     ["Kingdom Projects led", String(projects.length)],
   ];
-  text("AT A GLANCE", { size: 9, bold: true, color: GOLD });
+  text("AT A GLANCE", { size: 9, bold: true, color: GOLD_INK });
   line(18);
   for (const [label, value] of stats) {
     text(label, { size: 11, color: MUTED });
@@ -145,7 +146,7 @@ export async function GET(
   line(12);
 
   // City reach
-  text("CITY REACH — where connected citizens come from", { size: 9, bold: true, color: GOLD });
+  text("CITY REACH — where connected citizens come from", { size: 9, bold: true, color: GOLD_INK });
   line(18);
   if (reachRows.length === 0) {
     text("Reach data builds as citizens connect to events.", { size: 10, color: MUTED });
@@ -160,7 +161,7 @@ export async function GET(
   line(12);
 
   // Top events
-  text("TOP EVENTS — by citizens connected", { size: 9, bold: true, color: GOLD });
+  text("TOP EVENTS — by citizens connected", { size: 9, bold: true, color: GOLD_INK });
   line(18);
   if (topEvents.length === 0) {
     text("No events in this period.", { size: 10, color: MUTED });
@@ -176,7 +177,7 @@ export async function GET(
 
   // Kingdom projects
   if (projects.length > 0) {
-    text("KINGDOM PROJECTS LED", { size: 9, bold: true, color: GOLD });
+    text("KINGDOM PROJECTS LED", { size: 9, bold: true, color: GOLD_INK });
     line(18);
     for (const p of projects.slice(0, 6)) {
       text(`${p.title ?? "Untitled project"}`, { size: 10.5 });

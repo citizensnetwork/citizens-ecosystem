@@ -74,7 +74,7 @@
         className: cx('object-cover', className), style,
       });
     }
-    const hex = cat && cat.hex ? cat.hex : '#C9A84C';
+    const hex = cat && cat.hex ? cat.hex : '#F2BD22';
     return React.createElement('div', {
       'aria-label': alt || (cat ? cat.name : 'image'),
       className: cx('flex flex-col items-center justify-center gap-1 select-none', className),
@@ -90,7 +90,7 @@
     const sizes = { sm: 'text-xs px-3 py-2', md: 'text-sm px-4 py-2.5', lg: 'text-sm px-5 py-3.5' };
     const variants = {
       primary: 'bg-foreground text-background hover:bg-foreground/90 shadow-sm',
-      gold: 'gold-gradient text-white shadow-[0_4px_14px_rgba(201,168,76,0.4)] hover:brightness-105',
+      gold: 'gold-gradient text-white shadow-[0_4px_14px_rgba(242,189,34,0.4)] hover:brightness-105',
       soft: 'bg-accent text-gold-dark hover:bg-gold-light/60',
       ghost: 'text-foreground/70 hover:bg-accent/60 hover:text-foreground',
       outline: 'border border-border text-foreground hover:bg-accent/40',
@@ -199,7 +199,7 @@
     }).filter(Boolean);
     if (!links.length) return null;
 
-    const ink = accent || '#8B6914';
+    const ink = accent || '#836100';
     if (variant === 'compact') {
       return React.createElement('div', { className: cx('flex items-center gap-1.5 flex-wrap', className) },
         links.map(({ k, href, platform }) => React.createElement('a', {
@@ -349,7 +349,7 @@
   // ── Toast stack ──
   function Toasts() {
     const { toasts } = window.useApp();
-    const tone = { gold: 'bg-gold-dark', green: 'bg-[#16A34A]', red: 'bg-[#DC2626]' };
+    const tone = { gold: 'bg-gold', green: 'bg-[#16A34A]', red: 'bg-[#DC2626]' };
     const ic = { gold: 'Sparkles', green: 'CheckCircle2', red: 'XCircle' };
     return React.createElement('div', {
       className: 'fixed top-4 left-1/2 -translate-x-1/2 z-[400] flex flex-col items-center gap-2 pointer-events-none w-full px-4',
