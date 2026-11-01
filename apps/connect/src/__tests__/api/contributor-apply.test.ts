@@ -181,6 +181,7 @@ describe("POST /api/contributor/apply", () => {
         display_name: "Grace Hub",
         contributor_category: "retreat-healing",
         contributor_kind: "individual",
+        show_on_map: true,
         physical_latitude: -25.7479,
         physical_longitude: 28.2293,
       }),
@@ -205,6 +206,39 @@ describe("POST /api/contributor/apply", () => {
     const secondRow = insertedRow();
     expect(secondRow?.contributor_category).toBeNull();
     expect(secondRow?.physical_latitude).toBeNull();
+  });
+
+  it("Care / Recovery opts in to the map: without show_on_map the address and the pin are never stored (#202)", async () => {
+    for (const category of ["retreat-healing", "clinic", "rehab-development"]) {
+      resetRateLimitStore();
+      mockUser({ id: USER_ID });
+      preflight();
+      await POST(
+        makeReq({
+          display_name: "Quiet Clinic",
+          contributor_category: category,
+          physical_address: "1 Example Road",
+          physical_latitude: -25.7,
+          physical_longitude: 28.2,
+          show_on_map: "yes", // only the boolean true counts
+        }),
+      );
+      const row = insertedRow();
+      expect(row?.contributor_category).toBe(category);
+      expect(row?.no_fixed_location).toBe(false);
+      expect(row?.physical_address, category).toBeNull();
+      expect(row?.physical_latitude, category).toBeNull();
+      expect(row?.physical_longitude, category).toBeNull();
+    }
+  });
+
+  it("show_on_map changes nothing for a category that is not Care / Recovery (#202)", async () => {
+    mockUser({ id: USER_ID });
+    preflight();
+    await POST(makeReq({ display_name: "Grace Church", contributor_category: "churches-ministries", physical_address: "1 Example Road", physical_latitude: -25.7, physical_longitude: 28.2 }));
+    const row = insertedRow();
+    expect(row?.physical_address).toBe("1 Example Road");
+    expect(row?.physical_latitude).toBe(-25.7);
   });
 
   it("no fixed location nulls the address and the pin", async () => {
@@ -341,6 +375,15 @@ describe("POST /api/contributor/apply", () => {
   });
 
   describe("the admin email", () => {
+    it("tells the admin a Care / Recovery application is kept off the map, and never leaks the address (#202)", async () => {
+      mockUser({ id: USER_ID });
+      preflight();
+      await POST(makeReq({ display_name: "Quiet Clinic", contributor_category: "clinic", physical_address: "12 Example Road, Pretoria" }));
+      const mail = mockSendEmail.mock.calls[0][0] as { text: string };
+      expect(mail.text).toContain("kept off the map");
+      expect(mail.text).not.toContain("12 Example Road");
+    });
+
     it("emails the configured admin address with the applicant's name, category and area", async () => {
       mockUser({ id: USER_ID });
       preflight();
@@ -348,6 +391,7 @@ describe("POST /api/contributor/apply", () => {
         makeReq({
           display_name: "Grace Hub",
           contributor_category: "retreat-healing",
+          show_on_map: true,
           physical_address: "12 Example Road, Pretoria",
         }),
       );

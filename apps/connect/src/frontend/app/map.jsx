@@ -487,7 +487,7 @@
         const label = P.ariaLabelFor(m, catLabel, S.pin);
         const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, !!m.isLive, !!m.isBusy,
           m.broadcast ? m.broadcast.message + '|' + m.broadcast.bubbleId : '', catLabel].join('');
-        const fill = m.type === 'idea' ? '#C9A84C' : (cat ? cat.hex : '#C9A84C');
+        const fill = m.type === 'idea' ? '#F2BD22' : (cat ? cat.hex : '#F2BD22');
         const build = () => P.build(m, { lucideInner, icon: pinIcon(m, cat), hex: fill, strings: S.pin, onDismissBubble: onDismissBubbleRef.current });
         let mk = markerObjs.current.get(m.id);
         if (mk && mk._ccAnchor === anchor) {
@@ -709,7 +709,7 @@
       // fixed center pin (the map moves under it, not the other way round)
       h('div', { className: 'absolute left-1/2 top-1/2 pointer-events-none', style: { transform: 'translate(-50%, -100%)', filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.35))' } },
         h('svg', { width: 28, height: 36, viewBox: '0 0 30 38' },
-          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#C9A84C' }),
+          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#F2BD22' }),
           h('circle', { cx: 15, cy: 15, r: 6, fill: '#fff' }))),
       h('button', {
         type: 'button', onClick: useMyLocation, disabled: busy === 'locate',

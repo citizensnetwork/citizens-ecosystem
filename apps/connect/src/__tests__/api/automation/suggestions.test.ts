@@ -256,6 +256,19 @@ describe("POST /api/automation/suggestions: automatic publishing is for future e
     expect(state.events).toHaveLength(0);
   });
 
+  it("a Care / Recovery Contributor's event waits for them, even at events_auto (#202)", async () => {
+    state.profiles = [profile({ auto_update_level: "events_auto", contributor_category: "clinic" })];
+    const res = await POST(req(event()));
+    expect((await res.json()).results[0].status).toBe("pending");
+    expect(state.events).toHaveLength(0);
+  });
+
+  it("a care-recovery event from any Contributor waits for the owner, even at events_auto (#202)", async () => {
+    const res = await POST(req(event({ category: "care-recovery" })));
+    expect((await res.json()).results[0].status).toBe("pending");
+    expect(state.events).toHaveLength(0);
+  });
+
   it("news and profile suggestions always wait, even at events_auto", async () => {
     await POST(req({ kind: "news", contributor_id: CONTRIB, source_url: "https://www.church.example/news", payload: { title: "New building", body: "We open on Sunday." } }));
     await POST(req({ kind: "profile", contributor_id: CONTRIB, source_url: "https://www.church.example/about", payload: { field: "bio", value: "We serve Pretoria." } }));

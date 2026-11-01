@@ -145,7 +145,7 @@ test.describe("the Apply wizard", () => {
     await bootAt(page);
     await goTo(page, "apply");
     await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG);
-    await page.getByRole("button", { name: "Retreat / Healing" }).click();
+    await page.getByRole("button", { name: "Market / Expo" }).click();
     await page.getByText("I don't have a fixed physical location").click();
 
     await expander(page, GP).click();
@@ -174,7 +174,7 @@ test.describe("the Apply wizard", () => {
     await bootAt(page);
     await goTo(page, "apply");
     await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG);
-    await page.getByRole("button", { name: "Retreat / Healing" }).click();
+    await page.getByRole("button", { name: "Market / Expo" }).click();
     await page.getByText("I don't have a fixed physical location").click();
     await tick(page, GP).click();
     await page.getByRole("button", { name: "Continue" }).click();
