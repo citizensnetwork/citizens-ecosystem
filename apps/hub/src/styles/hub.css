@@ -1,0 +1,304 @@
+/*
+ * Citizens front door. White, black and gold, about 60 / 30 / 10: white is the page, black is the banner, the
+ * buttons and the footer, gold is the accent (rules, the "coming soon" badge, focus on black).
+ *
+ * Contrast (WCAG AA needs 4.5 for text, 3 for large text and interface lines; test/design.test.ts checks every
+ * pair below from these very values):
+ *   ink on white 18.9   white on black 19.5   gold on black 8.2   ink on gold 7.8
+ * Gold is never used for text on white (the design system's rule), only as a fill with an ink label, a rule, or text
+ * on black.
+ *
+ * No external fonts, no images, no script: the strict Content-Security-Policy allows only this stylesheet.
+ */
+
+:root {
+  --white: #ffffff;
+  --ink: #111111;
+  --black: #0a0a0a;
+  --gold: #c8a24f;
+  --muted: #3d3d3d;
+  --on-black-soft: #e6e6e6;
+  --line: #d9d9d9;
+  --radius: 12px;
+  --gap: clamp(1rem, 3vw, 1.5rem);
+  --display: Georgia, 'Times New Roman', serif;
+  --body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.wrap {
+  width: 100%;
+  max-width: 68rem;
+  margin-inline: auto;
+  padding-inline: clamp(1rem, 4vw, 2rem);
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+.site-header :focus-visible,
+.site-footer :focus-visible,
+.hero :focus-visible {
+  outline-color: var(--gold);
+}
+
+.skip-link {
+  position: absolute;
+  inset-inline-start: 0.5rem;
+  top: -4rem;
+  z-index: 10;
+  padding: 0.75rem 1rem;
+  background: var(--gold);
+  color: var(--ink);
+  font-weight: 600;
+  border-radius: var(--radius);
+}
+
+.skip-link:focus {
+  top: 0.5rem;
+}
+
+/* The black banner: brand and slogan. */
+.site-header {
+  background: var(--black);
+  color: var(--white);
+  border-bottom: 4px solid var(--gold);
+}
+
+.site-header .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1.5rem;
+  padding-block: 1rem;
+}
+
+.brand {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.brand:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-underline-offset: 6px;
+}
+
+.slogan {
+  margin: 0;
+  color: var(--gold);
+  font-size: 0.95rem;
+}
+
+main {
+  padding-block: clamp(1.5rem, 5vw, 3rem);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--display);
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+}
+
+h1 {
+  font-size: clamp(2rem, 6vw, 3.25rem);
+}
+
+h2 {
+  font-size: clamp(1.4rem, 3.5vw, 1.9rem);
+  margin-top: clamp(2rem, 6vw, 3.5rem);
+}
+
+h3 {
+  font-size: 1.25rem;
+}
+
+p {
+  margin: 0 0 1rem;
+  max-width: 44rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* The hero is a black block with a gold rule: the 30 and the 10 of the palette. */
+.hero {
+  background: var(--black);
+  color: var(--white);
+  border-radius: var(--radius);
+  border-top: 6px solid var(--gold);
+  padding: clamp(1.5rem, 5vw, 3rem);
+}
+
+.hero .eyebrow {
+  color: var(--gold);
+}
+
+.hero .lead {
+  color: var(--white);
+}
+
+.hero p:last-child {
+  margin-bottom: 0;
+  color: var(--on-black-soft);
+}
+
+.lead {
+  font-size: clamp(1.15rem, 2.5vw, 1.4rem);
+  line-height: 1.45;
+}
+
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  background: var(--white);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  border-top: 6px solid var(--gold);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+}
+
+.card p {
+  color: var(--muted);
+}
+
+.card .button {
+  margin-top: auto;
+}
+
+.card-soon {
+  border-style: dashed;
+  border-top-style: solid;
+}
+
+.badge {
+  display: inline-block;
+  margin: 0 0 0.75rem;
+  padding: 0.125rem 0.75rem;
+  background: var(--gold);
+  color: var(--ink);
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+/* A link that looks like a button: at least 44 px tall, ink fill, white label. */
+.button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 1.25rem;
+  background: var(--ink);
+  color: var(--white);
+  border-radius: var(--radius);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.button:hover {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+.soon {
+  padding-block: clamp(1rem, 4vw, 2.5rem);
+}
+
+.scripture {
+  margin: clamp(2rem, 6vw, 3.5rem) 0 0;
+  padding: 1.25rem 1.5rem;
+  border-inline-start: 6px solid var(--gold);
+}
+
+.scripture blockquote {
+  margin: 0;
+}
+
+.scripture p {
+  font-family: var(--display);
+  font-size: 1.15rem;
+  font-style: italic;
+  max-width: 52rem;
+}
+
+.scripture figcaption {
+  font-weight: 700;
+}
+
+.site-footer {
+  background: var(--black);
+  color: var(--white);
+  border-top: 4px solid var(--gold);
+}
+
+.site-footer .wrap {
+  padding-block: 1.5rem;
+}
+
+.site-footer p {
+  margin: 0;
+}
+
+@media (forced-colors: active) {
+  .button,
+  .badge,
+  .card {
+    border: 1px solid CanvasText;
+  }
+}
+
+@media print {
+  .skip-link {
+    display: none;
+  }
+}

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /citizens/connect/api/
+Disallow: /citizens/vision/api/
+Disallow: /citizens/wear/api/
+
+Sitemap: https://219.co.za/sitemap.xml
