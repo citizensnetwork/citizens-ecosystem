@@ -143,7 +143,7 @@ boot).
 ### B6. Mobile build/config wiring (unspecified)
 `scripts/build-frontend.js` generates `public/config.js` from `NEXT_PUBLIC_*` env vars at
 deploy. The Capacitor bundle is built locally → decide the mobile config source: bake a
-production `config.js` (API_BASE_URL = `https://citizens-connect.vercel.app`,
+production `config.js` (API_BASE_URL = the production alias `https://citizens-ecosystem-connect.vercel.app`, the earlier plan, `https://citizens-connect.vercel.app`, now returns 404;
 real MapTiler key) into `webDir` at `cap:sync` time, mirroring the same generator with a
 `--mobile` flag. Never point a store build at localhost fallbacks.
 
