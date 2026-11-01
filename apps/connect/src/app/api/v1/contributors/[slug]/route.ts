@@ -72,6 +72,7 @@ export async function GET(
         "physical_latitude",
         "physical_longitude",
         "no_fixed_location:contributor_no_fixed_location",
+        "open_to_collaborate",
         "gallery_urls",
         "cover_photo_urls",
         "contact_email:contributor_contact_email",

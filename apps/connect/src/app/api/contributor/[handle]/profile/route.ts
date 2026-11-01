@@ -30,6 +30,7 @@ const ALLOWED_KEYS = [
   "physical_latitude",
   "physical_longitude",
   "contributor_no_fixed_location",
+  "open_to_collaborate",
   "logo_url",
   "gallery_urls",
   "contributor_contact_email",
@@ -162,6 +163,12 @@ export async function POST(
     typeof update.contributor_no_fixed_location !== "boolean"
   ) {
     return NextResponse.json({ error: "contributor_no_fixed_location must be a boolean" }, { status: 400 });
+  }
+  if (
+    update.open_to_collaborate !== undefined &&
+    typeof update.open_to_collaborate !== "boolean"
+  ) {
+    return NextResponse.json({ error: "open_to_collaborate must be a boolean" }, { status: 400 });
   }
   if (update.contributor_no_fixed_location === true) {
     update.physical_address = null;

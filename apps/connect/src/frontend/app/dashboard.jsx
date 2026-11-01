@@ -216,6 +216,7 @@
       contactEmail: contributor.contactEmail || '',
       location: contributor.location || '',
       noFixedLocation: !!contributor.noFixedLocation,
+      openToCollaborate: !!contributor.openToCollaborate,
       socials: contributor.socials || {},
       gallery: contributor.gallery || [],
       category: contributor.category || '',
@@ -246,6 +247,13 @@
           checked: f.noFixedLocation, onChange: locked ? () => {} : setNoFixedLocation,
           label: "No fixed physical location",
           desc: "We're online, mobile, or serve without a permanent office — no map pin.",
+        }),
+        h(Toggle, {
+          checked: f.openToCollaborate,
+          onChange: locked ? () => {} : (v) => up('openToCollaborate', v),
+          disabled: locked,
+          label: window.MapV2Strings.sheet.collaborate,
+          desc: window.MapV2Strings.sheet.collaborateHint,
         }),
         // #259: a Contributor with no fixed location says where they serve; it saves on its own button (owner or editor, never a viewer)
         !locked && window.CCServing.offersPicker(f) && window.CCServing.isUuid(contributor.id)

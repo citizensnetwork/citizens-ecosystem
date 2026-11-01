@@ -2963,6 +2963,25 @@ a[data-mv2='card2'],
   gap: var(--space-2);
   margin: 0;
 }
+/* C41: "Open to collaborate". Gold fill with the contrast label (never white on gold).
+   Words carry the meaning; the icon is decorative. Not a control, so it does not take a hit target. */
+[data-mv2='collab-chip'] {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='collab-chip'] svg {
+  flex: none;
+}
 [data-mv2='explore-card'] [data-mv2='card-chip'],
 [data-mv2='xhead'] [data-mv2='card-chip'] {
   align-self: flex-start;

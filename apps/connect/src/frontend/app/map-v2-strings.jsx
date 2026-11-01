@@ -52,6 +52,9 @@
       eventsSort: { label: 'Which events to show', upcoming: 'Upcoming', recent: 'Recent', noneUpcoming: 'Nothing is coming up.', noneRecent: 'No recent events.' },
       // P2-08: shown only at 100 or more (MapV2.countBucket); never a low number
       followers: (bucket) => bucket + ' followers',
+      // C41: a listing that welcomes working with other contributors. Absent when the flag is off.
+      collaborate: 'Open to collaborate',
+      collaborateHint: 'Other organisations can see you welcome working together.',
       // P2-06: a QR code for the listing's own link, to print or show at a venue
       qr: {
         action: 'QR code',

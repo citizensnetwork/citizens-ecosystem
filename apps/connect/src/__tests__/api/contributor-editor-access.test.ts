@@ -116,6 +116,29 @@ describe("editor listing writes", () => {
     );
   });
 
+  it("lets an editor turn on open to collaborate through the allow-listed RPC", async () => {
+    accessMock.mockResolvedValueOnce(editorAccess());
+    const res = await profile.POST(
+      req("/api/contributor/grace-city/profile", "POST", { open_to_collaborate: true }),
+      params,
+    );
+    expect(res.status).toBe(200);
+    expect(userClient.rpc).toHaveBeenCalledWith("update_contributor_public_profile", {
+      p_contributor_id: CONTRIBUTOR_ID,
+      p_patch: { open_to_collaborate: true },
+    });
+  });
+
+  it("refuses a non-boolean open to collaborate value and does not call the RPC", async () => {
+    accessMock.mockResolvedValueOnce(editorAccess());
+    const res = await profile.POST(
+      req("/api/contributor/grace-city/profile", "POST", { open_to_collaborate: "yes" }),
+      params,
+    );
+    expect(res.status).toBe(400);
+    expect(userClient.rpc).not.toHaveBeenCalled();
+  });
+
   it("updates the public profile through the allow-listed RPC", async () => {
     accessMock.mockResolvedValueOnce(editorAccess());
     const res = await profile.POST(
@@ -162,6 +185,16 @@ describe("viewer and editor owner-only refusals", () => {
       const json = await res.json();
       expect(json.field).toBe(field);
     }
+    expect(userClient.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses a viewer changing open to collaborate", async () => {
+    accessMock.mockResolvedValueOnce(viewerAccess());
+    const res = await profile.POST(
+      req("/api/contributor/grace-city/profile", "POST", { open_to_collaborate: true }),
+      params,
+    );
+    expect(res.status).toBe(403);
     expect(userClient.rpc).not.toHaveBeenCalled();
   });
 
