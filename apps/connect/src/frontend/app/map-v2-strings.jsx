@@ -227,17 +227,35 @@
       loading: 'Loading',
     },
 
-    // Issue #210: the folding navigation (app/map-v2-nav.jsx). Messages, Alerts and Projects live in the
-    // account menu that Profile opens (founder, 2026-10-26), each with its count.
-    nav: {
-      label: 'Main',
-      open: 'Open navigation',
-      openUnread: 'Open navigation, you have unread messages or alerts',
-      close: 'Close navigation',
-      items: { home: 'Home', explore: 'Explore', map: 'Map', profile: 'Profile' },
-      menu: { projects: 'Projects', messages: 'Messages', alerts: 'Alerts' },
-      unread: (n) => n + ' unread',
-    },
+      // Issue #210: the folding navigation (app/map-v2-nav.jsx). Let's, Messages and Alerts live in the
+      // account menu that Profile opens. Kingdom Projects stays at /community, linked from the Let's page.
+      nav: {
+        label: 'Main',
+        open: 'Open navigation',
+        openUnread: 'Open navigation, you have unread messages or alerts',
+        close: 'Close navigation',
+        items: { home: 'Home', explore: 'Explore', map: 'Map', profile: 'Profile' },
+        menu: { lets: 'Let\'s…', messages: 'Messages', alerts: 'Alerts' },
+        unread: (n) => n + ' unread',
+      },
+
+      // Issue #313. The Let's page and the starters on event creation. Starter names are data (window.LETS).
+      lets: {
+        title: 'Let\'s…',
+        sub: 'Gather with people near you',
+        start: 'Start one',
+        happening: 'Happening',
+        empty: 'No gatherings yet. Start one above.',
+        projects: 'Kingdom Projects',
+        projectsHint: 'Ideas, votes and collaboration.',
+        error: 'Could not load gatherings.',
+        retry: 'Try again',
+        signIn: 'Sign in to start one',
+        preset: 'Picks a category for the map.',
+        cap: 'Up to four of these in 30 days.',
+        locked: 'The category stays with this gathering.',
+        loading: 'Loading gatherings',
+      },
 
     // Issue #210: the map home's category pills and the Explore row (app/map-v2-explore.jsx).
     // One muted colour per group (founder, 2026-10-26); the group names are the pills.
@@ -268,6 +286,17 @@
       chooseCategory: 'Choose a category',
       backToListings: 'Back to the listings',
       categoriesLabel: 'Categories',
+      // C40: the list's own switch. "Where to…" is the intent view of the same rows.
+      listLabel: 'Browse the list',
+      categoriesTab: 'Categories',
+      intentsTab: 'Where to…',
+      intentsLabel: 'Where to',
+      whereTo: (word) => 'Where to ' + word,
+      emptyIntent: (word) => 'Nothing nearby for where to ' + word + '.',
+      intents: {
+        coffee: 'coffee', learn: 'learn', worship: 'worship', run: 'run', reset: 'reset',
+        heal: 'heal', parent: 'parent', chill: 'chill', shop: 'shop', serve: 'serve',
+      },
       lower: 'Lower this panel to see more of the map',
       raise: 'Raise this panel',
       under: 'Under 100 m away',

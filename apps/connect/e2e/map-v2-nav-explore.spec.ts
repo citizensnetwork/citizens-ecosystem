@@ -151,15 +151,15 @@ test.describe("on a phone", () => {
     await expect(explore(page)).toBeVisible();
   });
 
-  test("Profile opens the account menu with Projects, Messages and Alerts", async ({ page }) => {
+  test("Profile opens the account menu with Let's, Messages and Alerts", async ({ page }) => {
     await open(page);
     await toggle(page).tap();
     const profile = nav(page).getByRole("button", { name: "Profile", exact: true });
     await profile.tap();
     await expect(profile).toHaveAttribute("aria-expanded", "true");
-    for (const label of ["View Profile", "Projects", "Messages", "Alerts"]) await expect(page.getByRole("button", { name: label })).toBeVisible();
-    await page.getByRole("button", { name: "Projects" }).tap();
-    await expect(page).toHaveURL(/\/community$/);
+    for (const label of ["View Profile", "Let's…", "Messages", "Alerts"]) await expect(page.getByRole("button", { name: label })).toBeVisible();
+    await page.getByRole("button", { name: "Let's…" }).tap();
+    await expect(page).toHaveURL(/\/lets$/);
   });
 
   test("the categories are INSIDE the panel: its title switches to a list of the groups, a pick filters the cards, and the panel never changes height", async ({ page }) => {
@@ -412,6 +412,43 @@ test.describe("on a phone", () => {
     expect(corner.y + corner.height).toBeLessThanOrEqual(row.y + 1);
   });
 
+  test("Where to… is the list's other view: coffee keeps cafés, and an intent with nothing near says so", async ({ page }) => {
+    const seed = await open(page);
+    await settledPanel(page);
+    const heightOf = async () => Math.round((await explore(page).boundingBox())!.height);
+    const cardsHeight = await heightOf();
+    const sw = explore(page).getByRole("button", { name: "Explore", exact: true });
+    await sw.tap();
+    await expect(explore(page).locator("[data-mv2='cat']")).toHaveCount(9);
+    await explore(page).getByRole("tab", { name: "Where to…" }).tap();
+    const intents = explore(page).locator("[data-mv2='intent']");
+    await expect(intents).toHaveCount(10);
+    await expect(explore(page).locator("[data-mv2='cat']")).toHaveCount(0);
+    expect(Math.abs((await heightOf()) - cardsHeight)).toBeLessThanOrEqual(2);
+    const boxes = await intents.evaluateAll((els) => els.map((e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left), h: Math.round(r.height) }; }));
+    for (const r of boxes) expect(r.h).toBeGreaterThanOrEqual(44);
+    expect(new Set(boxes.slice(0, 4).map((r) => r.x)).size).toBe(2);
+    await expect(explore(page).getByRole("button", { name: "Where to serve" })).toBeEnabled();
+    await explore(page).getByRole("button", { name: "Where to coffee" }).tap();
+    await expect(sw).toHaveAttribute("aria-expanded", "false");
+    await expect(explore(page).locator("[data-mv2='explore-view'][data-view='cats']")).toBeHidden();
+    await expect(explore(page).locator("[data-mv2='explore-filter']")).toHaveText("Where to coffee");
+    const coffeeIds = new Set(
+      [...seed.places, ...seed.contributors, ...seed.events].filter((r) => r.category === "hospitality-cafes").map((r) => r.id),
+    );
+    const ids = await explore(page).locator("[data-explore-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-explore-id")));
+    expect(ids.length).toBeGreaterThan(0);
+    expect(coffeeIds.size).toBeGreaterThan(0);
+    for (const id of ids) expect(coffeeIds.has(id!), id!).toBe(true);
+    await expect.poll(() => pinOf(page, seed.contributors[0].id).locator(".mv2-pin").evaluate((e) => e.hasAttribute("data-dim"))).toBe(true);
+    await sw.tap();
+    await expect(explore(page).getByRole("tab", { name: "Where to…" })).toHaveAttribute("aria-selected", "true");
+    await explore(page).getByRole("button", { name: "Where to parent" }).tap();
+    await expect(explore(page).locator("[data-mv2='explore-empty']")).toHaveText("Nothing nearby for where to parent.");
+    await expect(explore(page).locator("[data-explore-id]")).toHaveCount(0);
+    await expect(explore(page).locator("[data-mv2='explore-view'][data-view='cats']")).toBeHidden();
+  });
+
   test("reduced motion: the nav opens with no animation", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await open(page);
@@ -461,6 +498,10 @@ test.describe("screenshots (NAV_SHOTS_DIR)", () => {
       await explore(page).getByRole("button", { name: "Explore", exact: true }).tap();
       await page.waitForTimeout(500);
       await page.screenshot({ path: `${dir}/categories-375-${look}.png` });
+      await explore(page).getByRole("tab", { name: "Where to…" }).tap();
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${dir}/where-to-375-${look}.png` });
+      await explore(page).getByRole("tab", { name: "Categories" }).tap();
       await explore(page).getByRole("button", { name: "Churches & worship" }).tap();
       await page.waitForTimeout(400);
       await page.screenshot({ path: `${dir}/filtered-375-${look}.png` });
@@ -484,5 +525,26 @@ test.describe("screenshots (NAV_SHOTS_DIR)", () => {
       await page.screenshot({ path: `${dir}/nav-open-375-${look}.png` });
       await ctx.close();
     });
+  }
+
+  // C40: the intent list and a filtered row, at the other two widths the design guide asks for.
+  for (const width of [768, 1280] as const) {
+    for (const look of ["light", "dark"] as const) {
+      test(`${width} x 800, ${look}`, async ({ browser, baseURL }) => {
+        test.setTimeout(120_000);
+        const ctx = await browser.newContext({ viewport: { width, height: 800 }, deviceScaleFactor: 1, colorScheme: look, baseURL });
+        const page = await ctx.newPage();
+        await open(page);
+        await settledPanel(page);
+        await explore(page).getByRole("button", { name: "Explore", exact: true }).click();
+        await explore(page).getByRole("tab", { name: "Where to…" }).click();
+        await page.screenshot({ path: `${dir}/where-to-${width}-${look}.png` });
+        await explore(page).getByRole("button", { name: "Where to coffee" }).click();
+        await expect(explore(page).locator("[data-mv2='explore-filter']")).toHaveText("Where to coffee");
+        await expect(explore(page).locator("[data-mv2='explore-view'][data-view='cats']")).toBeHidden();
+        await page.screenshot({ path: `${dir}/where-to-coffee-${width}-${look}.png` });
+        await ctx.close();
+      });
+    }
   }
 });

@@ -203,6 +203,7 @@ test.describe("Every kind of screen opens directly and survives a reload, under 
     ["", "discover", "the front door, the map"],
     ["/", "discover", "the front door with a slash"],
     ["/discover", "kingdom-discovery", "Kingdom Exploration"],
+    ["/lets", "lets", "Let's…"],
     ["/community", "community", "Kingdom Projects"],
     [`/e/${EVENT_ID}`, "event", "an event"],
     [`/p/${PLACE_ID}`, "place", "a place"],
@@ -509,7 +510,7 @@ test.describe("Assets and API calls all live under the prefix", () => {
 
 test.describe("The server serves the app under the prefix and nowhere else", () => {
   test("every route returns the app shell with the prefixed <base>, with security headers, and unknown paths keep Next's 404", async ({ request }) => {
-    for (const p of ["", "/", "/discover", "/map", "/community", "/me", "/messages", `/messages/${EVENT_ID}`, "/notifications", "/settings", "/apply", "/onboarding", "/dashboard", "/dashboard/events", "/admin", "/admin/contributors", `/e/${EVENT_ID}`, `/p/${PLACE_ID}`, `/c/${SLUG}`]) {
+    for (const p of ["", "/", "/discover", "/map", "/lets", "/community", "/me", "/messages", `/messages/${EVENT_ID}`, "/notifications", "/settings", "/apply", "/onboarding", "/dashboard", "/dashboard/events", "/admin", "/admin/contributors", `/e/${EVENT_ID}`, `/p/${PLACE_ID}`, `/c/${SLUG}`]) {
       const res = await request.get(`${BASE}${p}`);
       expect(res.status(), p).toBe(200);
       expect(await res.text(), p).toContain(`<base href="${BASE}/"`);

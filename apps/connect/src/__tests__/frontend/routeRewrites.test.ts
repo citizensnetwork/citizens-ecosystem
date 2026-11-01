@@ -38,6 +38,7 @@ describe("next.config.ts rewrites ↔ routes.jsx", () => {
     const navs: Nav[] = [
       { page: "home", params: {} },
       { page: "kingdom-discovery", params: {} },
+      { page: "lets", params: {} },
       { page: "community", params: {} },
       { page: "messages", params: {} },
       { page: "messages", params: { convId: ID } },
