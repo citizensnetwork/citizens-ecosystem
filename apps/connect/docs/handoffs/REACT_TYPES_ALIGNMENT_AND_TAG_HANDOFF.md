@@ -1,5 +1,7 @@
 # HANDOFF — (A) One React-types version per React line + Next-scoped type resolution · (B) push the pre-mig-174 git tag
 
+> **The pre-apply git tag step was retired on 2026-11-01** (SHARED_DB_CONTRACT R7.4). This file is a finished record. Do not create a `pre-mig-*` tag from it.
+
 > **Status: ✅ DONE (2026-09-27).** Task A shipped in
 > [PR #72](https://github.com/citizensnetwork/citizens-ecosystem/pull/72) (merged `0231014`; production READY on
 > all three apps, 0 runtime errors). §A.5 matched exactly, and the §A.6 proof gave 0/0/0 under every hoist with

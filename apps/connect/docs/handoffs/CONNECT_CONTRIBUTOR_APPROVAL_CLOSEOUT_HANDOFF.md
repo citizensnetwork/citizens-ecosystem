@@ -14,7 +14,7 @@
 | Part | PR | State |
 |---|---|---|
 | A: approve resets `contributor_hidden` (P1 bug), repaired admin review RPCs | #86 | merged; migration 179 applied 2026-10-03 |
-| B: self-serve applications wait for an admin (D-12) | #88 | merged 2026-10-04 (`aeaf966`); **migration 180 applied** 2026-10-04 (version `20261004061633`) after the deploy, pre-apply tag `connect-pre-mig180-contributor-approval`; the production probe was green |
+| B: self-serve applications wait for an admin (D-12) | #88 | merged 2026-10-04 (`aeaf966`); **migration 180 applied** 2026-10-04 (version `20261004061633`) after the deploy; the production probe was green |
 | C: admin-created listings email the owner a welcome (D-13) | #90 | merged 2026-10-04 (this document is part of it) |
 
 Database head: migration 180 (`20261004061633`); next free number is **181**. Security advisors after the last migration: 0 ERROR / 118 WARN / 3 INFO (the new baseline: one fewer WARN, because the dropped `self_approve_contributor_application` was an authenticated SECURITY DEFINER grant).
@@ -82,7 +82,7 @@ checkout another session owns (use a sibling worktree).
 Pick ONE of these (ask the founder which, in one question):
  1. Walk the A11 live checks with the founder and fix whatever they find.
  2. S12: tighten `news_posts` INSERT to approved Contributors, add the `contributor_hidden` guard to /api/v1/contributors/<slug>/stats,
-    and review the open SELECT policies. Needs a migration: ask first, push a pre-apply tag, run a rollback-only probe, and compare
+    and review the open SELECT policies. Needs a migration: the founder's yes in chat first (the founder does not name the file, and there is no pre-apply git tag), then after applying run a rollback-only probe, and compare
     advisors with 0 ERROR / 118 WARN / 3 INFO.
  3. C18: drafts for pending applicants (design first: places and news_posts SELECT policies are `true`).
 

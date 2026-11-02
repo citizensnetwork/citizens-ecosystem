@@ -200,6 +200,11 @@ Cross-app tagging substrate. Connect itself does not read these; siblings consum
   app: it may not break a `/api/v1` guarantee (Rule 2) and must keep RLS intact (Rule 3).
 - **R7.3** Run `get_advisors` (security) after any DDL. Target: **0 ERROR**. New `SECURITY DEFINER`
   functions are expected WARNs only when grants are correctly tightened (R3.3).
+- **R7.4** *(founder, 2026-11-01)* Apply a migration to the live database only after the founder
+  says yes in chat. Database, auth and security changes still need that yes. The founder does
+  not name the file, and there is no pre-apply git tag. After applying, run that migration's
+  probe and the security advisor (0 ERROR, no unexpected new finding). Section 9 records tags
+  that were used before this rule. Those lines are history, not the current step.
 
 ---
 
@@ -214,6 +219,9 @@ FKs or direct cross-app table reads that would weld the schemas together (Rules 
 ---
 
 ## 9. Verification snapshot (updated 2026-10-03, project `xyiajtrvhlxaeplsiajj`, head = **mig 178**)
+
+> The pre-apply tags named in this section were the old step. R7.4 (2026-11-01) replaced it.
+> Do not create one. This section is a record of what was applied.
 
 > **2026-10-03: mig 178 (`admin_remove_contributor_listing`) APPLIED to prod** (version
 > `20261002231716`; pre-apply tag `connect-pre-mig178-admin-remove-listing` → `82e4dff`;

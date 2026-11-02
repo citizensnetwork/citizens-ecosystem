@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════
 --  PROPOSAL (not applied): convince_fix: make Convince work for ordinary friends, and close the holes found around it.
 --  NO MIGRATION NUMBER on purpose: take the next free one at apply time (the live head was 189 on 2026-10-18). Authored 2026-10-18 on the
---  founder's chat ask "fix the Convince bugs". Needs a fresh yes from Stephen for THIS file, then the usual steps: pre-apply git tag, MCP
+--  founder's chat ask "fix the Convince bugs". Needs the founder's yes in chat (the file need not be named, and there is no pre-apply git tag), then: MCP
 --  apply_migration, the rollback-only probe docs/audit/probes/convince_fix.probe.sql, the security advisor, and move this file to
 --  supabase/migrations/ in the same PR. ROLLBACK at the foot.
 --

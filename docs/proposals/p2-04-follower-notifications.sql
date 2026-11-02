@@ -32,7 +32,7 @@
 --  once, never again after a rename or a cancel and re-publish; a private, past, cancelled or citizen's event tells nobody;
 --  501 followers gave 500 notifications; the trigger functions are not callable by anon or authenticated.
 --
---  If approved: pre-apply git tag, MCP apply_migration (<next free number>_follower_notifications), get_advisors
+--  If approved: the founder's yes in chat (no pre-apply git tag; the file need not be named), MCP apply_migration (<next free number>_follower_notifications), get_advisors
 --  (0 ERROR; list any new WARN), rollback-only probe (below), move this file to supabase/migrations/ in the same PR.
 -- ════════════════════════════════════════════════════════════════════
 

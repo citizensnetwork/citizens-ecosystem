@@ -1,9 +1,14 @@
 -- ════════════════════════════════════════════════════════════════════
 --  192_private_events_news_and_public_stats
 --
---  NOT APPLIED. The owner applies this file after review (pre-apply tag,
---  rollback-only probe docs/audit/probes/192_private_events_news_and_public_stats.probe.sql,
---  advisor 0 ERROR). Expected advisor change: +1 WARN,
+--  APPLIED (live version 20261018172517, after the founder's yes in chat).
+--  Rule from 2026-11-01: apply after the founder says yes in chat. The
+--  founder does not name the file, and there is no pre-apply git tag.
+--  After applying, run
+--  docs/audit/probes/192_private_events_news_and_public_stats.probe.sql
+--  and the security advisor (0 ERROR, no unexpected new finding).
+--  Database, auth and security changes still need that yes.
+--  Expected advisor change: +1 WARN,
 --  public.caller_may_read_private_event (SECURITY DEFINER, executable by
 --  anon and signed-in users on purpose: the events SELECT policy calls it,
 --  and a missing EXECUTE would make every events read fail). It returns
