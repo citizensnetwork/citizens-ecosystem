@@ -21,7 +21,7 @@
     "@citizens/utils": "workspace:*",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
-    "next": "16.4.2",
+    "next": "16.4.3",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "zod": "^4.3.6"
@@ -37,7 +37,7 @@
     "@vitest/coverage-v8": "^5.0.5",
     "esbuild": "^0.28.2",
     "eslint": "^10",
-    "eslint-config-next": "16.4.2",
+    "eslint-config-next": "16.4.3",
     "jsdom": "^29.0.2",
     "typescript": "^5.9.3",
     "vite": "8.1.6",
