@@ -1,8 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════
 --  190_convince_fix: make Convince work for ordinary friends, and close the holes found around it. Authored as
 --  docs/proposals/convince-fix.sql on 2026-10-18 on the founder's chat ask "fix the Convince bugs"; applied 2026-10-18 through MCP
---  apply_migration as `190_convince_fix` on Stephen's yes in chat (pre-apply tag `connect-pre-mig190-convince-fix`, on origin/main
---  c8909ee). In the same yes he accepted the one privacy call in it: a mutual, unblocked friend can learn that you are considering
+--  apply_migration as `190_convince_fix` on Stephen's yes in chat (no pre-apply git tag; the file need not be named).
+--  In the same yes he accepted the one privacy call in it: a mutual, unblocked friend can learn that you are considering
 --  an event (that is the purpose of the feature); a person who is not your friend learns nothing.
 --
 --  What was wrong (all read from the live database before the apply; 0 convinces rows and 0 'considering' rsvps existed, so nothing
