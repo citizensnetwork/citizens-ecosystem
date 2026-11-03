@@ -20,7 +20,7 @@
   "devDependencies": {
     "@citizens/config": "workspace:*",
     "@eslint/js": "10.0.1",
-    "@types/node": "26.6.5",
+    "@types/node": "26.6.6",
     "@typescript-eslint/eslint-plugin": "8.72.0",
     "@typescript-eslint/parser": "8.72.0",
     "@vitest/coverage-v8": "^5.0.5",
