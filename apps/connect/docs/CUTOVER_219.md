@@ -7,7 +7,9 @@ preconditions have, see below). The code is merged (`@citizens/ecosystem`, the p
 setting, domain, variable or DNS record without a clear yes in chat for that step.
 
 Written so that a person who does not write code can follow it. Each step has the same four parts: **Why**, **Do**,
-**Check**, **Roll back**. Do the steps in order, and do not start the next one until the Check of the one before passes.
+**Check**, **Roll back**. Do the steps in this order: **Step 1, Step 3, Step 2, Step 4, Step 5, then Step 6's Check** (decided by the
+founder, 2026-11-03; see "Why this order"; the numbers are kept so other documents still point at the right step). Do not start the next
+one until the Check of the one before passes.
 
 > **Who does what.** The clicks in Vercel, Supabase, Google, MapTiler and Absolute Hosting are the founder's (or
 > someone the founder gives access). Claude can run every "Check" that is a command and read the result. The dashboards'
@@ -50,17 +52,17 @@ refused: **one project succeeding does not prove the others will.**
 | ------------ | --------------------------------------------- | --------------------------------------------------------------------------------- |
 | P6           | Wear: a new deployment from current `main`    | 1, or 0 extra if the cutover day pack's merge does it (that merge itself makes 3) |
 | Step 1       | The front door's first deployment             | 1 (2 if you redeploy after changing its Node version)                             |
-| Step 2       | Redeploy Vision and Wear                      | 2                                                                                 |
 | Step 3       | Redeploy Connect                              | 1                                                                                 |
+| Step 2       | Redeploy Vision and Wear (both variables)     | 2                                                                                 |
 | Steps 4, 5   | Move the domain; Supabase and Apps Script     | 0                                                                                 |
-| Step 6       | Redeploy Vision and Wear                      | 2                                                                                 |
-| **Total**    | Happy path                                    | **7** (6 if the day pack's merge covers P6; 8 with the Node redeploy)             |
+| Step 6       | Check only                                    | 0                                                                                 |
+| **Total**    | Happy path                                    | **5** (4 if the day pack's merge covers P6; 6 with the Node redeploy)             |
 
-- A roll back by "remove the variable and redeploy" costs the same again (Step 2: 2, Step 3: 1, Step 6: 2); Instant Rollback
-  builds nothing and is believed not to count (unverified). Worst case about 12: **keep at least 15 free.**
+- A roll back by "remove the variable and redeploy" costs the same again (Step 3: 1, Step 2: 2); Instant Rollback builds nothing
+  and is believed not to count (unverified). Worst case about 10: **keep at least 12 free.**
 - Every push to a PR branch costs 3 (a preview per project, built or skipped), 4 once the front door exists; every merge to
   `main` costs the same again. A change that is not docs-only under `scripts/`, `supabase/` or a root file builds every app instead
-  of skipping (a package builds its dependents; `scripts/vercel-ignore.mjs`). A cheaper order is proposed after Step 6 (saves 2; not in force).
+  of skipping (a package builds its dependents; `scripts/vercel-ignore.mjs`). The step order is the cheaper one (saves 2; see "Why this order").
 
 ---
 
@@ -153,7 +155,7 @@ for it separately). Keep the existing entries. Save. **Do this before anyone ope
 
 **Status: NOT satisfied for Wear (checked 2026-11-01).** The apps and the front door must be deployed from a `main` that
 contains PR C (`c9d60a74`) **and** the Vision fix for `CONNECT_API_BASE_URL` (Vision used to drop any path in that variable;
-Step 6 depends on it). Connect's and Vision's newest Production deployments are from `main` that day. Wear's is from
+Step 2 depends on it). Connect's and Vision's newest Production deployments are from `main` that day. Wear's is from
 `868f1aa8`, before PR C: the deployments after it were refused by the rate limit, so they were never created.
 
 **Check.** The proof that the front-door code is live in an app is that its `index.html` carries the relative icon link
@@ -211,53 +213,17 @@ the Connect project's setting.
 
 ---
 
-## Step 2. Put Vision and Wear under their prefixes
-
-**Why.** Each app learns to live at `/citizens/<app>` when told to. They go first because nothing sends visitors to them
-yet. The front door can then reach them.
-
-**Do, once for Vision and once for Wear.**
-
-1. Vercel > the project (`citizens-ecosystem-vision`, then `citizens-ecosystem-wear`) > **Settings** > **Environment Variables**.
-2. **Key**: `NEXT_PUBLIC_BASE_PATH`. **Value**: `/citizens/vision` for Vision, `/citizens/wear` for Wear. Type it exactly:
-   lowercase, a leading slash, no trailing slash or space. **Environments**: tick **Production** only; untick Preview and
-   Development. **Save**.
-3. **Deployments** tab > the newest **Production** deployment (after P6 its Source commit is the current `main`) > the
-   **...** menu > **Redeploy** > **untick** "Use existing Build Cache" > **Redeploy**. Wait for **Ready**. (The value is
-   read when the app is built, so it does nothing until there is a new build. *Costs 1 deployment per project, 2 in all.*)
-
-A wrong value makes the build fail with a message that names the right one; nothing goes live from a failed build.
-
-**What changes.** `https://citizens-ecosystem-vision.vercel.app/` now sends visitors on to `/citizens/vision`, and the same for
-Wear. Anything that called those two addresses at their root for pages is now expected to use the prefix. The apps'
-`/api/...` addresses keep working at the old path. Connect is untouched.
-
-**Check.** Using the test address `H` from Step 1:
-
-| Open                                              | You should see                                                                       |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `https://H/citizens/vision`                       | Vision's sign-in page, styled, with the Citizens icon in the browser tab              |
-| `https://H/citizens/wear`                         | Wear's first page, styled, with the Citizens icon in the browser tab                 |
-| `https://H/citizens/wear/health`                  | A small health answer (not a "not found")                                            |
-| Command: `curl.exe -sI https://H/citizens/vision/index.html` | `HTTP/2 200` and exactly one `content-security-policy` line (Vision's own)    |
-
-Do **not** try to sign in on `H`: the allowed return address list knows `219.co.za`, not `H`. Sign-in is tested in Step 5.
-
-**Roll back.** In each project, **Environment Variables**: the **...** next to `NEXT_PUBLIC_BASE_PATH` > **Remove**, then
-**Redeploy** (same as above). Or **Deployments** > the last good deployment > **...** > **Instant Rollback**.
-
----
-
 ## Step 3. Put Connect under its prefix
 
 **Why.** Connect is the app people use today. `219.co.za` is *still attached to Connect*, so once Connect lives under its
 prefix, `https://219.co.za/citizens/connect/...` already works with no help from the front door. This is also the step that
-turns the old `www.citizenscentral.co.za` addresses into forwards.
+turns the old `www.citizenscentral.co.za` addresses into forwards. It goes before Vision and Wear because their Step 2 points
+their reads at Connect's new address, which has to exist first.
 
 **Do.**
 
 1. Vercel > **Connect** project > **Settings** > **Environment Variables**.
-2. `NEXT_PUBLIC_BASE_PATH` = `/citizens/connect`, **Production** only (as in Step 2).
+2. `NEXT_PUBLIC_BASE_PATH` = `/citizens/connect`, **Production** only (untick Preview and Development).
 3. `NEXT_PUBLIC_SITE_URL` = `https://219.co.za` (the address only: no `/citizens/connect`, no trailing slash), **Production**
    only. If a row for it already exists, click **...** > **Edit**, and **write the old value down first**: you need it to roll back.
 4. **Deployments** > newest **Production** deployment > **...** > **Redeploy**, "Use existing Build Cache" **unticked**.
@@ -303,7 +269,58 @@ In a browser, open `https://219.co.za/citizens/connect`: the map shows (P2), and
 
 **Roll back.** **Environment Variables**: **Remove** `NEXT_PUBLIC_BASE_PATH`, put `NEXT_PUBLIC_SITE_URL` back to the old value you
 wrote down (or remove it if it did not exist), **Redeploy** without the build cache. Connect serves from its root again and
-`www.citizenscentral.co.za` works as it did. Nothing was lost.
+`www.citizenscentral.co.za` works as it did. Nothing was lost. (If Step 2 is already done, roll that back first.)
+
+---
+
+## Step 2. Put Vision and Wear under their prefixes
+
+**Why.** Each app learns to live at `/citizens/<app>` when told to, and, in the same redeploy, to read Contributors, events and
+places from Connect's `/api/v1` at Connect's new prefixed address (this used to be a separate Step 6). Connect is already under
+its prefix (Step 3), so that address exists. Nothing sends visitors to Vision or Wear yet; the front door can reach them after this.
+
+**Do, once for Vision and once for Wear.**
+
+1. Vercel > the project (`citizens-ecosystem-vision`, then `citizens-ecosystem-wear`) > **Settings** > **Environment Variables**.
+2. **Key**: `NEXT_PUBLIC_BASE_PATH`. **Value**: `/citizens/vision` for Vision, `/citizens/wear` for Wear. Type it exactly:
+   lowercase, a leading slash, no trailing slash or space. **Environments**: tick **Production** only; untick Preview and
+   Development. **Save**.
+3. **Key**: `CONNECT_API_BASE_URL` > **...** > **Edit**. **Write the old value down first.** New value, the same for both:
+
+   ```
+   https://citizens-ecosystem-connect.vercel.app/citizens/connect
+   ```
+
+   (Connect's own project address, **not** `219.co.za`: a server-to-server call needs no detour through the front door. No
+   trailing slash. No `/api/v1` on the end.) **Production** only. Vision used to throw away any path in this variable; that is
+   fixed in the code that is live after P6.
+4. **Deployments** tab > the newest **Production** deployment (after P6 its Source commit is the current `main`) > the
+   **...** menu > **Redeploy** > **untick** "Use existing Build Cache" > **Redeploy**. Wait for **Ready**. (The values are
+   read when the app is built, so they do nothing until there is a new build. *Costs 1 deployment per project, 2 in all.*)
+
+A wrong `NEXT_PUBLIC_BASE_PATH` makes the build fail with a message that names the right one; nothing goes live from a failed build.
+
+**What changes.** `https://citizens-ecosystem-vision.vercel.app/` now sends visitors on to `/citizens/vision`, and the same for
+Wear. Anything that called those two addresses at their root for pages is now expected to use the prefix. The apps'
+`/api/...` addresses keep working at the old path. Their reads of Connect now go to Connect's new address. Connect is untouched.
+
+**Check.** Using the test address `H` from Step 1:
+
+| Open                                              | You should see                                                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `https://H/citizens/vision`                       | Vision's sign-in page, styled, with the Citizens icon in the browser tab              |
+| `https://H/citizens/wear`                         | Wear's first page, styled, with the Citizens icon in the browser tab                 |
+| `https://H/citizens/wear/health`                  | A small health answer (not a "not found")                                            |
+| `https://H/citizens/connect`                      | Connect's page (it works since Step 3; Step 1 listed it as "not yet")                |
+| Command: `curl.exe -sI https://H/citizens/vision/index.html` | `HTTP/2 200` and exactly one `content-security-policy` line (Vision's own)    |
+
+Do **not** try to sign in on `H`: the allowed return address list knows `219.co.za`, not `H`. Sign-in is tested in Step 5, and the
+data check of the new `CONNECT_API_BASE_URL` is Step 6 (it needs a signed-in user).
+
+**Roll back.** In each project, **Environment Variables**: the **...** next to `NEXT_PUBLIC_BASE_PATH` > **Remove**; put
+`CONNECT_API_BASE_URL` back to the old value you wrote down; then **Redeploy** (same as above). Or **Deployments** > the last good
+deployment > **...** > **Instant Rollback**. **Do this before rolling back Step 3**: Connect at its root no longer answers
+`.../citizens/connect/api/v1`.
 
 ---
 
@@ -359,6 +376,7 @@ is back on Connect.
 4. Scan or open an old printed QR address (`https://www.citizenscentral.co.za/c/SLUG`): it lands on the same Contributor.
 5. `https://219.co.za/favicon.ico` and `https://219.co.za/robots.txt` answer (the front door's).
 6. `https://219.co.za/citizens/learn` shows "Coming soon", and `https://219.co.za/citizens/nothing` shows "Page not found".
+7. Now do **Step 6's Check** (it needs the signed-in session from item 2).
 
 **Then finish the settings** (only now):
 
@@ -366,68 +384,54 @@ is back on Connect.
   it is today and write it down first; it decides where sign-in emails send people.)
 - **Google Apps Script** (the Contributor form): Project Settings > Script properties > `INTAKE_URL` =
   `https://219.co.za/citizens/connect/api/intake/google-form`. Until you do this the old address keeps working through the
-  pass-through of Step 3, so there is no rush, but do it so the form no longer depends on it. Submit a test form and watch it arrive.
+  pass-through of Step 3, so there is no rush, but do it so the form no longer depends on it. Run `testConnection`, then submit a test form and watch it arrive.
 
 **Roll back.** Site URL and `INTAKE_URL`: put the old values back. Anything else wrong: Step 4's roll back.
 
 ---
 
-## Step 6. Point Vision's and Wear's reads of Connect at Connect's new address
+## Step 6. Check that Vision and Wear read Connect at its new address
 
-**Why.** Vision and Wear read Contributors, events and places from Connect's `/api/v1` from their servers. Those calls use
-the variable `CONNECT_API_BASE_URL`. Connect's own address now includes the prefix, so the variable should too. (Until it
-does, the calls still work through the `/api` pass-through of Step 3, with one extra hop. Vision used to throw away any
-path in this variable; that is fixed in the code that is live after P6.)
+**Why.** Vision and Wear read Contributors, events and places from Connect's `/api/v1` from their servers. Step 2 already set
+`CONNECT_API_BASE_URL` to Connect's prefixed address in the same redeploy as the prefix, so this step only checks that the reads
+work. It needs a signed-in user, so it comes after Step 5.
 
-**Do, for Vision and for Wear.** **Settings** > **Environment Variables** > `CONNECT_API_BASE_URL` > **...** > **Edit**:
-
-```
-https://citizens-ecosystem-connect.vercel.app/citizens/connect
-```
-
-(Connect's own project address, **not** `219.co.za`: a server-to-server call needs no detour through the front door. No
-trailing slash. No `/api/v1` on the end.) **Production** only. Write the old value down. Then **Redeploy** both projects
-(without the build cache; *2 deployments*).
+**Do.** Nothing to change.
 
 **Check.** In Vision, open the page that lists Connect's events or places; in Wear, open the Contributors directory.
 Both show data (they would show an empty list or an error if the address were wrong).
 
-**Roll back.** Put the old value back and redeploy; it keeps working through the pass-through.
+**Roll back.** Put `CONNECT_API_BASE_URL` back to the old value in both projects and redeploy (2 deployments, as in Step 2's
+roll back); it keeps working through the pass-through.
 
 ---
 
-## PROPOSAL (not adopted): Connect first, then Vision and Wear with one redeploy each
+## Why this order (decided by the founder, 2026-11-03)
 
-> **A proposal for the founder to accept or refuse. The steps above stay in their written order until you say so.**
+The earlier order was 1, 2, 3, 4, 5, 6. Step 6 was last only because its value (`.../citizens/connect`) needs Connect under its prefix
+already. Connect now goes first, so Vision and Wear get `NEXT_PUBLIC_BASE_PATH` **and** `CONNECT_API_BASE_URL` in one redeploy each.
+**It saves 2 deployments** (7 to 5). Checked against `apps/hub`, the ecosystem README's "Rollout rule", `oldAddressRules` and the code.
+Connect never links to Vision or Wear or the reverse (only Vision and Wear read Connect's `/api/v1`), so the order matters only through
+that one variable.
+- **After Step 3:** Connect at its prefix; Vision and Wear at their roots, still reading Connect at its old address through the `/api`
+  pass-through (the old order was in this same state between its Steps 3 and 6).
+- **After Step 2:** all three prefixed; the new variable points at an address that has existed since Step 3. `/citizens/vision` is a 404 on
+  `219.co.za` until Step 4, as it always was.
+- **The Rollout rule's three conditions** (prefix-aware frontends, something routing the prefix, old addresses forwarding) hold as before:
+  Connect's own rules start at Step 3; Vision and Wear are reached only after Step 4.
 
-**The idea.** Step 6 is last only because its value (`.../citizens/connect`) needs Connect under its prefix already. Do Step 3 first; then, in Step 2, set
-`NEXT_PUBLIC_BASE_PATH` **and** `CONNECT_API_BASE_URL` before the one redeploy of Vision and of Wear. Step 6 disappears (its Check runs after Step 5: the data
-pages need a signed-in user). **Saves 2 deployments** (7 to 5). Order: P1 to P6, Step 1, **3**, **2 (with Step 6's variable)**, 4, 5.
-
-**Safe at each point?** Checked against `apps/hub`, the ecosystem README's "Rollout rule", `oldAddressRules` and the code. Connect never links to Vision or Wear or
-the reverse (only Vision and Wear read Connect's `/api/v1`), so the order matters only through that one variable.
-- **After Step 3:** Connect at its prefix; Vision and Wear at their roots, still reading Connect at its old address through the `/api` pass-through. The written order
-  is in this same state between its Steps 3 and 6.
-- **After Step 2:** all three prefixed; the new variable points at an address that has existed since Step 3. `/citizens/vision` is a 404 on `219.co.za` until Step 4,
-  exactly as in the written order.
-- **The Rollout rule's three conditions** (prefix-aware frontends, something routing the prefix, old addresses forwarding) hold as in the written order: Connect's own
-  rules start at Step 3 in both; Vision and Wear are reached only after Step 4.
-
-**What it costs.** (a) The written order tries the prefix on Vision and Wear, which no visitor uses, before touching Connect; the proposal's first live use is
-Connect (its base-path e2e passes in CI; Step 3's roll back is complete). (b) If Connect has to be rolled back after Step 2, Vision's and Wear's
-`CONNECT_API_BASE_URL` must go back first (2 deployments): Connect at its root no longer answers `.../citizens/connect/api/v1`.
-
-**Not provable here (true of both orders):** that the `/api` pass-through works on Vercel (Step 3 commands 7 and 8 prove it; the proposal runs them before Vision and
-Wear change), and that their data pages work with the prefixed variable on real Vercel (Vision's join is unit-tested; the client Wear uses joins by plain
-concatenation, read in the code, with no prefixed-base test). So: **no unsafe point found, but not proven safe on Vercel.** A third option, skipping Step 6
-altogether, also saves 2 and leaves those reads taking the extra hop for good.
+**What it costs.** (a) The old order tried the prefix on Vision and Wear, which no visitor uses, before touching Connect; now the first live
+use is Connect (its base-path e2e passes in CI; Step 3's roll back is complete). (b) If Connect has to be rolled back after Step 2, Vision's and
+Wear's `CONNECT_API_BASE_URL` must go back first (2 deployments), which Step 3's roll back says. **Not proven on Vercel (true of either order):**
+the `/api` pass-through (Step 3 commands 7 and 8 prove it, before Vision and Wear change), and that Vision's and Wear's data pages work with the
+prefixed variable (Vision's join is unit-tested; the client Wear uses joins by plain concatenation, read in the code, with no prefixed-base test).
 
 ---
 
 ## Variable cheat sheet
 
 Scope is **Production** only in every case. A `NEXT_PUBLIC_` or `HUB_` value is read **when the app is built**: change it, then
-redeploy without the build cache.
+redeploy without the build cache. Vision and Wear get both of theirs in the same redeploy (Step 2).
 
 | Project | Name                    | Value                                                           | Step | Roll back to          |
 | ------- | ----------------------- | --------------------------------------------------------------- | ---- | --------------------- |
@@ -435,8 +439,8 @@ redeploy without the build cache.
 | Wear    | `NEXT_PUBLIC_BASE_PATH` | `/citizens/wear`                                                | 2    | remove, redeploy      |
 | Connect | `NEXT_PUBLIC_BASE_PATH` | `/citizens/connect`                                             | 3    | remove, redeploy      |
 | Connect | `NEXT_PUBLIC_SITE_URL`  | `https://219.co.za`                                             | 3    | the old value         |
-| Vision  | `CONNECT_API_BASE_URL`  | `https://citizens-ecosystem-connect.vercel.app/citizens/connect` | 6    | the old value         |
-| Wear    | `CONNECT_API_BASE_URL`  | `https://citizens-ecosystem-connect.vercel.app/citizens/connect` | 6    | the old value         |
+| Vision  | `CONNECT_API_BASE_URL`  | `https://citizens-ecosystem-connect.vercel.app/citizens/connect` | 2    | the old value         |
+| Wear    | `CONNECT_API_BASE_URL`  | `https://citizens-ecosystem-connect.vercel.app/citizens/connect` | 2    | the old value         |
 | Hub     | (none)                  | `HUB_ORIGIN_CONNECT`, `HUB_ORIGIN_VISION`, `HUB_ORIGIN_WEAR` exist but are **left unset**: their defaults are the three projects' production addresses | - | - |
 
 Never set `NEXT_PUBLIC_BASE_PATH` on Preview or Development: a Preview with a prefix answers only under it, and the
