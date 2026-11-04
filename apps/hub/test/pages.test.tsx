@@ -61,11 +61,11 @@ function assistiveText(fragment: string): string {
   }
   return out
     .join('')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'")
+    .replace(/&amp;/g, '&') // last, so an encoded entity such as &amp;lt; is not unescaped twice
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -538,7 +538,8 @@ describe('get involved (/citizens/get-involved)', () => {
 
 describe('the coming-soon pages (/citizens/learn, /play, /move, /impact)', () => {
   it('are generated for exactly the registry’s coming-soon slugs, and nothing else is a page', async () => {
-    const result = await getStaticPaths({});
+    // The page's getStaticPaths ignores its context argument, so call it the way it is written.
+    const result = await (getStaticPaths as () => ReturnType<typeof getStaticPaths>)();
     expect(result.fallback).toBe(false);
     expect(result.paths).toEqual(COMING_SOON.map((app) => ({ params: { slug: app.slug } })));
   });

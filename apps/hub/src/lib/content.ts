@@ -58,7 +58,9 @@ export const HERO = {
  * founder supplies community photography (with consent), a file goes in public/ and this becomes `{ src, alt }`.
  * Until then the hero shows its drawn art. The same goes for `photo` on a platform card.
  */
-export const HERO_PHOTO: { src: string; alt: string } | undefined = undefined;
+export function heroPhoto(): { src: string; alt: string } | undefined {
+  return undefined;
+}
 
 /** What Citizens is, in three lines (Conversation 5.0). */
 export const INTRO = {

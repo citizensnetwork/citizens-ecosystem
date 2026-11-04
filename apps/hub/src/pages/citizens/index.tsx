@@ -9,7 +9,6 @@ import {
   ECOSYSTEM_HEADING,
   ECOSYSTEM_SUB,
   HERO,
-  HERO_PHOTO,
   INTRO,
   LANDING_DESCRIPTION,
   LANDING_TITLE,
@@ -18,6 +17,7 @@ import {
   PHILOSOPHY,
   SCRIPTURE,
   appCards,
+  heroPhoto,
 } from '../../lib/content';
 import type { AppCard } from '../../lib/content';
 
@@ -66,6 +66,7 @@ function Tile({ card, wide }: { card: AppCard; wide: boolean }) {
 
 const Landing: NextPage = () => {
   const cards = appCards();
+  const photo = heroPhoto();
   // A lone last tile (7 tiles in rows of 3) spans the whole row, like Impact in the design.
   const lastIsAlone = cards.length % 3 === 1;
   return (
@@ -88,9 +89,9 @@ const Landing: NextPage = () => {
           </div>
         </div>
         <div className="hero-art" aria-hidden="true">
-          {HERO_PHOTO ? (
+          {photo ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img className="hero-photo" src={HERO_PHOTO.src} alt="" />
+            <img className="hero-photo" src={photo.src} alt="" />
           ) : null}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="hero-crown" src="/citizens-crown.png" alt="" width={240} height={130} />
