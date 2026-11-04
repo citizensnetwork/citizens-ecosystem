@@ -171,6 +171,10 @@ describe('hubHeaders', () => {
     for (const path of [
       '/',
       '/citizens',
+      '/citizens/ecosystem',
+      '/citizens/how-it-works',
+      '/citizens/philosophy',
+      '/citizens/get-involved',
       '/citizens/learn',
       '/citizens/play',
       '/citizens/move',
@@ -228,8 +232,23 @@ describe('robots.txt and sitemap.xml', () => {
   });
 
   it('the sitemap lists the hub’s own indexable pages only (no app, no noindex page)', () => {
-    expect([...HUB_PAGES]).toEqual(['/citizens']);
+    expect([...HUB_PAGES]).toEqual([
+      '/citizens',
+      '/citizens/ecosystem',
+      '/citizens/how-it-works',
+      '/citizens/philosophy',
+      '/citizens/get-involved',
+    ]);
     const locs = [...sitemapXml().matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-    expect(locs).toEqual([`${SITE_ORIGIN}/citizens`]);
+    expect(locs).toEqual([...HUB_PAGES].map((page) => `${SITE_ORIGIN}${page}`));
+  });
+
+  it('no hub page shares its slug with an app, built or coming soon (a page would hide the app, or the app the page)', () => {
+    const taken = new Set<string>([...APP_SLUGS, ...COMING_SOON.map((app) => app.slug)]);
+    for (const page of HUB_PAGES) {
+      const slug = page.split('/').pop() as string;
+      if (page === '/citizens') continue;
+      expect(taken.has(slug), `${page} collides with an app slug`).toBe(false);
+    }
   });
 });

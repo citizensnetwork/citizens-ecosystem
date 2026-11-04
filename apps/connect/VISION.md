@@ -59,10 +59,10 @@ to connect and uplift **All three at once**:
 - **For the organisation (contributor)** — being highlighted, supported, and exposed
   to ideal candidates across the nation, integrating features that inspire community input,
   service and participation - making connection fun and easy for anyone who find them.
-- **For social needs** — Providing an environment where each each role player is
+- **For social needs** — Providing an environment where each role player is
   provided opportunities to serve at events or organisations, collaborate in community work,
-  post community improvement ideas for public participation and form part of socially uplifting
-  initiatives.
+  post community improvement ideas for public participation (Kingdom Projects, in Connect) and
+  form part of socially uplifting initiatives.
 
 This is **simultaneous Kingdom discovery** And beyond discovery,
 we connect every player to **real needs in society** — enabling collaboration
@@ -117,28 +117,46 @@ More features may be added as we go.
 ## The ecosystem (one north star, many channels)
 
 - **Citizens Connect** — the discovery + connection layer (current focus). Map,
-  events, places, contributors, community.
-- **Citizens Vision** — the intelligence/impact layer: organisations see their
-  real community impact, reach, and engagement.
-- **Citizens Wear** — Kingdom-aligned fashion and ethical, community-rooted brands.
+  events, places, contributors, community. It is also where community needs become
+  visible: anyone can suggest a need, and Kingdom Projects is how Connect does that today.
+- **Citizens Vision** — the internal intelligence layer **for the contributing
+  organisations within the ecosystem**: they understand, coordinate and measure their
+  activities, reach, engagement and real community impact. Vision serves those
+  organisations only. It does not find needs, and it is not a public-facing platform.
+  *(Founder, 2026-11-04.)*
+- **Citizens Wear** — Kingdom-aligned fashion and ethical, community-rooted brands: a
+  collaborative marketplace of brands, designers and customers.
 - **Citizens Impact** — where community change is proposed, agreed, funded and
   officially launched; uniting large financial role players and organisations in
-  addressing community needs.
-- **Citizens Equip** — Discovery of Christian educational, equipping and training organisations
+  addressing community needs. It grows out of Kingdom Projects, which Connect already has.
+- **Citizens Learn** (first called Equip) — Christian courses, teachers and all learning
+  material, from educational, equipping and training organisations. The 2026-11-04
+  conversation also names practical skills, training and mentorship. *(Founder, 2026-11-01
+  and 2026-11-04.)*
 - **Citizens Play** — Cloud based Christian platform providing storage, resources, tools
-  games and entertainment to break the ice, share fun and share memories for Chrsitian gatherings of any size.
+  games and entertainment to break the ice, share fun and share memories for Christian gatherings of any size.
+- **Citizens Move** — active events for individuals and families: community runs, hikes,
+  prayer walks, archery, soccer, paddling, cycling and car runs. *(Founder, 2026-11-01.)*
+
+**How Connect, Impact and Vision fit** *(Founder, 2026-11-04; illustrative, not a fixed
+sequence).* Connect is the outward-facing environment: public discovery, community needs,
+suggestions and participation. Impact is the collaborative mechanism through which needs
+that were suggested become funded, resourced and carried out. Vision is the internal
+environment of the contributing organisations: managing, monitoring and measuring their
+own work, supporting them throughout. A citizen suggests a need in Connect; an organisation
+manages its response in Vision; many stakeholders collaborate through Impact.
 
 The platforms offer physical, real-world use, and each one is reachable from inside every
 other application. Examples: find and buy clothing (Wear); get ice-breakers for weekly
 fellowship groups and games nights (Play); get connected to ministry and leadership
-equipping sources, teachers and institutes (Equip). *(Founder, 2026-11-01.)*
+equipping sources, teachers and institutes (Learn). *(Founder, 2026-11-01.)*
 
 ## Culture
 
 > Scripture is the standard
 > Love, honour and serve God. Achieving this by doing so to one another (1 Corinthians 13/ John 13: 34/ 1 Peter 4: 8)
 > Seek the Kingdom and reflect the King in every action (Matthew 6:33)
-> Do so unto the least what you would unto God (Matthew 25: 25)
+> Do so unto the least what you would unto God (Matthew 25:40)
 > Worship God in everything done (Colossians 3:23 / Proverbs 16:3)
 > Develop through service and loving others in action (2 Peter 1: 5-8)
 
@@ -168,7 +186,7 @@ believer looking to serve and to the seeker just arriving?
 built to scale? Excellence here is worship and good stewardship of the people,
 time, and trust this platform carries.
 
-**5. Intuitive Service —** Is there any better way this could better benefit and
+**6. Intuitive Service —** Is there any better way this could better benefit and
 aid the user, whether citizen, admin or organisation?
 
 ### Then grade it honestly

@@ -112,7 +112,7 @@
     };
     return h('div', { className: 'bg-card rounded-2xl border border-gold/40 p-4 space-y-4' },
       h('div', { className: 'flex items-center justify-between' },
-        h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-2' }, h(Icon, { name: 'Lightbulb', size: 15, className: 'text-gold-dark' }), 'Post an Impact Idea'),
+        h('p', { className: 'text-sm font-bold text-foreground flex items-center gap-2' }, h(Icon, { name: 'Lightbulb', size: 15, className: 'text-gold-dark' }), 'Suggest a need'),
         h('button', { onClick: onClose, className: 'w-7 h-7 rounded-lg hover:bg-accent/60 flex items-center justify-center text-muted-foreground' }, h(Icon, { name: 'X', size: 15 }))),
       h(Field, { label: 'Title' }, h(Input, { value: title, onChange: (e) => setTitle(e.target.value), placeholder: 'What should we build together?' })),
       h(Field, { label: 'Description' }, h(Textarea, { value: description, rows: 3, onChange: (e) => setDescription(e.target.value), placeholder: 'Describe the need, the vision, and what collaboration looks like…' })),
@@ -126,7 +126,7 @@
         tier.fixed
           ? h('p', { className: 'text-xs text-muted-foreground' }, tier.label + ' projects always require ' + tier.min.toLocaleString() + ' votes and are reviewed by an admin once reached.')
           : h('input', { type: 'range', min: tier.min, max: tier.max, value: goal, onChange: (e) => setThreshold(Number(e.target.value)), className: 'w-full accent-[#836100]' })),
-      h(Button, { variant: 'gold', className: 'w-full', icon: 'Send', disabled: !valid || busy, onClick: submit }, busy ? 'Posting…' : 'Post Idea'));
+      h(Button, { variant: 'gold', className: 'w-full', icon: 'Send', disabled: !valid || busy, onClick: submit }, busy ? 'Sending…' : 'Suggest this need'));
   }
 
   function CommunityPage() {
@@ -136,16 +136,24 @@
     const map = { voting: 'voting', process: 'inProcess', confirmed: 'confirmed' };
     const list = ideas.filter((i) => i.status === map[tab]);
     return h('div', { className: 'flex-1 flex flex-col overflow-hidden bg-background', 'data-screen': 'community' },
-      h(Header, { icon: 'Lightbulb', title: 'Kingdom Projects', sub: 'Community ideas, voting & collaboration',
-        right: h(Button, { variant: 'gold', size: 'sm', icon: 'Plus', onClick: () => setComposing((c) => !c) }, 'Post Idea') }),
+      h(Header, { icon: 'Lightbulb', title: 'Kingdom Projects', sub: 'Suggest a need. Rally people. Launch it together.',
+        right: h(Button, { variant: 'gold', size: 'sm', icon: 'Plus', onClick: () => setComposing((c) => !c) }, 'Suggest a need') }),
       h('div', { className: 'px-4 sm:px-5 py-3 border-b border-border' }, h(Segmented, { options: [{ value: 'voting', label: 'Voting Now' }, { value: 'process', label: 'In Process' }, { value: 'confirmed', label: 'Confirmed' }], value: tab, onChange: setTab })),
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8 px-4 sm:px-5 py-4' },
         h('div', { className: 'max-w-2xl mx-auto space-y-4 fade-in' },
           composing && h(IdeaComposer, { onClose: () => setComposing(false) }),
-          tab === 'voting' && h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark mb-1' },
-            h(Icon, { name: 'Info', size: 15, className: 'shrink-0 mt-0.5' }),
-            h('p', { className: 'text-xs leading-relaxed' }, 'Ideas that reach their vote goal become collaborative Kingdom Projects. Voting polls also appear on the Discover map.')),
-          list.length === 0 ? h(Empty, { icon: 'Lightbulb', title: 'Nothing here yet', sub: tab === 'voting' ? 'Be the first — post an Impact Idea for your community.' : undefined }) : list.map((i) => h(IdeaCard, { key: i.id, idea: i })))));
+          // How a need becomes a Kingdom Project (founder, 2026-11-04: "Suggest a need" IS this feature). The steps are
+          // what the code does: votes to the goal (migration 130), voters told + the author leads + a real kickoff date
+          // + voters auto-connected (migration 132), larger tiers reviewed by an admin first.
+          tab === 'voting' && h('div', { className: 'p-3 rounded-xl bg-accent/60 text-gold-dark mb-1 space-y-2', 'data-kp-explainer': '' },
+            h('div', { className: 'flex items-start gap-2' },
+              h(Icon, { name: 'Info', size: 15, className: 'shrink-0 mt-0.5' }),
+              h('p', { className: 'text-xs font-bold leading-relaxed' }, 'See a need in your community? Suggest it and let others rally around it.')),
+            h('ol', { className: 'text-xs leading-relaxed space-y-1 pl-6 list-decimal' },
+              h('li', null, 'People vote to collaborate until the goal is reached. Larger ideas are reviewed by an admin first.'),
+              h('li', null, 'It becomes a Kingdom Project and everyone who voted is told. Whoever suggested it leads it: they pick the kickoff date, and the voters are connected.')),
+            h('p', { className: 'text-xs leading-relaxed pl-6' }, 'Voting polls also appear on the Discover map.')),
+          list.length === 0 ? h(Empty, { icon: 'Lightbulb', title: 'Nothing here yet', sub: tab === 'voting' ? 'Be the first — suggest a need in your community.' : undefined }) : list.map((i) => h(IdeaCard, { key: i.id, idea: i })))));
   }
 
   // ── Notifications ──

@@ -1,14 +1,15 @@
 /*
- * Citizens front door. White, black and gold, about 60 / 30 / 10: white is the page, black is the banner, the
- * buttons and the footer, gold is the accent (rules, the "coming soon" badge, focus on black).
+ * Citizens front door. White, black and gold, about 60 / 30 / 10: white is the page, black is the hero, the bands and
+ * the footer, gold is the accent (rules, the Join pill, badges, icons and outlines on black).
  *
  * Contrast (WCAG AA needs 4.5 for text, 3 for large text and interface lines; test/design.test.ts checks every
- * pair below from these very values):
+ * pair below from these very values, and caps the gold glows on the tile art so that white text stays above 4.5):
  *   ink on white 18.9   white on black 19.5   gold on black 11.4   ink on gold 10.9
  * Gold is never used for text on white (the design system's rule), only as a fill with an ink label, a rule, or text
- * on black.
+ * and icons on black.
  *
- * No external fonts, no images, no script: the strict Content-Security-Policy allows only this stylesheet.
+ * No external fonts, no images in the stylesheet, no script: the strict Content-Security-Policy allows only this file.
+ * The art on the tiles and the hero is drawn here with gradients; a real photograph goes in as an <img> (see content.ts).
  */
 
 :root {
@@ -19,10 +20,14 @@
   --muted: #3d3d3d;
   --on-black-soft: #e6e6e6;
   --line: #d9d9d9;
+  --paper: #f7f5ef;
+  --slab: #161616;
+  --slab-warm: #2a2312;
+  --slab-cool: #121c26;
   --radius: 12px;
   --gap: clamp(1rem, 3vw, 1.5rem);
-  --display: Georgia, 'Times New Roman', serif;
-  --body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --serif: Georgia, 'Times New Roman', serif;
 }
 
 *,
@@ -40,20 +45,36 @@ body {
   margin: 0;
   background: var(--white);
   color: var(--ink);
-  font-family: var(--body);
+  font-family: var(--sans);
   font-size: 1rem;
   line-height: 1.6;
 }
 
+img,
+svg {
+  max-width: 100%;
+}
+
 .wrap {
   width: 100%;
-  max-width: 68rem;
+  max-width: 72rem;
   margin-inline: auto;
   padding-inline: clamp(1rem, 4vw, 2rem);
 }
 
+a,
+summary {
+  -webkit-tap-highlight-color: rgba(242, 189, 34, 0.3);
+}
+
 a {
   color: inherit;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
 }
 
 :focus-visible {
@@ -61,17 +82,32 @@ a {
   outline-offset: 3px;
 }
 
-.site-header :focus-visible,
-.site-footer :focus-visible,
-.hero :focus-visible {
+.on-dark :focus-visible {
   outline-color: var(--gold);
+}
+
+.on-dark {
+  background: var(--black);
+  color: var(--white);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .skip-link {
   position: absolute;
   inset-inline-start: 0.5rem;
   top: -4rem;
-  z-index: 10;
+  z-index: 60;
   padding: 0.75rem 1rem;
   background: var(--gold);
   color: var(--ink);
@@ -83,68 +119,30 @@ a {
   top: 0.5rem;
 }
 
-/* The black banner: brand and slogan. */
-.site-header {
-  background: var(--black);
-  color: var(--white);
-  border-bottom: 4px solid var(--gold);
-}
-
-.site-header .wrap {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.25rem 1.5rem;
-  padding-block: 1rem;
-}
-
-.brand {
-  font-family: var(--display);
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-}
-
-.brand:hover {
-  text-decoration: underline;
-  text-decoration-color: var(--gold);
-  text-underline-offset: 6px;
-}
-
-.slogan {
-  margin: 0;
-  color: var(--gold);
-  font-size: 0.95rem;
-}
-
-main {
-  padding-block: clamp(1.5rem, 5vw, 3rem);
-}
-
+/* Headlines are a plain, sharp sans (the design); only the Scripture is set in a serif. */
 h1,
 h2,
 h3 {
-  font-family: var(--display);
-  line-height: 1.2;
+  font-family: var(--sans);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
   margin: 0 0 0.75rem;
 }
 
 h1 {
-  font-size: clamp(2rem, 6vw, 3.25rem);
+  font-size: clamp(2.4rem, 6.5vw, 4rem);
 }
 
 h2 {
-  font-size: clamp(1.4rem, 3.5vw, 1.9rem);
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
   margin-top: clamp(2rem, 6vw, 3.5rem);
 }
 
 h3 {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 p {
@@ -160,26 +158,8 @@ p {
   text-transform: uppercase;
 }
 
-/* The hero is a black block with a gold rule: the 30 and the 10 of the palette. */
-.hero {
-  background: var(--black);
-  color: var(--white);
-  border-radius: var(--radius);
-  border-top: 6px solid var(--gold);
-  padding: clamp(1.5rem, 5vw, 3rem);
-}
-
-.hero .eyebrow {
+.on-dark .eyebrow {
   color: var(--gold);
-}
-
-.hero .lead {
-  color: var(--white);
-}
-
-.hero p:last-child {
-  margin-bottom: 0;
-  color: var(--on-black-soft);
 }
 
 .lead {
@@ -187,59 +167,175 @@ p {
   line-height: 1.45;
 }
 
-.cards {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: var(--gap);
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+.main {
+  display: block;
 }
 
-.card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+/* ---------- Header and menus ---------- */
+
+.site-header {
+  position: relative;
+  z-index: 30;
   background: var(--white);
-  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+}
+
+.header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding-block: 0.5rem;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.brand-crown {
+  display: block;
+  height: 1.7rem;
+  width: auto;
+}
+
+.brand-name {
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.nav {
+  position: relative;
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 0.25rem;
+}
+
+.nav-group > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  list-style: none;
+}
+
+.nav-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.chevron {
+  width: 1rem;
+  height: 1rem;
+}
+
+.nav-group[open] .chevron {
+  transform: rotate(180deg);
+}
+
+/* On a phone the panel spans the whole menu row; from 48rem it hangs under its own button. */
+.nav-panel {
+  list-style: none;
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  z-index: 40;
+  margin: 0;
+  padding: 0.5rem;
+  background: var(--white);
   border: 1px solid var(--ink);
-  border-top: 6px solid var(--gold);
-  border-radius: var(--radius);
-  padding: 1.25rem;
+  border-top: 4px solid var(--gold);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.2);
 }
 
-.card p {
-  color: var(--muted);
+.nav-panel a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  text-decoration: none;
 }
 
-.card .button {
-  margin-top: auto;
+.nav-panel a:hover {
+  background: var(--ink);
+  color: var(--white);
 }
 
-.card-soon {
-  border-style: dashed;
-  border-top-style: solid;
+.nav-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
 }
 
-.badge {
-  display: inline-block;
-  margin: 0 0 0.75rem;
-  padding: 0.125rem 0.75rem;
+.nav-search svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.join {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-inline-start: auto;
+  padding: 0.5rem 1.5rem;
   background: var(--gold);
   color: var(--ink);
   border-radius: 999px;
-  font-size: 0.875rem;
   font-weight: 700;
+  text-decoration: none;
 }
+
+.join:hover {
+  background: var(--ink);
+  color: var(--white);
+}
+
+@media (min-width: 48rem) {
+  .nav {
+    flex: 0 1 auto;
+  }
+
+  .nav-group {
+    position: relative;
+  }
+
+  .nav-panel {
+    inset-inline: auto;
+    inset-inline-start: 0;
+    min-width: 17rem;
+  }
+
+  .join {
+    margin-inline-start: 0.75rem;
+  }
+}
+
+/* ---------- Buttons, badges and small links ---------- */
 
 /* A link that looks like a button: at least 44 px tall, ink fill, white label. */
 .button {
   display: inline-flex;
   align-items: center;
+  gap: 0.5rem;
   min-height: 44px;
   padding: 0.5rem 1.25rem;
   background: var(--ink);
   color: var(--white);
+  border: 2px solid var(--ink);
   border-radius: var(--radius);
   font-weight: 600;
   text-decoration: none;
@@ -248,14 +344,533 @@ p {
 .button:hover {
   background: var(--gold);
   color: var(--ink);
+  border-color: var(--gold);
 }
 
-.soon {
-  padding-block: clamp(1rem, 4vw, 2.5rem);
+.button-outline {
+  background: transparent;
+  color: var(--ink);
+  border-radius: 999px;
 }
+
+.on-dark .button-outline {
+  color: var(--gold);
+  border-color: var(--gold);
+}
+
+.on-dark .button-outline:hover {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+.button-quiet {
+  background: var(--white);
+  color: var(--ink);
+}
+
+.arrow {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.text-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.3em;
+}
+
+.badge {
+  display: inline-block;
+  margin: 0;
+  padding: 0.125rem 0.75rem;
+  background: var(--gold);
+  color: var(--ink);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0.1rem 0.75rem;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+a.chip {
+  min-height: 44px;
+}
+
+a.chip:hover {
+  background: var(--ink);
+  color: var(--white);
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero-inner {
+  position: relative;
+  z-index: 2;
+  padding-block: clamp(2.5rem, 8vw, 5.5rem);
+}
+
+.hero-text {
+  max-width: 28rem;
+}
+
+.hero-rule {
+  display: block;
+  width: 5.5rem;
+  height: 2px;
+  margin-bottom: 1.5rem;
+  background: var(--gold);
+}
+
+.hero h1 {
+  margin: 0 0 1rem;
+}
+
+.hero-verbs {
+  margin: 0 0 1.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--on-black-soft);
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+}
+
+.hero-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.35em;
+}
+
+/* The drawn art: dark, a gold glow and faint diagonals. A photograph, once there is one, fills it. */
+.hero-art {
+  position: relative;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 12rem;
+  overflow: hidden;
+  background: radial-gradient(60% 80% at 62% 38%, rgba(242, 189, 34, 0.28), transparent 70%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.035) 0 2px, transparent 2px 22px),
+    linear-gradient(135deg, #1f1b12 0%, #0e0e0e 70%);
+  clip-path: polygon(0 26%, 100% 0, 100% 100%, 0 100%);
+}
+
+.hero-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-crown {
+  position: relative;
+  width: min(14rem, 56%);
+  height: auto;
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
+}
+
+@media (min-width: 48rem) {
+  .hero-art {
+    position: absolute;
+    inset: 0 0 0 55%;
+    height: auto;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 38% 100%);
+  }
+
+  /* The gold wedge where the slanted edge meets the floor of the hero. */
+  .hero::after {
+    content: '';
+    position: absolute;
+    z-index: 1;
+    bottom: 0;
+    left: calc(55% + 0.38 * 45% - 9rem);
+    width: 9rem;
+    height: 6rem;
+    background: var(--gold);
+    clip-path: polygon(0 100%, 100% 100%, 100% 0);
+  }
+}
+
+@media (min-width: 64rem) {
+  .hero-art {
+    inset: 0 0 0 48%;
+  }
+
+  .hero::after {
+    left: calc(48% + 0.38 * 52% - 9rem);
+  }
+}
+
+/* ---------- Introduction ---------- */
+
+.intro {
+  padding-top: clamp(2rem, 6vw, 3.5rem);
+  text-align: center;
+}
+
+.intro p {
+  margin-inline: auto;
+  color: var(--muted);
+}
+
+.intro .intro-lead {
+  color: var(--ink);
+  font-size: clamp(1.2rem, 2.6vw, 1.6rem);
+  line-height: 1.4;
+}
+
+/* ---------- The ecosystem tiles ---------- */
+
+/* White space under the tiles, so the black Impact tile never runs into the black band below it. */
+.ecosystem {
+  padding-bottom: clamp(1.5rem, 5vw, 3rem);
+}
+
+.ecosystem h2 {
+  margin-top: clamp(1.5rem, 5vw, 2.5rem);
+}
+
+.section-sub {
+  margin-bottom: 1.25rem;
+  color: var(--muted);
+}
+
+.tiles {
+  --slant: 0rem;
+  --tile-gap: 0.5rem;
+  --tile-h: 8.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--tile-gap);
+  list-style: none;
+}
+
+.tile {
+  position: relative;
+}
+
+/* The link is a plain rectangle: its focus ring is never clipped. Only the art and the text catch the pointer. */
+.tile-link {
+  position: relative;
+  display: block;
+  color: var(--white);
+  text-decoration: none;
+  pointer-events: none;
+}
+
+.tile-art,
+.tile-body {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.tile-art {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--art);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 1.25rem), calc(100% - 2.5rem) 100%, 0 100%);
+  --art: linear-gradient(160deg, var(--slab-warm), var(--slab));
+}
+
+.tile-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.55;
+}
+
+/* The text sits in the flow at the bottom, so a tile that needs more room grows instead of spilling out. */
+.tile-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: var(--tile-h);
+  padding: 1.1rem 1rem 1.1rem calc(var(--slant) + 1rem);
+}
+
+.tile-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.tile-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-bottom: 0.35rem;
+  color: var(--gold);
+}
+
+.tile-title {
+  font-size: 1.5rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tile-verbs {
+  color: var(--on-black-soft);
+}
+
+/* What the tile says when it is hovered or focused on a wide screen with a pointer (see the media query below). */
+.tile-more {
+  position: absolute;
+  /* Room for the slant on both sides: the lower right corner of a tile is cut in by the same amount. */
+  inset: 1.1rem calc(var(--slant) + 0.75rem) 1.1rem calc(var(--slant) + 1rem);
+  display: none;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: var(--on-black-soft);
+}
+
+.tile-more-title {
+  color: var(--white);
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tile .badge {
+  position: absolute;
+  top: 0.85rem;
+  inset-inline-end: calc(var(--slant) + 0.85rem);
+  z-index: 1;
+}
+
+.tile-link:hover .tile-art,
+.tile-link:focus-visible .tile-art {
+  filter: brightness(1.3);
+}
+
+.tile-link:hover .tile-title,
+.tile-link:focus-visible .tile-title {
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.3em;
+}
+
+.tile:focus-within {
+  z-index: 2;
+}
+
+/* The drawn art of each platform: a dark slab with its own faint tint or texture. */
+.tile-connect .tile-art {
+  --art: radial-gradient(90% 100% at 15% 100%, rgba(242, 189, 34, 0.26), transparent 60%),
+    linear-gradient(160deg, var(--slab-warm), var(--slab));
+}
+
+.tile-vision .tile-art {
+  --art: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 1px, transparent 1px 24px),
+    linear-gradient(160deg, var(--slab-cool), var(--slab));
+}
+
+.tile-wear .tile-art {
+  --art: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0 2px, transparent 2px 30px),
+    linear-gradient(160deg, #1c1c1c, var(--slab));
+}
+
+.tile-learn .tile-art {
+  --art: radial-gradient(80% 90% at 85% 0%, rgba(242, 189, 34, 0.22), transparent 60%),
+    linear-gradient(160deg, var(--slab-warm), var(--slab));
+}
+
+.tile-play .tile-art {
+  --art: radial-gradient(70% 90% at 80% 100%, rgba(120, 160, 220, 0.18), transparent 60%),
+    linear-gradient(160deg, var(--slab-cool), var(--slab));
+}
+
+.tile-move .tile-art {
+  --art: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 3px, transparent 3px 26px),
+    linear-gradient(160deg, #1b1b1b, var(--slab));
+}
+
+.tile-impact .tile-art {
+  --art: linear-gradient(0deg, rgba(242, 189, 34, 0.32), transparent 55%),
+    linear-gradient(180deg, #17120a, #0b0b0b);
+}
+
+@media (min-width: 48rem) {
+  .tiles {
+    --slant: clamp(1.5rem, 4vw, 2.75rem);
+    --tile-h: clamp(10.5rem, 17vw, 12rem);
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--tile-gap) 0;
+  }
+
+  /* Neighbours in a row overlap by the slant, less the gap, so the diagonal white gap is one width all the way. */
+  .tile:nth-child(3n + 2),
+  .tile:nth-child(3n) {
+    margin-inline-start: calc(var(--tile-gap) - var(--slant));
+  }
+
+  .tile:nth-child(3n + 1) .tile-art {
+    clip-path: polygon(0 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+  }
+
+  .tile:nth-child(3n + 2) .tile-art {
+    clip-path: polygon(var(--slant) 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+  }
+
+  .tile:nth-child(3n) .tile-art {
+    clip-path: polygon(var(--slant) 0, 100% 0, 100% 100%, 0 100%);
+  }
+
+  /* A lone last tile spans the row, with one corner cut and its text centred. */
+  .tile.tile-wide {
+    grid-column: 1 / -1;
+    margin-inline-start: 0;
+  }
+
+  .tile.tile-wide .tile-art {
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 2.5rem), calc(100% - 2.5rem) 100%, 0 100%);
+  }
+
+  .tile.tile-wide .tile-body {
+    min-height: 8.5rem;
+    align-items: center;
+    padding-inline: 1.5rem;
+    text-align: center;
+  }
+
+  .tile.tile-wide .tile-main {
+    align-items: center;
+  }
+
+  .tile.tile-wide .tile-more {
+    inset-inline: 1.5rem;
+    align-items: center;
+  }
+}
+
+@media (hover: hover) and (min-width: 64rem) {
+  .tile-link:hover .tile-main,
+  .tile-link:focus-visible .tile-main {
+    opacity: 0;
+  }
+
+  .tile-link:hover .tile-more,
+  .tile-link:focus-visible .tile-more {
+    display: flex;
+  }
+}
+
+/* ---------- The interconnected-community band ---------- */
+
+.band {
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(50% 70% at 78% 50%, rgba(242, 189, 34, 0.12), transparent 70%),
+    linear-gradient(135deg, #131313 0%, var(--black) 60%);
+}
+
+.band-grid {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+  padding-block: clamp(2rem, 7vw, 4.5rem);
+}
+
+.band h2 {
+  margin-top: 0;
+  font-size: clamp(2rem, 5vw, 3.1rem);
+}
+
+.band p {
+  color: var(--on-black-soft);
+}
+
+@media (min-width: 48rem) {
+  .band-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.diagram {
+  display: block;
+  width: 100%;
+  max-width: 26rem;
+  height: auto;
+  margin-inline: auto;
+  color: var(--gold);
+}
+
+.diagram-ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  opacity: 0.6;
+}
+
+.diagram-ring-core {
+  opacity: 0.9;
+}
+
+.diagram-spoke {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 6;
+  opacity: 0.55;
+}
+
+.diagram-core {
+  fill: var(--black);
+}
+
+.diagram-node {
+  fill: var(--black);
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+/* ---------- Scripture and the closing line ---------- */
 
 .scripture {
-  margin: clamp(2rem, 6vw, 3.5rem) 0 0;
+  max-width: 52rem;
+  margin: clamp(2rem, 6vw, 3.5rem) auto;
   padding: 1.25rem 1.5rem;
   border-inline-start: 6px solid var(--gold);
 }
@@ -265,40 +880,512 @@ p {
 }
 
 .scripture p {
-  font-family: var(--display);
+  font-family: var(--serif);
   font-size: 1.15rem;
   font-style: italic;
   max-width: 52rem;
 }
 
 .scripture figcaption {
+  margin-bottom: 0.5rem;
   font-weight: 700;
 }
 
+.part-to-play {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  max-width: none;
+  margin: 0;
+  padding: clamp(1.5rem, 4vw, 2.5rem) clamp(1rem, 4vw, 2rem) clamp(2rem, 5vw, 3.5rem);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.part-to-play::before,
+.part-to-play::after {
+  content: '';
+  flex: 1 1 2rem;
+  max-width: 14rem;
+  height: 2px;
+  background: var(--gold);
+}
+
+/* ---------- Footer ---------- */
+
 .site-footer {
-  background: var(--black);
-  color: var(--white);
   border-top: 4px solid var(--gold);
 }
 
-.site-footer .wrap {
-  padding-block: 1.5rem;
+.footer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+  padding-block: 1.25rem;
 }
 
 .site-footer p {
   margin: 0;
 }
 
+.site-footer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1.25rem;
+  list-style: none;
+}
+
+.site-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--gold);
+  text-underline-offset: 0.3em;
+}
+
+/* ---------- Inner pages ---------- */
+
+.page-head {
+  padding-block: clamp(2rem, 7vw, 4rem);
+  border-bottom: 4px solid var(--gold);
+}
+
+.page-head h1 {
+  margin-bottom: 0.75rem;
+}
+
+.page-head .lead {
+  margin: 0;
+  color: var(--on-black-soft);
+}
+
+.prose {
+  padding-block: clamp(1.5rem, 5vw, 3rem);
+}
+
+.prose h2:first-child {
+  margin-top: 0;
+}
+
+.ticks {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0 1.5rem;
+  list-style: none;
+}
+
+.ticks li {
+  position: relative;
+  max-width: 44rem;
+  padding-inline-start: 1.6rem;
+}
+
+.ticks li::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0.55em;
+  width: 0.7rem;
+  height: 0.7rem;
+  background: var(--gold);
+  border-radius: 50%;
+}
+
+.callout {
+  margin-block: 2rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background: var(--paper);
+  border-inline-start: 6px solid var(--gold);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.callout h2 {
+  margin-top: 0;
+}
+
+.callout p {
+  color: var(--muted);
+}
+
+/* ---------- The ecosystem page ---------- */
+
+.platforms {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 2.5rem);
+  margin-top: 2rem;
+  list-style: none;
+}
+
+.platform {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border: 1px solid var(--ink);
+  border-top: 6px solid var(--gold);
+  border-radius: var(--radius);
+}
+
+.platform-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.platform-head h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 3.5vw, 1.9rem);
+}
+
+.platform-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  background: var(--black);
+  color: var(--white);
+  border: 2px solid var(--gold);
+  border-radius: 50%;
+}
+
+.platform-icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.platform-verbs {
+  margin: 0.6rem 0 1rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.platform h3 {
+  margin-top: 1.25rem;
+}
+
+.fits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 1.25rem;
+  max-width: none;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* ---------- How it works ---------- */
+
+.steps {
+  display: grid;
+  gap: 1.5rem;
+  margin: 2rem 0;
+  list-style: none;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem 1.25rem;
+  align-items: start;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  background: var(--gold);
+  color: var(--ink);
+  border-radius: 50%;
+  font-weight: 700;
+}
+
+.step h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.step .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
+}
+
+.roles {
+  margin: 1rem 0;
+  border: 1px solid var(--ink);
+  border-radius: var(--radius);
+}
+
+.roles div {
+  display: grid;
+  gap: 0.15rem 1.5rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.roles div:last-child {
+  border-bottom: 0;
+}
+
+.roles dt {
+  font-weight: 700;
+}
+
+.roles dd {
+  margin: 0;
+}
+
+@media (min-width: 40rem) {
+  .roles div {
+    grid-template-columns: 9rem 1fr;
+  }
+}
+
+.kp-steps {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0;
+  list-style: none;
+  counter-reset: kp;
+}
+
+.kp-steps li {
+  position: relative;
+  max-width: 44rem;
+  padding-inline-start: 2.75rem;
+  counter-increment: kp;
+}
+
+.kp-steps li::before {
+  content: counter(kp);
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  background: var(--ink);
+  color: var(--white);
+  border-radius: 50%;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.kp-steps h3 {
+  margin: 0 0 0.15rem;
+}
+
+.kp-steps p {
+  margin: 0;
+}
+
+/* ---------- Philosophy ---------- */
+
+.words {
+  display: grid;
+  gap: 0.25rem;
+  margin: 1rem 0;
+}
+
+.words dt {
+  margin-top: 0.75rem;
+  font-weight: 700;
+}
+
+.words dd {
+  max-width: 44rem;
+  margin: 0;
+}
+
+.closing {
+  padding-block: clamp(1.5rem, 5vw, 2.5rem);
+}
+
+/* ---------- Get involved ---------- */
+
+.audiences {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: var(--gap);
+  margin: 2rem 0;
+  list-style: none;
+}
+
+.audience {
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  border: 1px solid var(--ink);
+  border-top: 6px solid var(--gold);
+  border-radius: var(--radius);
+}
+
+.audience h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+}
+
+.audience p {
+  color: var(--muted);
+}
+
+.doors {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  list-style: none;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+
+/* ---------- Coming-soon pages ---------- */
+
+.soon {
+  padding-block: clamp(2rem, 7vw, 4rem);
+  border-bottom: 4px solid var(--gold);
+}
+
+.soon-grid {
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+}
+
+.soon h1 {
+  margin: 0.75rem 0 0.5rem;
+}
+
+.soon .lead {
+  margin: 0;
+  color: var(--on-black-soft);
+}
+
+.soon-verbs {
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--on-black-soft);
+}
+
+.on-dark .soon-icon {
+  width: clamp(5rem, 16vw, 9rem);
+  height: auto;
+  color: var(--gold);
+}
+
+@media (min-width: 48rem) {
+  .soon-grid {
+    grid-template-columns: 1fr auto;
+  }
+}
+
+.progression {
+  display: grid;
+  gap: 0.75rem;
+  margin: 1.25rem 0;
+  list-style: none;
+}
+
+.progression li {
+  padding: 1rem;
+  border: 1px solid var(--ink);
+  border-top: 6px solid var(--gold);
+  border-radius: var(--radius);
+}
+
+.progression li.later {
+  border-style: dashed;
+  border-top-style: solid;
+}
+
+.progression h3 {
+  margin: 0 0 0.25rem;
+}
+
+.progression p {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.progression .tag {
+  display: block;
+  margin-top: 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+@media (min-width: 40rem) {
+  .progression {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* ---------- Motion (only for people who have not asked for less) ---------- */
+
+@media (prefers-reduced-motion: no-preference) {
+  .tile-art {
+    transition: filter 0.25s ease;
+  }
+
+  .chevron {
+    transition: transform 0.2s ease;
+  }
+
+  .diagram-spoke {
+    animation: flow 9s linear infinite;
+  }
+
+  @keyframes flow {
+    to {
+      stroke-dashoffset: -60;
+    }
+  }
+}
+
+/* ---------- Other modes ---------- */
+
 @media (forced-colors: active) {
   .button,
   .badge,
-  .card {
+  .chip,
+  .join,
+  .platform,
+  .audience,
+  .tile-link {
     border: 1px solid CanvasText;
   }
 }
 
 @media print {
-  .skip-link {
+  .skip-link,
+  .nav {
     display: none;
   }
 }

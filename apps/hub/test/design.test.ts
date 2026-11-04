@@ -52,6 +52,17 @@ describe('palette', () => {
     ['ink', 'gold', 4.5, 'button label on hover'],
     ['ink', 'white', 3, 'focus ring on white (needs 3 as an interface line)'],
     ['gold', 'black', 3, 'gold rules on the black bands'],
+    ['ink', 'paper', 4.5, 'text in the soft callouts'],
+    ['muted', 'paper', 4.5, 'secondary text in the soft callouts'],
+    ['white', 'slab', 4.5, 'tile name on the drawn art'],
+    ['white', 'slab-warm', 4.5, 'tile name on the warm art'],
+    ['white', 'slab-cool', 4.5, 'tile name on the cool art'],
+    ['on-black-soft', 'slab', 4.5, 'tile verbs and purpose on the drawn art'],
+    ['on-black-soft', 'slab-warm', 4.5, 'tile verbs and purpose on the warm art'],
+    ['on-black-soft', 'slab-cool', 4.5, 'tile verbs and purpose on the cool art'],
+    ['gold', 'slab', 3, 'tile pictograms on the drawn art (an interface graphic needs 3)'],
+    ['gold', 'slab-warm', 3, 'tile pictograms on the warm art'],
+    ['gold', 'slab-cool', 3, 'tile pictograms on the cool art'],
   ];
 
   it.each(PAIRS)('%s on %s is at least %s:1 (%s)', (fg, bg, min) => {
@@ -68,9 +79,30 @@ describe('palette', () => {
     for (const { selector, body } of rules) {
       if (!/(^|;|\s)color:\s*var\(--gold\)/.test(body)) continue;
       expect(selector, `gold text in "${selector}" must sit on a black band`).toMatch(
-        /\.slogan|\.hero|\.eyebrow|:focus/,
+        /\.slogan|\.hero|\.eyebrow|:focus|\.on-dark|\.tile-icon|\.diagram/,
       );
     }
+  });
+
+  it('keeps the gold glows on the drawn art faint (alpha 0.32 at most), so white text on them stays above 4.5:1', () => {
+    // Worst case: gold at alpha a over the lightest slab (#2a2312). At 0.32 white text is still about 7:1.
+    const alphas = [...css.matchAll(/rgba\(\s*242\s*,\s*189\s*,\s*34\s*,\s*([0-9.]+)\s*\)/g)].map(
+      (m) => Number(m[1]),
+    );
+    expect(alphas.length).toBeGreaterThan(0);
+    for (const alpha of alphas) expect(alpha).toBeLessThanOrEqual(0.32);
+    const base = tokens()['slab-warm'] as string;
+    const over = (channel: number, glow: number) => Math.round(glow * 0.32 + channel * (1 - 0.32));
+    const rgb = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16));
+    const glowed = `#${[
+      over(rgb[0] as number, 242),
+      over(rgb[1] as number, 189),
+      over(rgb[2] as number, 34),
+    ]
+      .map((v) => v.toString(16).padStart(2, '0'))
+      .join('')}`;
+    expect(contrast('#ffffff', glowed)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast('#e6e6e6', glowed)).toBeGreaterThanOrEqual(4.5);
   });
 });
 
@@ -82,6 +114,27 @@ describe('the stylesheet', () => {
   it('keeps every tap target at least 44 px tall', () => {
     expect(css).toMatch(/\.button\s*{[^}]*min-height:\s*44px/);
     expect(css).toMatch(/\.brand\s*{[^}]*min-height:\s*44px/);
+    // The menus, the search and Join buttons, the footer and in-text links and the chips that link somewhere.
+    for (const selector of [
+      '\\.nav-group > summary',
+      '\\.nav-panel a',
+      '\\.join',
+      '\\.text-link',
+      '\\.hero-link',
+      '\\.site-footer a',
+      'a\\.chip',
+    ]) {
+      expect(css, selector).toMatch(new RegExp(`${selector}\\s*{[^}]*min-height:\\s*44px`));
+    }
+    expect(css).toMatch(/\.nav-search\s*{[^}]*width:\s*44px;[^}]*height:\s*44px/);
+  });
+
+  it('moves nothing for people who asked for less motion: every animation and transition is inside prefers-reduced-motion: no-preference', () => {
+    const marker = '@media (prefers-reduced-motion: no-preference)';
+    const at = css.indexOf(marker);
+    expect(at).toBeGreaterThan(-1);
+    const before = css.slice(0, at);
+    expect(before).not.toMatch(/animation\s*:|transition\s*:|@keyframes/);
   });
 
   it('shows a visible keyboard focus ring', () => {
@@ -103,6 +156,12 @@ describe('icons', () => {
       expect(copy.equals(read('../../connect/public/icons/icon.svg'))).toBe(true);
     },
   );
+
+  it('citizens-crown.png is the brand crown, byte for byte as Connect and Wear ship it (copy it again when it changes)', () => {
+    const crown = read('../public/citizens-crown.png');
+    expect(crown.subarray(0, 4).toString('hex')).toBe('89504e47');
+    expect(crown.equals(read('../../connect/src/frontend/assets/citizens-crown.png'))).toBe(true);
+  });
 
   it('favicon.ico is a real icon holding 16, 32 and 48 pixel PNGs', () => {
     const ico = read('../public/favicon.ico');
