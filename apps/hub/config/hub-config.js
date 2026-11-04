@@ -14,8 +14,18 @@ const {
   appOrigin,
 } = require('@citizens/ecosystem');
 
-/** The pages the front door itself serves and lists in its sitemap. Coming-soon pages are noindex, so not here. */
-const HUB_PAGES = Object.freeze([PATH_ROOT]);
+/**
+ * The pages the front door itself serves and lists in its sitemap: the landing page and its four content pages
+ * (src/lib/content.ts `PAGES` names the same four; a test compares them). Coming-soon pages are noindex, so not here.
+ * None of these may share a slug with an app (built or coming soon): a test checks that too.
+ */
+const HUB_PAGES = Object.freeze([
+  PATH_ROOT,
+  `${PATH_ROOT}/ecosystem`,
+  `${PATH_ROOT}/how-it-works`,
+  `${PATH_ROOT}/philosophy`,
+  `${PATH_ROOT}/get-involved`,
+]);
 
 /**
  * One external rewrite pair per BUILT app: /citizens/<slug> and /citizens/<slug>/:path* go to the same path on the
