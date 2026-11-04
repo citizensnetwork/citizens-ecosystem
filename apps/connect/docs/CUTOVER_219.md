@@ -1,10 +1,10 @@
 # Cutover to 219.co.za: the runbook (C39 PR D, A19)
 
 Moves the three apps onto one address each: `219.co.za/citizens/connect`, `/citizens/vision`, `/citizens/wear`
-(`/learn`, `/play`, `/move`, `/impact` show a "coming soon" page). **Steps 1 to 6 have not been done** (most
-preconditions have, see below). The code is merged (`@citizens/ecosystem`, the prefix in every app, the front door
-`apps/hub`, the old-address rules); production still serves every app from its own root, and Claude changes no Vercel
-setting, domain, variable or DNS record without a clear yes in chat for that step.
+(`/learn`, `/play`, `/move`, `/impact` show a "coming soon" page). **Steps 1 to 4 were done on 2026-11-03** (in the order
+1, 3, 2, 4; session journal, issue #323): `219.co.za` is the front door and every app answers under its prefix. **Step 5
+(the founder's sign-in walk, then Supabase's Site URL and the Apps Script `INTAKE_URL`) and Step 6's Check are still to
+do.** Claude changes no Vercel setting, domain, variable or DNS record without a clear yes in chat for that step.
 
 Written so that a person who does not write code can follow it. Each step has the same four parts: **Why**, **Do**,
 **Check**, **Roll back**. Do the steps in this order: **Step 1, Step 3, Step 2, Step 4, Step 5, then Step 6's Check** (decided by the
@@ -20,8 +20,9 @@ one until the Check of the one before passes.
 > no token) and exits 1 only on a `FAIL`. Run it before Step 1, after Step 1 with `--hub-url https://citizens-ecosystem-hub.vercel.app`, and after Step 4
 > with `--phase after`.
 
-**State on 2026-11-01:** P1 done and checked; P2 to P4 reported done by the founder; P5 decided; **P6 not satisfied for Wear**;
-Vercel is refusing some deployments (see "Deployment budget"); Steps 1 to 6 not started.
+**State on 2026-11-04:** P1 to P6 done (P2 to P4 on the founder's word); Steps 1 to 4 done on 2026-11-03; the pre-flight
+`--phase after` gave 36 PASS, 0 FAIL on 2026-11-04 at 19:20 UTC. Left: Step 5 and Step 6's Check, and Step 3's command 7 (a POST,
+run by hand).
 
 ## What people will notice
 

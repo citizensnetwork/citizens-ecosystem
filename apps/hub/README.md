@@ -16,6 +16,8 @@ The one project that will own the shared domain, `219.co.za`. Every Citizens app
 219.co.za/citizens/wear     proxied to the Wear project               }
 219.co.za/citizens/<other>  404 (this app)
 219.co.za/favicon.ico, /icon.svg, /robots.txt, /sitemap.xml    this app
+219.co.za/c/<slug>, /e/<id>, /dashboard ... (Connect's page paths)   308 to the same path under /citizens/connect
+219.co.za/<anything else>   404 (this app)
 ```
 
 **Status: live.** `219.co.za` has answered from this project since the cutover of 2026-11-03 (the steps and their
@@ -63,7 +65,18 @@ the build with the variable's name in the message. Leave them unset on Vercel un
 one needs a redeploy of the hub.
 
 `/citizens/connect/` (trailing slash) is redirected by the hub to `/citizens/connect` (308, the default), like the apps
-do themselves.
+do themselves. One policy everywhere: lowercase, no trailing slash, no file extension (Vision and Wear end on
+`/citizens/<app>/index.html` because their pages load assets by relative links; changing that is their own work).
+
+**Connect's old root addresses.** From 2026-11-01 to 2026-11-03 `219.co.za` served Connect at the domain root, so a
+link copied then reads `https://219.co.za/c/<slug>`, `/e/<id>`, `/dashboard` and so on. `hubRedirects()` sends every
+Connect page path (`CONNECT_ROOT_PAGES`, kept equal to Connect's route table by a test) and `/index.html` to the same
+path under `/citizens/connect` with a 308, query kept. `/api/*` is not forwarded (nothing called the root API, and a
+redirect can turn a POST into a GET).
+
+**Letter case.** Vercel matches the proxy rules without regard to case, so `/citizens/Connect` reaches Connect, whose
+page then rewrites the address bar to `/citizens/connect`. The hub's own pages are exact: `/citizens/Ecosystem` is the
+hub's 404. Every link the hub writes is lowercase (a test checks each one against the route list).
 
 ## Security headers: the hub's own pages only
 

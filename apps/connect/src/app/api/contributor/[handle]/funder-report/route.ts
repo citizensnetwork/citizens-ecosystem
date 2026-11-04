@@ -189,7 +189,7 @@ export async function GET(
 
   // Footer
   page.drawLine({ start: { x: margin, y: margin + 26 }, end: { x: width - margin, y: margin + 26 }, thickness: 0.8, color: GOLD });
-  page.drawText("Connecting the Kingdom  ·  citizenscentral.co.za", {
+  page.drawText("Connecting the Kingdom  ·  219.co.za", {
     x: margin, y: margin + 12, size: 8.5, font: helv, color: MUTED,
   });
 

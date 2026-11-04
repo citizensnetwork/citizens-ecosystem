@@ -45,9 +45,53 @@ function proxyRewrites(env = process.env) {
   return rules;
 }
 
-/** `/` is a 302, not a permanent redirect, so the root stays free to become something else. */
+/**
+ * The first path segment of every Connect page, as Connect's own route table has it (apps/connect/next.config.ts:
+ * APP_PAGES plus the `/<segment>/:param` screens). From 2026-11-01 to 2026-11-03 `219.co.za` served Connect at the
+ * domain ROOT, so links such as `https://219.co.za/c/<slug>` or `/e/<id>` were copied and shared then. Since the
+ * domain moved to the front door they would be a 404 here; instead each one is forwarded to the same screen under
+ * Connect's prefix. A test keeps this list equal to Connect's route table, so a new Connect page forwards too.
+ * None of these may be a path the hub serves itself (`citizens`, `_next`, a public/ file): a test checks that.
+ */
+const CONNECT_ROOT_PAGES = Object.freeze([
+  'map',
+  'discover',
+  'explore',
+  'lets',
+  'community',
+  'me',
+  'messages',
+  'notifications',
+  'settings',
+  'apply',
+  'onboarding',
+  'dashboard',
+  'admin',
+  'e',
+  'p',
+  'c',
+  'upgrade',
+]);
+
+/**
+ * `/` is a 302, not a permanent redirect, so the root stays free to become something else.
+ *
+ * Connect's old root addresses (see CONNECT_ROOT_PAGES) are 308s to the same path under `/citizens/connect`; Next keeps
+ * the query string (`/index.html?c=<slug>` is the oldest QR form). Permanent, because those screens live under the
+ * prefix for good. `/api/*` is NOT forwarded: nothing called 219.co.za's root API (the Apps Script, the phone builds
+ * and Vision/Wear use other addresses), and a redirect can turn a POST into a GET.
+ */
 function hubRedirects() {
-  return [{ source: '/', destination: PATH_ROOT, statusCode: 302 }];
+  const connect = `${PATH_ROOT}/connect`;
+  return [
+    { source: '/', destination: PATH_ROOT, statusCode: 302 },
+    {
+      source: `/:page(${CONNECT_ROOT_PAGES.join('|')})/:rest*`,
+      destination: `${connect}/:page/:rest*`,
+      statusCode: 308,
+    },
+    { source: '/index.html', destination: `${connect}/index.html`, statusCode: 308 },
+  ];
 }
 
 /**
@@ -134,6 +178,7 @@ function sitemapXml() {
 }
 
 module.exports = {
+  CONNECT_ROOT_PAGES,
   HUB_PAGES,
   contentSecurityPolicy,
   hubHeaders,

@@ -11,6 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { SITE_ORIGIN } from "@citizens/ecosystem";
 import { loadFrontend } from "./support/loadFrontend";
 
 type Opts = { native?: boolean; webOrigin?: string } | undefined;
@@ -189,13 +190,14 @@ describe("the callers build no link by hand", () => {
     expect(src).not.toMatch(/window\.MapV2QR\.PUBLIC_ORIGIN\s*\+/);
   });
 
-  it("the web QR origin constant is unchanged: a printed web code always opens the public site", () => {
-    expect(read("map-v2-qr.jsx")).toContain("const PUBLIC_ORIGIN = 'https://www.citizenscentral.co.za';");
+  it("the web QR origin is the shared domain (the registry's SITE_ORIGIN), never the old citizenscentral.co.za", () => {
+    // A printed code outlives the old domain's registration (2027-06-08); the front door forwards a root-mode /c/<slug>.
+    const qr = /const PUBLIC_ORIGIN = '([^']+)';/.exec(read("map-v2-qr.jsx"));
+    expect(qr?.[1]).toBe(SITE_ORIGIN);
   });
 
-  it("the phone app's default public origin matches the QR constant, so an unset build behaves as before", () => {
-    const qr = /const PUBLIC_ORIGIN = '([^']+)';/.exec(read("map-v2-qr.jsx"));
+  it("the phone app's fallback origin (no config) is still an address that answers: the old host, which forwards", () => {
     const routes = /const DEFAULT_PUBLIC_ORIGIN = '([^']+)';/.exec(read("routes.jsx"));
-    expect(routes?.[1]).toBe(qr?.[1]);
+    expect(routes?.[1]).toBe(TODAY);
   });
 });
