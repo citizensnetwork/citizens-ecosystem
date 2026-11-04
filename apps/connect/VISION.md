@@ -59,7 +59,7 @@ to connect and uplift **All three at once**:
 - **For the organisation (contributor)** — being highlighted, supported, and exposed
   to ideal candidates across the nation, integrating features that inspire community input,
   service and participation - making connection fun and easy for anyone who find them.
-- **For social needs** — Providing an environment where each each role player is
+- **For social needs** — Providing an environment where each role player is
   provided opportunities to serve at events or organisations, collaborate in community work,
   post community improvement ideas for public participation and form part of socially uplifting
   initiatives.
@@ -126,7 +126,7 @@ More features may be added as we go.
   addressing community needs.
 - **Citizens Equip** — Discovery of Christian educational, equipping and training organisations
 - **Citizens Play** — Cloud based Christian platform providing storage, resources, tools
-  games and entertainment to break the ice, share fun and share memories for Chrsitian gatherings of any size.
+  games and entertainment to break the ice, share fun and share memories for Christian gatherings of any size.
 
 The platforms offer physical, real-world use, and each one is reachable from inside every
 other application. Examples: find and buy clothing (Wear); get ice-breakers for weekly
@@ -138,7 +138,7 @@ equipping sources, teachers and institutes (Equip). *(Founder, 2026-11-01.)*
 > Scripture is the standard
 > Love, honour and serve God. Achieving this by doing so to one another (1 Corinthians 13/ John 13: 34/ 1 Peter 4: 8)
 > Seek the Kingdom and reflect the King in every action (Matthew 6:33)
-> Do so unto the least what you would unto God (Matthew 25: 25)
+> Do so unto the least what you would unto God (Matthew 25:40)
 > Worship God in everything done (Colossians 3:23 / Proverbs 16:3)
 > Develop through service and loving others in action (2 Peter 1: 5-8)
 
@@ -168,7 +168,7 @@ believer looking to serve and to the seeker just arriving?
 built to scale? Excellence here is worship and good stewardship of the people,
 time, and trust this platform carries.
 
-**5. Intuitive Service —** Is there any better way this could better benefit and
+**6. Intuitive Service —** Is there any better way this could better benefit and
 aid the user, whether citizen, admin or organisation?
 
 ### Then grade it honestly
