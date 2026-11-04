@@ -392,6 +392,22 @@ describe('Kingdom Projects is "Suggest a need" (founder, 2026-11-04)', () => {
     expect(suggest).toEqual([{ label: 'Suggest a need', href: CONNECT.kingdomProjects }]);
   });
 
+  it('quotes the tier sizes as Connect really has them (a small volunteer group up to 20 votes, a provincial vision of 10,000)', () => {
+    const connectPages = readFileSync(
+      fileURLToPath(new URL('../../connect/src/frontend/app/pages.jsx', import.meta.url)),
+      'utf8',
+    );
+    expect(connectPages).toContain(
+      "{ id: 'small_volunteer', label: 'Small Volunteer', min: 1, max: 20 }",
+    );
+    expect(connectPages).toContain(
+      "{ id: 'provincial_vision', label: 'Provincial Vision', min: 10000, max: 10000, fixed: true }",
+    );
+    const rally = KINGDOM_PROJECTS.steps.find((step) => step.name === 'Rally')!.text;
+    expect(rally).toContain('up to 20 votes');
+    expect(rally).toContain('10,000 votes');
+  });
+
   it('does not say that Vision, or a "second feature", does it', () => {
     const words = JSON.stringify(KINGDOM_PROJECTS);
     expect(words).not.toMatch(/Vision (finds|discovers|identifies)/i);
