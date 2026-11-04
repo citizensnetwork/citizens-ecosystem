@@ -32,21 +32,42 @@ function app(ideas: unknown[] = []) {
 
 beforeAll(() => {
   const w = window as unknown as Record<string, unknown>;
-  w.Icon = ({ name }: { name: string }) => h("svg", { "data-icon": name });
-  w.AccountButton = () => null;
+  w.Icon = function Icon({ name }: { name: string }) {
+    return h("svg", { "data-icon": name });
+  };
+  w.AccountButton = function AccountButton() {
+    return null;
+  };
   w.DATA = { getCategory: () => null, EVENT_CATEGORIES: [{ id: "service", short: "Service", hex: "#000000", icon: "Heart" }] };
   w.UI = {
     cx: (...parts: unknown[]) => parts.filter(Boolean).join(" "),
-    Avatar: () => null,
-    Button: ({ children, onClick, disabled }: Props) => h("button", { onClick, disabled }, children),
-    Field: ({ label, children }: Props) => h("label", null, h("span", null, label as string), children),
-    Input: (p: Props) => h("input", p),
-    Textarea: (p: Props) => h("textarea", p),
-    Toggle: () => null,
-    Segmented: ({ options, value, onChange }: { options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) =>
-      h("div", null, options.map((o) => h("button", { key: o.value, "aria-pressed": o.value === value, onClick: () => onChange(o.value) }, o.label))),
-    MediaPicker: () => null,
-    Empty: ({ title, sub }: { title: string; sub?: string }) => h("div", null, h("p", null, title), sub ? h("p", null, sub) : null),
+    Avatar: function Avatar() {
+      return null;
+    },
+    Button: function Button({ children, onClick, disabled }: Props) {
+      return h("button", { onClick, disabled }, children);
+    },
+    Field: function Field({ label, children }: Props) {
+      return h("label", null, h("span", null, label as string), children);
+    },
+    Input: function Input(p: Props) {
+      return h("input", p);
+    },
+    Textarea: function Textarea(p: Props) {
+      return h("textarea", p);
+    },
+    Toggle: function Toggle() {
+      return null;
+    },
+    Segmented: function Segmented({ options, value, onChange }: { options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) {
+      return h("div", null, options.map((o) => h("button", { key: o.value, "aria-pressed": o.value === value, onClick: () => onChange(o.value) }, o.label)));
+    },
+    MediaPicker: function MediaPicker() {
+      return null;
+    },
+    Empty: function Empty({ title, sub }: { title: string; sub?: string }) {
+      return h("div", null, h("p", null, title), sub ? h("p", null, sub) : null);
+    },
     inputCls: "",
   };
   load("pages.jsx");
