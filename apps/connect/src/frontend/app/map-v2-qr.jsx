@@ -19,8 +19,11 @@
   const h = React.createElement;
   const { useRef, useEffect, useMemo } = React;
   const useBackGuard = window.useBackGuard || function () {};
-  // A printed code must always open the public site, never the page it was made on (a preview, localhost, the app shell)
-  const PUBLIC_ORIGIN = 'https://www.citizenscentral.co.za';
+  // A printed code must always open the public site, never the page it was made on (a preview, localhost, the app shell).
+  // The shared domain itself (packages/ecosystem SITE_ORIGIN), not the old citizenscentral.co.za: a printed code outlives
+  // the old domain's registration. Production adds Connect's prefix (/citizens/connect/c/<slug>); a build at the root
+  // (local, preview) gives /c/<slug>, which the front door forwards to the same screen under the prefix.
+  const PUBLIC_ORIGIN = 'https://219.co.za';
   // Level M, versions 1 to 10: error-correction codewords per block, and the blocks as [count, data codewords].
   const SPEC = {
     1: { ec: 10, blocks: [[1, 16]] },

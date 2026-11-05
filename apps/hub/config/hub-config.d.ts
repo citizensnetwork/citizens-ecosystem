@@ -27,7 +27,10 @@ export declare const HUB_PAGES: readonly string[];
 /** `/citizens/<slug>` and `/citizens/<slug>/:path*` to the app's project, for every built app. */
 export declare function proxyRewrites(env?: Record<string, string | undefined>): HubRewrite[];
 
-/** `/` as a 302 to `/citizens`. */
+/** Connect's page paths (first segment) that 219.co.za's root forwards to `/citizens/connect/...`. */
+export declare const CONNECT_ROOT_PAGES: readonly string[];
+
+/** `/` as a 302 to `/citizens`, and Connect's old root addresses as 308s to the same path under `/citizens/connect`. */
 export declare function hubRedirects(): HubRedirect[];
 
 /** The front door's own Content-Security-Policy (no inline script or style). */

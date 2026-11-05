@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { APP_SLUGS, COMING_SOON, PATH_ROOT, SITE_ORIGIN } from '@citizens/ecosystem';
-import { HUB_PAGES } from '../config/hub-config';
+import { CONNECT_ROOT_PAGES, HUB_PAGES } from '../config/hub-config';
 import { hasAppIcon } from '../src/components/Icons';
 import Landing, { config as landingConfig } from '../src/pages/citizens/index';
 import Ecosystem, { config as ecosystemConfig } from '../src/pages/citizens/ecosystem';
@@ -109,6 +109,15 @@ const everyPage = [
   { name: '404', markup: notFound, config: notFoundConfig },
 ];
 
+/** Every address a hub link may point at, and the markup of each hub page by its path (for page#anchor links). */
+const knownAddresses = new Set<string>([
+  ...HUB_PAGES,
+  ...APP_SLUGS.map((s) => `${PATH_ROOT}/${s}`),
+  ...COMING_SOON.map((a) => `${PATH_ROOT}/${a.slug}`),
+  ...Object.values(CONNECT),
+]);
+const markupByPath = new Map(everyPage.map((page) => [page.name, page.markup]));
+
 describe.each(everyPage)('every page: $name', ({ markup, config }) => {
   it('has one h1 and never skips a heading level', () => {
     expect(markup.match(/<h1\b/g)).toHaveLength(1);
@@ -167,6 +176,19 @@ describe.each(everyPage)('every page: $name', ({ markup, config }) => {
         href,
       ).toBe(true);
       if (href.startsWith('#')) expect(markup, href).toContain(`id="${href.slice(1)}"`);
+    }
+  });
+
+  it('sends every link to an address that exists: a hub page, an app, a coming-soon page or a Connect screen, and every page#anchor to an id on that page', () => {
+    for (const { href } of links(markup)) {
+      if (href.startsWith('#')) continue;
+      const [path, fragment] = href.split('#') as [string, string | undefined];
+      expect(knownAddresses.has(path), `${href} is not a route`).toBe(true);
+      if (fragment) {
+        const target = markupByPath.get(path);
+        expect(target, `${href}: the target is not a hub page`).toBeDefined();
+        expect(target, href).toContain(`id="${fragment}"`);
+      }
     }
   });
 });
@@ -531,6 +553,9 @@ describe('get involved (/citizens/get-involved)', () => {
     for (const [key, page, path] of screens) {
       expect(routes, page).toMatch(new RegExp(`['"]?${page}['"]?:\\s*'${path}'`));
       expect(CONNECT[key], key).toBe(`/citizens/connect${path}`);
+      // ...and Connect's server answers it on a refresh or a shared link (its next.config rewrite list; the hub's
+      // CONNECT_ROOT_PAGES is kept equal to that list by hub-config.test.ts).
+      expect(CONNECT_ROOT_PAGES, key).toContain(path.slice(1));
     }
     expect(CONNECT.home).toBe('/citizens/connect');
   });
