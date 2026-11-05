@@ -5,11 +5,14 @@ import assert from 'node:assert/strict';
 import {
   APPS,
   COMING_SOON,
+  CONNECT_API_BASE_URL,
   STATUS_URL,
   assertReadOnlyRequest,
   checkAppCsp,
   checkHubCsp,
   checkRedirect,
+  checkV1List,
+  checkWearStatus,
   classifyAddresses,
   collectHeaders,
   classifyVercelStatuses,
@@ -50,6 +53,40 @@ describe('the app and coming-soon lists match the registry', () => {
       [...COMING_SOON],
       registry.COMING_SOON.map((entry) => entry.slug),
     ));
+  it('CONNECT_API_BASE_URL is Connect\'s own address plus its prefix', () =>
+    assert.equal(CONNECT_API_BASE_URL, `${registry.PRODUCTION_ORIGINS.connect}${registry.appPath('connect')}`));
+});
+
+describe('Step 6: Connect\'s /api/v1 lists and Wear\'s status probe', () => {
+  const answer = (status, body) => ({ status, headers: {}, body: typeof body === 'string' ? body : JSON.stringify(body) });
+
+  it('a 200 with a data list passes, and the reason is the count, not the body', () => {
+    const check = checkV1List(answer(200, { data: [{ name: 'a <script>' }, {}], meta: {} }));
+    assert.deepEqual(check, { ok: true, reason: '200, a list of 2' });
+  });
+
+  it('an empty list passes unless rows are required', () => {
+    assert.equal(checkV1List(answer(200, { data: [] })).ok, true);
+    assert.deepEqual(checkV1List(answer(200, { data: [] }), { requireRows: true }), { ok: false, reason: 'the list is empty' });
+  });
+
+  it('a wrong status, a non-JSON answer and a body without a list all fail with a plain reason', () => {
+    assert.deepEqual(checkV1List(answer(404, '')), { ok: false, reason: 'status 404, expected 200' });
+    assert.deepEqual(checkV1List(answer(200, '<html>')), { ok: false, reason: 'the answer is not JSON' });
+    assert.deepEqual(checkV1List(answer(200, { data: {} })), { ok: false, reason: 'the answer has no "data" list' });
+    assert.deepEqual(checkV1List(answer(200, 'null')), { ok: false, reason: 'the answer has no "data" list' });
+  });
+
+  it('Wear: live passes, mock is information, anything else fails', () => {
+    assert.equal(checkWearStatus(answer(200, { ok: true, mode: 'live' })).level, 'PASS');
+    const mock = checkWearStatus(answer(200, { ok: true, mode: 'mock', message: 'MockConnectClient ready.' }));
+    assert.equal(mock.level, 'INFO');
+    assert.match(mock.reason, /mock/);
+    assert.equal(checkWearStatus(answer(200, { ok: true, mode: 'other' })).level, 'FAIL');
+    assert.equal(checkWearStatus(answer(200, { ok: false, mode: 'live' })).level, 'FAIL');
+    assert.equal(checkWearStatus(answer(503, '')).level, 'FAIL');
+    assert.equal(checkWearStatus(answer(200, 'nope')).level, 'FAIL');
+  });
 });
 
 describe('sanitizeExcerpt', () => {
@@ -485,6 +522,13 @@ function afterWorld() {
   w.put('GET', 'https://219.co.za/citizens/x', 404);
   w.put('GET', 'https://219.co.za/robots.txt', 200);
   w.put('GET', 'https://219.co.za/sitemap.xml', 200);
+  // Step 6: Connect's /api/v1 at the address Vision and Wear read it from, Vision's route, Wear's probe
+  const v1 = 'https://citizens-ecosystem-connect.vercel.app/citizens/connect/api/v1';
+  w.put('GET', `${v1}/categories`, 200, {}, json({ data: [{ name: 'Worship' }], meta: {} }));
+  w.put('GET', `${v1}/events?limit=1`, 200, {}, json({ data: [], meta: {} }));
+  w.put('GET', `${v1}/places?limit=1`, 200, {}, json({ data: [{ name: 'A place' }], meta: {} }));
+  w.put('GET', 'https://219.co.za/citizens/vision/api/spaces/mappings', 401, {}, json({ error: 'Unauthorized' }));
+  w.put('GET', 'https://219.co.za/citizens/wear/api/connect/status', 200, {}, json({ ok: true, mode: 'mock' }));
   return w;
 }
 
@@ -537,6 +581,42 @@ describe('the whole run, against a fake network', () => {
     const results = await runChecks({ phase: 'after', hubUrl: null }, w.deps);
     const failed = results.filter((r) => r.level === 'FAIL').map((r) => r.name);
     assert.deepEqual(failed, ['step3/3 /dashboard']);
+  });
+
+  it('after: Step 6 passes the three Connect reads and the Vision route, says Wear is in mock mode, and says what it cannot check', async () => {
+    const w = afterWorld();
+    const results = await runChecks({ phase: 'after', hubUrl: null }, w.deps);
+    const step6 = results.filter((r) => r.name.startsWith('step6/'));
+    const level = (name) => step6.find((r) => r.name === name).level;
+    assert.equal(step6.length, 6);
+    for (const part of ['categories', 'events', 'places']) assert.equal(level(`step6/connect-v1/${part}`), 'PASS');
+    assert.equal(level('step6/vision-route'), 'PASS');
+    assert.equal(level('step6/wear-mode'), 'INFO');
+    assert.equal(level('step6/signed-in-read'), 'INFO');
+    for (const call of w.calls) assert.match(call, /^(GET|HEAD|OPTIONS) /);
+  });
+
+  it('after: Step 6 is not run before the move', async () => {
+    const results = await runChecks({ phase: 'before', hubUrl: null }, beforeWorld().deps);
+    assert.deepEqual(results.filter((r) => r.name.startsWith('step6/')), []);
+  });
+
+  it('after: Connect\'s categories failing (the address Vision reads is wrong) fails that line only', async () => {
+    const w = afterWorld();
+    w.put('GET', 'https://citizens-ecosystem-connect.vercel.app/citizens/connect/api/v1/categories', 404, {}, '{}');
+    const results = await runChecks({ phase: 'after', hubUrl: null }, w.deps);
+    assert.deepEqual(results.filter((r) => r.level === 'FAIL').map((r) => r.name), ['step6/connect-v1/categories']);
+  });
+
+  it('after: a Vision route that is not under its prefix fails and names the cause; Wear live passes', async () => {
+    const w = afterWorld();
+    w.put('GET', 'https://219.co.za/citizens/vision/api/spaces/mappings', 404);
+    w.put('GET', 'https://219.co.za/citizens/wear/api/connect/status', 200, {}, json({ ok: true, mode: 'live' }));
+    const results = await runChecks({ phase: 'after', hubUrl: null }, w.deps);
+    const vision = results.find((r) => r.name === 'step6/vision-route');
+    assert.equal(vision.level, 'FAIL');
+    assert.match(vision.reason, /404/);
+    assert.equal(results.find((r) => r.name === 'step6/wear-mode').level, 'PASS');
   });
 
   it('with --hub-url the Step 1 checks run against it, and Connect not being under its prefix yet is information', async () => {

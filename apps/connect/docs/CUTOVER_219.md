@@ -3,8 +3,9 @@
 Moves the three apps onto one address each: `219.co.za/citizens/connect`, `/citizens/vision`, `/citizens/wear`
 (`/learn`, `/play`, `/move`, `/impact` show a "coming soon" page). **Steps 1 to 4 were done on 2026-11-03** (in the order
 1, 3, 2, 4; session journal, issue #323): `219.co.za` is the front door and every app answers under its prefix. **Step 5
-(the founder's sign-in walk, then Supabase's Site URL and the Apps Script `INTAKE_URL`) and Step 6's Check are still to
-do.** Claude changes no Vercel setting, domain, variable or DNS record without a clear yes in chat for that step.
+(the founder's sign-in walk, then Supabase's Site URL and the Apps Script `INTAKE_URL`) was reported complete by the founder on
+2026-11-05, and Step 6's Check was run the same day** (what it could and could not prove is in Step 6). Claude changes no Vercel
+setting, domain, variable or DNS record without a clear yes in chat for that step.
 
 Written so that a person who does not write code can follow it. Each step has the same four parts: **Why**, **Do**,
 **Check**, **Roll back**. Do the steps in this order: **Step 1, Step 3, Step 2, Step 4, Step 5, then Step 6's Check** (decided by the
@@ -18,11 +19,12 @@ one until the Check of the one before passes.
 > **The pre-flight.** `node scripts/cutover-preflight.mjs` (Node 22, from the repository root) runs this runbook's own Check commands and prints
 > one line each: `PASS`, `FAIL` or `INFO`, with the reason. It only looks (DNS lookups, GET, HEAD, OPTIONS; it never POSTs, sends no login, needs
 > no token) and exits 1 only on a `FAIL`. Run it before Step 1, after Step 1 with `--hub-url https://citizens-ecosystem-hub.vercel.app`, and after Step 4
-> with `--phase after`.
+> with `--phase after` (which also runs Step 6's reads).
 
-**State on 2026-11-04:** P1 to P6 done (P2 to P4 on the founder's word); Steps 1 to 4 done on 2026-11-03; the pre-flight
-`--phase after` gave 36 PASS, 0 FAIL on 2026-11-04 at 19:20 UTC. Left: Step 5 and Step 6's Check, and Step 3's command 7 (a POST,
-run by hand).
+**State on 2026-11-05:** P1 to P6 done (P2 to P4 on the founder's word); Steps 1 to 4 done on 2026-11-03; Step 3's command 7 (a POST)
+was run by hand and answers 401, as it must; the pre-flight `--phase after` gives 0 FAIL (it now also runs Step 6's reads). Step 5's
+sign-in walk is the founder's word, and Claude saw the browser at `219.co.za` signed in on Connect and on Vision. Supabase's Site URL
+and the Apps Script `INTAKE_URL` cannot be read from here, so they stay the founder's word too.
 
 ## What people will notice
 
@@ -227,8 +229,10 @@ their reads at Connect's new address, which has to exist first.
 2. `NEXT_PUBLIC_BASE_PATH` = `/citizens/connect`, **Production** only (untick Preview and Development).
 3. `NEXT_PUBLIC_SITE_URL` = `https://219.co.za` (the address only: no `/citizens/connect`, no trailing slash), **Production**
    only. If a row for it already exists, click **...** > **Edit**, and **write the old value down first**: you need it to roll back.
-4. **Deployments** > newest **Production** deployment > **...** > **Redeploy**, "Use existing Build Cache" **unticked**.
-   (*Costs 1 deployment.*)
+4. **Deployments** > newest **Production** deployment > **...** > **Redeploy**, "Use existing Build Cache" **unticked**, and
+   "Use project's Ignore Build Step" **unticked too**. (*Costs 1 deployment.*) The second box is **ticked by default**: left
+   ticked, the project's ignore step stops the build ("Canceled", nothing changes). A redeploy started from the Vercel API tools is
+   stopped the same way (seen 2026-11-03), so use the dashboard.
 
 **What changes the moment it is Ready.** `www.citizenscentral.co.za` and `citizenscentral.co.za` send every page address to the
 same path under `https://219.co.za/citizens/connect/`, and the bare `/` on any other Connect address
@@ -286,7 +290,10 @@ its prefix (Step 3), so that address exists. Nothing sends visitors to Vision or
 2. **Key**: `NEXT_PUBLIC_BASE_PATH`. **Value**: `/citizens/vision` for Vision, `/citizens/wear` for Wear. Type it exactly:
    lowercase, a leading slash, no trailing slash or space. **Environments**: tick **Production** only; untick Preview and
    Development. **Save**.
-3. **Key**: `CONNECT_API_BASE_URL` > **...** > **Edit**. **Write the old value down first.** New value, the same for both:
+3. **Key**: `CONNECT_API_BASE_URL` > **...** > **Edit**. **Write the old value down first.** (Vision's row is type **Sensitive**: its
+   value can never be read back, so there is nothing to write down; roll Vision back with **Instant Rollback**, below. Wear had
+   **no** such row on 2026-11-03: add it, **Production** only. It changes nothing while Wear runs in mock mode, see Step 6.
+   Keep a row's existing environments when you edit it: dropping Preview leaves pull-request previews with no value.) New value, the same for both:
 
    ```
    https://citizens-ecosystem-connect.vercel.app/citizens/connect
@@ -296,7 +303,8 @@ its prefix (Step 3), so that address exists. Nothing sends visitors to Vision or
    trailing slash. No `/api/v1` on the end.) **Production** only. Vision used to throw away any path in this variable; that is
    fixed in the code that is live after P6.
 4. **Deployments** tab > the newest **Production** deployment (after P6 its Source commit is the current `main`) > the
-   **...** menu > **Redeploy** > **untick** "Use existing Build Cache" > **Redeploy**. Wait for **Ready**. (The values are
+   **...** menu > **Redeploy** > **untick** "Use existing Build Cache" **and** "Use project's Ignore Build Step" (see Step 3) >
+   **Redeploy**. Wait for **Ready**; the free plan builds one deployment at a time, so the second project queues behind the first. (The values are
    read when the app is built, so they do nothing until there is a new build. *Costs 1 deployment per project, 2 in all.*)
 
 A wrong `NEXT_PUBLIC_BASE_PATH` makes the build fail with a message that names the right one; nothing goes live from a failed build.
@@ -319,7 +327,8 @@ Do **not** try to sign in on `H`: the allowed return address list knows `219.co.
 data check of the new `CONNECT_API_BASE_URL` is Step 6 (it needs a signed-in user).
 
 **Roll back.** In each project, **Environment Variables**: the **...** next to `NEXT_PUBLIC_BASE_PATH` > **Remove**; put
-`CONNECT_API_BASE_URL` back to the old value you wrote down; then **Redeploy** (same as above). Or **Deployments** > the last good
+`CONNECT_API_BASE_URL` back to the old value you wrote down (Vision's cannot be read, and Wear's is the row you added: remove it);
+then **Redeploy** (same as above). Or, and for Vision always, **Deployments** > the last good
 deployment > **...** > **Instant Rollback**. **Do this before rolling back Step 3**: Connect at its root no longer answers
 `.../citizens/connect/api/v1`.
 
@@ -337,7 +346,10 @@ deployment > **...** > **Instant Rollback**. **Do this before rolling back Step 
 2. Vercel > the **hub** project (`citizens-ecosystem-hub`) > **Settings** > **Domains** > **Add**: `219.co.za` > **Add**.
    Choose to connect it to **Production**.
 3. **Add** `www.219.co.za`. When it asks what to do, choose **Redirect to Another Domain**, pick `219.co.za`, and keep the
-   status **308 Permanent Redirect**.
+   status **308 Permanent Redirect**. (On 2026-11-03 the **Add** box added **both** names at once and set the apex to redirect to
+   `www`, the wrong way round, and pressing Enter in it submits straight away. Fix: **Edit** `219.co.za` > **Connect to an
+   environment** (Production) > **Save**; then **Edit** `www.219.co.za` > **Redirect to Another Domain** > 308 > `219.co.za` > **Save**.
+   Removing a domain from Connect asks only for a confirm click, no emailed code.)
 4. Wait until both rows say **Valid Configuration** (a minute or two). Both names already have a valid certificate (two
    separate ones, from Let's Encrypt, valid to 2027-01-30, read on 2026-11-01); Vercel re-uses or renews them. *No deployment.*
 
@@ -399,11 +411,33 @@ work. It needs a signed-in user, so it comes after Step 5.
 
 **Do.** Nothing to change.
 
-**Check.** In Vision, open the page that lists Connect's events or places; in Wear, open the Contributors directory.
-Both show data (they would show an empty list or an error if the address were wrong).
+**Check.** There is no page to open that lists Connect's events or places: Vision's screens show sample data until an organisation is
+linked to Connect, its Connect events and places routes exist only as API routes that no screen calls, and Wear is not wired to
+Connect at all (below). So check the reads themselves:
 
-**Roll back.** Put `CONNECT_API_BASE_URL` back to the old value in both projects and redeploy (2 deployments, as in Step 2's
-roll back); it keeps working through the pass-through.
+1. `node scripts/cutover-preflight.mjs --phase after` prints the `step6/` lines. `step6/connect-v1/categories`, `events` and `places`
+   must PASS (Connect's `/api/v1` answers `200` and a list at the exact address Vision and Wear read it from);
+   `step6/vision-route` must PASS (`401`: Vision's data route is reachable behind its prefix and asks for a sign-in);
+   `step6/wear-mode` is INFO while Wear is in mock mode.
+2. The read a signed-in person makes. Signed in at `219.co.za/citizens/vision`, ask Claude to call `/api/spaces/mappings` for the
+   person's organisation from the browser tab. It answers `200` and a list of Connect's event categories (17 on 2026-11-05): Vision's
+   server read them from Connect through `CONNECT_API_BASE_URL`. A wrong address gives `502 "Citizens Connect API is unavailable"`.
+
+**What 2026-11-05 showed.** Check 1 passed (27 categories, an event list and a place list, all `200`; Vision's route `401`). Check 2
+passed in the founder's signed-in browser (`200`, 17 categories). Two things are **not faults** and should not be "fixed" as part of
+the cutover:
+
+- Every Vision screen carries a **Demo data** badge, with the reason on hover: the signed-in organisation ("Platform") is **not
+  linked to Connect**, so Vision shows sample data and its events and places routes answer `200` with `linked: false` and no list
+  (they do not call Connect). Real Connect events and places appear in Vision only once an organisation is linked to a Connect
+  Contributor (a product step, not part of this runbook).
+- **Wear runs on its built-in mock client**: neither `CONNECT_MODE` nor a `CONNECT_API_BASE_URL` existed in its project, and its
+  `/api/connect/status` probe says `"mode":"mock"`. Its Contributors directory is sample data. Setting `CONNECT_MODE=live` would
+  make Wear read Connect at the address Step 2 set; that is a separate decision, with its own check, and was not made.
+
+**Roll back.** Vision: **Instant Rollback** to its last good deployment (its old `CONNECT_API_BASE_URL` was Sensitive and cannot be
+retyped). Wear: remove the `CONNECT_API_BASE_URL` row and redeploy (2 deployments in all, as in Step 2's roll back). Both keep
+working through the pass-through, which still answers `/api/v1` at Connect's old root.
 
 ---
 
