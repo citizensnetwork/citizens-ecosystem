@@ -80,16 +80,18 @@ const CONNECT_ROOT_PAGES = Object.freeze([
  * the query string (`/index.html?c=<slug>` is the oldest QR form). Permanent, because those screens live under the
  * prefix for good. `/api/*` is NOT forwarded: nothing called 219.co.za's root API (the Apps Script, the phone builds
  * and Vision/Wear use other addresses), and a redirect can turn a POST into a GET.
+ *
+ * Two rules, not one `/:page/:rest*`: with an empty `:rest*` Vercel writes the destination with a trailing slash
+ * (`/citizens/connect/discover/`, seen live on 2026-11-05; `next start` does not), and Connect then redirects again
+ * to drop it. A bare page and a page with more path each get their own exact destination: one hop.
  */
 function hubRedirects() {
   const connect = `${PATH_ROOT}/connect`;
+  const page = `/:page(${CONNECT_ROOT_PAGES.join('|')})`;
   return [
     { source: '/', destination: PATH_ROOT, statusCode: 302 },
-    {
-      source: `/:page(${CONNECT_ROOT_PAGES.join('|')})/:rest*`,
-      destination: `${connect}/:page/:rest*`,
-      statusCode: 308,
-    },
+    { source: page, destination: `${connect}/:page`, statusCode: 308 },
+    { source: `${page}/:rest+`, destination: `${connect}/:page/:rest+`, statusCode: 308 },
     { source: '/index.html', destination: `${connect}/index.html`, statusCode: 308 },
   ];
 }

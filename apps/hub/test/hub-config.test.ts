@@ -172,6 +172,14 @@ describe('hubRedirects', () => {
     expect([...CONNECT_ROOT_PAGES].sort()).toEqual([...segments].sort());
   });
 
+  it('gives a bare page and a longer path each an exact destination: one hop, no trailing slash', () => {
+    // An empty `:rest*` in a destination becomes a trailing slash on Vercel (/citizens/connect/discover/), and Connect
+    // then redirects a second time. A destination may only use required parameters.
+    for (const rule of rules) expect(rule.destination, rule.source).not.toMatch(/:[a-z]+[*?]/);
+    expect(firstMatch('/discover')?.destination).toBe('/citizens/connect/:page');
+    expect(firstMatch('/dashboard/saved')?.destination).toBe('/citizens/connect/:page/:rest+');
+  });
+
   it('never forwards a path the hub serves itself', () => {
     const publicFiles = [
       'favicon.ico',
