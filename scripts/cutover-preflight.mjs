@@ -37,6 +37,8 @@ export const COMING_SOON = ['learn', 'play', 'move', 'impact'];
 export const SITE_HOST = '219.co.za';
 export const OLD_HOST = 'www.citizenscentral.co.za';
 export const NEW_CONNECT_URL = 'https://219.co.za/citizens/connect';
+/** The value of CONNECT_API_BASE_URL in Vision and Wear (runbook Step 2): Connect's own address plus its prefix. */
+export const CONNECT_API_BASE_URL = 'https://citizens-ecosystem-connect.vercel.app/citizens/connect';
 
 export const STATUS_URL =
   'https://api.github.com/repos/citizensnetwork/citizens-ecosystem/commits/main/status';
@@ -128,7 +130,7 @@ export function parseHubUrl(raw) {
 export const USAGE = [
   'Usage: node scripts/cutover-preflight.mjs [--phase before|after] [--hub-url https://<name>.vercel.app]',
   '  --phase before  (default) nothing has moved yet',
-  '  --phase after   after Step 4: also checks the old-address forwards and the front door on 219.co.za',
+  '  --phase after   after Step 4: also checks the old-address forwards, the front door on 219.co.za and Step 6\'s reads',
   '  --hub-url       the front door project\'s own address, to run the Step 1 checks against it',
   'Read-only: DNS lookups and GET / HEAD / OPTIONS requests. It never POSTs and reads no secret.',
 ].join('\n');
@@ -478,6 +480,45 @@ export function isUnderPrefix(pathname, prefix) {
   const path = pathname.split('/').filter(Boolean);
   const want = prefix.split('/').filter(Boolean);
   return want.length <= path.length && want.every((segment, i) => path[i] === segment);
+}
+
+/**
+ * Connect's /api/v1 answers { data: [...], meta }. The reason is built from the status and the count only, never from the
+ * body. A list may be empty (a quiet week has no events) unless the caller says Connect always has rows.
+ */
+export function checkV1List(response, { requireRows = false } = {}) {
+  if (response.status !== 200) return { ok: false, reason: `status ${response.status}, expected 200` };
+  let body;
+  try {
+    body = JSON.parse(response.body);
+  } catch {
+    return { ok: false, reason: 'the answer is not JSON' };
+  }
+  if (body === null || typeof body !== 'object' || !Array.isArray(body.data)) {
+    return { ok: false, reason: 'the answer has no "data" list' };
+  }
+  if (requireRows && body.data.length === 0) return { ok: false, reason: 'the list is empty' };
+  return { ok: true, reason: `200, a list of ${body.data.length}` };
+}
+
+/**
+ * Wear's /api/connect/status probe: { ok, mode: 'mock' | 'live' }. Wear reads Connect only in live mode (CONNECT_MODE=live);
+ * in mock mode its Contributors directory is sample data, which is information for Step 6, not a failure.
+ */
+export function checkWearStatus(response) {
+  if (response.status !== 200) return { level: 'FAIL', reason: `status ${response.status}, expected 200` };
+  let body;
+  try {
+    body = JSON.parse(response.body);
+  } catch {
+    return { level: 'FAIL', reason: 'the answer is not JSON' };
+  }
+  if (body === null || typeof body !== 'object' || body.ok !== true) return { level: 'FAIL', reason: 'the probe does not say ok' };
+  if (body.mode === 'live') return { level: 'PASS', reason: 'live: Wear reads Connect at CONNECT_API_BASE_URL' };
+  if (body.mode === 'mock') {
+    return { level: 'INFO', reason: 'mock: Wear shows sample data and does not read Connect (CONNECT_MODE is not live), so Step 6 has no Wear data to check' };
+  }
+  return { level: 'FAIL', reason: 'the probe names a mode that is neither mock nor live' };
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -917,6 +958,49 @@ async function domainChecks(deps) {
   return lines.flat();
 }
 
+/**
+ * Runbook Step 6, the part a script can do without signing in: Connect's /api/v1 answers at the address Vision and Wear
+ * read it from, Vision's data routes are reachable behind the prefix, and Wear says which mode it is in. The read a
+ * signed-in person makes through Vision cannot be done here (the script never sends a credential): the INFO line says so.
+ */
+async function step6Checks(deps) {
+  const reads = [
+    ['categories', '/api/v1/categories', true],
+    ['events', '/api/v1/events?limit=1', false],
+    ['places', '/api/v1/places?limit=1', false],
+  ];
+  const lines = await Promise.all([
+    ...reads.map(([part, path, requireRows]) =>
+      attempt(`step6/connect-v1/${part}`, async () => {
+        const name = `step6/connect-v1/${part}`;
+        const check = checkV1List(await deps.request(`${CONNECT_API_BASE_URL}${path}`), { requireRows });
+        return [check.ok ? pass(name, check.reason) : fail(name, check.reason)];
+      }),
+    ),
+    attempt('step6/vision-route', async () => {
+      const name = 'step6/vision-route';
+      const response = await deps.request(`https://${SITE_HOST}/citizens/vision/api/spaces/mappings`);
+      return [
+        response.status === 401
+          ? pass(name, '401: Vision\'s data route answers under its prefix and asks for a sign-in')
+          : fail(name, `status ${response.status}, expected 401 (a 404 means the prefix or the front door is not passing /api on)`),
+      ];
+    }),
+    attempt('step6/wear-mode', async () => {
+      const name = 'step6/wear-mode';
+      const check = checkWearStatus(await deps.request(`https://${SITE_HOST}/citizens/wear/api/connect/status`));
+      return [{ level: check.level, name, reason: check.reason }];
+    }),
+    Promise.resolve([
+      info(
+        'step6/signed-in-read',
+        'not checked: it needs a signed-in person. In Vision, Configure Spaces lists Connect\'s categories (an error there says "Citizens Connect API is unavailable")',
+      ),
+    ]),
+  ]);
+  return lines.flat();
+}
+
 /** Runs the checks for the phase and returns every line, in a fixed order. */
 export async function runChecks({ phase, hubUrl }, deps = defaultDeps) {
   const sections = [dnsChecks(deps), certificateChecks(deps), appChecks(phase, deps), deploymentChecks(deps)];
@@ -924,7 +1008,7 @@ export async function runChecks({ phase, hubUrl }, deps = defaultDeps) {
   // The front door's own pages: on --hub-url when given, and on the real domain once it has moved.
   const hubOrigins = [hubUrl, phase === 'after' ? `https://${SITE_HOST}` : null].filter(Boolean);
   for (const origin of new Set(hubOrigins)) sections.push(hubChecks(origin, phase, deps));
-  if (phase === 'after') sections.push(barePrefixChecks(deps), oldAddressChecks(deps), domainChecks(deps));
+  if (phase === 'after') sections.push(barePrefixChecks(deps), oldAddressChecks(deps), domainChecks(deps), step6Checks(deps));
   return (await Promise.all(sections)).flat();
 }
 
