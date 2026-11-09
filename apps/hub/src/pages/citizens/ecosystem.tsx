@@ -1,5 +1,6 @@
 import type { NextPage } from 'next';
-import { AppIcon } from '../../components/Icons';
+import { EcosystemDiagram } from '../../components/EcosystemDiagram';
+import { AppIcon, ArrowIcon } from '../../components/Icons';
 import { Layout } from '../../components/Layout';
 import { PageHead } from '../../components/PageHead';
 import {
@@ -30,6 +31,7 @@ const Ecosystem: NextPage = () => (
     <PageHead eyebrow={SITE_NAME} title={ECOSYSTEM_PAGE.title} lead={ECOSYSTEM_SUB} />
     <div className="wrap prose">
       <p className="lead">{ECOSYSTEM_INTRO}</p>
+      <EcosystemDiagram />
       <ol className="platforms">
         {appCards().map((card) => (
           <li key={card.slug} id={card.slug} className="platform">
@@ -72,6 +74,7 @@ const Ecosystem: NextPage = () => (
             ) : null}
             <a className="button" href={card.href}>
               {card.comingSoon ? ECOSYSTEM_PAGE.about : ECOSYSTEM_PAGE.open} {card.label}
+              <ArrowIcon className="arrow" />
             </a>
           </li>
         ))}

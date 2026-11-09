@@ -33,9 +33,9 @@ function contrast(a: string, b: string): number {
 describe('palette', () => {
   const t = tokens();
 
-  it('is white, near-black and Connect’s one gold (#304)', () => {
+  it('is white, near-black and the one gold (the approved preview value)', () => {
     expect(t.white).toBe('#ffffff');
-    expect(t.gold).toBe('#f2bd22');
+    expect(t.gold).toBe('#d4af37');
     expect(t.ink).toBe('#111111');
     expect(t.black).toBe('#0a0a0a');
   });
@@ -86,7 +86,7 @@ describe('palette', () => {
 
   it('keeps the gold glows on the drawn art faint (alpha 0.32 at most), so white text on them stays above 4.5:1', () => {
     // Worst case: gold at alpha a over the lightest slab (#2a2312). At 0.32 white text is still about 7:1.
-    const alphas = [...css.matchAll(/rgba\(\s*242\s*,\s*189\s*,\s*34\s*,\s*([0-9.]+)\s*\)/g)].map(
+    const alphas = [...css.matchAll(/rgba\(\s*212\s*,\s*175\s*,\s*55\s*,\s*([0-9.]+)\s*\)/g)].map(
       (m) => Number(m[1]),
     );
     expect(alphas.length).toBeGreaterThan(0);
@@ -95,9 +95,9 @@ describe('palette', () => {
     const over = (channel: number, glow: number) => Math.round(glow * 0.32 + channel * (1 - 0.32));
     const rgb = [1, 3, 5].map((i) => parseInt(base.slice(i, i + 2), 16));
     const glowed = `#${[
-      over(rgb[0] as number, 242),
-      over(rgb[1] as number, 189),
-      over(rgb[2] as number, 34),
+      over(rgb[0] as number, 212),
+      over(rgb[1] as number, 175),
+      over(rgb[2] as number, 55),
     ]
       .map((v) => v.toString(16).padStart(2, '0'))
       .join('')}`;

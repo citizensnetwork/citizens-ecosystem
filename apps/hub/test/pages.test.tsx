@@ -5,7 +5,9 @@ import { describe, expect, it } from 'vitest';
 import { APP_SLUGS, COMING_SOON, PATH_ROOT, SITE_ORIGIN } from '@citizens/ecosystem';
 import { CONNECT_ROOT_PAGES, HUB_PAGES } from '../config/hub-config';
 import { hasAppIcon } from '../src/components/Icons';
-import Landing, { config as landingConfig } from '../src/pages/citizens/index';
+import Home, { config as homeConfig } from '../src/pages/index';
+import Central from '../src/pages/citizens/index';
+import Settings from '../src/pages/citizens/settings';
 import Ecosystem, { config as ecosystemConfig } from '../src/pages/citizens/ecosystem';
 import HowItWorks, { config as howConfig } from '../src/pages/citizens/how-it-works';
 import Philosophy, { config as philosophyConfig } from '../src/pages/citizens/philosophy';
@@ -88,7 +90,9 @@ const comingSoonPages = await Promise.all(
   }),
 );
 
-const landing = html(<Landing />);
+const home = html(<Home />);
+const landing = html(<Central />);
+const settings = html(<Settings />);
 const ecosystem = html(<Ecosystem />);
 const how = html(<HowItWorks />);
 const philosophy = html(<Philosophy />);
@@ -96,7 +100,9 @@ const involved = html(<GetInvolved />);
 const notFound = html(<NotFound />);
 
 const everyPage = [
-  { name: '/citizens', markup: landing, config: landingConfig },
+  { name: '/', markup: home, config: homeConfig },
+  { name: '/citizens', markup: landing, config: undefined },
+  { name: '/citizens/settings', markup: settings, config: undefined },
   { name: '/citizens/ecosystem', markup: ecosystem, config: ecosystemConfig },
   { name: '/citizens/how-it-works', markup: how, config: howConfig },
   { name: '/citizens/philosophy', markup: philosophy, config: philosophyConfig },
@@ -118,7 +124,7 @@ const knownAddresses = new Set<string>([
 ]);
 const markupByPath = new Map(everyPage.map((page) => [page.name, page.markup]));
 
-describe.each(everyPage)('every page: $name', ({ markup, config }) => {
+describe.each(everyPage)('every page: $name', ({ name, markup, config }) => {
   it('has one h1 and never skips a heading level', () => {
     expect(markup.match(/<h1\b/g)).toHaveLength(1);
     const levels = headingLevels(markup);
@@ -131,9 +137,9 @@ describe.each(everyPage)('every page: $name', ({ markup, config }) => {
   it('has the landmarks: skip link, banner, labelled navigation, main, footer', () => {
     expect(markup).toMatch(/<a class="skip-link" href="#main">/);
     expect(markup).toMatch(/<header\b/);
-    expect(markup).toMatch(/<nav class="nav" aria-label="Main">/);
+    expect(markup).toMatch(/<nav\b[^>]*aria-label="/);
     expect(markup).toMatch(/<nav aria-label="Footer">/);
-    expect(markup).toMatch(/<main id="main" /);
+    expect(markup).toMatch(/<main id="main"/);
     expect(markup).toMatch(/<footer\b/);
   });
 
@@ -144,8 +150,9 @@ describe.each(everyPage)('every page: $name', ({ markup, config }) => {
     expect(markup).not.toMatch(/(?:src|href)="(?:https?:)?\/\//i);
   });
 
-  it('ships no JavaScript at all', () => {
-    expect(config).toEqual({ unstable_runtimeJS: false });
+  it('ships no JavaScript on the static pages; Central and Settings keep the runtime for weather and theme', () => {
+    if (name === '/citizens' || name === '/citizens/settings') expect(config).toBeUndefined();
+    else expect(config).toEqual({ unstable_runtimeJS: false });
   });
 
   it('gives every image alt text and a size, and hides every svg from assistive technology', () => {
@@ -193,72 +200,91 @@ describe.each(everyPage)('every page: $name', ({ markup, config }) => {
   });
 });
 
-describe('the landing page (/citizens)', () => {
-  it('opens with the slogan as the one h1, then the three verbs and the way in', () => {
-    expect(landing).toMatch(/<h1[^>]*>Connecting the Kingdom\.<\/h1>/);
-    expect(landing).toContain('Discover. Participate. Belong.');
-    expect(links(landing)).toContainEqual({ href: '#ecosystem', text: 'Explore the Ecosystem' });
-    expect(links(landing)).toContainEqual({ href: PAGES.getInvolved, text: 'Get Involved' });
-    expect(landing).toContain('id="ecosystem"');
+describe('the 219 homepage (/)', () => {
+  it('opens with the call, and leads into Citizens without leaving the site', () => {
+    expect(home).toMatch(/<h1[^>]*>So much life\./);
+    expect(home).toContain('expressed.');
+    expect(home).toContain('id="heart219"');
+    expect(home).toContain('id="approach219"');
+    expect(links(home)).toContainEqual({ href: PATH_ROOT, text: 'Discover Citizens' });
+    expect(links(home)).toContainEqual({ href: PATH_ROOT, text: 'Enter Citizens' });
+    expect(home).not.toContain('Phone');
+    expect(home).not.toContain('Preview tools');
+    expect(home).not.toContain('will not ship');
+  });
+});
+
+describe('Central, the Citizens front door (/citizens)', () => {
+  const cards = appCards();
+
+  it('is the editorial home, with the encouragement and the hour card under it', () => {
+    expect(landing).toMatch(/<h1[^>]*>A little closer, every day\.<\/h1>/);
+    expect(landing).toContain('Today’s Encouragement');
+    expect(landing).toContain('1 Thessalonians 5:11');
+    expect(landing).toContain('This hour around you');
+    expect(landing).toContain('Pretoria');
+    expect(landing.indexOf('Today’s Encouragement')).toBeLessThan(landing.indexOf('hour-card'));
+    expect(landing.indexOf('hour-card')).toBeLessThan(landing.indexOf('New in the Body!'));
   });
 
-  it('says what Citizens is in the founder’s words, before the tiles', () => {
-    const at = (text: string) => landing.indexOf(text);
-    expect(at('Citizens is an interconnected Kingdom environment')).toBeGreaterThan(-1);
-    expect(at('Citizens is an interconnected Kingdom environment')).toBeLessThan(
-      at('The Citizens Ecosystem'),
-    );
-  });
-
-  it('shows one tile for every app, built apps first and then the coming-soon ones, each linking to its prefix', () => {
-    const cards = appCards();
-    expect(cards.map((c) => c.slug)).toEqual([...APP_SLUGS, ...COMING_SOON.map((a) => a.slug)]);
-    expect(landing.match(/<li class="tile /g)).toHaveLength(APP_SLUGS.length + COMING_SOON.length);
-    const found = links(landing);
+  it('names every app in a small window, and the arrow (not the window) is the live app', () => {
     for (const card of cards) {
-      const name = `${card.short} ${card.tileVerbs}${card.comingSoon ? ' Coming soon' : ''}`;
-      expect(found, card.slug).toContainEqual({ href: `/citizens/${card.slug}`, text: name });
+      expect(landing, card.slug).toContain(`id="app-${card.slug}"`);
+      expect(landing, card.slug).toContain(`href="#app-${card.slug}"`);
+      const action = card.comingSoon ? `About ${card.label}` : `Open ${card.label}`;
+      expect(links(landing), card.slug).toContainEqual({ href: card.href, text: action });
     }
-    // tiles come in registry order
-    const order = cards.map((c) => landing.indexOf(`class="tile-link" href="/citizens/${c.slug}"`));
-    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    expect(landing).toContain('Discover. Participate. Belong.');
+    expect(landing).toContain('Express. Create. Collaborate.');
+    expect(landing).toContain('Collaborate. Contribute. Transform.');
   });
 
-  it('names Wear and Impact on the landing page, spelled out (founder, 2026-11-01)', () => {
-    const found = links(landing).map((l) => l.text);
-    expect(found).toContain('Wear Express & Collaborate');
-    expect(found).toContain('Impact Collaborate & Transform Coming soon');
+  it('says Coming soon in words on each unbuilt app', () => {
+    for (const app of COMING_SOON) {
+      expect(landing).toContain(`Citizens ${app.label.replace(/^Citizens /, '')}`);
+    }
+    expect(landing.match(/Coming soon/g)?.length ?? 0).toBeGreaterThanOrEqual(COMING_SOON.length);
   });
 
-  it('says "Coming soon" in words on each unbuilt tile (never colour alone), and nowhere else', () => {
-    expect(landing.match(/Coming soon/g)).toHaveLength(COMING_SOON.length);
-  });
-
-  it('lets a lone last tile span the row (Impact, as in the design)', () => {
-    expect(landing.match(/class="tile tile-impact tile-soon tile-wide"/g)).toHaveLength(1);
-  });
-
-  it('has the interconnected-community band, with the crown and the six parts (Vision is not one of them, on purpose)', () => {
-    expect(landing).toContain('An Interconnected Community');
-    expect(landing).toContain(
-      'People, resources and opportunities, working together for lasting impact.',
-    );
-    expect(links(landing)).toContainEqual({ href: PAGES.howItWorks, text: 'Learn More' });
-    expect(landing.match(/class="diagram-node"/g)).toHaveLength(6);
-    expect(landing).toContain('href="/citizens-crown.png"');
-  });
-
-  it('quotes the founding Scripture exactly as VISION.md has it, with its reference', () => {
-    expect(landing).toContain(SCRIPTURE.text);
-    expect(landing).toMatch(/<figcaption>Ephesians 2:19-21<\/figcaption>/);
+  it('keeps Connect inside its window: the preview is a hash, the full app is /citizens/connect', () => {
+    expect(landing).toContain('href="#app-connect"');
+    expect(landing).not.toContain('target="_blank"');
     expect(
-      SCRIPTURE.text.startsWith('Now, therefore, you are no longer strangers and foreigners'),
-    ).toBe(true);
-    expect(SCRIPTURE.text.endsWith('grows into a holy temple in the Lord')).toBe(true);
+      links(landing).filter((link) => link.href === '/citizens/connect').length,
+    ).toBeGreaterThan(0);
   });
 
-  it('ends with the line the design closes on', () => {
-    expect(landing).toContain('Every Citizen has a part to play');
+  it('leads each feed card with the platform, and that label links into the app', () => {
+    expect(links(landing)).toContainEqual({ href: '/citizens/connect', text: 'Connect' });
+    expect(links(landing)).toContainEqual({ href: '/citizens/wear', text: 'Discover Wear' });
+    expect(links(landing)).toContainEqual({ href: '/citizens/move', text: 'Move' });
+    expect(links(landing)).toContainEqual({ href: '/citizens/impact', text: 'Impact' });
+    expect(links(landing)).toContainEqual({ href: '/citizens/play', text: 'Play' });
+    expect(landing).toContain('coffee');
+    expect(landing).toContain('volume');
+    expect(landing).toContain('music');
+    expect(landing).toContain('run');
+  });
+
+  it('puts Me, the plain C and the crown on the bar, and keeps theme out of the bar', () => {
+    expect(landing).toContain('>C<');
+    expect(landing).toContain('href="/citizens-crown.png"');
+    expect(links(landing)).toContainEqual({ href: PAGES.settings, text: 'Me' });
+    expect(landing).not.toContain('Preview tools');
+    expect(landing).not.toContain('This Page only');
+    expect(landing).not.toContain('Pretoria · preview');
+  });
+});
+
+describe('Settings (/citizens/settings)', () => {
+  it('offers System, Light and Dark, and nothing else that looks like a quick toggle', () => {
+    expect(settings).toMatch(/<h1[^>]*>Settings<\/h1>/);
+    expect(settings).toContain('Appearance');
+    expect(settings).toContain('System');
+    expect(settings).toContain('Light');
+    expect(settings).toContain('Dark');
+    expect(settings).not.toContain('Preview tools');
+    expect(settings).not.toContain('marker-language');
   });
 });
 
@@ -266,16 +292,16 @@ describe('the menus', () => {
   const groups = navGroups();
 
   it('are three disclosures, Explore, Get involved and About, with Search and Join beside them', () => {
-    expect(landing.match(/<details\b/g)).toHaveLength(3);
+    expect(ecosystem.match(/<details\b/g)).toHaveLength(3);
     expect(groups.map((g) => g.label)).toEqual(['Explore', 'Get involved', 'About']);
     for (const group of groups) {
-      expect(landing, group.label).toMatch(
+      expect(ecosystem, group.label).toMatch(
         new RegExp(`<summary>${group.label}<svg[^>]*>.*?</svg></summary>`),
       );
       expect(group.links.length, group.label).toBeGreaterThan(0);
     }
-    expect(links(landing)).toContainEqual({ href: CONNECT.search, text: 'Search the Kingdom' });
-    expect(links(landing)).toContainEqual({ href: CONNECT.home, text: 'Join' });
+    expect(links(ecosystem)).toContainEqual({ href: CONNECT.search, text: 'Search the Kingdom' });
+    expect(links(ecosystem)).toContainEqual({ href: CONNECT.home, text: 'Join' });
   });
 
   it('lead only to pages that exist: a hub page, an app or coming-soon page, or one of Connect’s own screens', () => {
@@ -382,7 +408,7 @@ describe('platform copy', () => {
   });
 
   it('keeps every hub page’s path in step between content.ts and the sitemap list', () => {
-    expect([PATH_ROOT, ...Object.values(PAGES)]).toEqual([...HUB_PAGES]);
+    expect(['/', PATH_ROOT, ...Object.values(PAGES)]).toEqual([...HUB_PAGES]);
   });
 
   it('builds the canonical address from the registry’s site origin, and titles inner pages "Name: Citizens"', () => {

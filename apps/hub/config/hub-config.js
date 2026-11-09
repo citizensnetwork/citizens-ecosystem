@@ -15,16 +15,19 @@ const {
 } = require('@citizens/ecosystem');
 
 /**
- * The pages the front door itself serves and lists in its sitemap: the landing page and its four content pages
- * (src/lib/content.ts `PAGES` names the same four; a test compares them). Coming-soon pages are noindex, so not here.
- * None of these may share a slug with an app (built or coming soon): a test checks that too.
+ * The pages the front door itself serves and lists in its sitemap: the 219 homepage, Central, its four content
+ * pages and Settings (src/lib/content.ts `PAGES` names the same paths after `/`; a test compares them).
+ * Coming-soon pages are noindex, so not here. None of these may share a slug with an app (built or coming soon):
+ * a test checks that too.
  */
 const HUB_PAGES = Object.freeze([
+  '/',
   PATH_ROOT,
   `${PATH_ROOT}/ecosystem`,
   `${PATH_ROOT}/how-it-works`,
   `${PATH_ROOT}/philosophy`,
   `${PATH_ROOT}/get-involved`,
+  `${PATH_ROOT}/settings`,
 ]);
 
 /**
@@ -74,7 +77,7 @@ const CONNECT_ROOT_PAGES = Object.freeze([
 ]);
 
 /**
- * `/` is a 302, not a permanent redirect, so the root stays free to become something else.
+ * `/` is the 219 homepage (this app). It used to be a 302 to `/citizens` so the root stayed free; that page is it.
  *
  * Connect's old root addresses (see CONNECT_ROOT_PAGES) are 308s to the same path under `/citizens/connect`; Next keeps
  * the query string (`/index.html?c=<slug>` is the oldest QR form). Permanent, because those screens live under the
@@ -89,7 +92,6 @@ function hubRedirects() {
   const connect = `${PATH_ROOT}/connect`;
   const page = `/:page(${CONNECT_ROOT_PAGES.join('|')})`;
   return [
-    { source: '/', destination: PATH_ROOT, statusCode: 302 },
     { source: page, destination: `${connect}/:page`, statusCode: 308 },
     { source: `${page}/:rest+`, destination: `${connect}/:page/:rest+`, statusCode: 308 },
     { source: '/index.html', destination: `${connect}/index.html`, statusCode: 308 },
@@ -97,8 +99,9 @@ function hubRedirects() {
 }
 
 /**
- * Strict policy for the front door's own pages. They are static HTML with one external stylesheet and no script at
- * all, so nothing inline is allowed. Development adds what `next dev` needs (React Refresh, injected styles).
+ * Strict policy for the front door's own pages. Scripts and styles are same-origin files (no inline). Central
+ * fetches the weather from Open-Meteo in the browser when the feed opens, so that host is the one extra connect
+ * source. Development adds what `next dev` needs (React Refresh, injected styles).
  */
 function contentSecurityPolicy(isDev = false) {
   return [
@@ -107,7 +110,7 @@ function contentSecurityPolicy(isDev = false) {
     `style-src 'self'${isDev ? " 'unsafe-inline'" : ''}`,
     "img-src 'self' data:",
     "font-src 'self'",
-    "connect-src 'self'",
+    "connect-src 'self' https://api.open-meteo.com",
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'none'",

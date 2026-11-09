@@ -4,8 +4,8 @@ The one project that will own the shared domain, `219.co.za`. Every Citizens app
 `219.co.za/citizens/<app>`; this app is what answers at that domain and decides who serves what.
 
 ```
-219.co.za/                  302 to /citizens (a 302, so the root stays free for later)
-219.co.za/citizens          the ecosystem landing page (this app)
+219.co.za/                  the 219 homepage (this app; it stays light and leads into Citizens)
+219.co.za/citizens          Central, the Citizens front door (this app)
 219.co.za/citizens/ecosystem, /how-it-works, /philosophy, /get-involved    content pages (this app, in the sitemap)
 219.co.za/citizens/learn    "coming soon" page (this app, noindex)    } the registry's COMING_SOON list
 219.co.za/citizens/play     "coming soon" page (this app, noindex)    }
@@ -80,11 +80,12 @@ hub's 404. Every link the hub writes is lowercase (a test checks each one agains
 
 ## Security headers: the hub's own pages only
 
-The hub's pages are static HTML plus one external stylesheet and **no script at all**, so the policy allows nothing
-inline:
+The hub's pages are HTML plus stylesheets from this app. Central and Settings also load the app's script (the hour
+card reads Open-Meteo in the browser, and Settings remembers Light, Dark or System). Nothing inline is allowed, and
+`connect-src` adds only `https://api.open-meteo.com`:
 
 ```
-default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self';
+default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.open-meteo.com;
 object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 ```
 

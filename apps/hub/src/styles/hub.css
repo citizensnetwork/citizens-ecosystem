@@ -16,11 +16,12 @@
   --white: #ffffff;
   --ink: #111111;
   --black: #0a0a0a;
-  --gold: #f2bd22;
+  /* The one gold on the front door. Approved preview value (was #f2bd22). */
+  --gold: #d4af37;
   --muted: #3d3d3d;
   --on-black-soft: #e6e6e6;
   --line: #d9d9d9;
-  --paper: #f7f5ef;
+  --paper: #f7f6f1;
   --slab: #161616;
   --slab-warm: #2a2312;
   --slab-cool: #121c26;
@@ -64,7 +65,7 @@ svg {
 
 a,
 summary {
-  -webkit-tap-highlight-color: rgba(242, 189, 34, 0.3);
+  -webkit-tap-highlight-color: rgba(212, 175, 55, 0.3);
 }
 
 a {
@@ -483,7 +484,7 @@ a.chip:hover {
   justify-content: center;
   height: 12rem;
   overflow: hidden;
-  background: radial-gradient(60% 80% at 62% 38%, rgba(242, 189, 34, 0.28), transparent 70%),
+  background: radial-gradient(60% 80% at 62% 38%, rgba(212, 175, 55, 0.28), transparent 70%),
     repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.035) 0 2px, transparent 2px 22px),
     linear-gradient(135deg, #1f1b12 0%, #0e0e0e 70%);
   clip-path: polygon(0 26%, 100% 0, 100% 100%, 0 100%);
@@ -698,7 +699,7 @@ a.chip:hover {
 
 /* The drawn art of each platform: a dark slab with its own faint tint or texture. */
 .tile-connect .tile-art {
-  --art: radial-gradient(90% 100% at 15% 100%, rgba(242, 189, 34, 0.26), transparent 60%),
+  --art: radial-gradient(90% 100% at 15% 100%, rgba(212, 175, 55, 0.26), transparent 60%),
     linear-gradient(160deg, var(--slab-warm), var(--slab));
 }
 
@@ -714,7 +715,7 @@ a.chip:hover {
 }
 
 .tile-learn .tile-art {
-  --art: radial-gradient(80% 90% at 85% 0%, rgba(242, 189, 34, 0.22), transparent 60%),
+  --art: radial-gradient(80% 90% at 85% 0%, rgba(212, 175, 55, 0.22), transparent 60%),
     linear-gradient(160deg, var(--slab-warm), var(--slab));
 }
 
@@ -729,7 +730,7 @@ a.chip:hover {
 }
 
 .tile-impact .tile-art {
-  --art: linear-gradient(0deg, rgba(242, 189, 34, 0.32), transparent 55%),
+  --art: linear-gradient(0deg, rgba(212, 175, 55, 0.32), transparent 55%),
     linear-gradient(180deg, #17120a, #0b0b0b);
 }
 
@@ -803,7 +804,7 @@ a.chip:hover {
 .band {
   position: relative;
   overflow: hidden;
-  background: radial-gradient(50% 70% at 78% 50%, rgba(242, 189, 34, 0.12), transparent 70%),
+  background: radial-gradient(50% 70% at 78% 50%, rgba(212, 175, 55, 0.12), transparent 70%),
     linear-gradient(135deg, #131313 0%, var(--black) 60%);
 }
 

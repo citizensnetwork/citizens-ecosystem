@@ -25,6 +25,8 @@ export const PAGES = {
   howItWorks: `${PATH_ROOT}/how-it-works`,
   philosophy: `${PATH_ROOT}/philosophy`,
   getInvolved: `${PATH_ROOT}/get-involved`,
+  /** Appearance for Central. Connect's own settings stay at /citizens/connect/settings. */
+  settings: `${PATH_ROOT}/settings`,
 } as const;
 
 /** Where Connect's own screens live under the shared domain (app-relative paths from Connect's routes.jsx). */
@@ -85,6 +87,87 @@ export const BAND = {
 
 /** The line that closes the page (Design; the Conversation's closing message ends with it). */
 export const PART_TO_PLAY = 'Every Citizen has a part to play';
+
+/* ------------------------------------------------------------------------------------------------------------------
+ * 219 homepage and Central (approved preview, 9 November 2026). The feed lines are example data, not a live feed.
+ * ---------------------------------------------------------------------------------------------------------------- */
+
+export const HOME_219 = {
+  title: '219: Connecting the Kingdom',
+  description:
+    '219 is a call for the existing Body of Christ to be recognised, joined together and strengthened.',
+  kicker: 'Connecting the Kingdom · Ephesians 2:19–22',
+  headline: ['So much life.', 'More fully', 'expressed.'],
+  lead: '219 is a call for the existing Body of Christ to be recognised, joined together and strengthened.',
+  aside: 'Not a new Christian world. A greater expression of the life already present.',
+  heartCta: 'Understand the heart',
+  citizensCta: 'Discover Citizens',
+  enterCta: 'Enter Citizens',
+  artLine: 'Unity without uniformity. Connection without control.',
+  heartKicker: 'The heart of the initiative',
+  heartQuote: '“219 is the cry for its expression to be realised.”',
+  heartLeft:
+    'The Body already carries extraordinary resources, abilities, wisdom and relationships. Much remains disconnected, undiscovered or overlooked.',
+  heartRight:
+    'Collection that results in life, health and strength comes before mobilisation. Collective life must be experienced, not merely explained.',
+  principles: [
+    {
+      kicker: 'Recognise',
+      title: 'People before tasks.',
+      text: 'Ordinary work, creativity and daily life matter, beyond what they can provide to a project.',
+    },
+    {
+      kicker: 'Join together',
+      title: 'Belonging before output.',
+      text: 'Belonging is not conditional on contribution. Relationships make room for participation.',
+    },
+    {
+      kicker: 'Strengthen',
+      title: 'Freedom, not ownership.',
+      text: '219 is not the head or owner of the Body, nor a central institution through which everything must pass.',
+    },
+  ],
+  doorKicker: 'One practical environment · Citizens',
+  doorTitle: 'Collective life, in the everyday.',
+  doorBody:
+    'Citizens is one expression of 219, not the whole of it. Central is a shared daily home for encouragement, discovery and participation.',
+  footerMark: '219 · Connecting the Kingdom',
+  footerNote: 'Firm in identity. Humble in leadership.',
+} as const;
+
+export const CENTRAL = {
+  title: 'Central: Citizens',
+  description:
+    'A place to experience life together — encouragement, connection and possibilities already among us.',
+  kicker: 'Your shared home',
+  headline: 'A little closer, every day.',
+  lead: 'A place to experience life together — encouragement, connection and possibilities already among us.',
+  encouragementLabel: 'Today’s Encouragement',
+  encouragement: 'Encourage one another and build each other up.',
+  encouragementRef: '1 Thessalonians 5:11',
+  hourKicker: 'This hour around you',
+  place: 'Pretoria',
+  preview: 'Preview',
+  open: 'Open',
+  about: 'About',
+} as const;
+
+/** Where the Central theme choice lives, and the line under it. */
+export const APPEARANCE = {
+  title: 'Settings: Citizens',
+  description: 'Light, dark, or follow this device. The choice is saved on this device only.',
+  heading: 'Settings',
+  section: 'Appearance',
+  theme: 'Theme',
+  system: 'System',
+  light: 'Light',
+  dark: 'Dark',
+  systemLight: 'Follows your device · light right now',
+  systemDark: 'Follows your device · dark right now',
+  alwaysLight: 'Always light on this device',
+  alwaysDark: 'Always dark on this device',
+  note: 'Saved on this device only. Central follows it. The 219 homepage stays light.',
+} as const;
 
 /** Ephesians 2:19-21, word for word as it stands in VISION.md. */
 export const SCRIPTURE = {

@@ -116,8 +116,8 @@ describe('hubRedirects', () => {
   // The first rule whose compiled source matches, as Next applies them (first match wins).
   const firstMatch = (path: string) => rules.find((rule) => toRegExp(rule.source).test(path));
 
-  it('sends / to /citizens as a 302 (not permanent, so the root stays free)', () => {
-    expect(rules[0]).toEqual({ source: '/', destination: '/citizens', statusCode: 302 });
+  it('leaves / to the 219 homepage (it used to redirect, and the root is that page now)', () => {
+    expect(firstMatch('/')).toBeUndefined();
   });
 
   it('forwards Connect’s old root addresses (2026-11-01 to 11-03) to the same screen under its prefix, permanently', () => {
@@ -140,6 +140,7 @@ describe('hubRedirects', () => {
 
   it('leaves the hub’s own addresses, the apps’ prefixes, /api and near-misses alone', () => {
     const own = [
+      '/',
       '/citizens',
       '/citizens/connect',
       '/citizens/c/x',
@@ -212,7 +213,7 @@ describe('security headers', () => {
     expect(directive('base-uri')).toEqual(["'none'"]);
     expect(directive('form-action')).toEqual(["'none'"]);
     expect(directive('frame-ancestors')).toEqual(["'none'"]);
-    expect(directive('connect-src')).toEqual(["'self'"]);
+    expect(directive('connect-src')).toEqual(["'self'", 'https://api.open-meteo.com']);
   });
 
   it('relaxes only what `next dev` needs, and only in development', () => {
@@ -312,11 +313,13 @@ describe('robots.txt and sitemap.xml', () => {
 
   it('the sitemap lists the hub’s own indexable pages only (no app, no noindex page)', () => {
     expect([...HUB_PAGES]).toEqual([
+      '/',
       '/citizens',
       '/citizens/ecosystem',
       '/citizens/how-it-works',
       '/citizens/philosophy',
       '/citizens/get-involved',
+      '/citizens/settings',
     ]);
     const locs = [...sitemapXml().matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
     expect(locs).toEqual([...HUB_PAGES].map((page) => `${SITE_ORIGIN}${page}`));
