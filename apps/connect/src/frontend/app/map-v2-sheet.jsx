@@ -160,10 +160,15 @@
       : h('span', { 'data-mv2': 'card-media', 'data-cover': '', 'data-tile': '', 'aria-hidden': 'true' }, h(Icon, { name: icon, size: 40 }));
   }
 
-  function Action({ icon, label, href, onClick, external, primary, on }) {
+  function Action({ icon, label, href, onClick, external, primary, on, kind, online }) {
     const Icon = window.Icon;
-    const kids = [h(Icon, { key: 'i', name: icon, size: 16, fill: on ? 'currentColor' : 'none' }), h('span', { key: 't' }, label)];
-    const common = { 'data-mv2': 'action', 'data-primary': primary ? '' : undefined, 'data-on': on ? '' : undefined };
+    const kids = [h(Icon, { key: 'i', name: icon, size: 16, fill: on ? 'currentColor' : 'none' }), h('span', { key: 't' }, label),
+      online ? h('span', { key: 'on', 'data-mv2': 'online-word' }, StrSafe()) : null];
+    const common = { 'data-mv2': 'action', 'data-kind': kind || undefined, 'data-primary': primary ? '' : undefined, 'data-on': on ? '' : undefined };
+    function StrSafe() {
+      const s = window.MapV2Strings && window.MapV2Strings.sheet;
+      return (s && s.online) || '';
+    }
     return href
       ? h('a', Object.assign({ href, target: external ? '_blank' : undefined, rel: external ? 'noopener noreferrer' : undefined }, common), kids)
       : h('button', Object.assign({ type: 'button', onClick }, common), kids);
@@ -251,7 +256,7 @@
   }
 
   // ── the sheet ────────────────────────────────────────────────────
-  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view }) {
+  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view, onFilterGroup }) {
     const app = window.useApp();
     const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, savedContributors, savedPlaces, toggleSave, realUser } = app;
     // Place and Event actions (#210, founder 2026-10-30): the same pills as a Contributor's, so the sheet speaks one way
@@ -539,7 +544,7 @@
     const org = !isContributor && item.organizerId ? contributors.find((c) => c.id === item.organizerId) : null;
     const name = item.title || item.name || '';
     const cat = window.DATA.getItemCategory(Object.assign({}, item, { type }));
-    const hex = cat ? cat.hex : '#F2BD22';
+    const hex = cat ? cat.hex : '#D4AF37';
     const catLabel = cat ? cat.name : ((isContributor && window.MapV2Strings.pin.kind[item.kind]) || window.MapV2Strings.pin.type[type]);
     const avatarSrc = isContributor ? item.profilePhoto : org && org.profilePhoto;
     const avatarName = isContributor ? name : org && org.name;
@@ -607,7 +612,8 @@
     // one thing a person does with the listing (Follow, or Connect for an event), then Save (Consider for an event), Share,
     // and the listing's own links. The card's own gradient Follow button and its white box are gone.
     const actions = [];
-    if (dir) actions.push(h(Action, { key: 'dir', icon: 'Navigation', label: Str.directions, href: dir, external: true, primary: true }));
+    const eventOnline = type === 'event' && !!(item.online || item.isOnline || item.lat == null);
+    if (dir && !eventOnline) actions.push(h(Action, { key: 'dir', icon: 'Navigation', label: Str.directions, href: dir, external: true }));
     // P2-04: Follow, for a Contributor that is not you
     const following = isContributor && followedOrgs.has(item.id);
     if (isContributor && !(realUser && realUser.id === item.id)) {
@@ -620,7 +626,7 @@
     }
     if (type === 'event') {
       const on = connected.has(item.id);
-      actions.push(h(Action, { key: 'connect', icon: on ? 'Check' : 'CalendarCheck', label: on ? Str.connected : Str.connect, on, onClick: () => toggleConnect(item.id) }));
+      actions.push(h(Action, { key: 'connect', kind: 'connect', online: eventOnline && !on, icon: on ? 'Check' : 'CalendarCheck', label: on ? Str.connected : Str.connect, on, onClick: () => toggleConnect(item.id) }));
     }
     // P2-04: Save, a PRIVATE bookmark for a Contributor (not you) or a Place; an Event keeps its Consider bookmark. Never counted,
     // never shown to the listing: the only trace is the person's own list in Settings.
@@ -829,7 +835,10 @@
       h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
       h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
       h('p', { 'data-mv2': 'xmeta' },
-        h('span', { 'data-mv2': 'card-chip' },
+        h('button', {
+          type: 'button', 'data-mv2': 'card-chip', 'data-pressable': '', 'data-cat': group || undefined,
+          onClick: () => { if (group && onFilterGroup) onFilterGroup(group); },
+        },
           h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
           h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
         expanded && collabChip,
@@ -838,6 +847,8 @@
     return h('section', {
       ref: root, 'data-mv2': 'sheet', 'data-snap': wide ? 'panel' : snap, 'data-wide': wide ? '1' : undefined,
       'data-expanded': expanded ? '' : undefined,
+      'data-cat': group || undefined,
+      style: group ? { '--pin-cat': 'var(--cat-' + group + ')' } : undefined,
       role: 'dialog', 'aria-label': Str.dialogLabel(name), 'aria-modal': 'false',
       onPointerDown,
     },

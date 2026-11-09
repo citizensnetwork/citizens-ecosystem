@@ -200,7 +200,7 @@
     const cat = window.DATA && window.DATA.getItemCategory ? window.DATA.getItemCategory(m) : null;
     const group = groupOf(m);
     const cover = rec.coverPhoto || '';
-    return h('div', { 'data-mv2': 'explore-card', 'data-explore-id': m.id, 'data-selected': opts.selected ? '' : undefined },
+    return h('div', { 'data-mv2': 'explore-card', 'data-explore-id': m.id, 'data-selected': opts.selected ? '' : undefined, 'data-step': opts.step == null ? undefined : String(opts.step) },
       // "Selected" in words (never the outline alone), laid OVER the picture so the card never changes size
       opts.selected ? h('span', { 'data-mv2': 'explore-badge', 'aria-hidden': 'true' }, opts.badge) : null,
       h(Card, {
@@ -378,9 +378,11 @@
     }, [props.reveal, rankKey]);
 
     const distWords = view.user ? str : (str.centre || {});
-    const render = ({ m, meters }) => cardFor({
+    const selAt = rows.findIndex((r) => r.m.id === props.selectedId);
+    const render = ({ m, meters }, i) => cardFor({
       m: m, meters: meters, rec: byKey.get(m.type + ':' + m.id), idPrefix: 'mv2-x-' + m.id, words: distWords,
       selected: props.selectedId === m.id, badge: str.selectedBadge, onOpen: props.onOpen,
+      step: selAt < 0 ? undefined : Math.min(2, Math.abs(i - selAt)),
     });
 
     // The handle: a tap lowers or raises the panel, and so does a short swipe down or up (never a drag that follows the

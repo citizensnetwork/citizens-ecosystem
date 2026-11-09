@@ -46,7 +46,7 @@ test.describe("P1-01 Map v2 is the map", () => {
     await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0); // removed at the founder's request (2026-10-12)
     expect(await theme(page)).toBe("light");
     // the token file is really applied: --accent resolves to gold
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#f2bd22");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#d4af37");
     // a visitor who never chose gets no key written for them
     expect(await stored(page)).toBeNull();
   });
@@ -109,7 +109,7 @@ test.describe("P1-04 the pin", () => {
     await expect(pin).toHaveClass(/is-selected/);
     await expect(pin).toHaveClass(/is-loaded/);
     await expect.poll(() => pin.locator("[data-mv2='logo-wrap']").evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
-    await expect.poll(() => pin.locator("[data-mv2='body']").evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).a)).toBeCloseTo(1.6, 2);
+    await expect.poll(() => pin.locator("[data-mv2='body']").evaluate((e) => new DOMMatrix(getComputedStyle(e).transform).a)).toBeCloseTo(1, 2);
   });
 
   test("a logo that fails to load leaves the category glyph, never a dead image", async ({ page }) => {

@@ -48,7 +48,24 @@
     return node.filter((c) => Array.isArray(c) && typeof c[0] === 'string');
   }
 
+  const DAZZLE = {
+    DazzleMe: '<path d="M5 21C5 17.13 8.13 14 12 14C15.87 14 19 17.13 19 21M16 7C16 9.21 14.21 11 12 11C9.79 11 8 9.21 8 7C8 4.79 9.79 3 12 3C14.21 3 16 4.79 16 7Z"/>',
+    DazzleMap: '<path d="M15 6V21M15 6L21 3V18L15 21M15 6L9 3M15 21L9 18M9 18L3 21V6L9 3M9 18V3"/>',
+    DazzleExplore: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5 13.4 13.4 8.5 15.5 10.6 10.6Z"/>',
+    DazzleDo: '<rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/>',
+  };
+
   function Icon({ name, size = 18, strokeWidth = 2, className = '', style, ...rest }) {
+    if (name === 'DazzleCentral') {
+      return React.createElement('span', { className: 'type-c', style: Object.assign({ fontSize: size, lineHeight: 1, fontWeight: 500 }, style), 'aria-hidden': true }, 'C');
+    }
+    if (DAZZLE[name]) {
+      return React.createElement('svg', {
+        width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+        strokeWidth, strokeLinecap: 'round', strokeLinejoin: 'round', className, style,
+        dangerouslySetInnerHTML: { __html: DAZZLE[name] }, ...rest,
+      });
+    }
     const brand = BRANDS[name];
     if (brand) {
       return React.createElement(

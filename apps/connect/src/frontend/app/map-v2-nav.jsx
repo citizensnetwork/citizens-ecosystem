@@ -21,30 +21,41 @@
   const useBackGuard = (open, fn) => (window.useBackGuard ? window.useBackGuard(open, fn) : undefined);
 
   const ITEMS = [
-    { id: 'home', icon: 'House' },
-    { id: 'explore', icon: 'Compass' },
-    { id: 'map', icon: 'Map' },
-    { id: 'profile', icon: 'User' },
+    { id: 'me', icon: 'DazzleMe' },
+    { id: 'map', icon: 'DazzleMap' },
+    { id: 'central', icon: 'DazzleCentral' },
+    { id: 'do', icon: 'DazzleDo' },
+    { id: 'explore', icon: 'DazzleExplore' },
   ];
-  // Screens that now live under Profile's menu light up Profile.
-  const UNDER_PROFILE = ['messages', 'notifications', 'lets', 'community', 'settings', 'dashboard', 'admin'];
+  // Me holds messages, alerts, settings and the contributor tools.
+  const UNDER_ME = ['messages', 'notifications', 'settings', 'dashboard', 'admin', 'apply', 'onboarding'];
 
-  /** Which item a screen belongs to: 'home' | 'explore' | 'map' | 'profile', or '' (an event or place page). */
+  /** Which item a screen belongs to, or '' when the screen is a listing. */
   function currentOf(nav) {
     const page = nav && nav.page;
     const params = (nav && nav.params) || {};
-    if (!page || page === 'home') return params.view === 'map' ? 'map' : 'home';
+    if (!page || page === 'home') return 'map';
     if (page === 'explore' || page === 'kingdom-discovery') return 'explore';
-    if (page === 'profile') return params.id ? '' : 'profile';
-    return UNDER_PROFILE.indexOf(page) !== -1 ? 'profile' : '';
+    if (page === 'lets' || page === 'community') return 'do';
+    if (page === 'profile') return params.id ? '' : 'me';
+    return UNDER_ME.indexOf(page) !== -1 ? 'me' : '';
   }
 
-  /** Where an item goes: [page, params]. Profile opens a menu instead, so it has none. */
+  /** Where an item goes: [page, params]. Central leaves Connect for the citizens home. Me opens the profile. */
   function targetOf(id) {
-    if (id === 'home') return ['home', {}];
-    if (id === 'map') return ['home', { view: 'map' }];
+    if (id === 'map') return ['home', {}];
     if (id === 'explore') return ['explore', {}];
+    if (id === 'do') return ['lets', {}];
+    if (id === 'me') return ['profile', {}];
     return null;
+  }
+
+  function centralHref() {
+    const base = (window.CC_ROUTES && window.CC_ROUTES.BASE_PATH) || '';
+    if (typeof base === 'string' && base.indexOf('/connect') !== -1) {
+      return base.replace(/\/connect\/?$/, '') || '/citizens';
+    }
+    return 'https://219.co.za/citizens';
   }
 
   function useWide() {
@@ -93,7 +104,7 @@
       return () => clearTimeout(timer.current);
     }, [open, menu, arm]);
 
-    // A new screen folds the bar.
+    // A new screen folds the bar. The first paint keeps a first visit open.
     const where = nav ? nav.page + '|' + ((nav.params && nav.params.view) || '') : '';
     useEffect(() => { setOpen(false); setMenu(false); }, [where]);
 
@@ -117,7 +128,12 @@
     if (wide) return null;
 
     const pick = (id) => {
-      if (id === 'profile') { setMenu((m) => !m); return; }
+      if (id === 'central') {
+        const href = centralHref();
+        setOpen(false);
+        if (href) window.location.assign(href);
+        return;
+      }
       const t = targetOf(id);
       setOpen(false);
       setMenu(false);
@@ -127,16 +143,12 @@
     const item = (it) => h('button', {
       key: it.id, type: 'button', 'data-mv2': 'nav-item', 'data-nav': it.id,
       'aria-current': cur === it.id ? 'page' : undefined,
-      'aria-expanded': it.id === 'profile' ? (menu ? 'true' : 'false') : undefined,
-      // The account menu closes on a press outside it; this press is the toggle, so keep it from counting as "outside".
-      onMouseDown: it.id === 'profile' ? (e) => e.stopPropagation() : undefined,
+      'aria-expanded': undefined,
       onClick: () => pick(it.id),
     },
       Icon ? h(Icon, { name: it.icon, size: 22 }) : null,
       h('span', { 'data-mv2': 'nav-label' }, (str.items || {})[it.id]),
-      it.id === 'profile' && unread > 0 ? h('span', { 'data-mv2': 'nav-dot', 'aria-hidden': 'true' }) : null);
-
-    const curIcon = (ITEMS.find((it) => it.id === cur) || {}).icon || 'Menu';
+      it.id === 'me' && unread > 0 ? h('span', { 'data-mv2': 'nav-dot', 'aria-hidden': 'true' }) : null);
 
     return h(React.Fragment, null,
       open ? h('div', { 'data-mv2': 'nav-dim', 'aria-hidden': 'true', onClick: fold }) : null,
@@ -149,14 +161,13 @@
             ITEMS.map(item),
             h('button', {
               type: 'button', 'data-mv2': 'nav-close', 'aria-label': str.close, onClick: fold,
-            }, Icon ? h(Icon, { name: 'X', size: 20 }) : null))
+            }, window.CrownMark ? h(window.CrownMark, { size: 28 }) : (Icon ? h(Icon, { name: 'X', size: 20 }) : null)))
           : h('button', {
             ref: toggle, type: 'button', 'data-mv2': 'nav-toggle', 'aria-expanded': 'false',
             'aria-label': unread > 0 ? str.openUnread : str.open,
             onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') byKeyboard.current = true; },
             onClick: () => setOpen(true),
           },
-            Icon ? h(Icon, { name: curIcon, size: 22 }) : null,
             unread > 0 ? h('span', { 'data-mv2': 'nav-dot', 'aria-hidden': 'true' }) : null),
         menu && window.ProfilePanel
           ? h('div', { 'data-mv2': 'nav-menu' }, h(window.ProfilePanel, { anchor: 'nav', extras: true, onClose: () => setMenu(false) }))

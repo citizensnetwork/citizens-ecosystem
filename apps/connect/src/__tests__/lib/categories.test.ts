@@ -66,8 +66,9 @@ describe("CATEGORY_BADGE_CLASSES", () => {
     }
   });
 
-  it("uses gold-soft for church-services category", () => {
-    expect(CATEGORY_BADGE_CLASSES["church-services"]).toContain("gold-soft");
+  it("uses the worship group colour for church-services, never gold", () => {
+    expect(CATEGORY_BADGE_CLASSES["church-services"]).toContain("7040B5");
+    expect(CATEGORY_BADGE_CLASSES["church-services"]).not.toContain("gold");
   });
 });
 
@@ -78,8 +79,8 @@ describe("CATEGORY_COLORS", () => {
     }
   });
 
-  it("uses brand gold for church-services", () => {
-    expect(CATEGORY_COLORS["church-services"]).toBe("#F2BD22");
+  it("uses the worship group colour for church-services, never gold", () => {
+    expect(CATEGORY_COLORS["church-services"]).toBe("#7040B5");
   });
 });
 

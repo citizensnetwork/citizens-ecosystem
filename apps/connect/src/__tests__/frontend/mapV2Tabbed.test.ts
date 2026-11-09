@@ -93,7 +93,7 @@ describe("map sheet tabbed block (issue 217)", () => {
     const darkRatio = contrast(hex(decl(dark, "--surface-1")), darkInk.rgb, darkInk.a);
     // About 1.30:1 light and 1.48:1 dark. Below 3:1 on purpose: a non-interactive hairline.
     expect(lightRatio).toBeCloseTo(1.302, 2);
-    expect(darkRatio).toBeCloseTo(1.485, 2);
+    expect(darkRatio).toBeCloseTo(1.524, 2);
     expect(lightRatio).toBeGreaterThan(1);
     expect(darkRatio).toBeGreaterThan(1);
   });
@@ -103,8 +103,8 @@ describe("map sheet tabbed block (issue 217)", () => {
     expect(sheet).toContain("tabIndex: 0");
     expect(sheet).toContain("scrollTop += d");
     expect(sheet).not.toContain("role: 'separator'");
-    expect(lib).toContain("/assets/map-v2.css?v=20261101c");
+    expect(lib).toContain("/assets/map-v2.css?v=20261109a");
     expect(html).toContain("app/map-v2-sheet.jsx?v=20261101b");
-    expect(html).toContain("app/map-v2-lib.jsx?v=20261101c");
+    expect(html).toContain("app/map-v2-lib.jsx?v=20261109a");
   });
 });

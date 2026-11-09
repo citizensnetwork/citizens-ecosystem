@@ -45,7 +45,7 @@ export const CATEGORY_LABELS_SHORT: Record<EventCategory, string> = {
 /** Hex colour per category — used for calendar, map markers, badges. */
 export const CATEGORY_HEX: Record<EventCategory, string> = {
   "worship-prayer": "#B8860B",
-  "church-services": "#F2BD22",
+  "church-services": "#7040B5",
   "outreach-missions": "#1ABC9C",
   "markets-expos": "#F39C12",
   "sport-recreation": "#2ECC71",
@@ -66,7 +66,7 @@ export const CATEGORY_HEX: Record<EventCategory, string> = {
 /** Tailwind class strings for category badges. */
 export const CATEGORY_BADGE_CLASSES: Record<EventCategory, string> = {
   "worship-prayer": "bg-[#B8860B]/15 text-[#7a5b08]",
-  "church-services": "bg-[var(--gold-soft)] text-black",
+  "church-services": "bg-[#7040B5]/15 text-[#4a2a82]",
   "outreach-missions": "bg-[#1ABC9C]/15 text-[#148f77]",
   "markets-expos": "bg-[#F39C12]/15 text-[#b7710c]",
   "sport-recreation": "bg-[#2ECC71]/15 text-[#1e8449]",
@@ -211,7 +211,7 @@ export const PLACE_CATEGORY_DESCRIPTIONS: Record<PlaceCategory, string> = {
 
 /** Hex colour per place category. */
 export const PLACE_CATEGORY_HEX: Record<PlaceCategory, string> = {
-  "churches-ministries": "#F2BD22",
+  "churches-ministries": "#7040B5",
   "hospitality-cafes": "#8B4513",
   "recreation-sport": "#2ECC71",
   "media-broadcasting": "#9B59B6",
@@ -219,7 +219,7 @@ export const PLACE_CATEGORY_HEX: Record<PlaceCategory, string> = {
   "health-wellness": "#E74C3C",
   "education-training": "#3498DB",
   "arts-creative": "#FF6B35",
-  "christian-businesses": "#A67C00",
+  "christian-businesses": "#687D20",
   "safe-spaces": "#B59CD9",
 };
 
@@ -269,10 +269,10 @@ export const CONTRIBUTOR_TYPES: readonly {
   hex: string;
   icon: string;
 }[] = [
-  { value: "churches-ministries", label: "Church", hex: "#F2BD22", icon: "Church" },
+  { value: "churches-ministries", label: "Church", hex: "#7040B5", icon: "Church" },
   { value: "outreach-missions", label: "Outreach / Mission", hex: "#1ABC9C", icon: "Globe" },
   { value: "markets-expos", label: "Market / Expo", hex: "#F39C12", icon: "Store" },
-  { value: "christian-businesses", label: "Business", hex: "#A67C00", icon: "Store" },
+  { value: "christian-businesses", label: "Business", hex: "#687D20", icon: "Store" },
   { value: "sport-recreation", label: "Sport & Recreation", hex: "#2ECC71", icon: "CircleDot" },
   { value: "social-gatherings", label: "Social Gathering", hex: "#E91E63", icon: "Wine" },
   { value: "arts-culture", label: "Arts & Culture", hex: "#FF6B35", icon: "Palette" },

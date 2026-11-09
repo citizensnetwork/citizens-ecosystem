@@ -20,7 +20,7 @@
 
   function roleBadge(role, level) {
     if (role === 'admin') return { label: 'Admin', color: '#8E44AD', fg: '#FFFFFF', icon: 'Shield' };
-    if (role === 'contributor') return { label: level || 'Contributor', color: '#F2BD22', fg: '#0A0908', icon: 'Crown' };
+    if (role === 'contributor') return { label: level || 'Contributor', color: '#D4AF37', fg: '#0A0908', icon: 'Crown' };
     return null;
   }
 
@@ -180,7 +180,7 @@
     const rb = roleBadge(role, user.involvementLevel);
 
     return React.createElement('aside', {
-      className: cx('hidden md:flex flex-col glass border-r border-white/40 z-40 shrink-0 transition-all duration-300 relative', collapsed ? 'w-[74px]' : 'w-64'),
+      className: cx('cc-rail hidden md:flex flex-col glass border-r border-white/40 z-40 shrink-0 transition-all duration-300 relative', collapsed ? 'w-[74px]' : 'w-64'),
     },
       // logo
       React.createElement('button', {
@@ -201,7 +201,7 @@
           className: cx('flex items-center w-full rounded-xl transition-colors hover:bg-accent/50 p-2', collapsed ? 'justify-center' : 'gap-3'),
         },
           React.createElement('div', { className: 'relative shrink-0' },
-            React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 36, ring: 'rgba(242,189,34,0.4)' }),
+            React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 36, ring: 'rgba(212,175,55,0.4)' }),
             role !== 'citizen' && React.createElement('span', {
               className: 'absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-background flex items-center justify-center',
               style: { background: rb.color },
@@ -267,7 +267,7 @@
           React.createElement(Icon, { name: 'CalendarPlus', size: 15, className: 'text-gold-dark' }), React.createElement('span', { className: 'text-xs font-bold' }, 'Create Event'))),
       React.createElement('button', {
         onClick: () => setOpen((o) => !o),
-        className: 'w-14 h-14 rounded-2xl gold-gradient text-white shadow-[0_8px_24px_rgba(242,189,34,0.5)] flex items-center justify-center transition-transform active:scale-95',
+        className: 'w-14 h-14 rounded-2xl gold-gradient text-white shadow-[0_8px_24px_rgba(212,175,55,0.5)] flex items-center justify-center transition-transform active:scale-95',
         style: { transform: open ? 'rotate(45deg)' : 'none' },
       }, React.createElement(Icon, { name: 'Plus', size: 24, strokeWidth: 2.5 })));
   }

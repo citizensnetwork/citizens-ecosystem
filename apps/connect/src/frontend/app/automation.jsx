@@ -511,7 +511,7 @@
       h('input', {
         type: 'checkbox', checked, disabled, 'aria-label': label,
         onChange: (e) => onChange(e.target.checked),
-        className: 'w-5 h-5 accent-[#A67C00] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A67C00]',
+        className: 'w-5 h-5 accent-[#D4AF37] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4AF37]',
       }));
   }
 
@@ -640,7 +640,7 @@
             h('input', {
               ref: allRef, type: 'checkbox', checked: sel.all, disabled: auto.busy,
               onChange: (e) => setPicked(e.target.checked ? auto.pending.map((s) => s.id) : []),
-              className: 'w-5 h-5 accent-[#A67C00] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#A67C00]',
+              className: 'w-5 h-5 accent-[#D4AF37] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D4AF37]',
             })),
           h('span', { className: 'text-xs font-bold text-foreground' }, 'Select all (' + sel.total + ')')),
         h('p', { role: 'status', 'aria-live': 'polite', 'data-selection-count': sel.count, className: 'text-xs text-muted-foreground flex-1' }, selectionText(sel.count, sel.total)),

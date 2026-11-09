@@ -100,7 +100,11 @@
     const cur = steps[step];
     const last = step === steps.length - 1;
     const canNext = (cur.valid ? cur.valid() : true) && !(last && busy);
-    return h('div', { className: 'flex-1 flex flex-col h-full bg-background', 'data-screen': 'apply' },
+    const hues = { connect: '#d4af37', vision: '#718ba9', wear: '#a8685a', learn: '#4f8a8b', play: '#94708c', move: '#718b78', impact: '#b4535a' };
+    let from = 'connect';
+    try { from = (new URLSearchParams(window.location.search).get('from') || 'connect').toLowerCase(); } catch (e) { /* keep connect */ }
+    const acc = hues[from] || hues.connect;
+    return h('div', { className: 'cc-intake flex-1 flex flex-col h-full bg-background', 'data-screen': 'apply', 'data-from': from, style: { '--acc': acc } },
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto' },
         h('div', { className: 'max-w-xl mx-auto px-4 sm:px-6 pt-5 pb-40 md:pb-8' },
           // header
@@ -119,7 +123,7 @@
       h('div', { className: 'shrink-0 border-t border-border glass-strong px-4 sm:px-6 py-3 fixed bottom-16 md:static left-0 right-0 z-10' },
         h('div', { className: 'max-w-xl mx-auto flex gap-3' },
           step > 0 && h(Button, { variant: 'outline', onClick: () => setStep(step - 1), className: 'flex-1' }, 'Back'),
-          h(Button, { variant: 'gold', disabled: !canNext, className: 'flex-[2]', iconRight: last ? null : 'ArrowRight', icon: last ? 'Check' : null, onClick: () => (last ? onComplete() : setStep(step + 1)) }, last ? completeLabel : 'Continue'))));
+          h(Button, { variant: last ? 'connect' : 'outline', disabled: !canNext, className: 'flex-[2]', iconRight: last ? null : 'ArrowRight', icon: last ? 'Check' : null, onClick: () => (last ? onComplete() : setStep(step + 1)) }, last ? completeLabel : 'Continue'))));
   }
 
   // ── Apply page ──
@@ -156,7 +160,8 @@
       h('div', { className: 'absolute -right-2 bottom-2 w-16 h-16 rounded-full bg-white/10' }),
       h('div', { className: 'relative' },
         h('div', { className: 'w-11 h-11 rounded-2xl bg-white/25 flex items-center justify-center mb-3' }, h(Icon, { name: 'Crown', size: 20, className: 'text-white' })),
-        h('h1', { className: 'text-white text-xl mb-1' }, 'Become a Contributor'),
+        h('span', { 'data-intake-kicker': '', className: 'block mb-2' }, 'Requesting contributor access'),
+        h('h1', { className: 'text-xl mb-1' }, 'Become a Contributor'),
         h('p', { className: 'text-white/85 text-xs leading-relaxed max-w-sm' }, 'Contributors create events & places, broadcast updates, message citizens, and lead Kingdom initiatives across the map.')));
 
     // The Contributor type list, as in the category grid and the admin card (an events-only lookup left 6 of the 12 types unnamed).

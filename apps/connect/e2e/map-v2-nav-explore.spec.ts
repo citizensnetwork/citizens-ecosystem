@@ -98,7 +98,7 @@ test.describe("on a phone", () => {
     expect(Math.abs(b.x + b.width / 2 - 375 / 2)).toBeLessThan(2);
     expect(812 - (b.y + b.height)).toBeLessThan(40);
     await expect(toggle(page)).toHaveCSS("border-radius", /px/);
-    await expect(toggle(page)).toHaveCSS("border-top-color", "rgb(242, 189, 34)"); // --accent, the one gold
+    await expect(toggle(page)).toHaveCSS("border-top-color", "rgb(212, 175, 55)"); // --accent, the one gold
     await expect(toggle(page)).toHaveAccessibleName("Open navigation");
   });
 
@@ -106,13 +106,13 @@ test.describe("on a phone", () => {
     await open(page);
     await toggle(page).tap();
     const items = nav(page).locator("[data-mv2='nav-item']");
-    await expect(items).toHaveText(["Home", "Explore", "Map", "Profile"]);
-    for (let i = 0; i < 4; i++) {
+    await expect(items).toHaveText(["Me", "Map", "Central", "Do", "Explore"]);
+    for (let i = 0; i < 5; i++) {
       const b = (await items.nth(i).boundingBox())!;
       expect(b.width).toBeGreaterThanOrEqual(44);
       expect(b.height).toBeGreaterThanOrEqual(44);
     }
-    const home = nav(page).getByRole("button", { name: "Home" });
+    const home = nav(page).getByRole("button", { name: "Map" });
     await expect(home).toHaveAttribute("aria-current", "page");
     await expect(home).not.toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(page.locator("[data-mv2='nav-dim']")).toBeVisible();
@@ -125,40 +125,31 @@ test.describe("on a phone", () => {
   test("it folds back by itself after a few seconds untouched", async ({ page }) => {
     await open(page);
     await toggle(page).tap();
-    await expect(nav(page).locator("[data-mv2='nav-item']")).toHaveCount(4);
+    await expect(nav(page).locator("[data-mv2='nav-item']")).toHaveCount(5);
     await page.waitForTimeout(3000);
-    await expect(nav(page).locator("[data-mv2='nav-item']")).toHaveCount(4);
+    await expect(nav(page).locator("[data-mv2='nav-item']")).toHaveCount(5);
     await expect(nav(page).locator("[data-mv2='nav-item']")).toHaveCount(0, { timeout: 4000 });
   });
 
-  test("Map gives a clean map (no pills, no row; a pin opens the sheet there), Home brings them back", async ({ page }) => {
-    const seed = await open(page);
+  test("Map stays on the map with its row, and Me opens the personal profile", async ({ page }) => {
+    await open(page);
     await toggle(page).tap();
     await nav(page).getByRole("button", { name: "Map" }).tap();
     await expect(page.locator("[data-mv2='pills']")).toHaveCount(0);
-    await expect(explore(page)).toHaveCount(0);
-    // the clean map keeps its zoom and locate buttons, always
+    await expect(explore(page)).toBeVisible();
     await expect(page.locator(".maplibregl-ctrl-zoom-in")).toBeVisible();
     await toggle(page).tap();
     await expect(nav(page).getByRole("button", { name: "Map" })).toHaveAttribute("aria-current", "page");
     await page.locator("[data-mv2='nav-dim']").tap({ position: { x: 40, y: 300 } });
-    await pinOf(page, seed.contributors[0].id).dispatchEvent("click");
-    await expect(sheet(page)).toBeVisible();
-    await page.getByRole("button", { name: "Close details" }).tap();
     await toggle(page).tap();
-    await nav(page).getByRole("button", { name: "Home" }).tap();
-    await expect(page.locator("[data-mv2='pills']")).toHaveCount(0);   // the categories moved inside the panel
-    await expect(explore(page)).toBeVisible();
+    await nav(page).getByRole("button", { name: "Me" }).tap();
+    await expect(page.locator("[data-screen='profile']")).toBeVisible();
   });
 
-  test("Profile opens the account menu with Let's, Messages and Alerts", async ({ page }) => {
+  test("Do opens Let's", async ({ page }) => {
     await open(page);
     await toggle(page).tap();
-    const profile = nav(page).getByRole("button", { name: "Profile", exact: true });
-    await profile.tap();
-    await expect(profile).toHaveAttribute("aria-expanded", "true");
-    for (const label of ["View Profile", "Let's…", "Messages", "Alerts"]) await expect(page.getByRole("button", { name: label })).toBeVisible();
-    await page.getByRole("button", { name: "Let's…" }).tap();
+    await nav(page).getByRole("button", { name: "Do", exact: true }).tap();
     await expect(page).toHaveURL(/\/lets$/);
   });
 

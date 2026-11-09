@@ -227,21 +227,55 @@
   // ── Citizen (own profile) ──
   function CitizenProfilePage() {
     const app = window.useApp();
-    const { user, events, connected, considering, go } = app;
+    const { user, events, connected, considering, go, notifications, saveProfile, updateAvatar, isContributor, isCitizen } = app;
+    const [edit, setEdit] = useState(false);
+    const [pane, setPane] = useState(null);
+    const [tick, setTick] = useState(0);
+    const nav = (window.MapV2Strings && window.MapV2Strings.nav) || {};
+    const hidden = window.CCDismissed || new Set();
+    const notes = (notifications || []).filter((n) => !hidden.has(n.id));
+    void tick;
     const connectedEvents = events.filter((e) => connected.has(e.id)).slice(0, 6);
     const consideringEvents = events.filter((e) => considering.has(e.id)).slice(0, 4);
-    return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'profile' },
-      h(Scroll, null,
+    const seg = h('div', { className: 'cc-me-seg', role: 'tablist', 'aria-label': 'Me' },
+      ['messages', 'friends', 'settings'].map((id) => h('button', {
+        key: id, type: 'button', 'aria-pressed': pane === id ? 'true' : 'false', onClick: () => setPane(id),
+      }, id === 'messages' ? 'Messages' : id === 'friends' ? 'Friends' : 'Settings')));
+    return h('div', { className: 'cc-me flex-1 flex flex-col min-h-0', 'data-screen': 'profile' },
+      pane ? h('div', { className: 'flex-1 flex flex-col min-h-0' },
+        h('div', { className: 'px-4 pt-4 pb-3 flex items-center gap-3' },
+          h('button', { type: 'button', onClick: () => setPane(null), 'aria-label': 'Back to Me', className: 'w-10 h-10 rounded-full border border-border' }, '←'),
+          h('h1', { className: 'text-lg text-foreground flex-1' }, pane === 'messages' ? 'Messages' : pane === 'friends' ? 'Friends' : 'Settings'),
+          seg),
+        pane === 'messages' && window.MessagesPage ? h(window.MessagesPage) : null,
+        pane === 'settings' && window.SettingsPage ? h('div', { className: 'flex-1 min-h-0 overflow-hidden' }, h(window.SettingsPage)) : null,
+        pane === 'friends' ? h('p', { className: 'px-5 py-6 text-sm text-muted-foreground' }, 'Friends appear here when someone shares what they are considering. The friends list itself is still to come.') : null)
+      : h(Scroll, null,
         h('div', { className: 'relative h-44 sm:h-52' },
           h(SmartImage, { src: user.coverPhoto, alt: '', className: 'w-full h-full' }),
           h('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/60 to-transparent' }),
           h(BackBar, { onBack: () => go('home'), floating: true })),
-        h('div', { className: 'px-4 max-w-2xl mx-auto -mt-12 relative space-y-4' },
-          h(Avatar, { src: user.profilePhoto, name: user.name, size: 84, rounded: 'xl', ring: '#F7F4EE' }),
-          h('div', null,
-            h('h1', { className: 'text-xl text-foreground font-display' }, user.name),
-            h('span', { className: 'text-xs font-semibold text-muted-foreground' }, 'Citizen')),
+        h('div', { className: 'px-4 max-w-2xl mx-auto -mt-12 relative space-y-4 pb-28' },
+          h(Avatar, { src: user.profilePhoto, name: user.name, size: 84, rounded: 'xl', ring: 'var(--paper)' }),
+          h('div', { className: 'flex items-start justify-between gap-3' },
+            h('div', null,
+              h('h1', { className: 'text-xl text-foreground font-display' }, user.name),
+              h('span', { className: 'text-xs font-semibold text-muted-foreground' }, 'Citizen')),
+            h('button', { type: 'button', className: 'cc-connect px-4 py-2 text-sm', onClick: () => setEdit(true) }, 'Edit profile')),
           user.bio && h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, user.bio),
+          h('div', { className: 'space-y-2' },
+            h('p', { className: 'text-sm font-semibold text-foreground' }, 'Notifications'),
+            notes.length === 0
+              ? h('p', { className: 'text-sm text-muted-foreground' }, nav.caughtUp || 'You\'re all caught up.')
+              : notes.slice(0, 4).map((n) => h('div', { key: n.id, className: 'cc-notice' },
+                h('span', { className: 'flex-1 min-w-0' }, h('b', { className: 'block text-sm' }, n.title), h('small', { className: 'text-muted-foreground' }, n.body)),
+                h('button', { type: 'button', 'data-dismiss': '', 'aria-label': 'Dismiss', onClick: () => { hidden.add(n.id); setTick((t) => t + 1); } }, '×')))),
+          seg,
+          isCitizen && !isContributor && h('button', { type: 'button', className: 'cc-notice w-full text-left', onClick: () => go('apply') },
+            h('span', { className: 'flex-1' }, h('b', { className: 'block text-sm' }, nav.become || 'Become a contributor'), h('small', { className: 'text-muted-foreground' }, nav.becomeHint || '')),
+            h('span', { 'aria-hidden': true }, '→')),
+          isContributor && h('button', { type: 'button', className: 'text-sm underline text-foreground', onClick: () => go('dashboard') }, nav.approved || 'Already approved? Open your listing home'),
+          edit && h(EditProfile, { user, onClose: () => setEdit(false), saveProfile, updateAvatar }),
           connectedEvents.length > 0 && h('div', null,
             h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Attending (' + connectedEvents.length + ')'),
             h('div', { className: 'grid grid-cols-2 gap-2' }, connectedEvents.map((e) =>
@@ -261,6 +295,30 @@
                   h('p', { className: 'text-sm font-bold text-foreground truncate' }, e.title),
                   h('p', { className: 'text-xs text-muted-foreground' }, e.date ? new Date(e.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '')),
                 h(Icon, { name: 'ChevronRight', size: 15, className: 'text-muted-foreground' }))))))));
+  }
+
+  function EditProfile({ user, onClose, saveProfile, updateAvatar }) {
+    const { Field, Input, Textarea, MediaPicker } = window.UI;
+    const [name, setName] = useState(user.name || '');
+    const [bio, setBio] = useState(user.bio || '');
+    const [photo, setPhoto] = useState(user.profilePhoto || '');
+    const [cover, setCover] = useState(user.coverPhoto || '');
+    const [saving, setSaving] = useState(false);
+    return h('div', { className: 'fixed inset-0 z-[200] flex items-end sm:items-center justify-center bg-black/40', role: 'dialog', 'aria-label': 'Edit profile' },
+      h('div', { className: 'w-full max-w-lg max-h-[88vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-background p-5 space-y-3' },
+        h('h2', { className: 'text-lg' }, 'Edit profile'),
+        Field && h(Field, { label: 'Photo' }, h(MediaPicker, { value: photo, onChange: setPhoto, aspect: '1/1', label: 'photo', scope: 'avatar' })),
+        Field && h(Field, { label: 'Cover' }, h(MediaPicker, { value: cover, onChange: setCover, aspect: '16/6', label: 'cover', scope: 'event-cover' })),
+        Field && h(Field, { label: 'Name' }, h(Input, { value: name, onChange: (e) => setName(e.target.value) })),
+        Field && h(Field, { label: 'Bio' }, h(Textarea, { value: bio, rows: 3, onChange: (e) => setBio(e.target.value) })),
+        h('p', { className: 'text-xs text-muted-foreground' }, 'TODO: links and a personal gallery are shown here once the profile record has those fields. They are not saved.'),
+        h('div', { className: 'flex gap-2' },
+          h('button', { type: 'button', className: 'px-4 py-2 rounded-full border border-border', onClick: onClose }, 'Cancel'),
+          h('button', { type: 'button', className: 'cc-connect px-4 py-2', disabled: saving, onClick: () => {
+            if (photo) updateAvatar(photo);
+            setSaving(true);
+            saveProfile({ name: name.trim(), bio }, () => { setSaving(false); onClose(); });
+          } }, 'Save'))));
   }
 
   // ── Contributor ──

@@ -15,7 +15,7 @@ const read = (rel: string) => readFileSync(join(APP, rel), "utf8");
 const index = read("src/frontend/index.html");
 const mapCss = read("src/frontend/assets/map-v2.css");
 
-const CROWN = "#f2bd22";
+const CROWN = "#d4af37";
 const INK = "#836100";
 const LIGHT = "#fcdd6c";
 const AMBER = "#e3a00a";
@@ -68,7 +68,7 @@ describe("one gold: the crown's colour", () => {
   });
 
   it("no retired gold is left in application code", () => {
-    const retired = /#(c9a84c|d4af37|e8d48b|8b6914|e9ce72|9c7a1d|c8a24f|f2e8cc)\b|rgba?\(\s*(201\s*,\s*168\s*,\s*76|212\s*,\s*175\s*,\s*55)\b/i;
+    const retired = /#(c9a84c|f2bd22|e8d48b|8b6914|e9ce72|9c7a1d|c8a24f|f2e8cc)\b|rgba?\(\s*(201\s*,\s*168\s*,\s*76|242\s*,\s*189\s*,\s*34)\b/i;
     const hits = ["src/frontend", "src/lib", "src/app", "public"].flatMap((d) => sources(d)).filter((f) => retired.test(read(f)));
     expect(hits).toEqual([]);
   });

@@ -118,7 +118,7 @@
       h(Field, { label: 'Description' }, h(Textarea, { value: description, rows: 3, onChange: (e) => setDescription(e.target.value), placeholder: 'Describe the need, the vision, and what collaboration looks like…' })),
       h(Field, { label: 'Category' },
         h('div', { className: 'flex flex-wrap gap-1.5' }, window.DATA.EVENT_CATEGORIES.map((c) =>
-          h('button', { key: c.id, onClick: () => setCategory(category === c.id ? '' : c.id), className: 'px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors', style: category === c.id ? { background: c.hex, color: '#fff', borderColor: c.hex } : { borderColor: 'rgba(242,189,34,0.25)', color: '#7A7060' } }, c.short)))),
+          h('button', { key: c.id, onClick: () => setCategory(category === c.id ? '' : c.id), className: 'px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors', style: category === c.id ? { background: c.hex, color: '#fff', borderColor: c.hex } : { borderColor: 'rgba(212,175,55,0.25)', color: '#7A7060' } }, c.short)))),
       h(Field, { label: 'Project tier' },
         h('div', { className: 'flex flex-wrap gap-1.5' }, IDEA_TIERS.map((t) =>
           h('button', { key: t.id, onClick: () => pickTier(t), className: cx('px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors', tierId === t.id ? 'gold-gradient text-white border-transparent' : 'border-border text-muted-foreground hover:border-gold/40') }, t.label)))),
@@ -163,8 +163,12 @@
     volunteer: ['HeartHandshake', '#16A34A'], team: ['Users', '#3498DB'], admin: ['ShieldCheck', '#836100'],
     news: ['Newspaper', '#836100'],
   };
+  const dismissedNotifs = new Set();
   function NotificationsPage() {
     const { notifications, markNotifsRead, readNotification, go, user, toast } = window.useApp();
+    const [tick, setTick] = useState(0);
+    const shown = notifications.filter((n) => !dismissedNotifs.has(n.id));
+    void tick;
     const open = (n) => {
       readNotification(n.id);
       if (n.eventId) go('event', { id: n.eventId });
@@ -175,8 +179,8 @@
       h(Header, { icon: 'Bell', title: 'Notifications', right: h(Button, { variant: 'ghost', size: 'sm', onClick: markNotifsRead }, 'Mark all read') }),
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8' },
         h('div', { className: 'max-w-2xl mx-auto' },
-          notifications.length === 0 && h(Empty, { icon: 'Bell', title: 'No notifications yet', sub: 'Broadcasts, messages and event updates land here.' }),
-          notifications.map((n) => {
+          shown.length === 0 && h('p', { className: 'px-5 py-8 text-sm text-muted-foreground' }, 'You\'re all caught up.'),
+          shown.map((n) => {
             const [ic, c] = NOTIF_ICON[n.type] || ['Bell', '#836100'];
             const linked = !!(n.eventId || n.convId || n.contributorId);
             return h('div', { key: n.id, onClick: () => open(n), role: linked ? 'button' : undefined, 'data-notif': n.type,
@@ -189,7 +193,8 @@
                 // P2-09: a co-host invitation carries its own Accept / Decline (the database checks it is yours to answer)
                 n.kind === 'cohost_invite' && n.eventId && h(window.CohostInviteActions, { sb: window.CC_SUPABASE, me: user.id, eventId: n.eventId, toast, onAnswered: () => readNotification(n.id) }),
                 h('p', { className: 'text-[10px] text-muted-foreground mt-1' }, n.time)),
-              !n.read && h('span', { className: 'w-2 h-2 rounded-full bg-gold shrink-0 mt-1.5' }));
+              !n.read && h('span', { className: 'w-2 h-2 rounded-full bg-gold shrink-0 mt-1.5' }),
+              h('button', { type: 'button', 'data-dismiss': '', 'aria-label': 'Dismiss', onClick: (e) => { e.stopPropagation(); dismissedNotifs.add(n.id); setTick((t) => t + 1); }, style: { width: 30, height: 30, borderRadius: 999, border: '1px solid var(--line)', background: 'var(--paper-2)', color: 'var(--ink)', flex: 'none' } }, '×'));
           }))));
   }
 
@@ -225,6 +230,15 @@
             className: 'w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground' }, h(Icon, { name: 'X', size: 16 }))))),
       hidden > 0 && h('p', { 'data-saved': 'hidden', className: 'text-xs text-muted-foreground mt-2' },
         hidden === 1 ? '1 more saved listing is not on the map right now.' : hidden + ' more saved listings are not on the map right now.'));
+  }
+
+  function ThemeChoice() {
+    const [pref, setPref] = useState(() => (window.MapV2 && window.MapV2.themePref ? window.MapV2.themePref() : 'System'));
+    return h('div', { className: 'cc-theme', role: 'radiogroup', 'aria-label': 'Theme' },
+      ['System', 'Light', 'Dark'].map((p) => h('button', {
+        key: p, type: 'button', 'aria-pressed': pref === p ? 'true' : 'false',
+        onClick: () => { if (window.MapV2 && window.MapV2.setThemePref) window.MapV2.setThemePref(p); setPref(p); },
+      }, p)));
   }
 
   function SettingsPage() {
@@ -304,12 +318,16 @@
               : 'Citizens can post one community-organised event each week. Want to do more? Apply to become a Contributor.'),
             h(Button, { variant: 'gold', size: 'sm', icon: 'Crown', onClick: () => go('apply') }, contributorStatus === 'rejected' ? 'Apply again' : 'Apply to become a Contributor')),
 
+          h(Section, { title: 'Appearance', sub: 'Theme follows this device unless you choose otherwise' },
+            h(ThemeChoice)),
+
           h(Section, { title: 'Account' },
             h('div', { className: 'flex items-center justify-between' },
               h('div', null, h('p', { className: 'text-sm text-foreground capitalize' }, role + ' account'), h('p', { className: 'text-xs text-muted-foreground' }, realUser ? (realUser.email || '') : 'demo session')),
               h(Button, { variant: 'danger', size: 'sm', icon: 'LogOut', onClick: signOut }, 'Sign Out'))))));
   }
 
+  window.CCDismissed = dismissedNotifs;
   window.CommunityPage = CommunityPage;
   window.NotificationsPage = NotificationsPage;
   window.SettingsPage = SettingsPage;

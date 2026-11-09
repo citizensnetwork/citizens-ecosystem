@@ -153,8 +153,8 @@ describe("motion tokens and reduced motion", () => {
   });
 });
 
-describe("the map look follows the phone (founder, D1 as revised 2026-10-12)", () => {
-  it("is dark when the phone is dark and light when it is light", () => {
+describe("the map look follows the phone unless Settings chooses", () => {
+  it("System is dark when the phone is dark and light when it is light", () => {
     expect(boot({ dark: true }).api.resolvedTheme()).toBe("dark");
     expect(boot({ dark: false }).api.resolvedTheme()).toBe("light");
   });
@@ -164,10 +164,20 @@ describe("the map look follows the phone (founder, D1 as revised 2026-10-12)", (
     expect(boot({ storage: memoryStorage({ cc_map_theme: "light" }), dark: true }).api.resolvedTheme()).toBe("dark");
   });
 
-  it("offers no way to set a look in-app", () => {
-    const api = boot().api as Record<string, unknown>;
-    expect(api.setTheme).toBeUndefined();
-    expect(api.themeSetting).toBeUndefined();
+  it("Light, Dark and System are stored and System follows the phone live", () => {
+    const storage = memoryStorage();
+    const b = boot({ storage, dark: true });
+    const api = b.api as unknown as { themePref: () => string; setThemePref: (p: string) => void; resolvedTheme: () => string };
+    expect(api.themePref()).toBe("System");
+    expect(api.resolvedTheme()).toBe("dark");
+    api.setThemePref("Light");
+    expect(storage.dump()["citizens-theme"]).toBe("Light");
+    expect(api.resolvedTheme()).toBe("light");
+    api.setThemePref("Dark");
+    expect(api.resolvedTheme()).toBe("dark");
+    api.setThemePref("System");
+    expect(storage.dump()["citizens-theme"]).toBeUndefined();
+    expect(api.resolvedTheme()).toBe("dark");
   });
 });
 

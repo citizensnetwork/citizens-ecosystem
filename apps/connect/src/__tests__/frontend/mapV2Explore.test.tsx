@@ -446,47 +446,47 @@ describe("the folding nav", () => {
   const Nav = () => (window as unknown as { MapV2Nav: React.ComponentType }).MapV2Nav;
 
   it("maps each screen to its item, and each item to its screen", () => {
-    expect(N.currentOf({ page: "home", params: {} })).toBe("home");
+    expect(N.currentOf({ page: "home", params: {} })).toBe("map");
     expect(N.currentOf({ page: "home", params: { view: "map" } })).toBe("map");
     expect(N.currentOf({ page: "kingdom-discovery", params: {} })).toBe("explore");
-    expect(N.currentOf({ page: "explore", params: {} })).toBe("explore"); // #210 part 3: the Discover page
-    expect(N.currentOf({ page: "messages", params: {} })).toBe("profile");
-    expect(N.currentOf({ page: "lets", params: {} })).toBe("profile");
-    expect(N.currentOf({ page: "community", params: {} })).toBe("profile");
-    expect(N.currentOf({ page: "profile", params: {} })).toBe("profile");
+    expect(N.currentOf({ page: "explore", params: {} })).toBe("explore");
+    expect(N.currentOf({ page: "messages", params: {} })).toBe("me");
+    expect(N.currentOf({ page: "lets", params: {} })).toBe("do");
+    expect(N.currentOf({ page: "community", params: {} })).toBe("do");
+    expect(N.currentOf({ page: "profile", params: {} })).toBe("me");
     expect(N.currentOf({ page: "profile", params: { id: "x" } })).toBe("");
     expect(N.currentOf({ page: "event", params: { id: "x" } })).toBe("");
-    expect(N.targetOf("home")).toEqual(["home", {}]);
-    expect(N.targetOf("map")).toEqual(["home", { view: "map" }]);
+    expect(N.targetOf("map")).toEqual(["home", {}]);
     expect(N.targetOf("explore")).toEqual(["explore", {}]);
-    expect(N.targetOf("profile")).toBeNull();
-    expect(N.ITEMS.map((i) => i.id)).toEqual(["home", "explore", "map", "profile"]);
+    expect(N.targetOf("do")).toEqual(["lets", {}]);
+    expect(N.targetOf("me")).toEqual(["profile", {}]);
+    expect(N.targetOf("central")).toBeNull();
+    expect(N.ITEMS.map((i) => i.id)).toEqual(["me", "map", "central", "do", "explore"]);
   });
 
-  it("folds into one button that opens the bar of four, the current one marked", () => {
+  it("folds into one glow that opens Me, Map, Central, Do and Explore, Map marked on the map", () => {
     render(React.createElement(Nav()));
     const toggle = screen.getByRole("button", { name: S.nav.open as string });
     expect(toggle.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(toggle);
     const bar = screen.getByRole("navigation", { name: S.nav.label as string });
     const items = bar.querySelectorAll("[data-mv2='nav-item']");
-    expect([...items].map((b) => b.textContent)).toEqual(["Home", "Explore", "Map", "Profile"]);
-    expect(screen.getByRole("button", { name: "Home" }).getAttribute("aria-current")).toBe("page");
+    expect([...items].map((b) => b.textContent)).toEqual(["Me", "Map", "Central", "Do", "Explore"]);
+    expect(screen.getByRole("button", { name: "Map" }).getAttribute("aria-current")).toBe("page");
     expect(document.querySelector("[data-mv2='nav-dim']")).toBeTruthy();
   });
 
-  it("goes where each item says, and Profile opens the account menu with Projects, Messages and Alerts", () => {
+  it("goes where each item says, and Me opens the personal profile", () => {
     render(React.createElement(Nav()));
     fireEvent.click(screen.getByRole("button", { name: S.nav.open as string }));
     fireEvent.click(screen.getByRole("button", { name: "Map" }));
-    expect(go).toHaveBeenCalledWith("home", { view: "map" });
+    expect(go).toHaveBeenCalledWith("home", {});
     fireEvent.click(screen.getByRole("button", { name: S.nav.open as string }));
-    const profile = screen.getByRole("button", { name: "Profile" });
-    fireEvent.click(profile);
-    expect(profile.getAttribute("aria-expanded")).toBe("true");
-    const menu = screen.getByTestId("menu");
-    expect(menu.getAttribute("data-anchor")).toBe("nav");
-    expect(menu.getAttribute("data-extras")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Me" }));
+    expect(go).toHaveBeenCalledWith("profile", {});
+    fireEvent.click(screen.getByRole("button", { name: S.nav.open as string }));
+    fireEvent.click(screen.getByRole("button", { name: "Do" }));
+    expect(go).toHaveBeenCalledWith("lets", {});
   });
 
   it("folds back after a while untouched, on Escape, and on a tap on the dimmed map", () => {
@@ -581,7 +581,7 @@ describe("the stylesheet and the wiring", () => {
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261101c");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261109a");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.matchesFilter(pill, intent, m)");
     expect(home).toContain("onIntent: (id) => { setPill('all'); setIntent(id); }");

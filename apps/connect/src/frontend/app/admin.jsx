@@ -317,7 +317,7 @@
       h(Field, { label: 'Short bio / about' }, h(Textarea, { value: f.bio, rows: 3, onChange: (e) => up('bio', e.target.value), placeholder: 'A vibrant community committed to…' })),
 
       h('label', { className: 'flex items-start gap-2.5 p-3 rounded-xl bg-white/60 border border-border cursor-pointer' },
-        h('input', { type: 'checkbox', checked: f.emailOwner, onChange: (e) => up('emailOwner', e.target.checked), className: 'mt-0.5 w-4 h-4 accent-[#A67C00]' }),
+        h('input', { type: 'checkbox', checked: f.emailOwner, onChange: (e) => up('emailOwner', e.target.checked), className: 'mt-0.5 w-4 h-4 accent-[#D4AF37]' }),
         h('span', null,
           h('span', { className: 'block text-sm font-semibold text-foreground' }, 'Email the owner a welcome'),
           h('span', { className: 'block text-xs text-muted-foreground leading-relaxed' }, 'Sends the sign-in steps (a 6-digit code) from no-reply@citizenscentral.co.za. Untick it if you would rather tell them yourself.'))),

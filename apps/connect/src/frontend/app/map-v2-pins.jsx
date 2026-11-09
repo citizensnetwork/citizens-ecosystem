@@ -184,47 +184,58 @@
     root.style.setProperty('--pin-glyph', glyphColor(hex));
     const glyphInner = deps.lucideInner(deps.icon);
 
-    if (m.type === 'contributor') {
-      const bodyEl = document.createElement('span');
-      bodyEl.setAttribute('data-mv2', 'body');
-      const tail = document.createElement('span');
-      tail.setAttribute('data-mv2', 'tail');
-      const disc = document.createElement('span');
-      disc.setAttribute('data-mv2', 'disc');
-      disc.setAttribute('data-cc-pin', 'contributor');
-      disc.appendChild(glyphSvg(glyphInner, 'glyph'));
-      if (m.profilePhoto) {
-        root.classList.add('has-logo');
-        disc.setAttribute('data-cc-logo', '1');
-        const wrap = document.createElement('span');
-        wrap.setAttribute('data-mv2', 'logo-wrap');
-        if (m.kind === 'individual') wrap.setAttribute('data-photo', '1');
-        const img = document.createElement('img');
-        img.setAttribute('data-mv2', 'logo');
-        img.alt = '';
-        img.decoding = 'async';
-        img.width = 96; img.height = 96;
-        img.setAttribute('data-src', m.profilePhoto);
-        img.onload = () => { root.classList.add('is-loaded'); };
-        img.onerror = () => { root.classList.add('is-broken'); };
-        wrap.appendChild(img);
-        disc.appendChild(wrap);
-        const badge = document.createElement('span');
-        badge.setAttribute('data-mv2', 'badge');
-        badge.appendChild(glyphSvg(glyphInner, 'badge-glyph'));
-        bodyEl.appendChild(badge);
-      }
-      bodyEl.insertBefore(tail, bodyEl.firstChild);
-      bodyEl.insertBefore(disc, tail.nextSibling);
-      root.appendChild(bodyEl);
-    } else {
-      const bodyEl = document.createElement('span');
-      bodyEl.setAttribute('data-mv2', 'body');
-      const isIdea = m.type === 'idea';
-      // selected scale is a CSS transform on the body, so the SVG is always drawn at rest size
-      bodyEl.appendChild(shapeSvg({ shape: isIdea ? 'idea' : m.type === 'event' ? 'event' : 'place', hex, glyph: glyphInner, selected: false }));
-      root.appendChild(bodyEl);
+    const bodyEl = document.createElement('span');
+    bodyEl.setAttribute('data-mv2', 'body');
+    const frame = document.createElement('span');
+    frame.className = 'cc-ink';
+    frame.setAttribute('data-mv2', m.type === 'contributor' ? 'disc' : 'ink');
+    frame.setAttribute('data-cc-pin', m.type);
+    frame.appendChild(glyphSvg(glyphInner, 'glyph'));
+    const photo = m.type === 'place' ? '' : (m.coverPhoto || m.profilePhoto || '');
+    if (photo) {
+      root.classList.add('has-logo');
+      const wrap = document.createElement('span');
+      wrap.setAttribute('data-mv2', 'logo-wrap');
+      if (m.kind === 'individual') wrap.setAttribute('data-photo', '1');
+      const img = document.createElement('img');
+      img.setAttribute('data-mv2', 'logo');
+      img.alt = '';
+      img.decoding = 'async';
+      img.width = 96; img.height = 96;
+      img.setAttribute('data-src', photo);
+      img.onload = () => { root.classList.add('is-loaded'); };
+      img.onerror = () => { root.classList.add('is-broken'); };
+      wrap.appendChild(img);
+      frame.appendChild(wrap);
     }
+    bodyEl.appendChild(frame);
+    if (m.type !== 'idea') {
+      const quick = document.createElement('div');
+      quick.setAttribute('data-mv2', 'quick');
+      const acts = m.type === 'contributor' ? ['follow', 'message'] : ['connect', 'share'];
+      acts.forEach((act) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.setAttribute('data-kind', act);
+        const word = (deps.strings && deps.strings[act]) || act;
+        btn.textContent = word;
+        if (act === 'connect' && m.online && deps.strings && deps.strings.online) {
+          const soft = document.createElement('span');
+          soft.setAttribute('data-mv2', 'online-word');
+          soft.textContent = deps.strings.online;
+          btn.appendChild(soft);
+        }
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          window.dispatchEvent(new CustomEvent('cc-pin-action', { detail: { id: m.id, type: m.type, action: act } }));
+        });
+        quick.appendChild(btn);
+      });
+      bodyEl.appendChild(quick);
+    }
+    root.appendChild(bodyEl);
+    if (m.broadcast && m.broadcast.message) root.classList.add('is-broadcast');
 
     if (m.isLive || m.isBusy) {
       const dot = document.createElement('span');

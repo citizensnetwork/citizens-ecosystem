@@ -14,6 +14,11 @@
       type: { event: 'Event', place: 'Place', contributor: 'Contributor', idea: 'Impact idea' },
       kind: { ministry: 'Ministry', organization: 'Organisation', business: 'Business', individual: 'Individual' },
       dismissUpdate: 'Dismiss update',
+      follow: 'Follow',
+      message: 'Message',
+      connect: 'Connect',
+      share: 'Share',
+      online: 'Online',
     },
 
     sheet: {
@@ -33,6 +38,7 @@
       // #210: a Place and an Event speak in the same pills (the Event's own Connect and Consider, and a message to its organiser)
       connect: 'Connect',
       connected: 'Connected',
+      online: 'Online',
       consider: 'Consider',
       considering: 'Considering',
       message: 'Message',
@@ -234,7 +240,11 @@
         open: 'Open navigation',
         openUnread: 'Open navigation, you have unread messages or alerts',
         close: 'Close navigation',
-        items: { home: 'Home', explore: 'Explore', map: 'Map', profile: 'Profile' },
+        items: { me: 'Me', map: 'Map', central: 'Central', do: 'Do', explore: 'Explore' },
+        caughtUp: 'You\'re all caught up.',
+        become: 'Become a contributor',
+        becomeHint: 'List your organisation so people can find you',
+        approved: 'Already approved? Open your listing home',
         menu: { lets: 'Let\'s…', messages: 'Messages', alerts: 'Alerts' },
         unread: (n) => n + ' unread',
       },

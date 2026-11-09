@@ -49,6 +49,34 @@
     }
   }
 
+  const STRIP = [
+    { id: 'all' },
+    { id: 'worship', color: '#7040b5' },
+    { id: 'serve', color: '#087d69' },
+    { id: 'culture', color: '#c14f2a' },
+    { id: 'learn', color: '#245fba' },
+    { id: 'audiences', color: '#b33272' },
+    { id: 'business', color: '#687d20' },
+  ];
+  function CategoryStrip({ pill, onPill, scrollerRef, ends, onScroll }) {
+    const labels = (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.groups) || {};
+    const nudge = (dir) => {
+      const el = scrollerRef.current;
+      if (!el) return;
+      el.scrollBy({ left: dir * Math.max(120, el.clientWidth * 0.6), behavior: 'smooth' });
+    };
+    React.useEffect(() => { onScroll(); }, [onScroll]);
+    return React.createElement('div', { 'data-mv2': 'cat-strip', 'data-overflow': ends.over ? '' : undefined },
+      React.createElement('button', { type: 'button', 'data-mv2': 'cat-arrow', 'aria-label': 'Previous categories', disabled: ends.start, onClick: () => nudge(-1) }, '‹'),
+      React.createElement('div', { 'data-mv2': 'cat-scroller', ref: scrollerRef, onScroll },
+        STRIP.map((c) => React.createElement('button', {
+          key: c.id, type: 'button', 'data-mv2': 'cat-chip', 'aria-pressed': pill === c.id ? 'true' : 'false', onClick: () => onPill(c.id),
+        },
+          c.color ? React.createElement('i', { 'data-mv2': 'cat-dot', style: { '--c': c.color }, 'aria-hidden': true }) : null,
+          labels[c.id] || c.id))),
+      React.createElement('button', { type: 'button', 'data-mv2': 'cat-arrow', 'aria-label': 'Next categories', disabled: ends.end, onClick: () => nudge(1) }, '›'));
+  }
+
   function decorateForV2(markers, events, newsPosts, now) {
     const ms = (v) => { const t = v ? Date.parse(v) : NaN; return Number.isNaN(t) ? undefined : t; };
     const byOrg = Object.create(null);
@@ -94,6 +122,8 @@
     const [selType, setSelType] = useState('event');
     const [showIdeas, setShowIdeas] = useState(false);
     const [query, setQuery] = useState('');
+    const [searchOn, setSearchOn] = useState(false);
+    const [stripEnds, setStripEnds] = useState({ over: false, start: true, end: true });
     // Which entity types the current zoom is showing ('all' | 'places' |
     // 'contributors' | 'none' — see map.jsx zoomBandFor). The map owns the
     // thresholds and only reports when the band actually changes, so this is
@@ -142,8 +172,8 @@
     const markers = [
       // A finished event is history, not a place to turn up: it leaves the map
       // (it stays on its organiser's profile and dashboard, under "Past events").
-      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast })),
-      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
+      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast, coverPhoto: e.coverPhoto, online: !!(e.online || e.isOnline || (e.lat == null && e.lng == null)) })),
+      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast, coverPhoto: p.coverPhoto })),
       // Contributors: same marker shape, minus the event-only isLive/isBusy/
       // broadcast fields (a Contributor pin is just a plain coloured pin —
       // see V1_SCOPE.md, "leave live-pulse/broadcast as-is" was scoped to
@@ -172,6 +202,31 @@
       if (mapApi.current) mapApi.current.focusSelected(openMapPad(rootRef.current), CARD_ZOOM);
     };
     const rowMarkers = pillTest ? markers.filter((m) => m.type !== 'idea' && pillTest(m)) : markers.filter((m) => m.type !== 'idea');
+    const stripRef = useRef(null);
+    const measureStrip = useCallback(() => {
+      const el = stripRef.current;
+      if (!el) return;
+      const over = el.scrollWidth > el.clientWidth + 4;
+      setStripEnds({ over, start: el.scrollLeft <= 2, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 2 });
+    }, []);
+    React.useEffect(() => {
+      const onAct = (e) => {
+        const d = e.detail || {};
+        if (d.action === 'follow' && d.type === 'contributor') app.toggleFollow(d.id);
+        else if (d.action === 'message' && d.type === 'contributor') {
+          const c = (app.contributors || []).find((x) => x.id === d.id);
+          if (c && app.startConversationWith) app.startConversationWith(c.name, c.profilePhoto, true, c.id);
+        } else if (d.action === 'connect' && d.type === 'event') app.toggleConnect(d.id);
+        else if (d.action === 'connect' && d.type === 'place') app.togglePlaceFollow(d.id);
+        else if (d.action === 'share') app.shareLink({ page: d.type === 'event' ? 'event' : d.type === 'place' ? 'place' : 'profile', params: { id: d.id } });
+      };
+      window.addEventListener('cc-pin-action', onAct);
+      return () => window.removeEventListener('cc-pin-action', onAct);
+    }, [app]);
+    React.useEffect(() => {
+      document.documentElement.toggleAttribute('data-map-priority', !!(sheet || selected));
+      return () => document.documentElement.removeAttribute('data-map-priority');
+    }, [sheet, selected]);
     const XS = window.MapV2Strings.explore;
     return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-explore-min': min ? '' : undefined },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => { setSelected(null); setSheet(null); } },
@@ -197,9 +252,10 @@
         React.createElement('div', { 'data-mv2': 'home-bar' },
           React.createElement('label', { 'data-mv2': 'home-search' },
             React.createElement(Icon, { name: 'Search', size: 18 }),
-            React.createElement('input', { value: query, onChange: (e) => setQuery(e.target.value), placeholder: XS.search, 'aria-label': XS.search }),
+            React.createElement('input', { value: query, onChange: (e) => setQuery(e.target.value), placeholder: XS.search, 'aria-label': XS.search, onFocus: () => setSearchOn(true), onBlur: () => setSearchOn(false) }),
             query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 16 }))),
-          React.createElement(window.AccountButton, { variant: 'round' }))),
+          React.createElement(window.AccountButton, { variant: 'round' })),
+        (searchOn || (pill && pill !== 'all')) && React.createElement(CategoryStrip, { pill, onPill: (id) => { setIntent(null); setPill(id); }, scrollerRef: stripRef, ends: stripEnds, onScroll: measureStrip })),
 
       // zoom-gate hint + the MapTiler logo, kept above the Explore row (MapTiler's Free plan needs the logo bottom-left)
       React.createElement('div', { 'data-mv2': 'home-corner' },
@@ -227,7 +283,8 @@
       // panel; it never moves the map); the clean map's pin opens today's half sheet
       sheet && React.createElement(window.MapV2Sheet, {
         id: sheet.id, type: sheet.type, expanded: !clean, view: sheet.view,
-        onClose: closeSheet, onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
+        onClose: closeSheet, onFilterGroup: (group) => { setSheet(null); setPill(group); setQuery(''); const input = rootRef.current && rootRef.current.querySelector("[data-mv2='home-search'] input"); if (input) input.focus(); },
+        onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
         nearby: markers,
         // a Nearby pick keeps the place the distances were measured from (the map has moved under the sheet since)
         onPick: (id, t) => openSheet(id, t, sheet.view),

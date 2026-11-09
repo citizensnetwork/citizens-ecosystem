@@ -21,7 +21,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const VALID_PERIODS = [30, 90, 180, 365];
-const GOLD = rgb(0.949, 0.741, 0.133); // #F2BD22, the crown gold: rules and lines only
+const GOLD = rgb(0.831, 0.686, 0.216); // #D4AF37, the one gold: rules and lines only
 const GOLD_INK = rgb(0.514, 0.380, 0); // #836100, gold TEXT (vivid gold on white paper is 1.74:1)
 const INK = rgb(0.04, 0.035, 0.03); // #0A0908
 const MUTED = rgb(0.48, 0.44, 0.38); // #7A7060

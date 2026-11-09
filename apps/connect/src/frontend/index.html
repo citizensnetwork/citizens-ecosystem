@@ -59,16 +59,16 @@
     theme: {
       extend: {
         colors: {
-          background: '#F7F4EE', foreground: '#0A0908',
-          card: 'rgba(255,255,255,0.82)', 'card-foreground': '#0A0908',
-          popover: 'rgba(255,255,255,0.97)',
-          primary: '#0A0908', 'primary-foreground': '#FFFFFF',
-          secondary: '#F2BD22', 'secondary-foreground': '#0A0908',
-          muted: '#EDE8DC', 'muted-foreground': '#7A7060',
-          accent: '#FBF1CC', 'accent-foreground': '#0A0908',
-          border: 'rgba(242,189,34,0.22)',
+          background: 'var(--paper)', foreground: 'var(--ink)',
+          card: 'var(--card)', 'card-foreground': 'var(--ink)',
+          popover: 'var(--paper-2)',
+          primary: 'var(--ink)', 'primary-foreground': 'var(--paper)',
+          secondary: '#D4AF37', 'secondary-foreground': '#272a25',
+          muted: 'var(--muted)', 'muted-foreground': 'var(--muted-ink)',
+          accent: 'var(--accent-wash)', 'accent-foreground': 'var(--ink)',
+          border: 'var(--line)',
           destructive: '#c0392b',
-          gold: '#F2BD22', 'gold-light': '#FCDD6C', 'gold-dark': '#836100',
+          gold: '#D4AF37', 'gold-light': '#FCDD6C', 'gold-dark': '#836100',
         },
         fontFamily: {
           sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'sans-serif'],
@@ -84,18 +84,25 @@
 
 <style>
   :root {
-    /* THE gold (founder, 2026-10-31): the crown logo's own colour, sampled from the logo (#F2BD22). One fill gold; the
+    /* THE gold (founder, 2026-10-31): the crown logo's own colour, sampled from the logo (#D4AF37). One fill gold; the
        other values are its roles, never a second gold: --gold-light and --gold-deep are the gradient stops (light and
        amber, never brown), --gold-dark is the INK for gold text, rings and icons (plain gold on white is 1.74:1).
        Same values as Map v2's --accent and --accent-ink (its own stylesheet); a unit test keeps the two in step. */
-    --gold:#F2BD22; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#EDE5D4;
+    --gold:#D4AF37; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#e6e4da;
+    --paper:#f7f6f1; --paper-2:#fffdf8; --ink:#272a25; --muted-ink:#5c6058; --muted:#efece4;
+    --line:rgba(39,42,37,0.14); --card:rgba(255,253,248,0.86); --accent-wash:#f8f1dc;
     /* the crown mark's old, separate gold: now the same gold (kept so nothing that reads them breaks) */
     --gold-crown:var(--gold); --gold-crown-light:var(--gold-light); --gold-crown-dark:var(--gold-dark);
   }
   * { -webkit-tap-highlight-color: transparent; }
   html, body, #root { height: 100%; }
+  [data-theme='dark'] {
+    --paper:#1b1c18; --paper-2:#23251f; --ink:#f7f6f1; --muted-ink:#b9b9b4; --muted:#2a2c26;
+    --line:rgba(247,246,241,0.14); --card:rgba(35,37,31,0.9); --accent-wash:rgba(212,175,55,0.16);
+    --map-bg:#16170f;
+  }
   body {
-    margin: 0; background: #F7F4EE; color: #0A0908;
+    margin: 0; background: var(--paper); color: var(--ink);
     font-family: 'Plus Jakarta Sans', sans-serif; -webkit-font-smoothing: antialiased;
     overscroll-behavior: none;
   }
@@ -132,8 +139,8 @@
   .scrollbar-none { scrollbar-width: none; }
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(242,189,34,0.4); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(242,189,34,0.7); }
+  ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.4); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.7); }
 
   /* animations */
   @keyframes pinPulse { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(2.4);opacity:0} }
@@ -215,7 +222,7 @@
 
 <script type="text/babel" src="app/icons.jsx?v=20260826c"></script>
 <script type="text/babel" src="app/routes.jsx?v=20261026c"></script>
-<script type="text/babel" src="app/map-v2-lib.jsx?v=20261101c"></script>
+<script type="text/babel" src="app/map-v2-lib.jsx?v=20261109a"></script>
 <script type="text/babel" src="app/saved-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/cohost-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/moments-lib.jsx?v=20261017a"></script>
@@ -232,7 +239,7 @@
 <script type="text/babel" src="app/cohosts.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/moments.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/convince.jsx?v=20261018a"></script>
-<script type="text/babel" src="app/map-v2-strings.jsx?v=20261101c"></script>
+<script type="text/babel" src="app/map-v2-strings.jsx?v=20261109a"></script>
 <script type="text/babel" src="app/serving-areas.jsx?v=20261022a"></script>
 <script type="text/babel" src="app/map-v2-time.jsx?v=20261025a"></script>
 <script type="text/babel" src="app/map-v2-qr.jsx?v=20261019f"></script>

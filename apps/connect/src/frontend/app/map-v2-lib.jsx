@@ -32,10 +32,14 @@
   // Where the retired Map look control stored a choice; cleared on mount so a
   // tester's old "Light"/"Dark" can never pin the look against their phone.
   const LEGACY_THEME_KEY = 'cc_map_theme';
+  // Settings → Appearance → Theme. "System" is the absence of a stored choice and follows the device live.
+  // "Light" and "Dark" are stored. The old map toggle key above is never read.
+  const THEME_KEY = 'citizens-theme';
   // Bump the ?v= whenever assets/map-v2.css changes: the service worker is
   // cache-first for same-origin static files. Root-absolute, plus the path prefix when the app is served under one
   // (/citizens/connect, C39): routes.jsx loads first and owns it.
-  const CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/map-v2.css?v=20261101c');
+  const CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/map-v2.css?v=20261109a');
+  const INK_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/connect-ink.css?v=20261109a');
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
@@ -153,12 +157,30 @@
   // A duration in ms for JS-driven motion: 0 when the person asked for less motion.
   const dur = (name) => (prefersReducedMotion() ? 0 : MOTION[name]);
 
-  // ── Map look: follows the phone ───────────────────────────────────
+  // ── Map look ──────────────────────────────────────────────────────
+  // System (no stored choice) follows the device and updates live. Light and Dark are a Settings choice.
   function systemPrefersDark() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch { return false; }
   }
+  function themePref() {
+    try {
+      const v = store() && store().getItem(THEME_KEY);
+      if (v === 'Light' || v === 'Dark' || v === 'System') return v;
+    } catch { /* private mode */ }
+    return 'System';
+  }
   // 'light' or 'dark': what is actually drawn.
-  const resolvedTheme = () => (systemPrefersDark() ? 'dark' : 'light');
+  const resolvedTheme = () => {
+    const p = themePref();
+    if (p === 'Dark') return 'dark';
+    if (p === 'Light') return 'light';
+    return systemPrefersDark() ? 'dark' : 'light';
+  };
+  function setThemePref(p) {
+    if (p !== 'Light' && p !== 'Dark' && p !== 'System') return;
+    write(THEME_KEY, p === 'System' ? null : p);
+    applyTheme();
+  }
   function applyTheme() {
     if (!doc || !doc.documentElement) return;
     doc.documentElement.setAttribute('data-theme', resolvedTheme());
@@ -167,7 +189,7 @@
 
   // ── Stylesheet ───────────────────────────────────────────────────────────────────────────────────────
   const api = {
-    motion: MOTION, dur, prefersReducedMotion, resolvedTheme, PITCH, countBucket,
+    motion: MOTION, dur, prefersReducedMotion, resolvedTheme, themePref, setThemePref, PITCH, countBucket,
     trapFocus, lockBehind,
     // the globe is on only while the constant says so (read when this file loads)
     get onlineGlobe() { return ONLINE_GLOBE_ON; },
@@ -195,6 +217,10 @@
     link.onload = done;
     link.onerror = done;
     doc.head.appendChild(link);
+    const ink = doc.createElement('link');
+    ink.rel = 'stylesheet';
+    ink.href = INK_HREF;
+    doc.head.appendChild(ink);
   }
   if (doc) {
     if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', mount);
