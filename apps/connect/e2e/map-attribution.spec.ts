@@ -114,5 +114,12 @@ test("the location picker (Become a Contributor) shows the logo and the © MapTi
   await expect(picker).toHaveCount(1, { timeout: 15_000 });
   await expectLogoLink(page);
   await expect(picker.locator(".maplibregl-ctrl-attrib")).toHaveCount(1);
+  // The wizard's sticky footer sits over the foot of a tall form. Bring the logo into the open area above it.
+  await page.locator(LOGO).first().evaluate((el) => {
+    const scroller = document.getElementById("main-scroll");
+    if (!scroller) return;
+    const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTop = Math.max(0, top - 140);
+  });
   expect((await logoState(page)).uncovered).toBe(true);
 });
