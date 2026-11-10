@@ -369,7 +369,7 @@
       h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0' },
         h('div', { className: 'flex items-center justify-between' },
           h('div', { className: 'flex items-center gap-3' },
-            h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(242,189,34,0.4)', fit: logoFit(activeContributor.kind) }),
+            h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(212,175,55,0.4)', fit: logoFit(activeContributor.kind) }),
             h('div', null,
               h('h2', { className: 'text-foreground leading-none text-xl' }, 'Dashboard'),
               h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, activeContributor.name),

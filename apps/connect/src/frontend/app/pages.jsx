@@ -118,7 +118,7 @@
       h(Field, { label: 'Description' }, h(Textarea, { value: description, rows: 3, onChange: (e) => setDescription(e.target.value), placeholder: 'Describe the need, the vision, and what collaboration looks like…' })),
       h(Field, { label: 'Category' },
         h('div', { className: 'flex flex-wrap gap-1.5' }, window.DATA.EVENT_CATEGORIES.map((c) =>
-          h('button', { key: c.id, onClick: () => setCategory(category === c.id ? '' : c.id), className: 'px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors', style: category === c.id ? { background: c.hex, color: '#fff', borderColor: c.hex } : { borderColor: 'rgba(242,189,34,0.25)', color: '#7A7060' } }, c.short)))),
+          h('button', { key: c.id, onClick: () => setCategory(category === c.id ? '' : c.id), className: 'px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors', style: category === c.id ? { background: c.hex, color: '#fff', borderColor: c.hex } : { borderColor: 'rgba(212,175,55,0.25)', color: '#7A7060' } }, c.short)))),
       h(Field, { label: 'Project tier' },
         h('div', { className: 'flex flex-wrap gap-1.5' }, IDEA_TIERS.map((t) =>
           h('button', { key: t.id, onClick: () => pickTier(t), className: cx('px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors', tierId === t.id ? 'gold-gradient text-white border-transparent' : 'border-border text-muted-foreground hover:border-gold/40') }, t.label)))),

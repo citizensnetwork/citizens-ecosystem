@@ -20,7 +20,7 @@
 
   function roleBadge(role, level) {
     if (role === 'admin') return { label: 'Admin', color: '#8E44AD', fg: '#FFFFFF', icon: 'Shield' };
-    if (role === 'contributor') return { label: level || 'Contributor', color: '#F2BD22', fg: '#0A0908', icon: 'Crown' };
+    if (role === 'contributor') return { label: level || 'Contributor', color: '#D4AF37', fg: '#0A0908', icon: 'Crown' };
     return null;
   }
 
@@ -201,7 +201,7 @@
           className: cx('flex items-center w-full rounded-xl transition-colors hover:bg-accent/50 p-2', collapsed ? 'justify-center' : 'gap-3'),
         },
           React.createElement('div', { className: 'relative shrink-0' },
-            React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 36, ring: 'rgba(242,189,34,0.4)' }),
+            React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 36, ring: 'rgba(212,175,55,0.4)' }),
             role !== 'citizen' && React.createElement('span', {
               className: 'absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-background flex items-center justify-center',
               style: { background: rb.color },
@@ -267,7 +267,7 @@
           React.createElement(Icon, { name: 'CalendarPlus', size: 15, className: 'text-gold-dark' }), React.createElement('span', { className: 'text-xs font-bold' }, 'Create Event'))),
       React.createElement('button', {
         onClick: () => setOpen((o) => !o),
-        className: 'w-14 h-14 rounded-2xl gold-gradient text-white shadow-[0_8px_24px_rgba(242,189,34,0.5)] flex items-center justify-center transition-transform active:scale-95',
+        className: 'w-14 h-14 rounded-2xl gold-gradient text-white shadow-[0_8px_24px_rgba(212,175,55,0.5)] flex items-center justify-center transition-transform active:scale-95',
         style: { transform: open ? 'rotate(45deg)' : 'none' },
       }, React.createElement(Icon, { name: 'Plus', size: 24, strokeWidth: 2.5 })));
   }
@@ -317,17 +317,23 @@
 
   function Shell() {
     const { createKind, createEditing, authed, guestMode, authResolved } = window.useApp();
+    const chrome = window.ConnectChrome;
+    const wide = chrome.useWide();
+    const frame = chrome.useShell();
     // Signed out: the landing — but while a probable session is still resolving,
     // the loading splash instead, so a returning member sees no "sign in" flash.
     if (!authed && !guestMode) return React.createElement(authResolved ? window.AuthScreen : window.LoadingSplash);
-    return React.createElement('div', { className: 'flex h-full w-full overflow-hidden bg-background' },
-      React.createElement(Sidebar),
-      React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },
-        React.createElement(AssistBanner),
-        React.createElement(CurrentPage)),
-      // Map v2 (#210): one folding round button instead of a bottom bar.
-      React.createElement(window.MapV2Nav),
-      React.createElement(CreateFab),
+    return React.createElement('div', {
+      className: 'connect-shell ' + (wide ? 'desktop-review' : 'phone-review'),
+      'data-search': frame.search ? 'open' : 'closed',
+      'data-filter': frame.filter ? 'on' : 'off',
+      'data-marker-language': 'Ink',
+    },
+      React.createElement('div', { className: 'connect-frame' + (frame.central ? ' connect-central' : '') },
+        React.createElement('main', { className: 'connect-main' },
+          React.createElement(AssistBanner),
+          frame.central ? React.createElement(chrome.CentralView) : React.createElement(CurrentPage)),
+        chrome && React.createElement(chrome.Nav)),
       createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),
       window.CCListingClaim && React.createElement(window.CCListingClaim.Host),

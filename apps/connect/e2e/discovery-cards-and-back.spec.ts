@@ -241,13 +241,14 @@ test.describe("Device Back button", () => {
     await page.goBack();
     await expect.poll(() => screenName(page)).toBe("discover");
 
-    // An open overlay is dismissed BEFORE the screen changes. (The category
-    // sheet this used to open no longer exists — it duplicated the pill row —
-    // so the account panel, the app's one profile entry point, stands in.)
-    await page.getByRole("button", { name: "Your account" }).click();
-    await expect(page.getByRole("button", { name: /View Profile/ })).toBeVisible();
+    // An open overlay is dismissed BEFORE the screen changes. The listing sheet
+    // is the map's back-guarded overlay now that the account control has left the map.
+    const pin = page.locator('.maplibregl-marker:has([data-cc-pin="event"])').first();
+    await expect(pin).toBeVisible({ timeout: 15_000 });
+    await openListing(page, (await pin.getAttribute("data-cc-id"))!);
+    await expect(page.locator('[data-entity-card="event"]')).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole("button", { name: /View Profile/ })).toBeHidden();
+    await expect(page.locator('[data-entity-card="event"]')).toBeHidden();
     await expect.poll(() => screenName(page)).toBe("discover");
 
     // At the root with nothing open, Back really does leave — never a trap.
@@ -453,21 +454,20 @@ test.describe("Map density gates and pin labels", () => {
 });
 
 test.describe("One profile entry point", () => {
-  test("the account control is top-right on every screen and the bottom bar has no profile tab", async ({ page }) => {
+  test("the map dock has Me and no account button; Discover keeps the one account control", async ({ page }) => {
     await mockNetwork(page);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // #210: the bar folds into one round button (app/map-v2-nav.jsx). Open, it is Home, Explore, Map and Profile;
-    // never the old "You" tab, whose panel opened past the bottom edge of the screen and was unusable.
-    await page.getByRole("button", { name: "Open navigation" }).click();
-    const bottomNav = page.getByRole("navigation", { name: "Main" });
+    const bottomNav = page.getByRole("navigation", { name: "Connect navigation" });
     await expect(bottomNav.getByRole("button", { name: "You" })).toHaveCount(0);
-    await expect(bottomNav.getByRole("button", { name: "Explore" })).toBeVisible();
-    await page.keyboard.press("Escape");
+    await expect(bottomNav.getByRole("button", { name: "Me", exact: true })).toBeVisible();
+    await expect(bottomNav.getByRole("button", { name: "Explore", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(0);
 
-    // Exactly one account control, and its panel opens inside the viewport.
+    await bottomNav.getByRole("button", { name: "Explore", exact: true }).click();
+    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
     await page.getByRole("button", { name: "Your account" }).click();
     const panel = page.getByRole("button", { name: /View Profile/ });
@@ -477,13 +477,6 @@ test.describe("One profile entry point", () => {
     expect(box).not.toBeNull();
     expect(box!.y).toBeGreaterThanOrEqual(0);
     expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height);
-    await page.keyboard.press("Escape");
-
-    // Same control, same corner, on the list screen (#210 part 3: the nav's Explore is the Discover page).
-    await page.getByRole("button", { name: "Open navigation" }).click();
-    await bottomNav.getByRole("button", { name: "Explore" }).click();
-    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
-    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
   });
 
   test("the map's top bar is search + account only, and the categories are inside the Explore panel", async ({ page }) => {
@@ -500,8 +493,8 @@ test.describe("One profile entry point", () => {
     // category, place category and Contributor type (mapV2Explore.test.tsx checks the mapping). They are no longer a pill row
     // over the map: they are a list inside the Explore panel, behind its title, starting with All.
     await expect(screen.getByRole("group", { name: "Show on the map" })).toHaveCount(0);
-    await screen.locator("[data-mv2='explore']").getByRole("button", { name: "Explore", exact: true }).click();
-    const list = screen.getByRole("list", { name: "Categories" });
+    await screen.getByRole("button", { name: "Expand search" }).click();
+    const list = screen.getByRole("group", { name: "Filter the map by category" });
     await expect(list.getByRole("button", { name: "All", exact: true })).toBeVisible();
     await expect(list.getByRole("button", { name: "Churches & worship" })).toBeVisible();
     await expect(list.getByRole("button", { name: "Business" })).toBeAttached();

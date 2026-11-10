@@ -46,7 +46,7 @@ test.describe("P1-01 Map v2 is the map", () => {
     await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0); // removed at the founder's request (2026-10-12)
     expect(await theme(page)).toBe("light");
     // the token file is really applied: --accent resolves to gold
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#f2bd22");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#d4af37");
     // a visitor who never chose gets no key written for them
     expect(await stored(page)).toBeNull();
   });
@@ -155,9 +155,7 @@ test.describe("P1-04 the pin", () => {
     const outline = await first.evaluate((e) => getComputedStyle(e).outlineStyle + " " + getComputedStyle(e).outlineWidth);
     expect(outline).toBe("solid 2px");
     await page.keyboard.press("Enter");
-    // #210: Enter selects the pin and outlines its card in the Explore row, where the keyboard follows; Enter there opens the sheet
-    await expect(page.locator("[data-mv2='explore'] [data-selected]")).toBeVisible();
-    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest("[data-explore-id][data-selected]"))).toBe(true);
+    await expect(page.locator(".connect-marker.chosen")).toBeVisible();
     await page.keyboard.press("Enter");
     await expect(page.locator("[data-mv2='sheet']")).toBeVisible();
   });

@@ -321,9 +321,9 @@ test.describe("In-app navigation, Back and Forward never leave the prefix", () =
     await openDemo(page);
     await page.goto(`${BASE}/c/${SLUG}`);
     await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "Kingdom Exploration" }).first().click();
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
-    expect(path(page)).toBe(`${BASE}/discover`);
+    await page.getByRole("navigation", { name: "Connect navigation" }).getByRole("button", { name: "Explore", exact: true }).click();
+    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
+    expect(path(page)).toBe(`${BASE}/explore`);
     await page.goBack();
     await expect.poll(() => screen(page)).toBe("profile");
     expect(path(page)).toBe(`${BASE}/c/${SLUG}`);

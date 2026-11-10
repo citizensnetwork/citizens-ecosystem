@@ -107,6 +107,72 @@
     return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
   }
 
+  // Recolour the live MapTiler style toward the approved map palette. The engine stays MapLibre.
+  function restyleBasemap(map) {
+    if (!map || !map.getStyle) return;
+    const style = map.getStyle();
+    if (!style || !style.layers) return;
+    const dark = window.MapV2 && window.MapV2.resolvedTheme() === 'dark';
+    const k = dark
+      ? { g: '#1d1f1a', b: '#24261f', bi: '#2c2e27', park: '#24302a', road: '#33352e', w1: '#1d2b2c', w2: '#26393a', lab: '#a9a89c', halo: '#1b1c18' }
+      : { g: '#edeee5', b: '#e4e2d8', bi: '#d8d8ce', park: '#cbd8c3', road: '#fbfbf5', w1: '#a7c0bd', w2: '#c8dad5', lab: '#777e71', halo: '#f7f6f1' };
+    style.layers.forEach((layer) => {
+      const id = String(layer.id || '').toLowerCase();
+      try {
+        if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', k.g);
+        else if (layer.type === 'fill') {
+          const c = /water|ocean|river|lake/.test(id) ? k.w1 : /park|wood|grass|green|landcover/.test(id) ? k.park : /building/.test(id) ? k.bi : k.b;
+          map.setPaintProperty(layer.id, 'fill-color', c);
+        } else if (layer.type === 'line') {
+          map.setPaintProperty(layer.id, 'line-color', /water/.test(id) ? k.w2 : k.road);
+        } else if (layer.type === 'symbol') {
+          map.setPaintProperty(layer.id, 'text-color', k.lab);
+          map.setPaintProperty(layer.id, 'text-halo-color', k.halo);
+        }
+      } catch (e) { /* a layer whose paint is data-driven keeps MapTiler's value */ }
+    });
+  }
+
+  function capsuleButton(label, className, on, pressed) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = className + (on ? ' on' : '');
+    b.textContent = pressed || label;
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    return b;
+  }
+  function syncCapsules(wrap, m) {
+    const old = wrap.querySelector('.marker-capsules');
+    if (old) old.remove();
+    if (!m || m.type === 'place' || m.type === 'idea') return;
+    const bar = document.createElement('div');
+    bar.className = 'marker-capsules cn-glass';
+    bar.setAttribute('aria-label', m.type + ' quick actions');
+    const acts = window.ConnectActions || {};
+    if (m.type === 'contributor') {
+      const following = !!(acts.followed && acts.followed.has && acts.followed.has(m.id));
+      const follow = capsuleButton('Follow', 'lead', following, following ? 'Following' : '');
+      follow.addEventListener('click', (e) => { e.stopPropagation(); if (acts.toggleFollow) acts.toggleFollow(m.id, m.title); });
+      const message = capsuleButton('Message', '', false, '');
+      message.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (acts.startConversationWith) acts.startConversationWith(m.title || '', m.profilePhoto || '', true, m.id);
+      });
+      bar.appendChild(follow);
+      bar.appendChild(message);
+    } else {
+      const connected = !!(acts.connected && acts.connected.has && acts.connected.has(m.id));
+      const connect = capsuleButton('Connect', 'connect', connected, connected ? 'Connected' : '');
+      connect.addEventListener('click', (e) => { e.stopPropagation(); if (acts.toggleConnect) acts.toggleConnect(m.id); });
+      const share = capsuleButton('Share', '', false, '');
+      share.addEventListener('click', (e) => { e.stopPropagation(); if (acts.shareLink) acts.shareLink({ page: 'event', params: { id: m.id } }); });
+      bar.appendChild(connect);
+      bar.appendChild(share);
+    }
+    wrap.appendChild(bar);
+  }
+
+
   // MapTiler's Free plan (founder: staying on it, tracker MAP:D12) requires its logo, linked to
   // maptiler.com, bottom-left on every map that shows its tiles, beside the © MapTiler / © OpenStreetMap
   // text attribution (docs.maptiler.com, "Map attribution and how to add it"). The image is MapTiler's own
@@ -375,8 +441,15 @@
         geo.on('geolocate', onLocatedV2);
         // Once the user pans/zooms by hand, stop auto-framing the data.
         const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
-        map.on('dragstart', onUserMove);
-        map.on('zoomstart', onUserMove);
+        const onGesture = (e) => {
+          onUserMove(e);
+          if (e && e.originalEvent) {
+            try { window.dispatchEvent(new Event('cc-map-gesture')); } catch { /* old webview */ }
+          }
+        };
+        map.on('dragstart', onGesture);
+        map.on('zoomstart', onGesture);
+        map.on('wheel', () => { try { window.dispatchEvent(new Event('cc-map-gesture')); } catch { /* old webview */ } });
         mapRef.current = map;
         // Inspection/test hook, in the same spirit as store.jsx's `window.__cc`:
         // lets a spec (or the console) jumpTo an exact zoom instead of
@@ -388,6 +461,8 @@
         // fitBounds below, so the first frame is already correct.
         map.on('zoom', applyZoomGates);
         map.on('load', applyZoomGates);
+        const paintBasemap = () => restyleBasemap(map);
+        map.on('style.load', paintBasemap);
         // The phone's own look changed (light/dark): swap the base style on the same map; the DOM pins are untouched.
         const onTheme = () => {
           const t = window.MapV2.resolvedTheme();
@@ -446,6 +521,9 @@
           if (ro) ro.disconnect();
           map.off('zoom', applyZoomGates);
           map.off('load', applyZoomGates);
+          map.off('style.load', paintBasemap);
+          map.off('dragstart', onGesture);
+          map.off('zoomstart', onGesture);
           map.off('idle', onIdleV2);
           clearTimeout(idleTimer);
           map.off('moveend', tellView);
@@ -485,14 +563,22 @@
         const S = window.MapV2Strings, P = window.MapV2Pins;
         const catLabel = cat ? cat.name : ((m.type === 'contributor' && S.pin.kind[m.kind]) || S.pin.type[m.type] || '');
         const label = P.ariaLabelFor(m, catLabel, S.pin);
-        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, !!m.isLive, !!m.isBusy,
+        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, m.coverPhoto, !!m.isLive, !!m.isBusy, !!m.linked,
           m.broadcast ? m.broadcast.message + '|' + m.broadcast.bubbleId : '', catLabel].join('');
-        const fill = m.type === 'idea' ? '#F2BD22' : (cat ? cat.hex : '#F2BD22');
+        const grouped = window.ConnectChrome && window.ConnectChrome.groupHex && window.ConnectChrome.groupHex(m.category);
+        const fill = grouped || '#272a25';
         const build = () => P.build(m, { lucideInner, icon: pinIcon(m, cat), hex: fill, strings: S.pin, onDismissBubble: onDismissBubbleRef.current });
         let mk = markerObjs.current.get(m.id);
         if (mk && mk._ccAnchor === anchor) {
           const wrap = mk.getElement();
-          if (mk._ccSig !== sig) { wrap.replaceChildren(build()); wrap.setAttribute('aria-label', label); mk._ccSig = sig; }
+          if (mk._ccSig !== sig) {
+            const hit = wrap.querySelector('.marker-hit');
+            if (hit) hit.replaceChildren(build());
+            else wrap.replaceChildren(build());
+            syncCapsules(wrap, m);
+            wrap.setAttribute('aria-label', label);
+            mk._ccSig = sig;
+          }
           mk.setLngLat(coords);
         } else {
           if (mk) mk.remove();
@@ -502,6 +588,7 @@
           wrap.appendChild(build());
           const activate = () => { if (onSelectRef.current) onSelectRef.current(m.id, m.type); };
           P.makeOperable(wrap, activate);
+          syncCapsules(wrap, m);
           wrap.addEventListener('click', (e) => { e.stopPropagation(); activate(); });
           mk = new window.maplibregl.Marker({ element: wrap, anchor }).setLngLat(coords).addTo(mp);
           mk._ccAnchor = anchor;
@@ -525,7 +612,7 @@
         const dim = !!(filterCategory && !passes && m.type !== 'idea');
         const selected = selectedId === m.id;
         // Event and Contributor badges hang from their point ('bottom'); every other pin is centred on it.
-        const anchor = (m.type === 'event' || m.type === 'contributor') ? 'bottom' : 'center';
+        const anchor = 'center';
         upsertPinV2(m, cat, coords, anchor, dim, selected);
       });
       // drop markers whose item is gone
@@ -709,7 +796,7 @@
       // fixed center pin (the map moves under it, not the other way round)
       h('div', { className: 'absolute left-1/2 top-1/2 pointer-events-none', style: { transform: 'translate(-50%, -100%)', filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.35))' } },
         h('svg', { width: 28, height: 36, viewBox: '0 0 30 38' },
-          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#F2BD22' }),
+          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#D4AF37' }),
           h('circle', { cx: 15, cy: 15, r: 6, fill: '#fff' }))),
       h('button', {
         type: 'button', onClick: useMyLocation, disabled: busy === 'locate',

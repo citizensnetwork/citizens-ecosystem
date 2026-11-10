@@ -63,12 +63,12 @@
           card: 'rgba(255,255,255,0.82)', 'card-foreground': '#0A0908',
           popover: 'rgba(255,255,255,0.97)',
           primary: '#0A0908', 'primary-foreground': '#FFFFFF',
-          secondary: '#F2BD22', 'secondary-foreground': '#0A0908',
+          secondary: '#D4AF37', 'secondary-foreground': '#0A0908',
           muted: '#EDE8DC', 'muted-foreground': '#7A7060',
           accent: '#FBF1CC', 'accent-foreground': '#0A0908',
-          border: 'rgba(242,189,34,0.22)',
+          border: 'rgba(212,175,55,0.22)',
           destructive: '#c0392b',
-          gold: '#F2BD22', 'gold-light': '#FCDD6C', 'gold-dark': '#836100',
+          gold: '#D4AF37', 'gold-light': '#FCDD6C', 'gold-dark': '#836100',
         },
         fontFamily: {
           sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'sans-serif'],
@@ -84,11 +84,11 @@
 
 <style>
   :root {
-    /* THE gold (founder, 2026-10-31): the crown logo's own colour, sampled from the logo (#F2BD22). One fill gold; the
+    /* THE gold (founder, 2026-10-31): the crown logo's own colour, sampled from the logo (#D4AF37). One fill gold; the
        other values are its roles, never a second gold: --gold-light and --gold-deep are the gradient stops (light and
        amber, never brown), --gold-dark is the INK for gold text, rings and icons (plain gold on white is 1.74:1).
        Same values as Map v2's --accent and --accent-ink (its own stylesheet); a unit test keeps the two in step. */
-    --gold:#F2BD22; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#EDE5D4;
+    --gold:#D4AF37; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#edeee5;
     /* the crown mark's old, separate gold: now the same gold (kept so nothing that reads them breaks) */
     --gold-crown:var(--gold); --gold-crown-light:var(--gold-light); --gold-crown-dark:var(--gold-dark);
   }
@@ -132,8 +132,8 @@
   .scrollbar-none { scrollbar-width: none; }
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(242,189,34,0.4); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(242,189,34,0.7); }
+  ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.4); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.7); }
 
   /* animations */
   @keyframes pinPulse { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(2.4);opacity:0} }
@@ -247,6 +247,7 @@
 <script type="text/babel" src="app/map-v2-online.jsx?v=20261026a"></script>
 <script type="text/babel" src="app/map-v2-sheet.jsx?v=20261101b"></script>
 <script type="text/babel" src="app/map-v2-explore.jsx?v=20261101b"></script>
+<script type="text/babel" src="app/connect-chrome.jsx?v=20261110a"></script>
 <script type="text/babel" src="app/map-v2-nav.jsx?v=20261026c"></script>
 <script type="text/babel" src="app/map-v2-discover.jsx?v=20261030a"></script>
 <script type="text/babel" src="app/home.jsx?v=20261101b"></script>
