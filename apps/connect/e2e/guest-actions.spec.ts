@@ -10,7 +10,7 @@ import { mockMapNetwork, mockContributorDetail, openMap, openPinSheet, smallSeed
 
 type Row = { id: string; longitude?: number; latitude?: number; physical_longitude?: number; physical_latitude?: number };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: Row[]; places: Row[]; events: Row[] };
-const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
+const sheet = (page: Page) => page.locator(".cn-big");
 type MapHook = { jumpTo: (o: object, d: object) => void };
 type Kind = "contributor" | "place" | "event";
 
@@ -32,7 +32,7 @@ async function openAsGuest(page: Page, kind: Kind) {
 
 const toastWith = (page: Page, text: string) => page.locator("[role='status']").filter({ hasText: text });
 const signInButton = (page: Page) => page.locator("[data-toast-action]");
-const actionBtn = (page: Page, re: RegExp) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: re });
+const actionBtn = (page: Page, re: RegExp) => page.locator(".cn-big .cn-actions button", { hasText: re });
 
 test.describe("#201 a guest's Follow, Save, Consider and Connect never flip, and say why", () => {
   test("Follow on a Contributor", async ({ page }) => {

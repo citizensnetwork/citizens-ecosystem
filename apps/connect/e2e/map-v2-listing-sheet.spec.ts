@@ -14,7 +14,7 @@ type C = { id: string; contributor_slug: string; physical_longitude: number; phy
 type Seed = MapSeed & { contributors: C[] };
 type Post = { id: string; contributor_id: string; title: string; body: string; image_url: string | null; post_date: string; created_at: string };
 
-const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
+const sheet = (page: Page) => page.locator(".cn-big");
 const head = (page: Page) => sheet(page).locator("[data-mv2='xhead']");
 const explore = (page: Page) => page.locator("[data-mv2='explore']");
 const tabNames = (page: Page) => sheet(page).getByRole("tab").allInnerTexts();

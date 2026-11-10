@@ -104,13 +104,19 @@ export async function openListing(page: Page, id: string, _how: "click" | "tap" 
   await pin.waitFor({ state: "attached", timeout: 15_000 });
   // A marker MapLibre has panned off the screen cannot be clicked through the viewport.
   // Two clicks: the first selects the Ink marker and opens the conveyor, the second opens the big preview.
-  await pin.evaluate((el, _how) => {
-    void _how;
+  await pin.evaluate((el) => {
     const hit = el.querySelector(".marker-hit");
     const target = hit instanceof HTMLElement ? hit : el;
-    if (target instanceof HTMLElement) { target.click(); target.click(); }
-  }, _how);
+    if (target instanceof HTMLElement) target.click();
+  });
+  await page.locator(".cn-conveyor").waitFor({ state: "visible", timeout: 10_000 });
+  await pin.evaluate((el) => {
+    const hit = el.querySelector(".marker-hit");
+    const target = hit instanceof HTMLElement ? hit : el;
+    if (target instanceof HTMLElement) target.click();
+  });
   await page.locator(".cn-big").waitFor({ state: "visible", timeout: 10_000 });
+  void _how;
 }
 
 /**
@@ -128,8 +134,11 @@ export async function openPinSheet(page: Page, id: string, how: "click" | "tap" 
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
   await pin.waitFor({ state: "visible", timeout: 15_000 });
   // One tap opens the conveyor. A second tap opens the big preview.
-  if (how === "tap") { await pin.tap({ force: true }); await pin.tap({ force: true }); }
-  else { await pin.click({ force: true }); await pin.click({ force: true }); }
+  if (how === "tap") await pin.tap({ force: true });
+  else await pin.click({ force: true });
+  await page.locator(".cn-conveyor").waitFor({ state: "visible", timeout: 10_000 });
+  if (how === "tap") await pin.tap({ force: true });
+  else await pin.click({ force: true });
   await page.locator(".cn-big").waitFor({ state: "visible", timeout: 10_000 });
 }
 
@@ -217,7 +226,7 @@ export async function mockContributorDetail(
  * right before EVERY tap: a toast or a label change can move things between two taps.
  */
 export async function stillBox(page: Page, locator: Locator, { samples = 4, gapMs = 60 } = {}) {
-  const sheet = page.locator("[data-mv2='sheet']");
+  const sheet = page.locator(".cn-big");
   await expect
     .poll(
       async () => {

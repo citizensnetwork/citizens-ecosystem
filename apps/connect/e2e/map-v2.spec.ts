@@ -157,7 +157,7 @@ test.describe("P1-04 the pin", () => {
     await page.keyboard.press("Enter");
     await expect(page.locator(".connect-marker.chosen")).toBeVisible();
     await page.keyboard.press("Enter");
-    await expect(page.locator("[data-mv2='sheet']")).toBeVisible();
+    await expect(page.locator(".cn-big")).toBeVisible();
   });
 
   test("the tap target of every pin is at least 44 x 44 CSS px", async ({ page }) => {
@@ -257,7 +257,7 @@ test.describe("E23 and the 12.3 states", () => {
     const c = seed.contributors[0] as { id: string; physical_longitude: number; physical_latitude: number };
     await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
     await openListing(page, c.id);
-    const share = page.locator("[data-mv2='sheet']").getByRole("button", { name: "Share" });
+    const share = page.locator(".cn-big").getByRole("button", { name: "Share" });
     await expect(share).toBeVisible();
     await share.hover();
     await expect(share).toHaveCSS("border-top-color", "rgb(131, 97, 0)"); // --accent-ink on hover

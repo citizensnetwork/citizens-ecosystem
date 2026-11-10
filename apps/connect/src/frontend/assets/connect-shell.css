@@ -1165,7 +1165,7 @@
 .explore-search{position:sticky;top:78px;z-index:25;display:flex;flex-wrap:wrap;align-items:center;gap:6px;border-radius:24px;margin:-15px 15px 20px;padding:9px}
 .explore-search>.inline-icon{inline-size:19px;margin-left:4px}
 .explore-search input{background:transparent;border:0;flex:1 1 150px;font-size:11px;padding:8px}
-.explore-search select{flex:1;border:0;background:transparent;font-size:11px;padding:8px}
+.explore-search select{flex:0 1 96px;min-width:72px;border:0;background:transparent;font-size:11px;padding:8px}
 .explore-search .cn-primary{padding:9px 18px;font-size:10px!important}
 .photo-carousel{display:flex;overflow:auto;gap:15px;padding:5px 2px 15px;scroll-snap-type:x mandatory;scrollbar-width:thin}
 .photo-carousel>*{flex:0 0 76%;scroll-snap-align:start}
@@ -1241,3 +1241,25 @@
 [data-theme='dark'] .photo-fallback{background:radial-gradient(circle at 50% 46%,var(--fallback-paper) 0 34%,color-mix(in srgb,color-mix(in srgb,var(--fallback-color) 80%,#f7f6f1) 7%,var(--fallback-paper)) 100%);color:var(--fallback-ink)}
 [data-theme='dark'] .photo-fallback:after{border:1px solid color-mix(in srgb,color-mix(in srgb,var(--fallback-color) 80%,#f7f6f1) 60%,transparent)}
 [data-theme='dark'] .connect-frame .cn-primary{color:#1b1c18}
+
+/* Round 2. Photos and the cover shade stay dark-on-photo in both themes (pack 03/07 shots). */
+[data-theme='dark'] .cover-shade{background:linear-gradient(0deg,#1c241ccd,transparent 80%)}
+[data-theme='dark'] .photo-shade{background:linear-gradient(0deg,#1c241ce8,transparent 75%)}
+[data-theme='dark'] .photo-tile{background:#272a25;color:#f7f6f1!important;border-top:6px solid var(--category,#718b78)}
+[data-theme='dark'] .category-tiles>button{background:#272a25;color:#f7f6f1!important}
+[data-theme='dark'] .category-tiles>button>span{background:#272a25d9;color:#f7f6f1}
+[data-theme='dark'] .photo-title,[data-theme='dark'] .photo-title h3,[data-theme='dark'] .photo-title small,[data-theme='dark'] .photo-title>span{color:#f7f6f1}
+.explore-hero h1{margin:6px 0 8px;font-weight:500;letter-spacing:-.045em;line-height:1.02}
+.explore-hero .cn-eyebrow{letter-spacing:.17em;color:#f7f6f1}
+.connect-frame .explore-search input,.connect-frame .explore-search select{background:transparent;border:0;border-radius:0;padding:8px;box-shadow:none;color:inherit}
+.me-avatar{position:relative}
+.me-space-links button{min-height:115px;align-content:start}
+.desktop-review .me-space-links button{min-height:89px}
+.me-calendar{height:100%}
+.cn-modal textarea{min-height:72px}
+.cn-modal select,.cn-modal a.cn-primary{display:block;width:100%;margin-top:8px;text-decoration:none}
+.profile-mini-map{background:radial-gradient(circle at 50% 46%,#f7f6f1 0 30%,color-mix(in srgb,var(--category,#718b78) 18%,#e7e4da) 100%)}
+[data-theme='dark'] .profile-mini-map{background:radial-gradient(circle at 50% 46%,#23251f 0 30%,#1b1c18 100%)}
+.category-tiles>button>.photo-fallback{position:absolute;inset:0}
+.connect-map>.listing-profile{position:absolute;inset:0;z-index:32;overflow:auto;background:#f7f6f1}
+[data-theme='dark'] .connect-map>.listing-profile{background:#1b1c18}

@@ -304,7 +304,7 @@ test.describe("Every pin opens the same small card", () => {
     await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
 
     await openListing(page, (await page.locator('.maplibregl-marker:has([data-cc-pin="contributor"])').first().getAttribute("data-cc-id"))!);
-    const sheet = page.locator("[data-mv2='sheet']");
+    const sheet = page.locator(".cn-big");
     await expect(sheet).toBeVisible({ timeout: 10_000 });
     // Still on the map: the full-screen profile page was the old behaviour.
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();

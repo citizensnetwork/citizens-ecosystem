@@ -91,7 +91,7 @@ test.describe("P1-12 the map look follows the phone", () => {
     await expect(pin.locator(".marker-frame")).toHaveCSS("border-top-color", "rgb(247, 246, 241)");
     await expect(pin.locator(".marker-face")).toHaveCSS("background-color", "rgb(39, 42, 37)");
     await openListing(page, c.id);
-    const sheet = page.locator("[data-mv2='sheet']");
+    const sheet = page.locator(".cn-big");
     await expect(sheet).toHaveCSS("background-color", "rgb(26, 23, 20)");
     await expect(sheet.locator("[data-mv2='name']")).toHaveCSS("color", "rgb(247, 244, 238)");
     await expect(sheet.getByRole("link", { name: "Directions" })).toHaveCSS("color", "rgb(10, 9, 8)");

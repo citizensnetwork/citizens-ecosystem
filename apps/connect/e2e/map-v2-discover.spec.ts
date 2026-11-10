@@ -22,7 +22,7 @@ const rowOf = (page: Page, id: string) => page.locator(`[data-mv2='discover-row'
 const listOf = (page: Page, id: string) => rowOf(page, id).locator("[data-mv2='list']");
 const titles = (page: Page) => page.locator("[data-mv2='discover-row-title']").allTextContents();
 const dock = (page: Page) => page.getByRole("navigation", { name: "Connect navigation" });
-const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
+const sheet = (page: Page) => page.locator(".cn-big");
 const GROUP_TITLES = ["Churches & worship", "Serve & care", "Culture & fun", "Learn & grow", "Audiences", "Business"];
 
 async function network(page: Page) {

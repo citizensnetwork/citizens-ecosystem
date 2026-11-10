@@ -21,6 +21,17 @@
   function photoOf(item) {
     return item.image || item.coverPhoto || item.profilePhoto || '';
   }
+  function GlyphSlot({ slug }) {
+    const ref = useRef(null);
+    useEffect(() => {
+      const el = ref.current;
+      const chrome = window.ConnectChrome;
+      if (!el || !chrome || !chrome.glyphNode) return undefined;
+      el.replaceChildren(chrome.glyphNode(slug));
+      return undefined;
+    }, [slug]);
+    return h('span', { className: 'fallback-glyph', ref });
+  }
   function Photo({ src, alt, className, item }) {
     if (src) return h('img', { src, alt: alt || '', className, loading: 'lazy' });
     const color = item ? hexOf(item) : '#7040b5';
@@ -30,7 +41,7 @@
       role: 'img',
       'aria-label': alt || 'No photo yet',
       style: { '--fallback-color': color, '--fallback-paper': dark ? '#272a25' : '#f7f6f1', '--fallback-ink': dark ? '#f7f6f1' : '#272a25' },
-    }, h('span', { className: 'fallback-glyph' }, window.ConnectChrome && window.ConnectChrome.glyphNode(item && item.category)));
+    }, h(GlyphSlot, { slug: item && item.category }));
   }
 
   function listingsFrom(app, group, query) {
@@ -41,15 +52,17 @@
       id: e.id, type: 'event', title: e.title, category: e.category, detail: e.description || '',
       location: e.location || '', when: [e.date, e.time].filter(Boolean).join(' · '),
       image: e.coverPhoto || '', online: !e.lat && !e.location, host: e.organizerName || '',
-      hostId: e.organizerId, lat: e.lat, lng: e.lng, website: e.website || '',
+      hostId: e.organizerId, lat: e.lat, lng: e.lng,       website: e.website || '', phone: e.phone || '', email: e.email || '',
       connected: !!(app.connected && app.connected.has && app.connected.has(e.id)),
       connectCount: e.connectCount || 0, considerCount: e.considerCount || 0,
+      gallery: e.gallery || e.photos || [],
     }));
     (app.places || []).forEach((p) => rows.push({
       id: p.id, type: 'place', title: p.name, category: p.category, detail: p.description || p.about || '',
       location: p.address || p.location || '', when: p.hours || '', image: p.coverPhoto || '',
       host: p.organizerName || '', lat: p.lat, lng: p.lng, website: p.website || '', phone: p.phone || '',
-      openToCollaborate: !!p.openToCollaborate,
+      email: p.email || '', openToCollaborate: !!p.openToCollaborate, gallery: p.gallery || p.photos || [],
+      hours: p.hours || '',
     }));
     (app.contributors || []).forEach((c) => {
       if (c.lat == null && c.lng == null && !c.name) return;
@@ -57,8 +70,10 @@
         id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind,
         detail: c.bio || '', location: c.location || '', when: c.kind || '',
         image: c.profilePhoto || c.coverPhoto || '', host: c.name, lat: c.lat, lng: c.lng,
-        website: c.website || '', verified: !!c.verified, followers: c.followerCount || 0,
+        website: c.website || '', phone: c.phone || '', email: c.email || '',
+        verified: !!c.verified, followers: c.followerCount || 0,
         openToCollaborate: !!c.openToCollaborate, slug: c.slug,
+        gallery: c.gallery || c.photos || [],
       });
     });
     return rows.filter((i) => {
@@ -163,7 +178,7 @@
       ? [['Host', item.host || '—'], ['When', item.when || '—'], [item.online ? 'Online' : 'Where', item.online ? 'Online · not a physical venue' : (item.location || '—')], ['Responses', (item.connectCount || 0) + ' connected · ' + (item.considerCount || 0) + ' considering']]
       : [['Host', item.host || item.title], ['Status', item.when || '—'], ['Where', item.location || '—'], ['Community', (item.followers || 0) + ' followers']];
     return h('div', {
-      className: 'cn-big', role: 'dialog', 'aria-label': item.title + ' expanded preview',
+      className: 'cn-big', role: 'dialog', 'aria-modal': 'false', 'aria-label': item.title + ' expanded preview',
       style: { '--category': item.color },
     },
       h('div', { className: 'big-bar' },
@@ -203,60 +218,143 @@
         h('button', { type: 'button', className: 'cn-ink-button full-profile-button', onClick: onProfile }, 'View full profile ↗')));
   }
 
+  function listingPath(item) {
+    if (!item) return '/';
+    if (item.type === 'event') return '/e/' + item.id;
+    if (item.type === 'place') return '/p/' + item.id;
+    return '/c/' + (item.slug || item.id);
+  }
+  function listingHref(item) {
+    const path = listingPath(item);
+    const R = window.CC_ROUTES;
+    if (R && R.publicUrl) {
+      const url = R.publicUrl(path, { webOrigin: window.location.origin });
+      if (url) return url;
+    }
+    return window.location.origin + (R && R.appUrl ? R.appUrl(path) : path);
+  }
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const REPORT_REASON = { 'Listing details': 'misinformation', 'Content concern': 'other', 'Something else': 'other' };
+
+  function relatedMedia(app, item) {
+    const hosted = (app.events || []).filter((e) => item && (e.organizerId === item.id || e.organizerName === item.title || e.organizerName === item.host));
+    const news = (app.newsPosts || []).filter((n) => item && n.contributorId === item.id);
+    const gallery = []
+      .concat((item && item.gallery) || [])
+      .concat(hosted.map((e) => e.coverPhoto).filter(Boolean));
+    return { hosted, news, gallery };
+  }
+
   function ListingProfile({ item, onBack, onAction, flags }) {
+    const app = window.useApp ? window.useApp() : { events: [], newsPosts: [] };
+    const media = relatedMedia(app, item);
     const slides = [{ key: 'Cover', src: photoOf(item) }];
+    if (media.gallery[0]) slides.push({ key: 'Gallery', src: media.gallery[0] });
     const [slide, setSlide] = useState(0);
+    const [viewer, setViewer] = useState(null);
     const start = useRef(0);
     if (!item) return null;
     const socials = [
-      ['Call', item.phone], ['Website', item.website], ['Directions', item.lat != null || item.location],
+      ['Call', item.phone, 'Call'], ['Email', item.email, 'Email'], ['Website', item.website, 'Web'],
+      ['Directions', item.lat != null || item.location, 'Go'],
     ].filter((s) => s[1]);
+    const sections = [
+      ['Happening now & next', media.hosted.map((e) => ({ src: e.coverPhoto, title: e.title }))],
+      ['News', media.news.map((n) => ({ src: n.image || n.coverPhoto, title: n.title }))],
+      ['Gallery', media.gallery.map((src) => ({ src, title: item.title }))],
+    ].filter((s) => s[1].length);
+    const safe = Math.min(slide, slides.length - 1);
     return h('div', { className: 'cn-page listing-profile', style: { '--category': item.color }, 'data-screen': 'listing-profile' },
       h('div', {
         className: 'profile-hero',
         onPointerDown: (e) => { start.current = e.clientX; },
-        onPointerUp: (e) => { const dx = e.clientX - start.current; if (Math.abs(dx) > 35 && slides.length > 1) setSlide((s) => (s + (dx < 0 ? 1 : slides.length - 1)) % slides.length); },
+        onPointerUp: (e) => {
+          const dx = e.clientX - start.current;
+          if (Math.abs(dx) > 35 && slides.length > 1) setSlide((s) => (s + (dx < 0 ? 1 : slides.length - 1)) % slides.length);
+        },
       },
-        h(Photo, { src: slides[slide].src, alt: item.title, item }),
+        h(Photo, { src: slides[safe].src, alt: item.title, item }),
         h('button', { type: 'button', className: 'profile-back cn-round', 'aria-label': 'Back to listing preview', onClick: onBack }, '←'),
         h('div', { className: 'hero-dots' },
-          slides.map((s, n) => h('button', { key: s.key, type: 'button', className: n === slide ? 'active' : '', 'aria-label': s.key, onClick: () => setSlide(n) })),
-          h('small', null, slides[slide].key))),
+          slides.map((s, n) => h('button', { key: s.key, type: 'button', className: n === safe ? 'active' : '', 'aria-label': s.key, onClick: () => setSlide(n) })),
+          h('small', null, slides[safe].key))),
       h('div', { className: 'profile-copy' },
         h('div', { className: 'profile-identity' },
-          h('span', { className: 'org-logo', style: { background: item.color, color: '#f7f6f1' } }, window.ConnectChrome && window.ConnectChrome.glyphNode(item.category)),
+          h('span', { className: 'org-logo', style: { background: item.color, color: '#f7f6f1' } }, h(GlyphSlot, { slug: item.category })),
           h('div', null,
             h('h1', null, item.title, item.verified ? h('span', { className: 'verified', 'aria-label': 'Verified' }, '✓') : null),
             h('span', { className: 'category-line' }, h('i', { style: { background: item.color } }), item.groupLabel))),
         h('div', { className: 'cn-row' },
           item.openToCollaborate ? h('span', { className: 'collab-label' }, 'Open to collaborate') : null,
-          item.type !== 'event' ? h('span', null, (item.followers || 0) + ' followers') : null),
+          item.type !== 'event' && item.followers ? h('span', null, item.followers + ' followers') : null),
         h('div', { className: 'cn-actions profile-actions' },
           ['Follow', 'Message', 'Share'].map((label) => {
             const on = !!(flags && flags[item.id + label]);
             return h('button', { key: label, type: 'button', className: (label === 'Follow' ? 'lead ' : '') + (on ? 'on' : ''), onClick: () => onAction(item, label) }, on && TOGGLE[label] ? TOGGLE[label] : label);
           })),
-        socials.length ? h('div', { className: 'social-row' }, socials.map((s) => h('button', { key: s[0], type: 'button', 'aria-label': s[0], onClick: () => onAction(item, s[0]) }, h('small', null, s[0].slice(0, 2))))) : null,
-        item.detail ? h('section', { className: 'profile-section' },
+        socials.length ? h('div', { className: 'social-row' }, socials.map((s) => h('button', { key: s[0], type: 'button', title: s[0], 'aria-label': s[0], onClick: () => onAction(item, s[0]) }, h('small', null, s[2])))) : null,
+        sections.map((section) => h('section', { key: section[0], className: 'profile-section' },
+          h('button', { type: 'button', className: 'section-title', onClick: () => setViewer({ name: section[0], items: section[1], index: 0 }) },
+            h('h2', null, section[0]), h('span', null, '↗')),
+          h('div', { className: 'photo-carousel' }, section[1].map((m, n) => h('button', {
+            key: section[0] + n, type: 'button', className: 'profile-media', onClick: () => setViewer({ name: section[0], items: section[1], index: n }),
+          }, m.src ? h('img', { src: m.src, alt: m.title || '' }) : h(Photo, { src: '', alt: m.title, item }), h('h3', null, m.title || '')))))),
+        h('section', { className: 'profile-section' },
           h('div', { className: 'profile-about cn-glass' },
             h('h2', null, 'About'),
-            h('p', null, item.detail),
+            item.detail ? h('p', null, item.detail) : null,
             h('div', { className: 'about-facts' },
-              h('div', null, h('small', null, 'Hours'), h('p', null, item.when || '—')),
+              h('div', null, h('small', null, 'Hours'), h('p', null, item.hours || item.when || '—')),
               h('div', null, h('small', null, 'Find us'), h('p', null, item.location || '—')),
               h('div', null, h('small', null, 'Organisation'), h('p', null, item.host || item.title))),
-            h('button', { type: 'button', className: 'cn-text', onClick: () => onAction(item, 'Directions') }, 'Get directions →'))) : null));
+            (item.lat != null) ? h('div', { className: 'profile-mini-map', 'aria-label': 'Map' }) : null,
+            h('button', { type: 'button', className: 'cn-text', onClick: () => onAction(item, 'Directions') }, 'Get directions →')))),
+      viewer ? h('div', { className: 'cn-overlay', role: 'dialog', 'aria-label': viewer.name },
+        h('div', { className: 'cn-modal cn-glass' },
+          h('div', { className: 'cn-row' }, h('h2', null, viewer.name), h('button', { type: 'button', className: 'cn-round', 'aria-label': 'Close viewer', onClick: () => setViewer(null) }, '×')),
+          h(Photo, { src: (viewer.items[viewer.index] || {}).src, alt: '', className: 'viewer-image', item }),
+          h('h3', null, (viewer.items[viewer.index] || {}).title || ''),
+          h('p', null, (viewer.index + 1) + ' / ' + viewer.items.length),
+          h('div', { className: 'cn-actions' },
+            h('button', { type: 'button', onClick: () => setViewer(Object.assign({}, viewer, { index: (viewer.index + viewer.items.length - 1) % viewer.items.length })) }, 'Previous'),
+            h('button', { type: 'button', onClick: () => setViewer(Object.assign({}, viewer, { index: (viewer.index + 1) % viewer.items.length })) }, 'Next')))) : null);
   }
 
   function ActionModal({ action, item, onClose, onSend }) {
     const [note, setNote] = useState('');
     const [reason, setReason] = useState('Listing details');
+    const [reportState, setReportState] = useState('');
     if (!action || !item) return null;
+    const url = listingHref(item);
+    const sendReport = () => {
+      const targetType = item.type === 'place' ? 'place' : item.type === 'contributor' ? 'user' : 'event';
+      const targetId = item.type === 'contributor' ? (item.hostId || item.id) : item.id;
+      const apiReason = REPORT_REASON[reason] || 'other';
+      if (!window.authedFetch || !UUID_RE.test(String(targetId || ''))) {
+        setReportState('Could not send. Please try again.');
+        return;
+      }
+      setReportState('Sending…');
+      window.authedFetch('/api/reports', {
+        method: 'POST',
+        body: JSON.stringify({ target_type: targetType, target_id: targetId, reason: apiReason, body: reason }),
+      }).then((res) => {
+        if (res && res.ok) { setReportState('Thanks. An admin will look at it.'); return; }
+        setReportState(res && res.status === 409 ? 'You\u2019ve already reported this. Thanks, we\u2019re looking into it.' : 'Could not send. Please try again.');
+      }).catch(() => setReportState('Could not send. Please try again.'));
+    };
     let body = null;
     if (action === 'Message') body = h(React.Fragment, null, h('p', null, 'A conversation can begin with a simple hello.'), h('textarea', { 'aria-label': 'Write a message', placeholder: 'Write a little note…', value: note, onChange: (e) => setNote(e.target.value) }), h('button', { type: 'button', className: 'cn-primary', onClick: () => onSend(item, note) }, 'Send'));
-    else if (action === 'Share' || action === 'QR code') body = h('p', null, 'A link to keep or pass on.');
-    else if (action === 'Report') body = h(React.Fragment, null, h('p', null, 'What would you like the team to look at?'), h('select', { 'aria-label': 'Report reason', value: reason, onChange: (e) => setReason(e.target.value) }, ['Listing details', 'Content concern', 'Something else'].map((o) => h('option', { key: o }, o))));
-    else if (action === 'Directions') body = h('p', null, item.location || 'The listing has no address yet.');
+    else if (action === 'Share' || action === 'QR code') body = h(React.Fragment, null, h('p', null, 'A link to keep or pass on.'), h('a', { className: 'cn-primary', href: url }, url));
+    else if (action === 'Report') body = h(React.Fragment, null,
+      h('p', null, 'What would you like the team to look at?'),
+      h('select', { 'aria-label': 'Report reason', value: reason, onChange: (e) => setReason(e.target.value) }, ['Listing details', 'Content concern', 'Something else'].map((o) => h('option', { key: o }, o))),
+      h('button', { type: 'button', className: 'cn-primary', onClick: sendReport }, 'Send report'),
+      reportState ? h('p', null, reportState) : null);
+    else if (action === 'Directions') body = h(React.Fragment, null, h('p', null, item.location || 'The listing has no address yet.'), (item.lat != null && item.lng != null) ? h('a', { className: 'cn-primary', href: 'https://www.openstreetmap.org/?mlat=' + item.lat + '&mlon=' + item.lng + '#map=16/' + item.lat + '/' + item.lng }, 'Get directions →') : null);
+    else if (action === 'Website' && item.website) body = h('a', { className: 'cn-primary', href: item.website }, item.website);
+    else if (action === 'Call' && item.phone) body = h('a', { className: 'cn-primary', href: 'tel:' + item.phone }, item.phone);
+    else if (action === 'Email' && item.email) body = h('a', { className: 'cn-primary', href: 'mailto:' + item.email }, item.email);
     else body = h('p', null, item.website || item.location || item.title);
     return h('div', { className: 'cn-overlay', role: 'dialog', 'aria-label': action },
       h('div', { className: 'cn-modal cn-glass' },

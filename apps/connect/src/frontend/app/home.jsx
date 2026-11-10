@@ -87,7 +87,7 @@
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
-    const { events, places, contributors, ideas, newsPosts, dismissBubble, trackImpression, connected, followedOrgs, toggleConnect, shareLink, toggleFollow, startConversationWith } = app;
+    const { events, places, contributors, ideas, newsPosts, dismissBubble, trackImpression, connected, followedOrgs, toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, toggleSave, shareLink, startConversationWith, sendMessage, realUser } = app;
     const [selected, setSelected] = useState(null);
     // The sheet reports how much of the map it covers; the map keeps the selected pin clear of it
     const mapApi = useRef(null);
@@ -187,6 +187,20 @@
       return () => window.removeEventListener('cc-map-clear', clear);
     }, []);
     useEffect(() => {
+      const fly = (detail) => {
+        const map = window.__ccMap;
+        if (!map || !detail || detail.lat == null || detail.lng == null || !map.flyTo) return;
+        map.flyTo({ center: [detail.lng, detail.lat], zoom: Math.max(map.getZoom() || 12, 12), duration: 600 });
+      };
+      const onArea = (e) => fly(e.detail);
+      window.addEventListener('cc-set-area', onArea);
+      try {
+        const raw = window.sessionStorage.getItem('cc_area_pick');
+        if (raw) fly(JSON.parse(raw));
+      } catch (e) { /* private mode or a bad stored pick */ }
+      return () => window.removeEventListener('cc-set-area', onArea);
+    }, []);
+    useEffect(() => {
       const onPick = (e) => {
         const id = e.detail && e.detail.id;
         if (!id) return;
@@ -196,9 +210,28 @@
       window.addEventListener('cc-explore-pick', onPick);
       return () => window.removeEventListener('cc-explore-pick', onPick);
     }, []);
+    const pressAction = (item, label) => {
+      if (label === 'Connect' || label === 'Follow' || label === 'Save' || label === 'Consider') {
+        // A guest on the real site (CC_AUTH set, nobody signed in) must not see the label flip.
+        if (!(window.CC_AUTH && !realUser)) setFlags((f) => Object.assign({}, f, { [item.id + label]: !f[item.id + label] }));
+        if (label === 'Connect' && toggleConnect) toggleConnect(item.id);
+        if (label === 'Consider' && toggleConsider) toggleConsider(item.id);
+        if (label === 'Follow') {
+          if (item.type === 'place' && togglePlaceFollow) togglePlaceFollow(item.id, item.title);
+          else if (toggleFollow) toggleFollow(item.id, item.title);
+        }
+        if (label === 'Save' && toggleSave) toggleSave(item.type === 'place' ? 'place' : 'contributor', item.id, item.title);
+        return;
+      }
+      if (label === 'Share' && shareLink) shareLink({ page: item.type === 'contributor' ? 'profile' : item.type === 'place' ? 'place' : 'event', params: { id: item.id } });
+      setAction({ item, label });
+    };
     const rowMarkers = markers.filter((m) => m.type !== 'idea');
     return React.createElement('div', { ref: rootRef, className: 'connect-map flex-1 relative overflow-hidden' + (query ? ' typing' : ''), style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined },
-        React.createElement('div', { className: 'map-touch absolute inset-0', onClick: () => { setSelected(null); setSheet(null); setBig(false); setProfileOpen(false); } },
+        React.createElement('div', { className: 'map-touch absolute inset-0', onClick: (e) => {
+          if (e.target && e.target.closest && e.target.closest('.maplibregl-marker, .marker-capsules, .cn-conveyor, .cn-big')) return;
+          setSelected(null); setSheet(null); setBig(false); setProfileOpen(false);
+        } },
         React.createElement(window.StylizedMap, {
           markers, filterCategory: pillTest, selectedId: selected, apiRef: mapApi,
           // #210: a pin chooses its card in the Explore panel (the panel scrolls to it); the card's second tap opens the
@@ -248,17 +281,7 @@
           const next = items[(i + d + items.length) % items.length];
           if (next) { setSelected(next.id); setSelType(next.type); setBig(false); }
         },
-        onAction: (item, label) => {
-          if (label === 'Connect' || label === 'Follow' || label === 'Save' || label === 'Consider') {
-            setFlags((f) => Object.assign({}, f, { [item.id + label]: !f[item.id + label] }));
-            if (label === 'Connect' && toggleConnect) toggleConnect(item.id);
-            if (label === 'Follow' && toggleFollow) toggleFollow(item.id, item.title);
-            return;
-          }
-          if (label === 'Share' && shareLink) shareLink({ page: item.type === 'contributor' ? 'profile' : item.type === 'place' ? 'place' : 'event', params: { id: item.id } });
-          if (label === 'Message' && startConversationWith) startConversationWith(item.title, item.image, true, item.hostId || item.id);
-          setAction({ item, label });
-        },
+        onAction: pressAction,
       }),
       window.ConnectPreviews && big && !profileOpen && React.createElement(window.ConnectPreviews.BigPreview, {
         item: (window.ConnectPreviews.listingsFrom(app, group, query).find((i) => i.id === selected)) || null,
@@ -268,17 +291,30 @@
         onProfile: () => { setProfileOpen(true); setBig(false); },
         onGroup: (g) => { setGroup(g); setBig(false); },
         onFocus: (item) => { setSelected(item.id); setSelType(item.type); setBig(true); },
-        onAction: (item, label) => setAction({ item, label }),
+        onAction: pressAction,
       }),
       window.ConnectPreviews && profileOpen && React.createElement(window.ConnectPreviews.ListingProfile, {
         item: (window.ConnectPreviews.listingsFrom(app, 'all', '').find((i) => i.id === selected)) || null,
         flags,
         onBack: () => { setProfileOpen(false); setBig(true); },
-        onAction: (item, label) => setAction({ item, label }),
+        onAction: pressAction,
       }),
       window.ConnectPreviews && action && React.createElement(window.ConnectPreviews.ActionModal, {
         action: action.label, item: action.item, onClose: () => setAction(null),
-        onSend: () => setAction(null),
+        onSend: (item, note) => {
+          const recipient = item.hostId || (item.type === 'contributor' ? item.id : '');
+          const text = (note || '').trim();
+          const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (window.authedFetch && uuid.test(String(recipient || '')) && text) {
+            window.authedFetch('/api/conversations', { method: 'POST', body: JSON.stringify({ recipient_id: recipient }) })
+              .then((res) => res && res.ok ? res.json() : null)
+              .then((json) => { if (json && json.conversation_id && sendMessage) sendMessage(json.conversation_id, text); })
+              .catch(() => {});
+          } else if (startConversationWith) {
+            startConversationWith(item.host || item.title, item.image, true, recipient);
+          }
+          setAction(null);
+        },
       }));
   
   }

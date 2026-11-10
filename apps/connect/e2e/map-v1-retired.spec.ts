@@ -21,7 +21,7 @@ async function expectTheOneMap(page: Page, pageErrors: string[]) {
 
   const seed = smallSeed(FIXED_NOW) as { contributors: { id: string }[] };
   await openListing(page, seed.contributors[0].id); // a pin picks its card in the Explore row; the card opens the sheet
-  await expect(page.locator("[data-mv2='sheet']")).toBeVisible(); // the sheet, not the old floating preview card
+  await expect(page.locator(".cn-big")).toBeVisible(); // the sheet, not the old floating preview card
 }
 
 test.describe("the old map is retired", () => {
