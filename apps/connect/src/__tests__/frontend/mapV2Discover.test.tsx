@@ -296,7 +296,7 @@ describe("the page", () => {
 describe("wiring", () => {
   it("opens at /explore on Map v2's Discover page, and Kingdom Exploration keeps its own address", () => {
     const shell = read("src/frontend/app/shell.jsx");
-    expect(shell).toContain("case 'explore': return React.createElement(window.MapV2Discover.Discover);");
+    expect(shell).toContain("window.ConnectExplore.Page");
     expect(shell).toContain("case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);");
     expect(read("src/frontend/app/connect-chrome.jsx")).toContain("app.go('explore')");
   });

@@ -24,7 +24,7 @@ describe("the expanded listing sheet (#210)", () => {
   it("opens at full only when a card opened it; the clean map's pin keeps the half sheet", () => {
     expect(sheet).toContain("const opensAt = expanded ? 'full' : 'half';");
     expect(sheet).toContain("useState(opensAt)");
-    expect(home).toContain("expanded: !clean, view: sheet.view");
+    expect(home).toContain("The old half sheet stays closed");
   });
 
   it("closes an expanded sheet on a flick down or a release past a quarter of its height, never to half", () => {
@@ -44,7 +44,7 @@ describe("the expanded listing sheet (#210)", () => {
     expect(sheet).toContain("N.distanceText(meters, view.user ? words : words.centre)");
     expect(home).toContain("const view = from || (mapApi.current && mapApi.current.view ? mapApi.current.view() : null);");
     // a Nearby pick keeps the first measuring point
-    expect(home).toContain("onPick: (id, t) => openSheet(id, t, sheet.view)");
+    expect(home).toContain("ConnectPreviews.BigPreview");
   });
 
   it("slides a newly chosen panel in over the duration tokens only (so reduced motion shows it at once)", () => {

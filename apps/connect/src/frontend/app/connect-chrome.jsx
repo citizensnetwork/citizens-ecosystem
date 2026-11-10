@@ -364,6 +364,6 @@ const SLUGS={"worship-prayer": "praying-hands", "church-services": "church", "co
   }
 
   window.ConnectChrome = {
-    Nav, MapChrome, CentralView, GlobeMark, glyphNode, groupHex, GROUPS, patchShell, shell, useShell, useWide,
+    Nav, MapChrome, CentralView, GlobeMark, glyphNode, groupHex, GROUPS, patchShell, shell, useShell, useWide, useArea, Icon,
   };
 })();

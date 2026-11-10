@@ -103,14 +103,14 @@ export async function openListing(page: Page, id: string, _how: "click" | "tap" 
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
   await pin.waitFor({ state: "attached", timeout: 15_000 });
   // A marker MapLibre has panned off the screen cannot be clicked through the viewport.
-  // Two clicks on the hit target: the first selects the Ink marker, the second opens the sheet.
+  // Two clicks: the first selects the Ink marker and opens the conveyor, the second opens the big preview.
   await pin.evaluate((el, _how) => {
     void _how;
     const hit = el.querySelector(".marker-hit");
     const target = hit instanceof HTMLElement ? hit : el;
     if (target instanceof HTMLElement) { target.click(); target.click(); }
   }, _how);
-  await page.locator("[data-mv2='sheet']").waitFor({ state: "visible", timeout: 10_000 });
+  await page.locator(".cn-big").waitFor({ state: "visible", timeout: 10_000 });
 }
 
 /**
@@ -127,10 +127,10 @@ export async function openPinSheet(page: Page, id: string, how: "click" | "tap" 
   await toCleanMap(page);
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
   await pin.waitFor({ state: "visible", timeout: 15_000 });
-  // One tap on the nav's Map opens the half sheet. A second tap is the card path, not this one.
-  if (how === "tap") await pin.tap({ force: true });
-  else await pin.click({ force: true });
-  await page.locator("[data-mv2='sheet']").waitFor({ state: "visible", timeout: 10_000 });
+  // One tap opens the conveyor. A second tap opens the big preview.
+  if (how === "tap") { await pin.tap({ force: true }); await pin.tap({ force: true }); }
+  else { await pin.click({ force: true }); await pin.click({ force: true }); }
+  await page.locator(".cn-big").waitFor({ state: "visible", timeout: 10_000 });
 }
 
 /**

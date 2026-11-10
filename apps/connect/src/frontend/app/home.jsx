@@ -109,6 +109,10 @@
     // "Where to…" (C40): a saved set of categories. It replaces the pill while it is on.
     const [intent, setIntent] = useState(null);
     const [sheet, setSheet] = useState(null);
+    const [big, setBig] = useState(false);
+    const [profileOpen, setProfileOpen] = useState(false);
+    const [flags, setFlags] = useState({});
+    const [action, setAction] = useState(null);
     const [min, setMin] = useState(false);
     const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a second tap on a pin scrolls to its card again
     const rootRef = useRef(null);
@@ -175,28 +179,39 @@
     });
     useEffect(() => {
       const C = window.ConnectChrome;
-      if (C) C.patchShell({ panels: !!(selected || sheet) });
-    }, [selected, sheet]);
+      if (C) C.patchShell({ panels: !!(selected && !profileOpen) });
+    }, [selected, profileOpen]);
     useEffect(() => {
-      const clear = () => { setSelected(null); setSheet(null); };
+      const clear = () => { setSelected(null); setSheet(null); setBig(false); setProfileOpen(false); setAction(null); };
       window.addEventListener('cc-map-clear', clear);
       return () => window.removeEventListener('cc-map-clear', clear);
     }, []);
+    useEffect(() => {
+      const onPick = (e) => {
+        const id = e.detail && e.detail.id;
+        if (!id) return;
+        setSelected(id); setSelType(e.detail.type); setBig(true); setProfileOpen(false);
+        try { window.dispatchEvent(new Event('cc-map-select')); } catch (err) { /* old webview */ }
+      };
+      window.addEventListener('cc-explore-pick', onPick);
+      return () => window.removeEventListener('cc-explore-pick', onPick);
+    }, []);
     const rowMarkers = markers.filter((m) => m.type !== 'idea');
     return React.createElement('div', { ref: rootRef, className: 'connect-map flex-1 relative overflow-hidden' + (query ? ' typing' : ''), style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined },
-      React.createElement('div', { className: 'map-touch absolute inset-0', onClick: () => { setSelected(null); setSheet(null); } },
+        React.createElement('div', { className: 'map-touch absolute inset-0', onClick: () => { setSelected(null); setSheet(null); setBig(false); setProfileOpen(false); } },
         React.createElement(window.StylizedMap, {
           markers, filterCategory: pillTest, selectedId: selected, apiRef: mapApi,
           // #210: a pin chooses its card in the Explore panel (the panel scrolls to it); the card's second tap opens the
           // full listing. The clean map (the nav's Map) has no panel, so there a pin opens the sheet as before. Ideas keep their panel.
           onSelect: (id, t) => {
-            if (t === 'idea') { setSheet(null); setSelected((p) => (p === id ? null : id)); setSelType(t); return; }
+            if (t === 'idea') { setSheet(null); setBig(false); setSelected((p) => (p === id ? null : id)); setSelType(t); return; }
             try { window.dispatchEvent(new Event('cc-map-select')); } catch (e) { /* old webview */ }
-            // The nav's Map (view=map) has no card row, so one tap opens the half sheet, as it always did.
-            if (clean) { openSheet(id, t); return; }
-            if (chosen.current.id === id && chosen.current.type === t) { openSheet(id, t); return; }
+            // First tap selects and opens the conveyor. Second tap on the same pin opens the big preview.
+            // The old half sheet stays closed.
+            if (chosen.current.id === id && chosen.current.type === t) { setBig(true); setProfileOpen(false); return; }
             chosen.current = { id, type: t };
-            setSheet(null); setSelected(id); setSelType(t);
+            setSheet(null); setBig(false); setProfileOpen(false); setSelected(id); setSelType(t);
+            if (mapApi.current && mapApi.current.focusSelected) mapApi.current.focusSelected(openMapPad(rootRef.current), CARD_ZOOM);
           },
           onDismissBubble: dismissBubble,
           onZoomBandChange: setZoomBand,
@@ -217,16 +232,54 @@
               : zoomBand === 'contributors' ? 'Zoom in to see events and places'
               : 'Zoom in to see places')),
         window.MapTilerLogo && React.createElement(window.MapTilerLogo)),
-      // a chosen card tapped again opens the expanded sheet (#210: full, its cover and distance, swipe down back to the
-      // panel; it never moves the map); the clean map's pin opens today's half sheet
-      sheet && React.createElement(window.MapV2Sheet, {
-        id: sheet.id, type: sheet.type, expanded: !clean, view: sheet.view,
-        onClose: closeSheet, onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
-        nearby: markers,
-        // a Nearby pick keeps the place the distances were measured from (the map has moved under the sheet since)
-        onPick: (id, t) => openSheet(id, t, sheet.view),
+      selected && selType === 'idea' && React.createElement(IdeaPanel, { id: selected, onClose: () => setSelected(null) }),
+      window.ConnectPreviews && !profileOpen && !big && selected && selType !== 'idea' && React.createElement(window.ConnectPreviews.Conveyor, {
+        items: window.ConnectPreviews.listingsFrom(app, group, query),
+        activeId: selected,
+        flags,
+        onPick: (item) => {
+          if (item.id === selected) { setBig(true); return; }
+          setSelected(item.id); setSelType(item.type); setBig(false);
+        },
+        onClose: () => { setSelected(null); setBig(false); },
+        onStep: (d) => {
+          const items = window.ConnectPreviews.listingsFrom(app, group, query);
+          const i = items.findIndex((x) => x.id === selected);
+          const next = items[(i + d + items.length) % items.length];
+          if (next) { setSelected(next.id); setSelType(next.type); setBig(false); }
+        },
+        onAction: (item, label) => {
+          if (label === 'Connect' || label === 'Follow' || label === 'Save' || label === 'Consider') {
+            setFlags((f) => Object.assign({}, f, { [item.id + label]: !f[item.id + label] }));
+            if (label === 'Connect' && toggleConnect) toggleConnect(item.id);
+            if (label === 'Follow' && toggleFollow) toggleFollow(item.id, item.title);
+            return;
+          }
+          if (label === 'Share' && shareLink) shareLink({ page: item.type === 'contributor' ? 'profile' : item.type === 'place' ? 'place' : 'event', params: { id: item.id } });
+          if (label === 'Message' && startConversationWith) startConversationWith(item.title, item.image, true, item.hostId || item.id);
+          setAction({ item, label });
+        },
       }),
-      selected && selType === 'idea' && React.createElement(IdeaPanel, { id: selected, onClose: () => setSelected(null) }));
+      window.ConnectPreviews && big && !profileOpen && React.createElement(window.ConnectPreviews.BigPreview, {
+        item: (window.ConnectPreviews.listingsFrom(app, group, query).find((i) => i.id === selected)) || null,
+        items: window.ConnectPreviews.listingsFrom(app, group, query),
+        flags,
+        onClose: () => setBig(false),
+        onProfile: () => { setProfileOpen(true); setBig(false); },
+        onGroup: (g) => { setGroup(g); setBig(false); },
+        onFocus: (item) => { setSelected(item.id); setSelType(item.type); setBig(true); },
+        onAction: (item, label) => setAction({ item, label }),
+      }),
+      window.ConnectPreviews && profileOpen && React.createElement(window.ConnectPreviews.ListingProfile, {
+        item: (window.ConnectPreviews.listingsFrom(app, 'all', '').find((i) => i.id === selected)) || null,
+        flags,
+        onBack: () => { setProfileOpen(false); setBig(true); },
+        onAction: (item, label) => setAction({ item, label }),
+      }),
+      window.ConnectPreviews && action && React.createElement(window.ConnectPreviews.ActionModal, {
+        action: action.label, item: action.item, onClose: () => setAction(null),
+        onSend: () => setAction(null),
+      }));
   
   }
 

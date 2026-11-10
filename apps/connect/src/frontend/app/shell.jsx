@@ -280,14 +280,13 @@
       case 'home': return React.createElement(window.HomePage);
       case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
       // #210: Map v2's Discover page.
-      case 'explore': return React.createElement(window.MapV2Discover.Discover);
+      case 'explore': return window.ConnectExplore ? React.createElement(window.ConnectExplore.Page) : React.createElement(window.MapV2Discover.Discover);
       case 'lets': return React.createElement(window.LetsPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);
       case 'dashboard': return React.createElement((listingRole === 'editor' || listingRole === 'viewer') ? window.DashboardPage : (isPendingApplicant ? window.PendingApplicationPage : window.DashboardPage));
       case 'admin': return React.createElement(window.AdminPage);
-      case 'settings': return React.createElement(window.SettingsPage);
       case 'intake-upgrade': return React.createElement(window.IntakeUpgradePage);
       case 'apply': return React.createElement(window.ApplyPage);
       case 'onboarding': return React.createElement(window.OnboardingPage);
@@ -295,7 +294,8 @@
       case 'place': return React.createElement(window.PlaceProfilePage, { id: nav.params.id });
       case 'profile': return nav.params.id
         ? React.createElement(window.ContributorProfilePage, { id: nav.params.id })
-        : React.createElement(window.CitizenProfilePage);
+        : (window.ConnectMe ? React.createElement(window.ConnectMe.Page) : React.createElement(window.CitizenProfilePage));
+      case 'settings': return window.ConnectMe ? React.createElement(window.ConnectMe.Page, { space: 'Settings' }) : React.createElement(window.SettingsPage);
       default: return React.createElement(window.HomePage);
     }
   }
