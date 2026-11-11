@@ -98,10 +98,10 @@ Step by step:
 Where the code is:
 
 | Piece                             | Location                                        |
-| --------------------------------- | ----------------------------------------------- |
+| --------------------------------- | ----------------------------------------------- | -------------------------------------------------------------- |
 | Layout engine                     | `packages/central/src/layout.ts`                |
 | Feed item + registry contracts    | `packages/central/src/contract.ts`              |
-| Edition (ranking, finite, cursor) | `packages/central/src/edition.ts`               |
+| Edition (ranking, finite, cursor) | built                                           | `packages/central/src/edition.ts`; not yet called by any route |
 | Connect adapter                   | `packages/central/src/adapters/connect.ts`      |
 | Fixtures (sample content only)    | `packages/central/src/fixtures.ts`              |
 | Migrations (drafted)              | `supabase/migrations/203_*.sql` to `205_*.sql`  |
@@ -269,7 +269,7 @@ last), then by id.
 
 Each candidate gets a sort key of three parts, compared in this order:
 
-1. **Nearness band** (0 is best): within 5 km, 15 km, 40 km, 150 km, then everything else and
+1. **Nearness band** (0 is best): within 10 km, 25 km, 60 km, 150 km, then everything else and
    items with no place. Bands, not raw distance, so that two things in the same part of town
    are equals. With no viewer cell, every item is in the same band.
 2. **Time bucket** (0 is best): happening today, within 3 days, within 7 days, _timeless_
@@ -307,11 +307,11 @@ This spreads apps and kinds without letting any item jump more than 5 places.
 
 The approved reference has three, and all three are data:
 
-| Slot                               | Where                                   | Source                                                                                                                                                                                                                        |
-| ---------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Today's Encouragement**          | Lead block above the feed, left         | A feed item of kind `encouragement` from the app `central`, valid for the day (`startsAt`/`endsAt`). Returned as `lead.encouragement`, never placed in the grid.                                                              |
-| **This hour around you**           | Lead block above the feed, right        | Drawn by the client: the local time, the date, the place label. The reference's weather line is marked "(sample)" and has no data source: **OPEN** (section 12).                                                              |
-| **A slower moment / Time to Rest** | Inside the grid, as a square pause card | Feed items of kind `pause` from the app `central`. The edition inserts one after the 4th card and then after every 12th (positions 4, 16, 28 ...), cycling through the available pause items. No pause items, no pause cards. |
+| Slot                               | Where                                   | Source                                                                                                                                                                                                                                   |
+| ---------------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Today's Encouragement**          | Lead block above the feed, left         | A feed item of kind `encouragement` from the app `central`, valid for the day (`startsAt`/`endsAt`). Returned as `lead.encouragement`, never placed in the grid.                                                                         |
+| **This hour around you**           | Lead block above the feed, right        | Drawn by the client: the local time, the date, the place label. The reference's weather line is marked "(sample)" and has no data source: **OPEN** (section 12).                                                                         |
+| **A slower moment / Time to Rest** | Inside the grid, as a square pause card | Feed items of kind `pause` from the app `central`. The edition inserts one after the 4th card and then after every 12 cards more (after cards 4, 16, 28 ...), cycling through the available pause items. No pause items, no pause cards. |
 
 ---
 
@@ -639,8 +639,8 @@ refused.
 
 | Where                                   | Why it needs service_role                               | What limits it                                                                                   |
 | --------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `GET /api/v1/central/feed`              | The candidate function is service_role only.            | Read-only. Inputs are two rounded numbers and an integer. Output is public items only.           |
-| `GET /api/v1/central/apps`              | Same.                                                   | Read-only, no input.                                                                             |
+| `GET /api/v1/central/feed`              | not started                                             | build step 2; every piece it needs is built and tested                                           |
+| `GET /api/v1/central/apps`              | not started                                             | build step 2                                                                                     |
 | `POST` / `DELETE /api/v1/central/items` | The publish and remove functions are service_role only. | API key required, bound to one app; validation; quota; rate limit.                               |
 | Connect's own publisher (sync job)      | Same function, called in-process.                       | Runs only behind the existing cron secret; publishes only rows the public v1 API already serves. |
 
@@ -689,7 +689,7 @@ they must be added to `apps/connect/docs/api-v1.md` in the same change (R2.3).
     "edition": { "day": "2026-11-21", "cell": "-25.7,28.2", "size": 31 },
     "lead": { "encouragement": { "...": "a FeedItem or null" } },
     "items": [{ "...": "FeedItem" }],
-    "nextCursor": "djF8MjAyNi0xMS0yMXwtMjUuNywyOC4yfDEy",
+    "nextCursor": "v1~2026-11-21~-25.7,28.2~12",
     "caughtUp": false,
     "nextEditionAt": "2026-11-22T02:00:00.000Z"
   },
@@ -733,17 +733,17 @@ colours in both themes. They must equal the values in section 7. Then check: no 
 before the last row, wide cards span exactly two columns, the feed ends in "You're all caught
 up", and nothing moves when the next page arrives.
 
-| #   | Task                                                                                                                                                            | Files                                                                                   | Done when                                                                                                                                                          |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Founder reviews the three drafted migrations; apply them one at a time                                                                                          | `supabase/migrations/203` to `205`                                                      | Rolled-back probe passes (section 8); advisor 0 ERROR, no unexpected finding; `SHARED_DB_CONTRACT.md` section 1 and 9 gain the `central` schema in the same change |
-| 2   | Service-role reads: wire `GET /api/v1/central/feed` and `/apps` to the applied functions if anything differs from the draft                                     | `apps/connect/src/app/api/v1/central/`                                                  | `meta.status` is `ok` on a preview; `api-v1.md` documents both                                                                                                     |
-| 3   | Publish endpoint                                                                                                                                                | `apps/connect/src/app/api/v1/central/items/route.ts` + tests                            | A bound key can publish and remove; an unbound key gets 403; over-quota gets 429; tests cover each rejection reason                                                |
-| 4   | Connect's publisher: read Connect's own public events, places and contributors, map with `connectToFeedItems`, publish; run on a schedule and after create/edit | `apps/connect/src/lib/central/publish.ts`, a cron route beside the existing one         | Real Connect content appears in the feed; a cancelled event disappears within one run                                                                              |
-| 5   | The feed component (shared by both surfaces): fetch pages, `layoutBatch`, templates, states. Columns from a `ResizeObserver` on the feed container              | hub: `apps/hub/src/components/central/`; styles in `apps/hub/src/styles/`               | Measured equal to the reference at 390 / 1280, light / dark; property "nothing moves on append" holds in a Playwright check                                        |
-| 6   | Citizens landing: place the component under the hero and lead row; sticky bar and Crown **after** the founder answers O1                                        | `apps/hub/src/pages/citizens/index.tsx`                                                 | Hub tests pass; page works with `meta.status: not_ready` (quiet empty line, no errors)                                                                             |
-| 7   | Central inside Connect, behind the look switch chosen for the facelift                                                                                          | Connect's frontend, on the facelift branch that owns the shell                          | Same measurements; Connect's Playwright suite passes                                                                                                               |
-| 8   | A second source app (Wear is the first candidate): adapter + key + registry `publish_enabled`                                                                   | inside that app                                                                         | Its cards appear with its accent, with no change to Central's code                                                                                                 |
-| 9   | New kinds the founder named: music, books, community initiatives, business updates                                                                              | registry rows + adapters; a new template only if the four existing ones cannot carry it | Founder has said which app owns each (O6)                                                                                                                          |
+| #   | Task                                                                                                                                                                                                                                                                    | Files                                                                                   | Done when                                                                                                                                                          |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Founder reviews the three drafted migrations; apply them one at a time                                                                                                                                                                                                  | `supabase/migrations/203` to `205`                                                      | Rolled-back probe passes (section 8); advisor 0 ERROR, no unexpected finding; `SHARED_DB_CONTRACT.md` section 1 and 9 gain the `central` schema in the same change |
+| 2   | Build `GET /api/v1/central/feed` and `/apps` (section 10): `gateV1`, the service-role client, `central_feed_candidates`, then `buildEdition` and `pageOfEdition` from `@citizens/central`. Return `not_ready` (HTTP 200, no items) when the functions do not exist yet  | `apps/connect/src/app/api/v1/central/`                                                  | `meta.status` is `ok` on a preview; `api-v1.md` documents both                                                                                                     |
+| 3   | Publish endpoint                                                                                                                                                                                                                                                        | `apps/connect/src/app/api/v1/central/items/route.ts` + tests                            | A bound key can publish and remove; an unbound key gets 403; over-quota gets 429; tests cover each rejection reason                                                |
+| 4   | Connect's publisher: read Connect's own public events, places and contributors, map with `connectToFeedItems` (pass Connect's real share-link builders as `links` and the founder-approved kicker lines as `kickers`), publish; run on a schedule and after create/edit | `apps/connect/src/lib/central/publish.ts`, a cron route beside the existing one         | Real Connect content appears in the feed; a cancelled event disappears within one run                                                                              |
+| 5   | The feed component (shared by both surfaces): fetch pages, `layoutBatch`, templates, states. Columns from a `ResizeObserver` on the feed container                                                                                                                      | hub: `apps/hub/src/components/central/`; styles in `apps/hub/src/styles/`               | Measured equal to the reference at 390 / 1280, light / dark; property "nothing moves on append" holds in a Playwright check                                        |
+| 6   | Citizens landing: place the component under the hero and lead row; sticky bar and Crown **after** the founder answers O1                                                                                                                                                | `apps/hub/src/pages/citizens/index.tsx`                                                 | Hub tests pass; page works with `meta.status: not_ready` (quiet empty line, no errors)                                                                             |
+| 7   | Central inside Connect, behind the look switch chosen for the facelift                                                                                                                                                                                                  | Connect's frontend, on the facelift branch that owns the shell                          | Same measurements; Connect's Playwright suite passes                                                                                                               |
+| 8   | A second source app (Wear is the first candidate): adapter + key + registry `publish_enabled`                                                                                                                                                                           | inside that app                                                                         | Its cards appear with its accent, with no change to Central's code                                                                                                 |
+| 9   | New kinds the founder named: music, books, community initiatives, business updates                                                                                                                                                                                      | registry rows + adapters; a new template only if the four existing ones cannot carry it | Founder has said which app owns each (O6)                                                                                                                          |
 
 **Common ways to get this wrong**
 
@@ -783,34 +783,36 @@ up", and nothing moves when the next page arrives.
 See the table at the end of this file's pull request description for the state at hand-over;
 this table is updated by every change that moves a row.
 
-| Piece                                           | State       | Notes                                      |
-| ----------------------------------------------- | ----------- | ------------------------------------------ |
-| This guide                                      | built       |                                            |
-| Layout engine + property tests                  | not started | `packages/central/src/layout.ts`           |
-| Reference page (Central only)                   | not started | `docs/central/reference/`                  |
-| Feed item + registry contracts, validators      | not started | `packages/central/src/contract.ts`         |
-| Edition (ranking, finite, cursor)               | not started | `packages/central/src/edition.ts`          |
-| Connect adapter + fixtures                      | not started | `packages/central/src/adapters/connect.ts` |
-| Migrations 203 to 205                           | not started | to be drafted only; the founder applies    |
-| `GET /api/v1/central/feed`                      | not started |                                            |
-| `GET /api/v1/central/apps`                      | not started |                                            |
-| `POST` / `DELETE /api/v1/central/items`         | not started | build step 3                               |
-| Connect publisher (sync job)                    | not started | build step 4                               |
-| Feed component (hub)                            | not started | build step 5                               |
-| Citizens landing integration, sticky bar, Crown | not started | build step 6; needs O1                     |
-| Central inside Connect                          | not started | build step 7                               |
+| Piece                                           | State       | Notes                                                                                            |
+| ----------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| This guide                                      | built       |                                                                                                  |
+| Layout engine + property tests                  | built       | `packages/central/src/layout.ts`; seeded property tests of all six guarantees                    |
+| Reference page (Central only)                   | built       | `docs/central/reference/central-reference.html`; measured at 390px and 1280px, light and dark    |
+| Feed item + registry contracts, validators      | built       | `packages/central/src/contract.ts`                                                               |
+| Edition (ranking, finite, cursor)               | not started | `packages/central/src/edition.ts`                                                                |
+| Connect adapter + fixtures                      | built       | `packages/central/src/adapters/connect.ts`; pure mapping, not yet scheduled (build step 4)       |
+| Migrations 203 to 205                           | drafted     | files exist; **never executed anywhere**; the founder reviews, probes and applies (build step 1) |
+| `GET /api/v1/central/feed`                      | not started |                                                                                                  |
+| `GET /api/v1/central/apps`                      | not started |                                                                                                  |
+| `POST` / `DELETE /api/v1/central/items`         | not started | build step 3                                                                                     |
+| Connect publisher (sync job)                    | not started | build step 4                                                                                     |
+| Feed component (hub)                            | not started | build step 5                                                                                     |
+| Citizens landing integration, sticky bar, Crown | not started | build step 6; needs O1                                                                           |
+| Central inside Connect                          | not started | build step 7                                                                                     |
 
 ### Open questions for the founder
 
-| #   | Question                                                                                                                             | Recommended default                                                                                                              |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| O1  | The Crown's roll-out panels and both sticky bars are decided in words but not drawn. May a design check be made for them first?      | Yes: one small design check for the bar and the Crown, approved before code, as was done for the feed.                           |
-| O2  | Tablet widths (680 to 1000px): 2 columns, or the reference's 3?                                                                      | 2 columns below 1000px, 4 from 1000px: exactly the rule as written.                                                              |
-| O3  | Image proportion: a one-column card's image is at least square, a two-column card's at least 2:1, and it stretches to fill the row.  | Accept. It is what makes rows close without gaps.                                                                                |
-| O4  | When a single card is left for the last row on desktop, two cells stay empty above "You're all caught up".                           | Accept. The alternative (a card four columns wide) is a new shape.                                                               |
-| O5  | "This hour around you" shows weather in the reference, marked as sample. Is there to be a weather source?                            | Leave weather out for now; show time, date and place.                                                                            |
-| O6  | Who writes Today's Encouragement and the pause cards, and which apps will own music, books, community initiatives, business updates? | Encouragement and pause cards: entered by an admin as Central's own items. The four content types wait until their app is named. |
-| O7  | Should each app have a list of allowed link hosts for its cards?                                                                     | Yes, add it when the second app joins.                                                                                           |
-| O8  | Edition size (48 cards a day) and the 04:00 turnover.                                                                                | Keep both; review after two weeks of real use.                                                                                   |
-| O9  | Which apps does the Crown list: only live ones, or also the announced ones, faded?                                                   | Live ones first, announced ones faded with "coming soon", matching the Do panel decision.                                        |
-| O10 | Gold text in dark mode on Central (the reference defines `#836100` for light paper only).                                            | Do not use gold text on Central until decided.                                                                                   |
+| #   | Question                                                                                                                                                            | Recommended default                                                                                                                      |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| O1  | The Crown's roll-out panels and both sticky bars are decided in words but not drawn. May a design check be made for them first?                                     | Yes: one small design check for the bar and the Crown, approved before code, as was done for the feed.                                   |
+| O2  | Tablet widths (680 to 1000px): 2 columns, or the reference's 3?                                                                                                     | 2 columns below 1000px, 4 from 1000px: exactly the rule as written.                                                                      |
+| O3  | Image proportion: a one-column card's image is at least square, a two-column card's at least 2:1, and it stretches to fill the row.                                 | Accept. It is what makes rows close without gaps.                                                                                        |
+| O4  | When a single card is left for the last row on desktop, two cells stay empty above "You're all caught up".                                                          | Accept. The alternative (a card four columns wide) is a new shape.                                                                       |
+| O5  | "This hour around you" shows weather in the reference, marked as sample. Is there to be a weather source?                                                           | Leave weather out for now; show time, date and place.                                                                                    |
+| O6  | Who writes Today's Encouragement and the pause cards, and which apps will own music, books, community initiatives, business updates?                                | Encouragement and pause cards: entered by an admin as Central's own items. The four content types wait until their app is named.         |
+| O7  | Should each app have a list of allowed link hosts for its cards?                                                                                                    | Yes, add it when the second app joins.                                                                                                   |
+| O8  | Edition size (48 cards a day) and the 04:00 turnover.                                                                                                               | Keep both; review after two weeks of real use.                                                                                           |
+| O9  | Which apps does the Crown list: only live ones, or also the announced ones, faded?                                                                                  | Live ones first, announced ones faded with "coming soon", matching the Do panel decision.                                                |
+| O10 | Gold text in dark mode on Central (the reference defines `#836100` for light paper only).                                                                           | Do not use gold text on Central until decided.                                                                                           |
+| O11 | The short line after "Connect" on its cards (for example "Happening this week", "A place near you", "People serving nearby") is public copy. Who approves it?       | The founder approves one line per kind before Connect's publisher is switched on; the adapter takes them as options, so no code changes. |
+| O12 | An item published during the day waits for the next edition (04:00), so that the order does not shift under someone scrolling. Is a wait of up to a day acceptable? | Yes. It is what makes "all caught up" true. Revisit if contributors ask for same-day cards.                                              |
