@@ -1,0 +1,353 @@
+// ════════════════════════════════════════════════════════════════════
+//  Citizens Connect — static reference data (window.DATA)
+//  Entity arrays (events, places, contributors etc.) are populated
+//  from live Supabase data in store.jsx. This file only carries
+//  the category/tier constants that are safe to ship as code.
+// ════════════════════════════════════════════════════════════════════
+(function () {
+  // ── Event categories (17) ──
+  // `group` and `heading` mirror EVENT_GROUPS / eventGroupHeading in
+  // src/lib/categories.ts (founder, 2026-10-21). One mapping, checked by
+  // eventCategoryGroups.test.ts. Cards read heading off getItemCategory.
+  const EVENT_CATEGORIES = [
+    { id: 'worship-prayer',      name: 'Worship & Prayer',      short: 'Worship',     hex: '#B8860B', icon: 'HeartHandshake', group: 'Worship & church', heading: 'Worship & church | Worship & Prayer' },
+    { id: 'church-services',     name: 'Church Services',       short: 'Church',      hex: '#7040b5', icon: 'Building2',      group: 'Worship & church', heading: 'Worship & church | Church Services' },
+    { id: 'outreach-missions',   name: 'Outreach & Missions',   short: 'Outreach',    hex: '#1ABC9C', icon: 'Globe',          group: 'Serve',             heading: 'Serve | Outreach & Missions' },
+    { id: 'markets-expos',       name: 'Markets & Expos',       short: 'Markets',     hex: '#F39C12', icon: 'Store',          group: 'Culture & fun',     heading: 'Culture & fun | Markets & Expos' },
+    { id: 'sport-recreation',    name: 'Sport & Recreation',    short: 'Sport',       hex: '#2ECC71', icon: 'CircleDot',      group: 'Culture & fun',     heading: 'Culture & fun | Sport & Recreation' },
+    { id: 'arts-culture',        name: 'Arts & Culture',        short: 'Arts',        hex: '#FF6B35', icon: 'Palette',        group: 'Culture & fun',     heading: 'Culture & fun | Arts & Culture' },
+    { id: 'social-gatherings',   name: 'Social Gatherings',     short: 'Social',      hex: '#E91E63', icon: 'Wine',           group: 'Culture & fun',     heading: 'Culture & fun | Social Gatherings' },
+    { id: 'community-upliftment',name: 'Community Upliftment',  short: 'Upliftment',  hex: '#9B59B6', icon: 'HeartHandshake', group: 'Serve',             heading: 'Serve | Community Upliftment' },
+    { id: 'education-equipping', name: 'Education & Equipping', short: 'Education',   hex: '#3498DB', icon: 'GraduationCap',  group: 'Learn & grow',      heading: 'Learn & grow | Education & Equipping' },
+    { id: 'marriage-family',     name: 'Marriage & Family',     short: 'Family',      hex: '#E74C3C', icon: 'Users',          group: 'Learn & grow',      heading: 'Learn & grow | Marriage & Family' },
+    { id: 'mens-community',      name: "Men's Community",       short: "Men's",       hex: '#34495E', icon: 'User',           group: 'Audiences',         heading: "Audiences | Men's Community" },
+    { id: 'womens-community',    name: "Women's Community",     short: "Women's",     hex: '#C71585', icon: 'UserRound',      group: 'Audiences',         heading: "Audiences | Women's Community" },
+    { id: 'youth-students',      name: 'Youth & Students',      short: 'Youth',       hex: '#FF8C42', icon: 'Flame',          group: 'Audiences',         heading: 'Audiences | Youth & Students' },
+    { id: 'kids',                name: 'Kids',                  short: 'Kids',        hex: '#00BCD4', icon: 'Candy',          group: 'Audiences',         heading: 'Audiences | Kids' },
+    { id: 'care-recovery',       name: 'Care & Recovery',       short: 'Care',        hex: '#8E44AD', icon: 'HandHeart',      group: 'Serve',             heading: 'Serve | Care & Recovery' },
+    { id: 'members-only',        name: 'Members Only',          short: 'Members',     hex: '#212121', icon: 'KeyRound',       group: 'Audiences',         heading: 'Audiences | Members Only' },
+    { id: 'conferences-summits', name: 'Conferences & Summits', short: 'Conferences', hex: '#5D6D7E', icon: 'Mic',            group: 'Worship & church', heading: 'Worship & church | Conferences & Summits' },
+  ];
+
+  // ── Place categories (10) ──
+  const PLACE_CATEGORIES = [
+    { id: 'churches-ministries', name: 'Churches & Ministries', short: 'Churches',   hex: '#7040b5', icon: 'Building2' },
+    { id: 'hospitality-cafes',   name: 'Hospitality & Cafés',   short: 'Cafés',      hex: '#8B4513', icon: 'Coffee' },
+    { id: 'recreation-sport',    name: 'Recreation & Sport',    short: 'Recreation', hex: '#2ECC71', icon: 'Dumbbell' },
+    { id: 'media-broadcasting',  name: 'Media & Broadcasting',  short: 'Media',      hex: '#9B59B6', icon: 'Radio' },
+    { id: 'retail-shopping',     name: 'Retail & Shopping',     short: 'Retail',     hex: '#E91E63', icon: 'ShoppingBag' },
+    { id: 'health-wellness',     name: 'Health & Wellness',     short: 'Health',     hex: '#E74C3C', icon: 'Stethoscope' },
+    { id: 'education-training',  name: 'Education & Training',  short: 'Training',   hex: '#3498DB', icon: 'BookOpen' },
+    { id: 'arts-creative',       name: 'Arts & Creative',       short: 'Creative',   hex: '#FF6B35', icon: 'Palette' },
+    { id: 'christian-businesses',name: 'Christian Businesses',  short: 'Business',   hex: '#687d20', icon: 'Store' },
+    { id: 'safe-spaces',         name: 'Safe Spaces',           short: 'Safe',       hex: '#B59CD9', icon: 'Heart' },
+  ];
+
+  // ── Contributor types (12) — what a Contributor DOES (founder, 2026-09-26) ──
+  //  Their own list, separate from event categories. Slugs are reused where
+  //  the meaning is identical so existing pins, filters and rows keep working;
+  //  3 are new. Mirrors CONTRIBUTOR_TYPES in src/lib/categories.ts (server
+  //  validation) — change both together.
+  const CONTRIBUTOR_TYPES = [
+    { id: 'churches-ministries', name: 'Church',                short: 'Church',    hex: '#7040B5', icon: 'Church' },
+    { id: 'outreach-missions',   name: 'Outreach / Mission',    short: 'Outreach',  hex: '#1ABC9C', icon: 'Globe' },
+    { id: 'markets-expos',       name: 'Market / Expo',         short: 'Market',    hex: '#F39C12', icon: 'Store' },
+    { id: 'christian-businesses',name: 'Business',              short: 'Business',  hex: '#687D20', icon: 'Store' },
+    { id: 'sport-recreation',    name: 'Sport & Recreation',    short: 'Sport',     hex: '#2ECC71', icon: 'CircleDot' },
+    { id: 'social-gatherings',   name: 'Social Gathering',      short: 'Social',    hex: '#E91E63', icon: 'Wine' },
+    { id: 'arts-culture',        name: 'Arts & Culture',        short: 'Arts',      hex: '#FF6B35', icon: 'Palette' },
+    { id: 'media-broadcasting',  name: 'Media',                 short: 'Media',     hex: '#9B59B6', icon: 'Radio' },
+    { id: 'retreat-healing',     name: 'Retreat / Healing',     short: 'Retreat',   hex: '#6FA89A', icon: 'Leaf' },
+    { id: 'clinic',              name: 'Clinic',                short: 'Clinic',    hex: '#C0392B', icon: 'Stethoscope' },
+    { id: 'education-equipping', name: 'Education / Equipping', short: 'Education', hex: '#3498DB', icon: 'GraduationCap' },
+    { id: 'rehab-development',   name: 'Rehab / Development',   short: 'Rehab',     hex: '#5B2C6F', icon: 'HandHeart' },
+  ];
+
+  const getEventCategory = (id) => EVENT_CATEGORIES.find((c) => c.id === id);
+  const getPlaceCategory = (id) => PLACE_CATEGORIES.find((c) => c.id === id);
+  const getContributorType = (id) => CONTRIBUTOR_TYPES.find((c) => c.id === id);
+  const getCategory = (id) => getEventCategory(id) || getPlaceCategory(id) || getContributorType(id);
+  // Entity-aware lookup: a Contributor resolves its OWN type list first, so a
+  // reused slug shows the contributor label/icon (churches-ministries →
+  // "Church" + Church glyph) while events and places are unchanged.
+  const getItemCategory = (item) => {
+    const id = item && item.category;
+    return (item && item.type === 'contributor' && getContributorType(id)) || getCategory(id);
+  };
+  // Where a Contributor's listing can be found (tracker C21: say "on the map" only when it is true). Everyone is in
+  // Kingdom Discovery; only a listing with a pin (BOTH coordinates, never "no fixed location") is also on the map.
+  // Same rule as hasMapPin in src/lib/contributorFields.ts, which the server's emails and admin toasts use.
+  const hasMapPin = (row) => !!row && !row.noFixedLocation
+    && typeof row.lat === 'number' && Number.isFinite(row.lat) && typeof row.lng === 'number' && Number.isFinite(row.lng);
+  const listedWhere = (onMap) => (onMap ? 'on the map and in Kingdom Discovery' : 'in Kingdom Discovery');
+  // The map's single category pill row: events + places + the contributor
+  // types no event/place already covers (reused slugs would duplicate a pill).
+  const FILTER_CATEGORIES = EVENT_CATEGORIES.concat(
+    PLACE_CATEGORIES,
+    CONTRIBUTOR_TYPES.filter((t) => !getEventCategory(t.id) && !getPlaceCategory(t.id)),
+  );
+
+  // ── Events: has it finished? ─────────────────────────────────────────
+  //  The ONE definition behind "does this still belong on the map / in the
+  //  discovery list" (home.jsx, kingdom-discovery.jsx) and "which group does it
+  //  sit in on the organiser's profile and dashboard". An event is over once its
+  //  END is behind us. End time is optional on the create form, so an event with
+  //  no end stays up for the rest of its calendar day rather than vanishing the
+  //  minute it starts. `startsAt`/`endsAt` are the raw ISO instants store.jsx
+  //  adaptEvent keeps; an optimistic local draft carries only `date`; an event
+  //  with no time information at all is never called past (one stale pin beats
+  //  a hidden live event).
+  //  Recurrence is not modelled: create.jsx defers it to v2 and /api/v1/events
+  //  does not expose is_recurring, so each row is a single occurrence.
+  const isPastEvent = (e, now = Date.now()) => {
+    if (!e) return false;
+    const end = Date.parse(e.endsAt || '');
+    if (!isNaN(end)) return end < now;
+    const start = e.startsAt ? new Date(e.startsAt) : (e.date ? new Date(e.date + 'T00:00:00') : null);
+    if (!start || isNaN(start.getTime())) return false;
+    const endOfDay = new Date(start.getFullYear(), start.getMonth(), start.getDate(), 23, 59, 59, 999);
+    return endOfDay.getTime() < now;
+  };
+
+  // ── The public events feed (tracker C11) ─────────────────────────────
+  //  /api/v1/events is ordered by start date, oldest first, and one page holds at most 100 rows, past ones included. Asked
+  //  for with no start, the page fills with finished events as they pile up and the UPCOMING ones fall off the end, so the
+  //  map and Kingdom Discovery would silently lose them. The request therefore says where to start: local midnight the day
+  //  before today. A whole day of margin (not "now") keeps an event that began last night and runs past midnight, and keeps
+  //  the cut on the visitor's own calendar day whatever their time zone; isPastEvent above still decides what is drawn.
+  const EVENTS_FEED_LIMIT = 100;
+  const eventsFeedPath = (now = new Date()) => {
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    return '/api/v1/events?limit=' + EVENTS_FEED_LIMIT + '&from=' + encodeURIComponent(from.toISOString());
+  };
+
+  // ── Events and places: who may see a row? ────────────────────────────
+  //  store.jsx keeps ONE merged list per kind: the public feed (published rows
+  //  only, /api/v1) plus the signed-in owner's own rows of EVERY status (a direct
+  //  owner-scoped read, RLS allows it). These three helpers split that list back
+  //  into the two audiences, so a cancelled row can never reach the map, Kingdom
+  //  Discovery or any public list, and can never vanish from its owner's dashboard.
+  //  A row with no `status` (an optimistic local draft, the demo seed) is live.
+  const isPubliclyListed = (r) => !!r && (r.status || 'published') === 'published' && (r.visibility || 'public') === 'public';
+  const publicRows = (rows) => (rows || []).filter(isPubliclyListed);
+  // The owner's rows, whatever their status. No owner id means no rows, never "all rows".
+  const ownedRows = (rows, ownerId) => (ownerId ? (rows || []).filter((r) => r.organizerId === ownerId) : []);
+  // Fields that live on a row but arrive from other sources (map bubbles, the
+  // per-event counts), so a fresh read of the row must not zero them.
+  const KEEP_ON_MERGE = ['broadcast', 'connectCount', 'considerCount', 'viewCount'];
+  // Merge freshly read rows into the list by id: the fresh row wins, the KEEP_ON_MERGE
+  // fields of the row it replaces survive, rows the read did not mention stay, and new
+  // rows go in front (newest first, like a create). Returns `prev` untouched when
+  // there is nothing to merge, so React skips a pointless re-render.
+  const mergeRowsById = (prev, incoming) => {
+    if (!incoming || !incoming.length) return prev;
+    const fresh = new Map(incoming.map((r) => [r.id, r]));
+    const seen = new Set();
+    const merged = prev.map((old) => {
+      const row = fresh.get(old.id);
+      if (!row) return old;
+      seen.add(old.id);
+      const kept = {};
+      KEEP_ON_MERGE.forEach((k) => { if (old[k] != null && (row[k] == null || row[k] === 0)) kept[k] = old[k]; });
+      return { ...row, ...kept };
+    });
+    const added = incoming.filter((r) => !seen.has(r.id));
+    return added.length ? [...added, ...merged] : merged;
+  };
+
+  // ── Social platforms an Event / Place / Contributor can publish ──────
+  //  ONE table. The apply + onboarding + portal + create-listing inputs, the
+  //  public profile chips, the map preview and the Kingdom Discovery card all
+  //  key off it, so a platform's icon, its ordering and its link logic only
+  //  ever live in one place. Adding a platform here (plus its column in
+  //  migration 172's naming scheme) is the whole change.
+  //
+  //  Every platform accepts EITHER a bare handle OR a full URL — the founder
+  //  hit this the hard way: a handle typed into a URL-shaped box used to fail
+  //  server validation and take the entire profile save down with it.
+  const stripHandle = (v) => (v || '').trim().replace(/^@+/, '').replace(/^\/+/, '').replace(/\/+$/, '');
+  const isAbsolute = (v) => /^https?:\/\//i.test((v || '').trim());
+  // No platform handle contains a space, so "Grace Radio" is a DISPLAY NAME
+  // typed into a link box, not a handle. Building facebook.com/Grace Radio out
+  // of it makes a dead link (the first real Form submission did exactly that),
+  // so every builder below returns '' for it and SocialLinks draws nothing.
+  const isDisplayName = (v) => !isAbsolute(v) && /\s/.test((v || '').trim());
+  // Strip any leading "host/" (with or without www.) the user pasted in, so
+  // "instagram.com/damcool" and "damcool" both resolve to the same link.
+  //
+  // Deliberately NOT a RegExp built by concatenation. Escaping a host into a
+  // pattern means getting EVERY regex metacharacter right, and the previous
+  // version escaped only `.` — which CodeQL correctly flagged as incomplete
+  // escaping (js/incomplete-sanitization, a blocking high-severity alert).
+  // The hosts here are our own literals, so it was not exploitable, but a
+  // prefix strip needs no regex at all: plain comparison has no escaping
+  // problem to get wrong, and it is faster besides.
+  const stripHost = (v, host) => {
+    const s = stripHandle(v);
+    const lower = s.toLowerCase();
+    const h = String(host).toLowerCase();
+    // The optional `www.` is only consumed when the host really follows it —
+    // otherwise a value that merely starts with "www." is left untouched,
+    // exactly as the anchored pattern behaved.
+    const afterWww = lower.startsWith('www.') ? 4 : 0;
+    if (!lower.startsWith(h, afterWww)) return s;
+    let end = afterWww + h.length;
+    if (s.charAt(end) === '/') end += 1;
+    return s.slice(end);
+  };
+  // stripHandle only removes a LEADING @, and once the host comes off the
+  // front the handle can start with one again ("tiktok.com/@dam" -> "@dam") —
+  // so re-strip before re-applying the platform's own prefix, or the link
+  // comes out as "tiktok.com/@@dam" and 404s.
+  const bareHandle = (v) => v.replace(/^@+/, '');
+  const onHost = (host, prefix) => (v) => {
+    const t = (v || '').trim();
+    if (!t || isDisplayName(t)) return '';
+    if (isAbsolute(t)) return t;
+    const handle = prefix ? bareHandle(stripHost(t, host)) : stripHost(t, host);
+    return handle ? 'https://' + host + '/' + (prefix || '') + handle : '';
+  };
+  const SOCIAL_PLATFORMS = [
+    { key: 'instagram', label: 'Instagram', icon: 'BrandInstagram', prefix: '@', placeholder: '@yourhandle', urlFor: onHost('instagram.com') },
+    { key: 'facebook', label: 'Facebook', icon: 'BrandFacebook', prefix: '/', placeholder: 'facebook.com/yourpage', urlFor: onHost('facebook.com') },
+    { key: 'youtube', label: 'YouTube', icon: 'BrandYouTube', prefix: '@', placeholder: '@yourchannel', urlFor: (v) => {
+      const t = (v || '').trim();
+      if (!t || isDisplayName(t)) return '';
+      if (isAbsolute(t)) return t;
+      // YouTube's modern vanity URLs are /@handle; legacy ones are /c/… or
+      // /channel/… . Keep an explicit path, prefix a bare handle with @.
+      const h = stripHost(t, 'youtube.com');
+      if (!h) return '';
+      return 'https://youtube.com/' + (/^(c|channel|user)\//i.test(h) ? h : '@' + bareHandle(h));
+    } },
+    { key: 'tiktok', label: 'TikTok', icon: 'BrandTikTok', prefix: '@', placeholder: '@yourhandle', urlFor: onHost('tiktok.com', '@') },
+    { key: 'x', label: 'X', icon: 'BrandX', prefix: '@', placeholder: '@yourhandle', urlFor: onHost('x.com') },
+    { key: 'linkedin', label: 'LinkedIn', icon: 'BrandLinkedIn', prefix: '/', placeholder: 'linkedin.com/company/you', urlFor: (v) => {
+      const t = (v || '').trim();
+      if (!t || isDisplayName(t)) return '';
+      if (isAbsolute(t)) return t;
+      const h = stripHost(t, 'linkedin.com');
+      if (!h) return '';
+      // A bare word is almost always an organisation on LinkedIn; anything
+      // already carrying a path segment (company/…, in/…, school/…) is kept.
+      return 'https://www.linkedin.com/' + (h.indexOf('/') > -1 ? h : 'company/' + h);
+    } },
+    { key: 'whatsapp', label: 'WhatsApp', icon: 'BrandWhatsApp', prefix: '+', placeholder: '+27 82 000 0000', urlFor: (v) => {
+      const t = (v || '').trim();
+      if (!t) return '';
+      if (isAbsolute(t)) return t;
+      // A phone number (the usual case) → wa.me, which wants the international
+      // form with no leading 0: a local South African "0712345678" is
+      // 27712345678 (the first Form submission stored it the local way).
+      // Anything else is treated as a wa.me / chat.whatsapp.com path the
+      // contributor pasted without the scheme, so it still becomes a real link
+      // instead of dead text — unless it has spaces, which makes it a name.
+      let digits = t.replace(/[^\d]/g, '');
+      if (/^[+\d][\d\s().-]*$/.test(t) && digits.length >= 7) {
+        // "+27 (0)71…" keeps South Africa's trunk 0 after the country code.
+        if (/^270\d{9}$/.test(digits)) digits = '27' + digits.slice(3);
+        return 'https://wa.me/' + (/^0\d{9}$/.test(digits) && t.charAt(0) !== '+' ? '27' + digits.slice(1) : digits);
+      }
+      if (isDisplayName(t)) return '';
+      const h = stripHandle(t);
+      return h ? 'https://' + h.replace(/^(https?:\/\/)?/i, '') : '';
+    } },
+  ];
+  // Any future/unrecognised social key still gets a safe, clickable link —
+  // just with a generic icon instead of a mis-guessed brand one.
+  const genericUrl = (v) => { const t = (v || '').trim(); return t && !isAbsolute(t) ? 'https://' + t : t; };
+  const getSocialPlatform = (key) => SOCIAL_PLATFORMS.find((s) => s.key === key) || { key, label: key, icon: 'Link', urlFor: genericUrl };
+  // What the chip SHOWS. A pasted URL is unreadable at chip size, so it is
+  // reduced to the identifying part of the link — never to something that
+  // isn't in the stored value.
+  const socialDisplay = (key, v) => {
+    const t = (v || '').trim();
+    if (!t) return '';
+    // A stored number is international digits with no "+" (what wa.me wants): show it as one.
+    if (key === 'whatsapp' && /^\d{7,15}$/.test(t)) return '+' + t;
+    if (key === 'whatsapp') return t.replace(/^https?:\/\/(www\.)?wa\.me\//i, '+').replace(/^https?:\/\//i, '');
+    const bare = t.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/+$/, '');
+    const path = bare.indexOf('/') > -1 ? bare.slice(bare.indexOf('/') + 1) : bare;
+    if (!path) return bare;
+    return /^@/.test(t) || /^@/.test(path) ? '@' + path.replace(/^@/, '') : path;
+  };
+  // Row → { platformKey: value } in SOCIAL_PLATFORMS order, skipping blanks.
+  // `columns` maps a platform key to that table's column name (they differ:
+  // events/places use <platform>_url, profiles uses handle/url per platform —
+  // see migration 172's naming note).
+  const socialsFromRow = (row, columns) => {
+    const out = {};
+    if (!row) return out;
+    SOCIAL_PLATFORMS.forEach((p) => {
+      const col = columns[p.key];
+      const v = col && row[col];
+      if (typeof v === 'string' && v.trim()) out[p.key] = v.trim();
+    });
+    return out;
+  };
+  // The column name each table uses for each platform.
+  const SOCIAL_COLUMNS = {
+    event: { instagram: 'instagram_url', facebook: 'facebook_url', youtube: 'youtube_url', tiktok: 'tiktok_url', x: 'x_url', linkedin: 'linkedin_url', whatsapp: 'whatsapp_url' },
+    place: { instagram: 'instagram_url', facebook: 'facebook_url', youtube: 'youtube_url', tiktok: 'tiktok_url', x: 'x_url', linkedin: 'linkedin_url', whatsapp: 'whatsapp_url' },
+    contributor: { instagram: 'instagram_handle', facebook: 'facebook_url', youtube: 'youtube_url', tiktok: 'tiktok_handle', x: 'x_handle', linkedin: 'linkedin_url', whatsapp: 'whatsapp_number' },
+  };
+  // socials object → the columns to write for one entity type. Empty string
+  // (not undefined) for a cleared field so a removed handle really clears.
+  const socialsToRow = (socials, kind) => {
+    const cols = SOCIAL_COLUMNS[kind] || {};
+    const out = {};
+    SOCIAL_PLATFORMS.forEach((p) => {
+      const col = cols[p.key];
+      if (!col) return;
+      const v = socials && socials[p.key];
+      out[col] = (typeof v === 'string' && v.trim()) ? v.trim() : null;
+    });
+    return out;
+  };
+
+  // ── Contributor involvement tiers ──
+  const TIERS = [
+    { id: 'seed',     name: 'Seed',     min: 0,  desc: 'Newly approved contributor' },
+    { id: 'shepherd', name: 'Shepherd', min: 5,  desc: 'Growing presence in the community' },
+    { id: 'pillar',   name: 'Pillar',   min: 15, desc: 'A cornerstone of the community' },
+    { id: 'beacon',   name: 'Beacon',   min: 40, desc: 'Shining light across the Kingdom' },
+  ];
+
+  window.DATA = {
+    EVENT_CATEGORIES,
+    PLACE_CATEGORIES,
+    CONTRIBUTOR_TYPES,
+    FILTER_CATEGORIES,
+    TIERS,
+    getEventCategory,
+    getPlaceCategory,
+    getContributorType,
+    getCategory,
+    getItemCategory,
+    hasMapPin,
+    listedWhere,
+    isPastEvent,
+    eventsFeedPath,
+    isPubliclyListed,
+    publicRows,
+    ownedRows,
+    mergeRowsById,
+    SOCIAL_PLATFORMS,
+    SOCIAL_COLUMNS,
+    getSocialPlatform,
+    socialDisplay,
+    socialsFromRow,
+    socialsToRow,
+    // Live entity arrays — populated from Supabase in store.jsx
+    contributors: [],
+    events: [],
+    places: [],
+    citizens: [],
+    conversations: [],
+    impactIdeas: [],
+    notifications: [],
+    applications: [],
+    volunteerApplications: [],
+    reports: [],
+  };
+})();

@@ -177,7 +177,7 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     //     since D15; it used to jump straight to the full page), and its
     //     "View Full Profile" button is the way in to the Contributor's profile ──
     await openListing(page, (await marker.getAttribute("data-cc-id"))!);
-    const preview = page.locator(".cn-big");
+    const preview = page.locator("[data-mv2='sheet']");
     await expect(preview).toBeVisible({ timeout: 10_000 });
     await expect(preview.getByText(ORG_NAME).first()).toBeVisible();
     await preview.getByRole("button", { name: "View Full Profile" }).click();

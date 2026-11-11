@@ -14,9 +14,10 @@ type C = { id: string; contributor_slug: string; physical_longitude: number; phy
 type Seed = MapSeed & { contributors: C[] };
 type Post = { id: string; contributor_id: string; title: string; body: string; image_url: string | null; post_date: string; created_at: string };
 
-const sheet = (page: Page) => page.locator(".cn-big");
+const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 const head = (page: Page) => sheet(page).locator("[data-mv2='xhead']");
 const explore = (page: Page) => page.locator("[data-mv2='explore']");
+const cardOf = (page: Page, id: string) => explore(page).locator(`[data-explore-id="${id}"]`);
 const tabNames = (page: Page) => sheet(page).getByRole("tab").allInnerTexts();
 const selectedTab = (page: Page) => sheet(page).locator("[role='tab'][aria-selected='true']").innerText();
 const newsRow = (page: Page) => sheet(page).locator("[data-mv2='panel'] [data-mv2='hrow'] [data-layout='row']");
@@ -109,7 +110,8 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
 
     // the chip is the card's: same words, the group's dot and outline (--cat-<group>)
     const chip = head(page).locator("[data-mv2='card-chip']");
-    await expect(chip.locator("[data-mv2='card-chip-label']")).not.toHaveText("");
+    const cardChip = cardOf(page, c.id).locator("[data-mv2='card-chip-label']");
+    await expect(chip.locator("[data-mv2='card-chip-label']")).toHaveText(await cardChip.innerText());
     const group = await head(page).getAttribute("data-cat");
     expect(group).toBeTruthy();
     const colours = await chip.evaluate((el, g) => {
@@ -131,8 +133,15 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     const seed = await setUp(page, baseURL!);
     const c = seed.contributors[1];
     await jump(page, seed.contributors[0].physical_longitude, seed.contributors[0].physical_latitude);
-    await openListing(page, c.id);
-    await expect(head(page).locator("[data-mv2='distance']")).toHaveText(/from the map centre$/);
+    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).dispatchEvent("click");
+    const meta = cardOf(page, c.id).locator("[data-mv2='row-meta']").first();
+    await expect(meta).toHaveText(/from the map centre$/);
+    // the map settles, the row ranks again; then the card itself is pressed (a second pin press would deselect it)
+    let last = "";
+    await expect.poll(async () => { const now = await meta.innerText(); const still = now === last; last = now; return still; }, { intervals: [300] }).toBe(true);
+    const onCard = last;
+    await cardOf(page, c.id).locator("[data-mv2='card2']").click();
+    await expect(head(page).locator("[data-mv2='distance']")).toHaveText(onCard);
   });
 
   test("a listing without a cover gets the neutral tile with its category icon", async ({ page, baseURL }) => {
@@ -216,7 +225,9 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     await openCard(page, c, "tap");
     await page.getByRole("button", { name: "Close details" }).tap();
     await expect(sheet(page)).toHaveCount(0);
-    await expect(page.locator(`.maplibregl-marker[data-cc-id="${c.id}"] .connect-marker`)).toHaveClass(/chosen/);
+    await expect(explore(page)).toBeVisible();
+    await expect(cardOf(page, c.id)).toHaveAttribute("data-selected", "");
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"))).toBe(c.id);
   });
 
   test("a swipe down at the top closes to the Explore row; a short one springs back", async ({ page, baseURL }) => {
@@ -236,7 +247,8 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     // from the cover (content at its top: the scroll hand-off), a long way down
     await swipe(cdp, onCover, 320, { steps: 16, ms: 640 });
     await expect(sheet(page)).toHaveCount(0);
-    await expect(page.locator(`.maplibregl-marker[data-cc-id="${c.id}"] .connect-marker`)).toHaveClass(/chosen/);
+    await expect(cardOf(page, c.id)).toHaveAttribute("data-selected", "");
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"))).toBe(c.id);
   });
 
   test("a swipe up on the content scrolls it; the sheet does not move", async ({ page, baseURL }) => {
@@ -261,7 +273,8 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     expect(await page.evaluate(() => history.length)).toBe(before + 1);
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);
-    await expect(page.locator(`.maplibregl-marker[data-cc-id="${c.id}"] .connect-marker`)).toHaveClass(/chosen/);
+    await expect(explore(page)).toBeVisible();
+    await expect(cardOf(page, c.id)).toHaveAttribute("data-selected", "");
     expect(new URL(page.url()).pathname).toBe("/");
   });
 
@@ -269,9 +282,8 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     const seed = await setUp(page, baseURL!);
     const c = seed.contributors[0];
     await jump(page, c.physical_longitude, c.physical_latitude);
-    const pin = page.locator(`.maplibregl-marker[data-cc-id="${c.id}"] .marker-hit`);
-    await pin.focus();
-    await page.keyboard.press("Enter");
+    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).dispatchEvent("click");
+    await cardOf(page, c.id).locator("[data-mv2='card2']").focus();
     await page.keyboard.press("Enter");
     await expect(sheet(page)).toHaveAttribute("data-expanded", "");
     await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-mv2"))).toBe("name");
@@ -280,7 +292,7 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     await expect.poll(() => selectedTab(page)).toBe("News");
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
-    await expect(page.locator(`.maplibregl-marker[data-cc-id="${c.id}"] .connect-marker`)).toHaveClass(/chosen/);
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"))).toBe(c.id);
   });
 
   test("every control in the header bar and the tab bar is at least 44 px", async ({ page, baseURL }) => {

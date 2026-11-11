@@ -184,12 +184,12 @@ test.describe("R8 fixed tilt: the map still works under it (phone)", () => {
     const c = seed.contributors[0];
     await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
     await openPinSheet(page, c.id, "tap");
-    const sheet = page.locator(".cn-big");
+    const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet).toBeVisible();
     await page.waitForTimeout(900); // the 320 ms ease
     const { pinBottom, sheetTop } = await page.evaluate((id) => {
       const p = document.querySelector(`.maplibregl-marker[data-cc-id="${id}"]`)!.getBoundingClientRect();
-      const s = document.querySelector(".cn-big")!.getBoundingClientRect();
+      const s = document.querySelector("[data-mv2='sheet']")!.getBoundingClientRect();
       return { pinBottom: p.bottom, sheetTop: s.top };
     }, c.id);
     expect(pinBottom, "pin above the sheet's top edge").toBeLessThan(sheetTop);

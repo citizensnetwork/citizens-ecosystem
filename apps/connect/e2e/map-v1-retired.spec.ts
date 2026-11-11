@@ -14,14 +14,14 @@ const stored = (page: Page) => page.evaluate(() => localStorage.getItem("cc_map_
 async function expectTheOneMap(page: Page, pageErrors: string[]) {
   expect(await theme(page)).not.toBeNull();
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#f2bd22");
-  expect(await page.locator(".maplibregl-marker .marker-hit").count()).toBeGreaterThanOrEqual(8);
+  expect(await page.locator(".maplibregl-marker[role='button']").count()).toBeGreaterThanOrEqual(8);
   await expect(page.locator('[data-cc-pin="contributor-logo"]')).toHaveCount(0); // the old logo pin
   expect(await page.evaluate(() => typeof (window as unknown as { isMapV2?: unknown }).isMapV2)).toBe("undefined");
   expect(pageErrors).toEqual([]);
 
   const seed = smallSeed(FIXED_NOW) as { contributors: { id: string }[] };
   await openListing(page, seed.contributors[0].id); // a pin picks its card in the Explore row; the card opens the sheet
-  await expect(page.locator(".cn-big")).toBeVisible(); // the sheet, not the old floating preview card
+  await expect(page.locator("[data-mv2='sheet']")).toBeVisible(); // the sheet, not the old floating preview card
 }
 
 test.describe("the old map is retired", () => {

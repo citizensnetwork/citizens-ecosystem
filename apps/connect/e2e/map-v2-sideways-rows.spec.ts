@@ -57,7 +57,7 @@ const recordScrollBy = (page: Page) =>
   });
 const scrollByCalls = (page: Page) => page.evaluate(() => (window as unknown as { __by: { left: number; behavior: string }[] }).__by);
 
-const SHEET = ".cn-big";
+const SHEET = "[data-mv2='sheet']";
 const sheet = (page: Page) => page.locator(SHEET);
 const snapOf = (page: Page) => sheet(page).getAttribute("data-snap");
 const newsRegion = (page: Page) => page.getByRole("region", { name: "Latest news" });

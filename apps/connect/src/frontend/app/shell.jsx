@@ -280,13 +280,14 @@
       case 'home': return React.createElement(window.HomePage);
       case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
       // #210: Map v2's Discover page.
-      case 'explore': return window.ConnectExplore ? React.createElement(window.ConnectExplore.Page) : React.createElement(window.MapV2Discover.Discover);
+      case 'explore': return React.createElement(window.MapV2Discover.Discover);
       case 'lets': return React.createElement(window.LetsPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);
       case 'dashboard': return React.createElement((listingRole === 'editor' || listingRole === 'viewer') ? window.DashboardPage : (isPendingApplicant ? window.PendingApplicationPage : window.DashboardPage));
       case 'admin': return React.createElement(window.AdminPage);
+      case 'settings': return React.createElement(window.SettingsPage);
       case 'intake-upgrade': return React.createElement(window.IntakeUpgradePage);
       case 'apply': return React.createElement(window.ApplyPage);
       case 'onboarding': return React.createElement(window.OnboardingPage);
@@ -294,8 +295,7 @@
       case 'place': return React.createElement(window.PlaceProfilePage, { id: nav.params.id });
       case 'profile': return nav.params.id
         ? React.createElement(window.ContributorProfilePage, { id: nav.params.id })
-        : (window.ConnectMe ? React.createElement(window.ConnectMe.Page) : React.createElement(window.CitizenProfilePage));
-      case 'settings': return window.ConnectMe ? React.createElement(window.ConnectMe.Page, { space: 'Settings' }) : React.createElement(window.SettingsPage);
+        : React.createElement(window.CitizenProfilePage);
       default: return React.createElement(window.HomePage);
     }
   }
@@ -317,23 +317,17 @@
 
   function Shell() {
     const { createKind, createEditing, authed, guestMode, authResolved } = window.useApp();
-    const chrome = window.ConnectChrome;
-    const wide = chrome.useWide();
-    const frame = chrome.useShell();
     // Signed out: the landing — but while a probable session is still resolving,
     // the loading splash instead, so a returning member sees no "sign in" flash.
     if (!authed && !guestMode) return React.createElement(authResolved ? window.AuthScreen : window.LoadingSplash);
-    return React.createElement('div', {
-      className: 'connect-shell ' + (wide ? 'desktop-review' : 'phone-review'),
-      'data-search': frame.search ? 'open' : 'closed',
-      'data-filter': frame.filter ? 'on' : 'off',
-      'data-marker-language': 'Ink',
-    },
-      React.createElement('div', { className: 'connect-frame' + (frame.central ? ' connect-central' : '') },
-        React.createElement('main', { className: 'connect-main' },
-          React.createElement(AssistBanner),
-          frame.central ? React.createElement(chrome.CentralView) : React.createElement(CurrentPage)),
-        chrome && React.createElement(chrome.Nav)),
+    return React.createElement('div', { className: 'flex h-full w-full overflow-hidden bg-background' },
+      React.createElement(Sidebar),
+      React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },
+        React.createElement(AssistBanner),
+        React.createElement(CurrentPage)),
+      // Map v2 (#210): one folding round button instead of a bottom bar.
+      React.createElement(window.MapV2Nav),
+      React.createElement(CreateFab),
       createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),
       window.CCListingClaim && React.createElement(window.CCListingClaim.Host),

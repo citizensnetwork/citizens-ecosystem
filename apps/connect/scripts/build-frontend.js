@@ -41,6 +41,8 @@ const { buildFrontend } = require('@citizens/frontend-build');
 const { basePathFromEnv } = require('@citizens/ecosystem');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const frontendConfig = require('./frontend-config');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { buildLooks } = require('./look-bundles');
 
 // `next dev`/`next build` load .env.local themselves, but this script runs
 // as a PLAIN node process (a separate step before `next build` in the
@@ -95,9 +97,22 @@ function assertMaplibreVendorInSync(rootDir) {
 }
 assertMaplibreVendorInSync(path.join(__dirname, '..'));
 
-buildFrontend({
+const rootDir = path.join(__dirname, '..');
+
+// Every screen module of the LIVE look, in the exact dependency order the old
+// <script type="text/babel"> tags loaded them (later files reference
+// `window.X` set by earlier ones). The 2026 look's list is derived from this
+// one in ./look-bundles.js.
+const appFileOrder = [
+  'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'saved-lib.jsx', 'cohost-lib.jsx', 'moments-lib.jsx', 'convince-lib.jsx', 'serving-areas-lib.jsx', 'onboarding-presets-lib.jsx', 'data.jsx', 'lets-lib.jsx', 'store.jsx', 'ui.jsx', 'report.jsx', 'listing-claim.jsx', 'auth.jsx', 'cohosts.jsx', 'moments.jsx', 'convince.jsx', 'map-v2-strings.jsx', 'serving-areas.jsx', 'map-v2-time.jsx', 'map-v2-qr.jsx', 'map-v2-pins.jsx', 'map.jsx',
+  'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-card.jsx', 'map-v2-row.jsx', 'map-v2-nearby.jsx', 'map-v2-online.jsx', 'map-v2-sheet.jsx', 'map-v2-explore.jsx', 'map-v2-nav.jsx', 'map-v2-discover.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
+  'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx', 'lets.jsx', 'intake-upgrade.jsx',
+  'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
+];
+
+const built = buildFrontend({
   esbuild,
-  rootDir: path.join(__dirname, '..'),
+  rootDir,
   mobile: process.argv.includes('--mobile'),
 
   // '' until the Vercel project sets NEXT_PUBLIC_BASE_PATH=/citizens/connect
@@ -105,17 +120,12 @@ buildFrontend({
   // loadDotEnvLocal above, so a local .env.local value counts too.
   basePath: basePathFromEnv('connect'),
 
-  // Every screen module, in the exact dependency order the old
-  // <script type="text/babel"> tags loaded them (later files reference
-  // `window.X` set by earlier ones).
-  appFileOrder: [
-    'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'saved-lib.jsx', 'cohost-lib.jsx', 'moments-lib.jsx', 'convince-lib.jsx', 'serving-areas-lib.jsx', 'onboarding-presets-lib.jsx', 'data.jsx', 'lets-lib.jsx', 'store.jsx', 'ui.jsx', 'report.jsx', 'listing-claim.jsx', 'auth.jsx', 'cohosts.jsx', 'moments.jsx', 'convince.jsx', 'map-v2-strings.jsx', 'serving-areas.jsx', 'map-v2-time.jsx', 'map-v2-qr.jsx', 'map-v2-pins.jsx', 'map.jsx',
-    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-card.jsx', 'map-v2-row.jsx', 'map-v2-nearby.jsx', 'map-v2-online.jsx', 'map-v2-sheet.jsx', 'map-v2-explore.jsx', 'connect-chrome.jsx', 'connect-previews.jsx', 'connect-explore.jsx', 'connect-me.jsx', 'map-v2-nav.jsx', 'map-v2-discover.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
-    'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx', 'lets.jsx', 'intake-upgrade.jsx',
-    'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
-  ],
+  appFileOrder,
 
   // The config.js env-var mapping and the CDN pins live in ./frontend-config.js
   // (their own file so a test can run the real configuration into a temp directory).
   ...frontendConfig,
 });
+
+// The look switch: the 2026 look's bundle beside the live one, and the loader that picks between them.
+buildLooks({ esbuild, rootDir, dest: built.dest, liveOrder: appFileOrder, liveBundle: built.bundleFile });

@@ -18,6 +18,34 @@
   } catch (e) { /* stay zoomable */ }
 })();
 </script>
+<!-- The look switch (facelift; the founder's "switch, then flip", 2026-11-11). Today's look is the default. Opening any
+     Connect address with ?look=2026 turns the new look on for this browser and remembers it; ?look=live turns it off
+     again. It runs here, before anything is drawn, so the other look never flashes. It sets data-look on <html> and one
+     plain localStorage flag, nothing else: no sign-in, session or server data is read or changed. The build puts the
+     matching app bundle behind it and may set DEFAULT_LOOK from CONNECT_DEFAULT_LOOK (scripts/look-bundles.js). -->
+<script>
+(function () {
+  var DEFAULT_LOOK = 'live';
+  var KEY = 'cc_look';
+  var look = DEFAULT_LOOK;
+  try {
+    var asked = new URLSearchParams(location.search).get('look');
+    if (asked === '2026' || asked === 'live') {
+      look = asked;
+      try {
+        if (asked === DEFAULT_LOOK) localStorage.removeItem(KEY);
+        else localStorage.setItem(KEY, asked);
+      } catch (e) { /* storage blocked: the choice holds for this page only */ }
+    } else {
+      try {
+        var kept = localStorage.getItem(KEY);
+        if (kept === '2026' || kept === 'live') look = kept;
+      } catch (e) { /* storage blocked: the default look */ }
+    }
+  } catch (e) { /* an old webview: the default look */ }
+  if (look === '2026') document.documentElement.setAttribute('data-look', '2026');
+})();
+</script>
 <!-- Every screen has its own URL now (/discover, /e/<id>, /dashboard/events, ...), and the
      server serves this same file for all of them. Without a base, the relative script,
      style and vendor paths below would resolve under those paths (/e/app/store.jsx) and
@@ -88,7 +116,7 @@
        other values are its roles, never a second gold: --gold-light and --gold-deep are the gradient stops (light and
        amber, never brown), --gold-dark is the INK for gold text, rings and icons (plain gold on white is 1.74:1).
        Same values as Map v2's --accent and --accent-ink (its own stylesheet); a unit test keeps the two in step. */
-    --gold:#F2BD22; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#edeee5;
+    --gold:#F2BD22; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#EDE5D4;
     /* the crown mark's old, separate gold: now the same gold (kept so nothing that reads them breaks) */
     --gold-crown:var(--gold); --gold-crown-light:var(--gold-light); --gold-crown-dark:var(--gold-dark);
   }
@@ -247,10 +275,6 @@
 <script type="text/babel" src="app/map-v2-online.jsx?v=20261026a"></script>
 <script type="text/babel" src="app/map-v2-sheet.jsx?v=20261101b"></script>
 <script type="text/babel" src="app/map-v2-explore.jsx?v=20261101b"></script>
-<script type="text/babel" src="app/connect-chrome.jsx?v=20261110a"></script>
-<script type="text/babel" src="app/connect-previews.jsx?v=20261110b"></script>
-<script type="text/babel" src="app/connect-explore.jsx?v=20261110b"></script>
-<script type="text/babel" src="app/connect-me.jsx?v=20261110b"></script>
 <script type="text/babel" src="app/map-v2-nav.jsx?v=20261026c"></script>
 <script type="text/babel" src="app/map-v2-discover.jsx?v=20261030a"></script>
 <script type="text/babel" src="app/home.jsx?v=20261101b"></script>

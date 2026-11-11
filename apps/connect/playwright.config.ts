@@ -13,7 +13,8 @@ export default defineConfig({
   testDir: "./e2e",
   // The prefix-mode smoke run needs the app built and served under /citizens/connect: it has its own config
   // (playwright.base-path.config.ts, `pnpm test:e2e:base-path`) and would only fail against this root-mode server.
-  testIgnore: "base-path.spec.ts",
+  // The look switch: `*.look2026.spec.ts` are the new shell's versions of specs; they need a build whose default look is 2026.
+  testIgnore: ["base-path.spec.ts", "**/*.look2026.spec.ts"],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

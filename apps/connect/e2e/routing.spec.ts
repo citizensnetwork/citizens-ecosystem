@@ -317,9 +317,8 @@ test.describe("Browser Back and Forward", () => {
     await page.goto("/manifest.json");
     await page.goto(`/c/${SLUG}`);
     await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("navigation", { name: "Connect navigation" }).getByRole("button", { name: "Explore", exact: true }).click();
-    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
-    expect(path(page)).toBe("/explore");
+    await page.getByRole("button", { name: "Kingdom Exploration" }).first().click();
+    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
 
     await page.goBack();
     await expect.poll(() => screen(page)).toBe("profile");
@@ -465,10 +464,10 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole("navigation", { name: "Connect navigation" }).getByRole("button", { name: "Explore", exact: true }).click();
-    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
-    expect(path(page)).toBe("/explore");
-    expect(await pushes(page)).toEqual([{ active: true, guard: false, url: "/explore" }]);
+    await page.getByRole("button", { name: "Kingdom Exploration" }).first().click();
+    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
+    expect(path(page)).toBe("/discover");
+    expect(await pushes(page)).toEqual([{ active: true, guard: false, url: "/discover" }]);
 
     await page.goBack();
     await expect.poll(() => screen(page)).toBe("discover");

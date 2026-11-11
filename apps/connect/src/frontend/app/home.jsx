@@ -2,7 +2,7 @@
 //  Citizens Connect — Discover (map home) + Impact Idea preview panel
 // ════════════════════════════════════════════════════════════════════
 (function () {
-  const { useState, useRef, useMemo, useCallback, useEffect } = React;
+  const { useState, useRef, useMemo, useCallback } = React;
   const { CategoryBadge, Button } = window.UI;
   const Icon = window.Icon;
   const useBackGuard = window.useBackGuard || function () {};
@@ -87,14 +87,13 @@
   // ── Home / Discover ──
   function HomePage() {
     const app = window.useApp();
-    const { events, places, contributors, ideas, newsPosts, dismissBubble, trackImpression, connected, followedOrgs, toggleConnect, toggleConsider, toggleFollow, togglePlaceFollow, toggleSave, shareLink, startConversationWith, sendMessage, realUser } = app;
+    const { events, places, contributors, ideas, newsPosts, dismissBubble, trackImpression } = app;
     const [selected, setSelected] = useState(null);
     // The sheet reports how much of the map it covers; the map keeps the selected pin clear of it
     const mapApi = useRef(null);
     const [selType, setSelType] = useState('event');
     const [showIdeas, setShowIdeas] = useState(false);
     const [query, setQuery] = useState('');
-    const [group, setGroup] = useState('all');
     // Which entity types the current zoom is showing ('all' | 'places' |
     // 'contributors' | 'none' — see map.jsx zoomBandFor). The map owns the
     // thresholds and only reports when the band actually changes, so this is
@@ -109,10 +108,6 @@
     // "Where to…" (C40): a saved set of categories. It replaces the pill while it is on.
     const [intent, setIntent] = useState(null);
     const [sheet, setSheet] = useState(null);
-    const [big, setBig] = useState(false);
-    const [profileOpen, setProfileOpen] = useState(false);
-    const [flags, setFlags] = useState({});
-    const [action, setAction] = useState(null);
     const [min, setMin] = useState(false);
     const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a second tap on a pin scrolls to its card again
     const rootRef = useRef(null);
@@ -121,13 +116,9 @@
     const chosen = useRef({ id: null, type: null });   // the latest choice, so a second tap never reads a render's old one
     const narrow = X.useNarrow();
     const clean = !!(app.nav && app.nav.params && app.nav.params.view === 'map');
-    const q = query.trim().toLowerCase();
-    const passesChrome = useCallback((m) => {
-      const qok = !q || (m.title || m.name || '').toLowerCase().includes(q) || (m.organizerName || '').toLowerCase().includes(q);
-      const gok = group === 'all' || (X.groupOf && X.groupOf(m) === group);
-      return qok && gok;
-    }, [q, group, X]);
-    const pillTest = useMemo(() => (q || group !== 'all' ? passesChrome : null), [q, group, passesChrome]);
+    const pillTest = useMemo(() => (
+      (intent && X.intentOf(intent)) || (pill && pill !== 'all') ? (m) => X.matchesFilter(pill, intent, m) : null
+    ), [X, pill, intent]);
     // The panel's height goes straight onto the screen as a CSS variable (the map's controls and credit sit above it): no re-render.
     // The data is framed again as the panel grows, but never because the person lowered or raised it (the map would jump).
     const onExploreHeight = useCallback((px) => {
@@ -145,13 +136,19 @@
       setMin(down);
     }, []);
 
+    const q = query.trim().toLowerCase();
+    const matches = (t) => !q || (t.title || t.name || '').toLowerCase().includes(q) || (t.organizerName || '').toLowerCase().includes(q);
     const now = Date.now();
     const markers = [
       // A finished event is history, not a place to turn up: it leaves the map
       // (it stays on its organiser's profile and dashboard, under "Past events").
-      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, organizerName: e.organizerName, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast, coverPhoto: e.coverPhoto, linked: !!(connected && connected.has && connected.has(e.id)) })),
-      ...places.map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
-      ...contributors.filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto, linked: !!(followedOrgs && followedOrgs.has && followedOrgs.has(c.id)) })),
+      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast })),
+      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
+      // Contributors: same marker shape, minus the event-only isLive/isBusy/
+      // broadcast fields (a Contributor pin is just a plain coloured pin —
+      // see V1_SCOPE.md, "leave live-pulse/broadcast as-is" was scoped to
+      // events only, contributors never had those states to begin with).
+      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto })),
       ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
     ];
     // What decides which pin keeps its name label when two collide, and who heads a "+N" group:
@@ -174,89 +171,37 @@
       setSheet(null); setSelected(id); setSelType(t);
       if (mapApi.current) mapApi.current.focusSelected(openMapPad(rootRef.current), CARD_ZOOM);
     };
-    useEffect(() => {
-      window.ConnectActions = { toggleConnect, shareLink, toggleFollow, startConversationWith, connected, followed: followedOrgs };
-    });
-    useEffect(() => {
-      const C = window.ConnectChrome;
-      if (C) C.patchShell({ panels: !!(selected && !profileOpen) });
-    }, [selected, profileOpen]);
-    useEffect(() => {
-      const clear = () => { setSelected(null); setSheet(null); setBig(false); setProfileOpen(false); setAction(null); };
-      window.addEventListener('cc-map-clear', clear);
-      return () => window.removeEventListener('cc-map-clear', clear);
-    }, []);
-    useEffect(() => {
-      const fly = (detail) => {
-        const map = window.__ccMap;
-        if (!map || !detail || detail.lat == null || detail.lng == null || !map.flyTo) return;
-        map.flyTo({ center: [detail.lng, detail.lat], zoom: Math.max(map.getZoom() || 12, 12), duration: 600 });
-      };
-      const onArea = (e) => fly(e.detail);
-      window.addEventListener('cc-set-area', onArea);
-      try {
-        const raw = window.sessionStorage.getItem('cc_area_pick');
-        if (raw) fly(JSON.parse(raw));
-      } catch (e) { /* private mode or a bad stored pick */ }
-      return () => window.removeEventListener('cc-set-area', onArea);
-    }, []);
-    useEffect(() => {
-      const onPick = (e) => {
-        const id = e.detail && e.detail.id;
-        if (!id) return;
-        setSelected(id); setSelType(e.detail.type); setBig(true); setProfileOpen(false);
-        try { window.dispatchEvent(new Event('cc-map-select')); } catch (err) { /* old webview */ }
-      };
-      window.addEventListener('cc-explore-pick', onPick);
-      return () => window.removeEventListener('cc-explore-pick', onPick);
-    }, []);
-    const pressAction = (item, label) => {
-      if (label === 'Connect' || label === 'Follow' || label === 'Save' || label === 'Consider') {
-        // A guest on the real site (CC_AUTH set, nobody signed in) must not see the label flip.
-        if (!(window.CC_AUTH && !realUser)) setFlags((f) => Object.assign({}, f, { [item.id + label]: !f[item.id + label] }));
-        if (label === 'Connect' && toggleConnect) toggleConnect(item.id);
-        if (label === 'Consider' && toggleConsider) toggleConsider(item.id);
-        if (label === 'Follow') {
-          if (item.type === 'place' && togglePlaceFollow) togglePlaceFollow(item.id, item.title);
-          else if (toggleFollow) toggleFollow(item.id, item.title);
-        }
-        if (label === 'Save' && toggleSave) toggleSave(item.type === 'place' ? 'place' : 'contributor', item.id, item.title);
-        return;
-      }
-      if (label === 'Share' && shareLink) shareLink({ page: item.type === 'contributor' ? 'profile' : item.type === 'place' ? 'place' : 'event', params: { id: item.id } });
-      setAction({ item, label });
-    };
-    const rowMarkers = markers.filter((m) => m.type !== 'idea');
-    return React.createElement('div', { ref: rootRef, className: 'connect-map flex-1 relative overflow-hidden' + (query ? ' typing' : ''), style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined },
-        React.createElement('div', { className: 'map-touch absolute inset-0', onClick: (e) => {
-          if (e.target && e.target.closest && e.target.closest('.maplibregl-marker, .marker-capsules, .cn-conveyor, .cn-big')) return;
-          setSelected(null); setSheet(null); setBig(false); setProfileOpen(false);
-        } },
+    const rowMarkers = pillTest ? markers.filter((m) => m.type !== 'idea' && pillTest(m)) : markers.filter((m) => m.type !== 'idea');
+    const XS = window.MapV2Strings.explore;
+    return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-explore-min': min ? '' : undefined },
+      React.createElement('div', { className: 'absolute inset-0', onClick: () => { setSelected(null); setSheet(null); } },
         React.createElement(window.StylizedMap, {
           markers, filterCategory: pillTest, selectedId: selected, apiRef: mapApi,
           // #210: a pin chooses its card in the Explore panel (the panel scrolls to it); the card's second tap opens the
           // full listing. The clean map (the nav's Map) has no panel, so there a pin opens the sheet as before. Ideas keep their panel.
           onSelect: (id, t) => {
-            if (t === 'idea') { setSheet(null); setBig(false); setSelected((p) => (p === id ? null : id)); setSelType(t); return; }
-            try { window.dispatchEvent(new Event('cc-map-select')); } catch (e) { /* old webview */ }
-            // First tap selects and opens the conveyor. Second tap on the same pin opens the big preview.
-            // The old half sheet stays closed.
-            if (chosen.current.id === id && chosen.current.type === t) { setBig(true); setProfileOpen(false); return; }
-            chosen.current = { id, type: t };
-            setSheet(null); setBig(false); setProfileOpen(false); setSelected(id); setSelType(t);
-            if (mapApi.current && mapApi.current.focusSelected) mapApi.current.focusSelected(openMapPad(rootRef.current), CARD_ZOOM);
+            if (t === 'idea') { setSheet(null); setSelected((p) => (p === id ? null : id)); setSelType(t); return; }
+            if (clean) { openSheet(id, t); return; }
+            const a = document.activeElement;
+            const byKey = !!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })());
+            // A second tap on the same pin keeps it chosen (and brings its card back into view); a tap on the map clears it.
+            // A pin tap raises a lowered panel: its card has to be there to be chosen.
+            setSheet(null); setSelected(id); setSelType(t); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 })); lower(false);
           },
           onDismissBubble: dismissBubble,
           onZoomBandChange: setZoomBand,
         })),
 
-      window.ConnectChrome && React.createElement(window.ConnectChrome.MapChrome, {
-        query, onQuery: setQuery, group, onGroup: setGroup,
-      }),
+      // top: search and the account button, round and glassy (#210). The category choice is inside the Explore panel now.
+      React.createElement('div', { 'data-mv2': 'home-top' },
+        React.createElement('div', { 'data-mv2': 'home-bar' },
+          React.createElement('label', { 'data-mv2': 'home-search' },
+            React.createElement(Icon, { name: 'Search', size: 18 }),
+            React.createElement('input', { value: query, onChange: (e) => setQuery(e.target.value), placeholder: XS.search, 'aria-label': XS.search }),
+            query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 16 }))),
+          React.createElement(window.AccountButton, { variant: 'round' }))),
 
-      React.createElement('div', { className: 'map-overlay-stack' },
-        React.createElement(window.MapV2Online.Globe, { onOpenProfile: (id) => app.go('profile', { id }) })),
-
+      // zoom-gate hint + the MapTiler logo, kept above the Explore row (MapTiler's Free plan needs the logo bottom-left)
       React.createElement('div', { 'data-mv2': 'home-corner' },
         zoomBand !== 'all' && React.createElement('div', { 'data-mv2': 'zoom-hint', 'data-zoom-hint': zoomBand },
           React.createElement(Icon, { name: 'ZoomIn', size: 16 }),
@@ -265,57 +210,29 @@
               : zoomBand === 'contributors' ? 'Zoom in to see events and places'
               : 'Zoom in to see places')),
         window.MapTilerLogo && React.createElement(window.MapTilerLogo)),
-      selected && selType === 'idea' && React.createElement(IdeaPanel, { id: selected, onClose: () => setSelected(null) }),
-      window.ConnectPreviews && !profileOpen && !big && selected && selType !== 'idea' && React.createElement(window.ConnectPreviews.Conveyor, {
-        items: window.ConnectPreviews.listingsFrom(app, group, query),
-        activeId: selected,
-        flags,
-        onPick: (item) => {
-          if (item.id === selected) { setBig(true); return; }
-          setSelected(item.id); setSelType(item.type); setBig(false);
-        },
-        onClose: () => { setSelected(null); setBig(false); },
-        onStep: (d) => {
-          const items = window.ConnectPreviews.listingsFrom(app, group, query);
-          const i = items.findIndex((x) => x.id === selected);
-          const next = items[(i + d + items.length) % items.length];
-          if (next) { setSelected(next.id); setSelType(next.type); setBig(false); }
-        },
-        onAction: pressAction,
+
+      React.createElement(window.MapV2Online.Globe, { onOpenProfile: (id) => app.go('profile', { id }) }),
+
+      // ONE bottom area: the Explore panel, or the full listing of the card that was tapped twice, never both. The panel
+      // stays mounted (hidden) under the listing, so it keeps its place and the card that opened it gets focus back.
+      !clean && React.createElement(X.Explore, {
+        hidden: !!sheet,
+        markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, reveal,
+        pill, onPill: (id) => { setIntent(null); setPill(id); },
+        intent, onIntent: (id) => { setPill('all'); setIntent(id); },
+        ideas: showIdeas, onIdeas: () => setShowIdeas((v) => !v), min, onMin: lower,
+        onOpen: tapCard, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
       }),
-      window.ConnectPreviews && big && !profileOpen && React.createElement(window.ConnectPreviews.BigPreview, {
-        item: (window.ConnectPreviews.listingsFrom(app, group, query).find((i) => i.id === selected)) || null,
-        items: window.ConnectPreviews.listingsFrom(app, group, query),
-        flags,
-        onClose: () => setBig(false),
-        onProfile: () => { setProfileOpen(true); setBig(false); },
-        onGroup: (g) => { setGroup(g); setBig(false); },
-        onFocus: (item) => { setSelected(item.id); setSelType(item.type); setBig(true); },
-        onAction: pressAction,
+      // a chosen card tapped again opens the expanded sheet (#210: full, its cover and distance, swipe down back to the
+      // panel; it never moves the map); the clean map's pin opens today's half sheet
+      sheet && React.createElement(window.MapV2Sheet, {
+        id: sheet.id, type: sheet.type, expanded: !clean, view: sheet.view,
+        onClose: closeSheet, onOccupy: (pad) => { if (mapApi.current) mapApi.current.focusSelected(pad); },
+        nearby: markers,
+        // a Nearby pick keeps the place the distances were measured from (the map has moved under the sheet since)
+        onPick: (id, t) => openSheet(id, t, sheet.view),
       }),
-      window.ConnectPreviews && profileOpen && React.createElement(window.ConnectPreviews.ListingProfile, {
-        item: (window.ConnectPreviews.listingsFrom(app, 'all', '').find((i) => i.id === selected)) || null,
-        flags,
-        onBack: () => { setProfileOpen(false); setBig(true); },
-        onAction: pressAction,
-      }),
-      window.ConnectPreviews && action && React.createElement(window.ConnectPreviews.ActionModal, {
-        action: action.label, item: action.item, onClose: () => setAction(null),
-        onSend: (item, note) => {
-          const recipient = item.hostId || (item.type === 'contributor' ? item.id : '');
-          const text = (note || '').trim();
-          const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-          if (window.authedFetch && uuid.test(String(recipient || '')) && text) {
-            window.authedFetch('/api/conversations', { method: 'POST', body: JSON.stringify({ recipient_id: recipient }) })
-              .then((res) => res && res.ok ? res.json() : null)
-              .then((json) => { if (json && json.conversation_id && sendMessage) sendMessage(json.conversation_id, text); })
-              .catch(() => {});
-          } else if (startConversationWith) {
-            startConversationWith(item.host || item.title, item.image, true, recipient);
-          }
-          setAction(null);
-        },
-      }));
+      selected && selType === 'idea' && React.createElement(IdeaPanel, { id: selected, onClose: () => setSelected(null) }));
   
   }
 

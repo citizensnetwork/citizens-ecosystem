@@ -47,7 +47,7 @@ describe("which zoom shows the logo (D8)", () => {
 });
 
 describe("glyph colour on a category fill", () => {
-  const hexes = [...new Set([...readFileSync(join(process.cwd(), "src/frontend/app/data.jsx"), "utf8").matchAll(/hex: '(#[0-9A-Fa-f]{6})'/g)].map((m) => m[1].toLowerCase()))];
+  const hexes = [...new Set([...readFileSync(join(process.cwd(), "src/frontend/app/data.jsx"), "utf8").matchAll(/hex: '(#[0-9A-Fa-f]{6})'/g)].map((m) => m[1]))];
 
   it("picks white on a dark fill and near-black on a light one", () => {
     expect(P.glyphColor("#212121")).toBe("#FFFFFF");

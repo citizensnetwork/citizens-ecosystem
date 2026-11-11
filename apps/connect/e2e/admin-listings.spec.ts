@@ -106,7 +106,7 @@ test.describe("Admin → Listings", () => {
     });
 
     await page.goto("/");
-    await page.goto("/admin");
+    await page.getByRole("button", { name: /Admin Panel/ }).first().click({ timeout: 15_000 });
     await expect(page.locator('[data-screen="admin"]')).toBeVisible();
     await page.getByRole("button", { name: "Contributors", exact: true }).click();
 
@@ -208,7 +208,7 @@ test.describe("Admin → Listings", () => {
       route.fulfill({ json: { data: rows, meta: { page: 1, pageSize: 20, total: rows.length } } }),
     );
     await page.goto("/");
-    await page.goto("/admin");
+    await page.getByRole("button", { name: /Admin Panel/ }).first().click({ timeout: 15_000 });
     await expect(page.locator('[data-screen="admin"]')).toBeVisible();
     await page.getByRole("button", { name: "Contributors", exact: true }).click();
   }

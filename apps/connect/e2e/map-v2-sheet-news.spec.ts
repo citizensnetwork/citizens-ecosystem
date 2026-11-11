@@ -61,7 +61,7 @@ async function installNews(page: Page, posts: Post[]) {
   }, posts);
 }
 
-const sheet = (page: Page) => page.locator(".cn-big");
+const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 const reader = (page: Page) => page.locator("[data-mv2='news-card']");
 const card = (page: Page) => sheet(page).locator("[data-mv2='card2'][data-news]").first();
 
@@ -104,7 +104,7 @@ test("News tab: newest first, with a plain 'posted' time, and the tab appears on
   await openMap(page, "/?map=v2", 8);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
   await openPinSheet(page, c.id);
-  const sheet = page.locator(".cn-big");
+  const sheet = page.locator("[data-mv2='sheet']");
   await expect(sheet).toBeVisible();
 
   await expect(sheet.getByRole("tab")).toHaveText(["News"]);

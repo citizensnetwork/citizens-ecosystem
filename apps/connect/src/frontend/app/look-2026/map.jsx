@@ -1,0 +1,820 @@
+// ════════════════════════════════════════════════════════════════════
+//  Citizens Connect — REAL map (MapLibre GL + MapTiler)
+//  ------------------------------------------------------------------
+//  Phase 2: replaces the decorative SVG prototype with a real geographic
+//  map. Keeps the same public interface the home screen consumes:
+//    window.StylizedMap({ markers, filterCategory, selectedId, onSelect,
+//                         onDismissBubble, onZoomBandChange })
+//  (the old no-op MapFloatersLayer export is gone — bubbles and labels have
+//   ridden the markers themselves since the pin redesign.)
+//  Markers are native MapLibre markers: one floating SVG badge per item,
+//  carrying that item's own category glyph in its own category colour, on a
+//  shape that encodes the entity type — circle for a Place, rounded rectangle
+//  for an Event, ringed circle (or its logo) for a Contributor (+ live pulse +
+//  broadcast bubble + selected label). Coordinates use real lat/lng when an
+//  item has them; legacy mock items (only mapX/mapY) are projected into a
+//  greater-Pretoria bounding box so they still place sensibly during the
+//  mock→real data migration.
+//
+//  Visibility: DENSITY-GATED BY ZOOM (founder ask). A place is a street-level
+//  fact, an event a city-level one and a Contributor a regional one, so past a
+//  certain distance each stops being useful and starts being noise — see
+//  ZOOM_GATES below. There is still no clustering (Map v2 only adds a "+N" hint
+//  on overlapping pins, worked out when the map goes idle), and gating is pure CSS
+//  `display` on markers MapLibre already owns — no marker churn on zoom.
+// ════════════════════════════════════════════════════════════════════
+(function () {
+  const { useRef, useEffect } = React;
+  const env = window.__CC_ENV || {};
+
+  // ── Geo frame ──────────────────────────────────────────────────────
+  const PRETORIA = [28.2293, -25.7479];           // [lng, lat] — Church Square
+  // Greater-Pretoria bbox used only to project legacy % coords (mock items).
+  const BBOX = { west: 28.10, east: 28.36, south: -25.86, north: -25.66 };
+
+  // ── Zoom gates ─────────────────────────────────────────────────────
+  //  Web-Mercator zoom, calibrated against South Africa on a phone viewport:
+  //    z≈5–6   the whole country          ("national")
+  //    z≈8–9   one province, e.g. Gauteng ("provincial")
+  //    z≈10–11 one metro, e.g. Pretoria
+  //    z≈13+   suburb / street
+  //  Founder's rule: places drop out at provincial scale, events with them at
+  //  wider scale still, and — so the national view reads clean and professional
+  //  rather than as a scatter of pins — Contributors too below zoom 6
+  //  (2026-10-02; they used to be permanent anchors that never gated).
+  //  This is the ONE place the thresholds live; each type hides when z < gate.
+  const ZOOM_GATES = { place: 9.5, event: 7.5, contributor: 6 };
+  //  What the current zoom is showing — reported upward so the map screen can
+  //  say WHY pins vanished instead of leaving it a mystery.
+  //    'all'          everything with coordinates
+  //    'places'       places gated out (provincial)
+  //    'contributors' events gated out too — only Contributors remain
+  //    'none'         Contributors gated out as well (national) — nothing drawn
+  function zoomBandFor(z) {
+    if (z >= ZOOM_GATES.place) return 'all';
+    if (z >= ZOOM_GATES.event) return 'places';
+    if (z >= ZOOM_GATES.contributor) return 'contributors';
+    return 'none';
+  }
+  // A pin is hidden only when its own type is gated out (Impact Ideas are an
+  // opt-in layer and are never gated). The SELECTED pin is always drawn: its
+  // preview panel is open, and a preview pointing at nothing would be worse
+  // than one extra marker.
+  function markerHidden(type, z, selected) {
+    if (selected) return false;
+    const gate = ZOOM_GATES[type];
+    return gate !== undefined && z < gate;
+  }
+  // Titles only earn their space once you are close enough to read a
+  // neighbourhood; below that they'd overlap into mush. Tuned 12.6 → 15.6 →
+  // 18 → 16.5 (2026-08-26) — 18 was too tight (labels almost never showed at
+  // normal browsing zoom), so pulled back in — then 15 (2026-10-02, founder:
+  // neighbourhood scale). The selected pin keeps its label at every zoom
+  // (CSS `.cc-pin-label.is-selected`).
+  const ZOOM_LABELS = 15;
+  // Map v2 (founder D8): a Contributor pin shows its LOGO at and above this zoom and its
+  // category glyph below it; the selected pin always shows its logo. The founder's map-layering.md says no
+  // pictures in the mid tier. Tuned inside 13-15 (tracker E6); starts where the name labels start.
+  const ZOOM_PHOTO = 15;
+
+  function coordsFor(m) {
+    if (typeof m.lng === 'number' && typeof m.lat === 'number' && (m.lng !== 0 || m.lat !== 0)) {
+      return [m.lng, m.lat];
+    }
+    if (typeof m.mapX === 'number' && typeof m.mapY === 'number') {
+      const lng = BBOX.west + (m.mapX / 100) * (BBOX.east - BBOX.west);
+      const lat = BBOX.north - (m.mapY / 100) * (BBOX.north - BBOX.south);
+      return [lng, lat];
+    }
+    return null;
+  }
+
+  function styleUrl() {
+    const key = env.MAPTILER_KEY;
+    if (!key || key.indexOf('REPLACE_WITH') === 0) return null;
+    const style = env.MAPTILER_STYLE || 'streets-v2';
+    return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
+  }
+
+  // Map v2 dark look (founder D1; docs/audit/map-tiles.md): MapTiler's own dark sibling of the production
+  // Dataviz-based style. It loads with the existing key (HTTP 200 on 2026-10-10): no new key, tier or CSP entry.
+  // MAPTILER_STYLE_DARK may override it, but the build does not emit that variable, so the default is the rule.
+  const DARK_STYLE = 'dataviz-dark';
+  function styleUrlFor(theme) {
+    const key = env.MAPTILER_KEY;
+    if (!key || key.indexOf('REPLACE_WITH') === 0) return null;
+    const style = theme === 'dark' ? (env.MAPTILER_STYLE_DARK || DARK_STYLE) : (env.MAPTILER_STYLE || 'streets-v2');
+    return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
+  }
+
+  // Recolour the live MapTiler style toward the approved map palette. The engine stays MapLibre.
+  function restyleBasemap(map) {
+    if (!map || !map.getStyle) return;
+    const style = map.getStyle();
+    if (!style || !style.layers) return;
+    const dark = window.MapV2 && window.MapV2.resolvedTheme() === 'dark';
+    const k = dark
+      ? { g: '#1d1f1a', b: '#24261f', bi: '#2c2e27', park: '#24302a', road: '#33352e', w1: '#1d2b2c', w2: '#26393a', lab: '#a9a89c', halo: '#1b1c18' }
+      : { g: '#edeee5', b: '#e4e2d8', bi: '#d8d8ce', park: '#cbd8c3', road: '#fbfbf5', w1: '#a7c0bd', w2: '#c8dad5', lab: '#777e71', halo: '#f7f6f1' };
+    style.layers.forEach((layer) => {
+      const id = String(layer.id || '').toLowerCase();
+      try {
+        if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', k.g);
+        else if (layer.type === 'fill') {
+          const c = /water|ocean|river|lake/.test(id) ? k.w1 : /park|wood|grass|green|landcover/.test(id) ? k.park : /building/.test(id) ? k.bi : k.b;
+          map.setPaintProperty(layer.id, 'fill-color', c);
+        } else if (layer.type === 'line') {
+          map.setPaintProperty(layer.id, 'line-color', /water/.test(id) ? k.w2 : k.road);
+        } else if (layer.type === 'symbol') {
+          map.setPaintProperty(layer.id, 'text-color', k.lab);
+          map.setPaintProperty(layer.id, 'text-halo-color', k.halo);
+        }
+      } catch (e) { /* a layer whose paint is data-driven keeps MapTiler's value */ }
+    });
+  }
+
+  function capsuleButton(label, className, on, pressed) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = className + (on ? ' on' : '');
+    b.textContent = pressed || label;
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    return b;
+  }
+  function syncCapsules(wrap, m) {
+    const old = wrap.querySelector('.marker-capsules');
+    if (old) old.remove();
+    if (!m || m.type === 'place' || m.type === 'idea') return;
+    const bar = document.createElement('div');
+    bar.className = 'marker-capsules cn-glass';
+    bar.setAttribute('aria-label', m.type + ' quick actions');
+    const acts = window.ConnectActions || {};
+    if (m.type === 'contributor') {
+      const following = !!(acts.followed && acts.followed.has && acts.followed.has(m.id));
+      const follow = capsuleButton('Follow', 'lead', following, following ? 'Following' : '');
+      follow.addEventListener('click', (e) => { e.stopPropagation(); if (acts.toggleFollow) acts.toggleFollow(m.id, m.title); });
+      const message = capsuleButton('Message', '', false, '');
+      message.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (acts.startConversationWith) acts.startConversationWith(m.title || '', m.profilePhoto || '', true, m.id);
+      });
+      bar.appendChild(follow);
+      bar.appendChild(message);
+    } else {
+      const connected = !!(acts.connected && acts.connected.has && acts.connected.has(m.id));
+      const connect = capsuleButton('Connect', 'connect', connected, connected ? 'Connected' : '');
+      connect.addEventListener('click', (e) => { e.stopPropagation(); if (acts.toggleConnect) acts.toggleConnect(m.id); });
+      const share = capsuleButton('Share', '', false, '');
+      share.addEventListener('click', (e) => { e.stopPropagation(); if (acts.shareLink) acts.shareLink({ page: 'event', params: { id: m.id } }); });
+      bar.appendChild(connect);
+      bar.appendChild(share);
+    }
+    wrap.appendChild(bar);
+  }
+
+
+  // MapTiler's Free plan (founder: staying on it, tracker MAP:D12) requires its logo, linked to
+  // maptiler.com, bottom-left on every map that shows its tiles, beside the © MapTiler / © OpenStreetMap
+  // text attribution (docs.maptiler.com, "Map attribution and how to add it"). The image is MapTiler's own
+  // file (67 x 20 px; the CSP's img-src already allows api.maptiler.com). Its lettering is white, so it sits
+  // on a translucent plate in the app's near-black (#171310), readable on the light and the dark map. Two ways in:
+  //   - MapTilerLogo: a React element; the home map renders it at the foot of its bottom-left overlay column
+  //     (under the zoom hint), so nothing overlaps it and it clears the phone's bottom navigation at every width.
+  //   - mapTilerLogoControl(): a MapLibre control for maps with no such column (the LocationPicker).
+  const MAPTILER_LOGO = {
+    href: 'https://www.maptiler.com',
+    src: 'https://api.maptiler.com/resources/logo.svg',
+    alt: 'MapTiler logo',
+    plate: 'display:inline-block;line-height:0;padding:3px 6px;border-radius:999px;background:rgba(23,19,16,0.62);',
+  };
+  function MapTilerLogo() {
+    return React.createElement('a', {
+      href: MAPTILER_LOGO.href, target: '_blank', rel: 'noopener noreferrer', 'data-cc-maptiler-logo': '',
+      style: { display: 'inline-block', lineHeight: 0, padding: '3px 6px', borderRadius: 999, background: 'rgba(23,19,16,0.62)' },
+    }, React.createElement('img', { src: MAPTILER_LOGO.src, alt: MAPTILER_LOGO.alt, width: 67, height: 20, decoding: 'async' }));
+  }
+  function mapTilerLogoControl() {
+    let el = null;
+    return {
+      onAdd() {
+        el = document.createElement('a');
+        el.className = 'maplibregl-ctrl';
+        el.href = MAPTILER_LOGO.href;
+        el.target = '_blank';
+        el.rel = 'noopener noreferrer';
+        el.setAttribute('data-cc-maptiler-logo', '');
+        el.style.cssText = MAPTILER_LOGO.plate;
+        const img = document.createElement('img');
+        img.src = MAPTILER_LOGO.src;
+        img.alt = MAPTILER_LOGO.alt;
+        img.width = 67;
+        img.height = 20;
+        img.decoding = 'async';
+        el.appendChild(img);
+        return el;
+      },
+      onRemove() {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        el = null;
+      },
+    };
+  }
+
+  // window.maplibregl now comes from a <script type="module"> in index.html
+  // (v6 dropped its UMD build, GHSA-jrc7-96c5-q579 security bump — see that
+  // file for why). Module scripts are deferred relative to the classic
+  // scripts that boot this app, so `window.maplibregl` is NOT guaranteed to
+  // exist yet the first time a map component's mount effect runs — unlike
+  // the old synchronous UMD <script>, which always finished before any later
+  // tag. `cb` fires once maplibregl is ready, immediately if it already is;
+  // the returned function cancels a pending wait (call it from cleanup if the
+  // component unmounts before maplibregl loads).
+  function whenMaplibreReady(cb) {
+    if (window.maplibregl) { cb(); return () => {}; }
+    const id = setInterval(() => {
+      if (window.maplibregl) { clearInterval(id); cb(); }
+    }, 30);
+    return () => clearInterval(id);
+  }
+
+  // Raw-DOM Lucide icon builder — mirrors icons.jsx's <Icon>, but map pins
+  // are plain DOM nodes (MapLibre markers), not React, so it can't reuse
+  // that component. Reads the same window.lucide UMD data.
+  //
+  // Shape-tolerant on purpose: lucide's UMD has shipped its icon nodes both
+  // as a flat child list ([[tag, attrs], …], the current 1.x form) and as a
+  // full element triple (['svg', attrs, children]) in the 0.44x line. Reading
+  // only one of those turns every icon into a hard error, so normalise first.
+  function lucideChildren(name) {
+    const lib = window.lucide && window.lucide.icons;
+    let node = lib && lib[name];
+    if (!node || !Array.isArray(node)) return null;
+    if (typeof node[0] === 'string') node = Array.isArray(node[2]) ? node[2] : [];
+    return node.filter((c) => Array.isArray(c) && typeof c[0] === 'string');
+  }
+
+  const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+
+  // Inner markup of a lucide glyph, ready to drop inside a <g> of a bigger SVG.
+  function lucideInner(name) {
+    const kids = lucideChildren(name);
+    if (!kids || !kids.length) return '';
+    return kids.map(([tag, attrs]) => {
+      const a = Object.keys(attrs || {}).map((k) => k + '="' + esc(attrs[k]) + '"').join(' ');
+      return '<' + tag + (a ? ' ' + a : '') + '></' + tag + '>';
+    }).join('');
+  }
+
+  // ── Pin glyphs ──────────────────────────────────────────────────────
+  // Default glyph per entity type, for the (common) rows that carry no
+  // category yet — honest and type-specific rather than a generic drop pin.
+  const FALLBACK_ICON = Object.assign(Object.create(null),
+    { event: 'CalendarDays', place: 'Landmark', contributor: 'Building2', idea: 'Lightbulb' });
+  // Most Contributors have not picked a category yet, but nearly all have a
+  // kind — so an uncategorised org still gets a glyph that says something true
+  // about it rather than one generic building for the whole directory.
+  const KIND_ICON = Object.assign(Object.create(null),
+    { ministry: 'Church', organization: 'Building2', business: 'Store', individual: 'User' });
+
+  function pinIcon(m, cat) {
+    if (m.type === 'idea') return 'Lightbulb';
+    if (cat && cat.icon) return cat.icon;
+    if (m.type === 'contributor' && KIND_ICON[m.kind]) return KIND_ICON[m.kind];
+    return FALLBACK_ICON[m.type] || 'MapPin';
+  }
+
+  // ── The map component ──────────────────────────────────────────────
+  // The "frame the data" fallback keeps pins clear of what sits over the map. Off the home screen: 70 px all round. On Map v2's home
+  // (#210): measured, not guessed: below its top bar and pills, above the Explore row and the folding nav.
+  const FRAME_GAP = 40;
+  function framePadding(el) {
+    const home = el && el.closest ? el.closest("[data-mv2='home']") : null;
+    if (!home) return 70;
+    const box = el.getBoundingClientRect();
+    // the folding nav lives in the shell, outside the home screen: look for it in the document
+    const reach = (sel, fromTop, root) => {
+      const o = (root || home).querySelector(sel);
+      if (!o || o.hidden) return 0;
+      const r = o.getBoundingClientRect();
+      if (!r.height) return 0;
+      return fromTop ? Math.max(0, r.bottom - box.top) : Math.max(0, box.bottom - r.top);
+    };
+    const top = FRAME_GAP + reach("[data-mv2='home-top']", true);
+    const bottom = FRAME_GAP + Math.max(reach("[data-mv2='explore']", false), reach("[data-mv2='nav-toggle']", false, document));
+    const h = box.height || el.clientHeight || 0;
+    // never ask for more padding than the map is tall (MapLibre would refuse to fit at all)
+    if (h && top + bottom > h * 0.8) return 70;
+    return { top, bottom, left: FRAME_GAP, right: FRAME_GAP };
+  }
+
+  // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
+  function frameData(mp, items, el) {
+    const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
+    let outermost = Infinity;   // the lowest gate among the types actually present
+    items.forEach(({ m, coords }) => {
+      b.extend(coords);
+      const gate = ZOOM_GATES[m.type];
+      outermost = Math.min(outermost, gate === undefined ? 0 : gate);
+    });
+    const pad = framePadding(el);
+    mp.fitBounds(b, { padding: pad, maxZoom: 13, duration: 0 });
+    // Data spread across the whole country frames out past every gate and
+    // would open on a blank map. Never zoom out further than the point where
+    // at least one type of pin is still drawn — and centre on THOSE pins, not
+    // on the middle of the data (which can be an empty stretch of country,
+    // with the pins that are drawn cropped off the edge).
+    if (mp.getZoom() < outermost) {
+      const shown = new window.maplibregl.LngLatBounds();
+      items.forEach(({ m, coords }) => {
+        const gate = ZOOM_GATES[m.type];
+        if ((gate === undefined ? 0 : gate) <= outermost) shown.extend(coords);
+      });
+      // centred in what is left visible between the overlays (Map v2's home, #210), not in the middle of the screen,
+      // which there is the top edge of the Explore row
+      const dy = typeof pad === 'object' ? (pad.top - pad.bottom) / 2 : 0;
+      mp.easeTo({ center: shown.getCenter(), zoom: outermost, offset: [0, dy], duration: 0 });
+    }
+  }
+
+  function StylizedMap({ markers, filterCategory, selectedId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
+    const containerRef = useRef(null);
+    const mapRef = useRef(null);
+    // mapRef is a ref, so setting it alone doesn't re-run the pin-rendering
+    // effect below — this state flip is what does, the one time init()
+    // finishes (immediately on mount if maplibregl was already loaded, or
+    // whenever whenMaplibreReady's wait resolves).
+    const [mapReady, setMapReady] = React.useState(false);
+    const markerObjs = useRef(new Map());    // id → maplibre Marker (individual pin)
+    const userMovedRef = useRef(false);      // stop auto-framing once the user takes control
+    const onSelectRef = useRef(onSelect);
+    onSelectRef.current = onSelect;
+    const onDismissBubbleRef = useRef(onDismissBubble);
+    onDismissBubbleRef.current = onDismissBubble;
+    const onZoomBandChangeRef = useRef(onZoomBandChange);
+    onZoomBandChangeRef.current = onZoomBandChange;
+    const bandRef = useRef('all');           // last band reported upward
+    const selectedRef = useRef(selectedId);
+    selectedRef.current = selectedId;
+    // Map v2 (#210): who wants to hear that the view settled (the Explore row ranks by it), and where the person is
+    // once the browser has told us. Plain refs: a pan never re-renders the map screen.
+    const viewSubs = useRef(new Set());
+    const userLocRef = useRef(null);
+    const framedItemsRef = useRef([]);       // what "frame the data" last framed, so #210's row can ask for it again
+    const tellView = React.useCallback(() => { viewSubs.current.forEach((fn) => { try { fn(); } catch { /* one listener must not stop the rest */ } }); }, []);
+
+    // Applies the zoom gates to markers already on the map. Runs on every zoom
+    // frame, so it does nothing but flip a `display` (and one attribute for the
+    // labels) — no marker is created, destroyed or re-anchored by zooming, and
+    // the parent is only re-rendered when the BAND changes, not per frame.
+    const applyZoomGates = React.useCallback(() => {
+      const mp = mapRef.current;
+      if (!mp) return;
+      const z = mp.getZoom();
+      const el = containerRef.current;
+      if (el) el.setAttribute('data-cc-labels', z >= ZOOM_LABELS ? '1' : '0');
+      if (el) el.setAttribute('data-cc-photo', z >= ZOOM_PHOTO ? '1' : '0');
+      markerObjs.current.forEach((mk) => {
+        const w = mk.getElement();
+        if (!w) return;
+        const hidden = markerHidden(mk._ccType, z, selectedRef.current === mk._ccId);
+        w.style.display = hidden ? 'none' : '';
+      });
+      const band = zoomBandFor(z);
+      if (band !== bandRef.current) {
+        bandRef.current = band;
+        if (onZoomBandChangeRef.current) onZoomBandChangeRef.current(band);
+      }
+    }, []);
+
+    // When the map goes idle (never per frame): load the logos that are about to show (zoom >=
+    // ZOOM_PHOTO, inside the viewport + 20 %), put "+N" on overlapping pins, and hide colliding labels.
+    const layoutV2 = React.useCallback(() => {
+      const mp = mapRef.current;
+      const P = window.MapV2Pins;
+      if (!mp || !P) return;
+      const z = mp.getZoom();
+      if (P.photoShown(z, ZOOM_PHOTO, false)) {
+        const b = mp.getBounds();
+        const padLng = (b.getEast() - b.getWest()) * 0.2, padLat = (b.getNorth() - b.getSouth()) * 0.2;
+        markerObjs.current.forEach((mk) => {
+          const ll = mk.getLngLat();
+          if (ll.lng >= b.getWest() - padLng && ll.lng <= b.getEast() + padLng && ll.lat >= b.getSouth() - padLat && ll.lat <= b.getNorth() + padLat) P.ensureLogo(mk.getElement());
+        });
+      }
+      P.layoutOnIdle({ markers: markerObjs.current, project: (ll) => mp.project(ll), selectedId: selectedRef.current, showLabels: z >= ZOOM_LABELS });
+    }, []);
+
+    // init the map once — deferred until window.maplibregl is actually ready
+    // (see whenMaplibreReady above); everything from here down is unchanged
+    // from the old synchronous-load version, just wrapped in `init()` so it
+    // can run immediately or after a short wait.
+    useEffect(() => {
+      if (mapRef.current || !containerRef.current) return;
+      let cleanupInner = null;
+
+      function init() {
+        if (mapRef.current || !containerRef.current) return; // unmounted/remounted while waiting
+        // The base follows the phone's look, as it is now.
+        let styleTheme = window.MapV2.resolvedTheme();
+        const style = styleUrlFor(styleTheme);
+        if (!style) { console.warn('[map] MAPTILER_KEY missing — set it in config.js'); return; }
+        // The fixed tilt (R8, D17): ONE oblique angle, whatever the fingers do. min = max = the angle pins the camera,
+        // touchPitch is the two-finger vertical drag, pitchWithRotate the vertical part of a right-drag; zoom and rotation
+        // are untouched. MapV2.PITCH = 0 passes none of this: MapLibre's own defaults.
+        const tilt = window.MapV2.PITCH > 0 ? window.MapV2.PITCH : 0;
+        const map = new window.maplibregl.Map({
+          container: containerRef.current,
+          style,
+          center: PRETORIA,
+          zoom: 11,
+          attributionControl: { compact: true },
+          ...(tilt ? { pitch: tilt, minPitch: tilt, maxPitch: tilt, touchPitch: false, pitchWithRotate: false } : {}),
+        });
+        map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+        const geo = new window.maplibregl.GeolocateControl({
+          positionOptions: { enableHighAccuracy: true }, trackUserLocation: true,
+        });
+        map.addControl(geo, 'bottom-right');
+        // Map v2 (#210): the view settled, or the person's position arrived. Never per frame.
+        const onLocatedV2 = (e) => { if (e && e.coords) { userLocRef.current = { lat: e.coords.latitude, lng: e.coords.longitude }; tellView(); } };
+        map.on('moveend', tellView);
+        geo.on('geolocate', onLocatedV2);
+        // Once the user pans/zooms by hand, stop auto-framing the data.
+        const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
+        const onGesture = (e) => {
+          onUserMove(e);
+          if (e && e.originalEvent) {
+            try { window.dispatchEvent(new Event('cc-map-gesture')); } catch { /* old webview */ }
+          }
+        };
+        map.on('dragstart', onGesture);
+        map.on('zoomstart', onGesture);
+        map.on('wheel', () => { try { window.dispatchEvent(new Event('cc-map-gesture')); } catch { /* old webview */ } });
+        mapRef.current = map;
+        // Inspection/test hook, in the same spirit as store.jsx's `window.__cc`:
+        // lets a spec (or the console) jumpTo an exact zoom instead of
+        // keyboard-stepping toward it. Read-only by convention; cleared on unmount.
+        window.__ccMap = map;
+        try { window.dispatchEvent(new Event('cc-map-ready')); } catch { /* old webview */ }   // the "Online in this area" globe waits for this (#259)
+        setMapReady(true);
+        // Density gates follow the zoom, including the programmatic flyTo /
+        // fitBounds below, so the first frame is already correct.
+        map.on('zoom', applyZoomGates);
+        map.on('load', applyZoomGates);
+        const paintBasemap = () => restyleBasemap(map);
+        map.on('style.load', paintBasemap);
+        // The phone's own look changed (light/dark): swap the base style on the same map; the DOM pins are untouched.
+        const onTheme = () => {
+          const t = window.MapV2.resolvedTheme();
+          if (t === styleTheme) return;
+          styleTheme = t;
+          const u = styleUrlFor(t);
+          if (u) map.setStyle(u);
+        };
+        window.addEventListener('cc-map-theme', onTheme);
+        // 'idle' fires after every discrete render (a programmatic pan fires it each frame), so the work is
+        // debounced: it runs once the map has been quiet for 150 ms, never while it is being moved.
+        let idleTimer = null;
+        const onIdleV2 = () => { clearTimeout(idleTimer); idleTimer = setTimeout(layoutV2, 150); };
+        map.on('idle', onIdleV2);
+        applyZoomGates();
+
+        // MapLibre sizes its canvas once, from the container's dimensions at
+        // construction — it never re-measures on its own. Without this, a map
+        // built while the container was phone-sized (or mid-layout, before
+        // flex/grid settles) stays cropped to that size even after the window
+        // grows to desktop. A ResizeObserver keeps the canvas in sync with
+        // whatever the container actually measures, on every layout change.
+        let ro = null;
+        if (window.ResizeObserver) {
+          ro = new ResizeObserver(() => { if (mapRef.current === map) map.resize(); });
+          ro.observe(containerRef.current);
+        }
+
+        // ── Default framing: user location FIRST, national data as fallback ──
+        // Native shell (Capacitor): route through @capacitor/geolocation so the
+        // proper native permission prompt fires (raw navigator.geolocation is
+        // unreliable in a WKWebView/Android WebView without it — runbook Step 4).
+        // Web: unchanged browser Geolocation API. Either way this only fires once
+        // the map itself has mounted (first map view), never at app boot.
+        const isNativeMap = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
+        const positionOpts = { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 };
+        const onLocated = (coords) => {
+          if (mapRef.current === map) onLocatedV2({ coords });
+          if (mapRef.current !== map || userMovedRef.current) return;
+          userMovedRef.current = true;
+          map.flyTo({ center: [coords.longitude, coords.latitude], zoom: 12, duration: 0 });
+        };
+        if (isNativeMap && window.CapGeolocation) {
+          window.CapGeolocation.getCurrentPosition(positionOpts)
+            .then((pos) => onLocated(pos.coords))
+            .catch(() => { /* denied / unavailable → keep the national fallback */ });
+        } else if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => onLocated(pos.coords),
+            () => { /* denied / unavailable → keep the national fallback */ },
+            positionOpts,
+          );
+        }
+
+        cleanupInner = () => {
+          if (ro) ro.disconnect();
+          map.off('zoom', applyZoomGates);
+          map.off('load', applyZoomGates);
+          map.off('style.load', paintBasemap);
+          map.off('dragstart', onGesture);
+          map.off('zoomstart', onGesture);
+          map.off('idle', onIdleV2);
+          clearTimeout(idleTimer);
+          map.off('moveend', tellView);
+          geo.off('geolocate', onLocatedV2);
+          window.removeEventListener('cc-map-theme', onTheme);
+          markerObjs.current.forEach((mk) => mk.remove());
+          markerObjs.current.clear();
+          if (window.__ccMap === map) window.__ccMap = null;
+          map.remove();
+          mapRef.current = null;
+        };
+      }
+
+      const stopWaiting = whenMaplibreReady(init);
+      return () => {
+        stopWaiting();
+        if (cleanupInner) cleanupInner();
+      };
+    }, [applyZoomGates, layoutV2, tellView]);
+
+    // (re)render pins whenever inputs change. Zoom gating is NOT done here (it
+    // is applyZoomGates, per zoom frame), so this only needs to run on
+    // data/filter/selection/style changes — MapLibre keeps each marker glued
+    // to its coordinate on zoom/pan.
+    useEffect(() => {
+      const mp = mapRef.current;
+      if (!mp || !window.maplibregl) return;
+
+      // Resolve coordinates once.
+      const items = [];
+      markers.forEach((m) => { const c = coordsFor(m); if (c) items.push({ m, coords: c }); });
+
+      // One upsert per pin. Selecting a pin only toggles a class on the pin that is already there
+      // (so the 200 ms scale can animate and a tap does not rebuild every marker); a pin is rebuilt only when
+      // what it shows changes (its signature). The marker's outer element is still never replaced.
+      function upsertPinV2(m, cat, coords, anchor, dim, selected) {
+        const S = window.MapV2Strings, P = window.MapV2Pins;
+        const catLabel = cat ? cat.name : ((m.type === 'contributor' && S.pin.kind[m.kind]) || S.pin.type[m.type] || '');
+        const label = P.ariaLabelFor(m, catLabel, S.pin);
+        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, m.coverPhoto, !!m.isLive, !!m.isBusy, !!m.linked,
+          m.broadcast ? m.broadcast.message + '|' + m.broadcast.bubbleId : '', catLabel].join('');
+        const grouped = window.ConnectChrome && window.ConnectChrome.groupHex && window.ConnectChrome.groupHex(m.category);
+        const fill = grouped || '#272a25';
+        const build = () => P.build(m, { lucideInner, icon: pinIcon(m, cat), hex: fill, strings: S.pin, onDismissBubble: onDismissBubbleRef.current });
+        let mk = markerObjs.current.get(m.id);
+        if (mk && mk._ccAnchor === anchor) {
+          const wrap = mk.getElement();
+          if (mk._ccSig !== sig) {
+            const hit = wrap.querySelector('.marker-hit');
+            if (hit) hit.replaceChildren(build());
+            else wrap.replaceChildren(build());
+            syncCapsules(wrap, m);
+            wrap.setAttribute('aria-label', label);
+            mk._ccSig = sig;
+          }
+          mk.setLngLat(coords);
+        } else {
+          if (mk) mk.remove();
+          const wrap = document.createElement('div');
+          wrap.setAttribute('data-cc-id', m.id);
+          wrap.setAttribute('aria-label', label);
+          wrap.appendChild(build());
+          const activate = () => { if (onSelectRef.current) onSelectRef.current(m.id, m.type); };
+          P.makeOperable(wrap, activate);
+          syncCapsules(wrap, m);
+          wrap.addEventListener('click', (e) => { e.stopPropagation(); activate(); });
+          mk = new window.maplibregl.Marker({ element: wrap, anchor }).setLngLat(coords).addTo(mp);
+          mk._ccAnchor = anchor;
+          mk._ccSig = sig;
+          markerObjs.current.set(m.id, mk);
+        }
+        mk._ccType = m.type;
+        mk._ccId = m.id;
+        mk._ccMeta = { title: m.title, nextEventAt: m.nextEventAt, lastActivityAt: m.lastActivityAt };
+        P.applyDim(mk.getElement(), dim);
+        P.applySelected(mk.getElement(), selected);
+      }
+
+      // ── individual pins — show them all ──
+      const seenPins = new Set();
+      items.forEach(({ m, coords }) => {
+        seenPins.add(m.id);
+        const cat = window.DATA.getItemCategory(m);
+        // Map v2's pills (#210) pass a test per marker (a group, or "Events"); the old map passes one category id.
+        const passes = typeof filterCategory === 'function' ? filterCategory(m) : m.category === filterCategory;
+        const dim = !!(filterCategory && !passes && m.type !== 'idea');
+        const selected = selectedId === m.id;
+        // Event and Contributor badges hang from their point ('bottom'); every other pin is centred on it.
+        const anchor = 'center';
+        upsertPinV2(m, cat, coords, anchor, dim, selected);
+      });
+      // drop markers whose item is gone
+      markerObjs.current.forEach((mk, id) => {
+        if (!seenPins.has(id)) { mk.remove(); markerObjs.current.delete(id); }
+      });
+
+      // National fit-to-data — the FALLBACK when geolocation is denied/unavailable.
+      framedItemsRef.current = items;
+      if (!userMovedRef.current && items.length) frameData(mp, items, containerRef.current);
+      // New/rebuilt markers start un-gated; bring them in line with the zoom
+      // they were actually added at.
+      applyZoomGates();
+      layoutV2();
+    }, [markers, filterCategory, selectedId, applyZoomGates, layoutV2, mapReady]);
+
+    // Map v2: the sheet tells the map how much of it the sheet covers; the map eases the selected pin into the
+    // middle of what is left visible (tracker E5: about 27 % from the top with the sheet at 46 %). An imperative
+    // call rather than props, so a sheet opening never re-renders the whole map screen a second time; one frame
+    // later, so the first paint belongs to the sheet's header. Reduced motion makes it a jump.
+    // #210: a card tapped on the home screen sends `minZoom` too, so the pin it jumps to is close enough to be seen
+    // (a person zoomed out over the province would otherwise land on the same blur they started from).
+    useEffect(() => {
+      if (!apiRef) return undefined;
+      apiRef.current = {
+        focusSelected(padding, minZoom) {
+          requestAnimationFrame(() => {
+            const mp = mapRef.current;
+            const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
+            if (!mp || !mk || !padding) return;
+            userMovedRef.current = true;   // the "frame the data" fallback must never undo this
+            const to = { center: mk.getLngLat(), padding, duration: window.MapV2.dur('slow'), essential: true };
+            if (Number.isFinite(minZoom) && mp.getZoom() < minZoom) to.zoom = minZoom;   // never a zoom: undefined (easeTo reads it as NaN)
+            mp.easeTo(to, { originalEvent: {} });
+          });
+        },
+        // #210: where the map is looking and where the person is (null until known), and a way to hear when it settles.
+        // "Looking" is the middle of the OPEN map, between the top bar and the Explore row, not the canvas centre
+        // (on the home that is the top edge of the row, far from the pins the person is looking at when zoomed out).
+        view() {
+          const mp = mapRef.current;
+          const el = containerRef.current;
+          if (!mp) return { centre: null, user: userLocRef.current };
+          const pad = framePadding(el);
+          let c = mp.getCenter();
+          if (typeof pad === 'object' && el && el.clientHeight) {
+            c = mp.unproject([el.clientWidth / 2, pad.top + (el.clientHeight - pad.top - pad.bottom) / 2]);
+          }
+          return { centre: { lat: c.lat, lng: c.lng }, user: userLocRef.current };
+        },
+        onView(fn) {
+          viewSubs.current.add(fn);
+          return () => viewSubs.current.delete(fn);
+        },
+        // #210: the Explore row measured itself after the first framing; frame again so no pin starts behind it.
+        // Only while the person has not taken the map, and never past their own position (that wins).
+        reframe() {
+          const mp = mapRef.current;
+          const items = framedItemsRef.current;
+          if (!mp || userMovedRef.current || !items || !items.length) return;
+          frameData(mp, items, containerRef.current);
+        },
+      };
+      return () => { apiRef.current = null; };
+    }, [apiRef]);
+
+    return React.createElement('div', {
+      ref: containerRef, className: 'absolute inset-0 cc-map',
+      style: { background: 'var(--map-bg)' },
+    });
+  }
+
+  // ── LocationPicker — bidirectional address ↔ pin widget ─────────────
+  //  Small embedded MapLibre map with a FIXED center pin (Uber/Airbnb-style
+  //  drop pin, not a draggable maplibregl.Marker — dragging the map under a
+  //  fixed pin is far more robust on touch than marker-drag handling).
+  //  · Drag the map → moveend reverse-geocodes the new center into an address.
+  //  · Typed address (debounced) → forward-geocodes and flies the map there.
+  //  A `lastResolvedRef` guard against the type→geocode→reverse-geocode→
+  //  refill loop: we only re-geocode typed text that doesn't already match
+  //  the address we ourselves just resolved.
+  //  value: { address, lat, lng } — lat/lng may be null (no pin placed yet).
+  //  onChange(patch) receives only the field(s) that changed.
+  function LocationPicker({ value, onChange, height }) {
+    const h = React.createElement;
+    const { useRef, useEffect, useState } = React;
+    const containerRef = useRef(null);
+    const mapRef = useRef(null);
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
+    const suppressMoveRef = useRef(false);
+    const lastResolvedRef = useRef('');
+    const [busy, setBusy] = useState(false); // false | 'geocode' | 'reverse' | 'locate'
+    const hasPin = typeof value.lat === 'number' && typeof value.lng === 'number';
+
+    useEffect(() => {
+      if (mapRef.current || !containerRef.current) return;
+      let cleanupInner = null;
+
+      // See whenMaplibreReady in this file: window.maplibregl loads via a
+      // deferred <script type="module">, so it may not exist yet on mount.
+      function init() {
+        if (mapRef.current || !containerRef.current) return;
+        const style = styleUrl();
+        if (!style) return;
+        const map = new window.maplibregl.Map({
+          container: containerRef.current, style,
+          center: hasPin ? [value.lng, value.lat] : PRETORIA,
+          zoom: hasPin ? 15 : 11,
+          // The © MapTiler / © OpenStreetMap credit is required on every map, this small one included.
+          attributionControl: { compact: true },
+        });
+        map.addControl(mapTilerLogoControl(), 'bottom-left');
+        map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+        map.on('moveend', () => {
+          if (suppressMoveRef.current) { suppressMoveRef.current = false; return; }
+          const c = map.getCenter();
+          onChangeRef.current({ lat: c.lat, lng: c.lng });
+          setBusy('reverse');
+          window.reverseGeocode(c.lat, c.lng).then((addr) => {
+            setBusy(false);
+            if (addr) { lastResolvedRef.current = addr; onChangeRef.current({ lat: c.lat, lng: c.lng, address: addr }); }
+          });
+        });
+        mapRef.current = map;
+        let ro = null;
+        if (window.ResizeObserver) {
+          ro = new ResizeObserver(() => { if (mapRef.current === map) map.resize(); });
+          ro.observe(containerRef.current);
+        }
+        cleanupInner = () => { if (ro) ro.disconnect(); map.remove(); mapRef.current = null; };
+      }
+
+      const stopWaiting = whenMaplibreReady(init);
+      return () => {
+        stopWaiting();
+        if (cleanupInner) cleanupInner();
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // External lat/lng change (typed-address geocode below, or "use my
+    // location") flies the map there without re-triggering reverse-geocode.
+    useEffect(() => {
+      const map = mapRef.current;
+      if (!map || !hasPin) return;
+      const c = map.getCenter();
+      if (Math.abs(c.lat - value.lat) > 0.0002 || Math.abs(c.lng - value.lng) > 0.0002) {
+        suppressMoveRef.current = true;
+        map.flyTo({ center: [value.lng, value.lat], zoom: Math.max(map.getZoom(), 14), duration: 500 });
+      }
+    }, [value.lat, value.lng]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Debounced forward-geocode while the address text is typed.
+    useEffect(() => {
+      const addr = (value.address || '').trim();
+      if (!addr || addr === lastResolvedRef.current) return;
+      const t = setTimeout(() => {
+        setBusy('geocode');
+        window.geocodeAddress(addr).then((geo) => {
+          setBusy(false);
+          if (geo) { lastResolvedRef.current = addr; onChangeRef.current({ lat: geo.lat, lng: geo.lng }); }
+        });
+      }, 800);
+      return () => clearTimeout(t);
+    }, [value.address]);
+
+    const useMyLocation = () => {
+      if (!navigator.geolocation) return;
+      setBusy('locate');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { setBusy(false); onChangeRef.current({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+        () => setBusy(false),
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 },
+      );
+    };
+
+    return h('div', { className: 'rounded-2xl overflow-hidden border border-border relative', style: { height: height || 190 } },
+      h('div', { ref: containerRef, className: 'absolute inset-0', style: { background: 'var(--map-bg)' } }),
+      !styleUrl() && h('div', { className: 'absolute inset-0 flex items-center justify-center text-center text-[11px] text-muted-foreground bg-accent/30 px-4' }, 'Map unavailable — MapTiler key not configured.'),
+      // fixed center pin (the map moves under it, not the other way round)
+      h('div', { className: 'absolute left-1/2 top-1/2 pointer-events-none', style: { transform: 'translate(-50%, -100%)', filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.35))' } },
+        h('svg', { width: 28, height: 36, viewBox: '0 0 30 38' },
+          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#F2BD22' }),
+          h('circle', { cx: 15, cy: 15, r: 6, fill: '#fff' }))),
+      h('button', {
+        type: 'button', onClick: useMyLocation, disabled: busy === 'locate',
+        className: 'absolute right-2 top-2 w-8 h-8 rounded-xl bg-white/90 shadow-md border border-border flex items-center justify-center hover:bg-white transition-colors disabled:opacity-60',
+        title: 'Use my current location',
+      }, busy === 'locate'
+        ? h('span', { className: 'w-3.5 h-3.5 rounded-full border-2 border-gold border-t-transparent spin' })
+        : h(window.Icon, { name: 'LocateFixed', size: 15, className: 'text-gold-dark' })),
+      (busy === 'geocode' || busy === 'reverse') && h('div', { className: 'absolute left-2 top-2 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground flex items-center gap-1.5' },
+        h('span', { className: 'w-2.5 h-2.5 rounded-full border-2 border-gold border-t-transparent spin' }),
+        busy === 'geocode' ? 'Finding address…' : 'Reading location…'),
+      !hasPin && !busy && h('div', { className: 'absolute left-2 bottom-11 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground' }, 'Drag the map to drop your pin'));
+  }
+
+  // Exported so tests (and any future surface) assert against the SAME
+  // thresholds the map enforces, instead of re-declaring them.
+  window.MAP_ZOOM = { GATES: ZOOM_GATES, LABELS: ZOOM_LABELS, PHOTO: ZOOM_PHOTO, bandFor: zoomBandFor, hidden: markerHidden };
+  window.StylizedMap = StylizedMap;
+  window.LocationPicker = LocationPicker;
+  window.MapTilerLogo = MapTilerLogo;
+})();

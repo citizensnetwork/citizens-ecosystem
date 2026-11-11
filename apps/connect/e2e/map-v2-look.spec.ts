@@ -87,13 +87,13 @@ test.describe("P1-12 the map look follows the phone", () => {
       [c.physical_longitude, c.physical_latitude],
     );
     const pin = page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`);
-    // Ink contributor frame: charcoal paper, paper hairline. The photo sits on that face, not a white disc.
-    await expect(pin.locator(".marker-frame")).toHaveCSS("border-top-color", "rgb(247, 246, 241)");
-    await expect(pin.locator(".marker-face")).toHaveCSS("background-color", "rgb(39, 42, 37)");
+    await expect(pin.locator("[data-mv2='label-text']")).toHaveCSS("color", "rgb(247, 244, 238)"); // --pin-label (dark)
     await openListing(page, c.id);
-    const sheet = page.locator(".cn-big");
+    const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet).toHaveCSS("background-color", "rgb(26, 23, 20)");
     await expect(sheet.locator("[data-mv2='name']")).toHaveCSS("color", "rgb(247, 244, 238)");
+    await expect(pin.locator("[data-mv2='logo-wrap']")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    // the gold action keeps its near-black label
     await expect(sheet.getByRole("link", { name: "Directions" })).toHaveCSS("color", "rgb(10, 9, 8)");
   });
 });

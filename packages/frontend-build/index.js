@@ -44,7 +44,9 @@ const DEFAULT_SPECIAL_FILES = Object.freeze([
 ]);
 
 const HASHED_SINGLE_RE = /^(auth-client|capacitor-bridge)\.[0-9a-f]{10}\.js$/;
-const HASHED_BUNDLE_RE = /^bundle\.[0-9a-f]{10}\.js$/;
+// `bundle.<hash>.js`, or a named variant an app builds beside it (`bundle-<name>.<hash>.js`).
+const HASHED_BUNDLE_RE = /^bundle(?:-[a-z0-9]+)?\.[0-9a-f]{10}\.js$/;
+const BUNDLE_NAME_RE = /^bundle(?:-[a-z0-9]+)?$/;
 const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 
 /** Opening <script> tags, any case (attributes only — bodies are never inspected). */
@@ -345,8 +347,25 @@ function copyDir(src, dest, skip) {
  * Babel-standalone pragma) and the results are concatenated in load order, so
  * cross-file `window.X` wiring is untouched. React/ReactDOM and friends stay
  * on CDN UMD <script> tags — the host app's index.html owns that decision.
+ *
+ * `name` (default "bundle") lets an app build a second, differently composed bundle beside the
+ * first one (`bundle-<name>.<hash>.js`); a file name in `appFileOrder` may sit in a subfolder of app/.
+ * Returns the written file's name.
  */
-function buildAppBundle({ esbuild, srcDir, dest, appFileOrder, warn }) {
+function buildAppBundle({
+  esbuild,
+  srcDir,
+  dest,
+  appFileOrder,
+  warn = console.warn,
+  name: bundleName = 'bundle',
+}) {
+  // The name is part of the file name the stale-output cleaner looks for: keep the two in step.
+  if (!BUNDLE_NAME_RE.test(bundleName)) {
+    throw new Error(
+      `[frontend-build] bundle name must be "bundle" or "bundle-<lowercase letters or digits>" (got ${JSON.stringify(bundleName)})`,
+    );
+  }
   const appSrc = path.join(srcDir, 'app');
   const parts = appFileOrder.map((name) => {
     const src = fs.readFileSync(path.join(appSrc, name), 'utf8');
@@ -370,7 +389,7 @@ function buildAppBundle({ esbuild, srcDir, dest, appFileOrder, warn }) {
   });
 
   const hash = hashOf(minified);
-  const filename = `bundle.${hash}.js`;
+  const filename = `${bundleName}.${hash}.js`;
   fs.mkdirSync(path.join(dest, 'app'), { recursive: true });
   fs.writeFileSync(path.join(dest, 'app', filename), minified);
   return filename;
@@ -671,6 +690,7 @@ function buildFrontend(options) {
 
 module.exports = {
   DEFAULT_SPECIAL_FILES,
+  buildAppBundle,
   buildFrontend,
   hashOf,
   isBasePath,

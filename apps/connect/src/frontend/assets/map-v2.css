@@ -175,7 +175,7 @@
   --surface-1: #1a1714;
   --surface-2: #26221d;
   --card-bg: #ffffff;
-  --map-bg: #1d1f1a;              /* what the map shows before its tiles arrive */
+  --map-bg: #292929;              /* what the map shows before its tiles arrive (the old map's was warm beige) */
   --map-base: #292929;           /* dataviz-dark background hsl(0,0%,16%) */
 
   --text-1: #f7f4ee;
