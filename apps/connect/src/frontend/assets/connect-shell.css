@@ -1276,3 +1276,7 @@
 .phone-review .me-space-links b{flex-wrap:wrap}
 /* Avatar edit badge: the icon fills the 22px badge's own inner box (22 - 2x4 padding - 2x1 border) instead of the default 26px. */
 .me-avatar-edit .inline-icon{inline-size:12px}
+/* Look switch: what the map shows before its tiles arrive, in this look. index.html and map-v2.css keep the live look's
+   values; this sheet is loaded by the 2026 bundle only, and the selectors name the look so nothing reaches the live one. */
+:root[data-look="2026"]{--map-bg:#edeee5}
+:root[data-look="2026"][data-theme='dark']{--map-bg:#1d1f1a}

@@ -33,13 +33,6 @@
   const WIDE_MQ = '(min-width: 768px) and (pointer: fine)';
   const LEVEL_ORDER = { suburb: 0, place: 1, province: 2 };
 
-  function GlobeSvg() {
-    return h('svg', { viewBox: '0 0 24 24', width: '100%', fill: 'none', stroke: 'currentColor', strokeWidth: '1.8', 'aria-hidden': 'true' },
-      h('circle', { cx: '12', cy: '12', r: '9' }),
-      h('ellipse', { cx: '12', cy: '12', rx: '4', ry: '9' }),
-      h('path', { d: 'M3 12h18M5 6q7 5 14 0M5 18q7-5 14 0' }));
-  }
-
   /** Is the globe allowed at all: the one constant. */
   const globeOn = () => !!(window.MapV2 && window.MapV2.onlineGlobe);
 
@@ -192,12 +185,12 @@
           }))),
           h('p', { 'data-mv2': 'near-hint' }, Str.alsoFoot)));
     }
-    return h('div', { className: 'online-area-sheet cn-glass', 'data-mv2': 'online-sheet', 'data-wide': wide ? '' : undefined, role: 'dialog', 'aria-labelledby': 'mv2-online-title', 'data-online-status': state.status },
+    return h('div', { 'data-mv2': 'online-sheet', 'data-wide': wide ? '' : undefined, role: 'dialog', 'aria-labelledby': 'mv2-online-title', 'data-online-status': state.status },
       h('div', { 'data-mv2': 'online-head' },
         h('span', { 'data-mv2': 'online-glyph', 'aria-hidden': 'true' }, h(window.Icon, { name: 'Globe', size: 22 })),
         h('div', { 'data-mv2': 'titles' },
           h('h2', { id: 'mv2-online-title', ref: titleRef, tabIndex: -1, 'data-mv2': 'online-title' }, Str.title),
-          h('p', { 'data-mv2': 'near-hint' }, areaName ? Str.subtitle(areaName) : Str.loading)),
+          h('p', { 'data-mv2': 'near-hint' }, areaName ? Str.subtitle(areaName) + (total ? ' · ' + Str.count(total) : '') : Str.loading)),
         h('button', { type: 'button', 'data-mv2': 'icon-btn', 'data-online': 'close', 'aria-label': Str.closeSheet, onClick: onClose }, h(window.Icon, { name: 'X', size: 18 }))),
       h('div', { 'data-mv2': 'online-scroller' }, body));
   }
@@ -234,6 +227,7 @@
     const map = useMap();
     const [view, setView] = useState({ areaId: null, status: 'idle', data: null });
     const [open, setOpen] = useState(false);
+    const [host, setHost] = useState(null);
     const index = useRef(null);                       // the loaded area index (provinces, cities and towns, suburbs as met)
     const watcher = useRef(null);
     const askedKids = useRef({});
@@ -274,21 +268,27 @@
     const total = data ? data.main.length + data.also.length : 0;
     const visible = on && (total > 0 || open);
 
+    // the button's home among the controls (added only while there is something to show, so no empty gap is ever left)
+    useEffect(() => {
+      if (!map || !visible) { setHost(null); return undefined; }
+      const ctl = hostControl();
+      map.addControl(ctl, 'bottom-right');
+      setHost(ctl.el);
+      return () => { try { map.removeControl(ctl); } catch { /* the map is gone */ } setHost(null); };
+    }, [map, visible]);
+
     const close = useCallback(() => { setOpen(false); setTimeout(() => { if (btn.current) btn.current.focus(); }, 0); }, []);
     const pick = useCallback((person) => { if (onOpenProfile) onOpenProfile(person.id); setOpen(false); }, [onOpenProfile]);   // navigate FIRST, then close
     const retry = useCallback(() => { if (watcher.current) watcher.current.retry(); }, []);
 
-    if (!on || !visible) return null;
+    if (!on) return null;
     const Str = S();
-    const button = h('button', {
-      type: 'button', ref: btn, className: 'online-area cn-glass', 'data-mv2': 'globe',
-      'aria-label': Str.button(total), 'aria-expanded': open,
+    const button = host && h('button', {
+      type: 'button', ref: btn, 'data-mv2': 'globe', 'aria-label': Str.button(total), 'aria-haspopup': 'dialog', 'aria-expanded': open,
       onClick: () => setOpen((o) => !o),
-    },
-      h('span', { 'aria-hidden': 'true' }, h(GlobeSvg)),
-      h('span', null, Str.here, ' ', h('b', { 'data-mv2': 'globe-count' }, total)));
+    }, h(window.Icon, { name: 'Globe', size: 22 }), h('span', { 'data-mv2': 'globe-count', 'aria-hidden': 'true' }, total));
     return h(React.Fragment, null,
-      button,
+      host && window.ReactDOM && window.ReactDOM.createPortal(button, host),
       open && h(OnlineSheet, { state: view, onClose: close, onPick: pick, onRetry: retry }));
   }
 

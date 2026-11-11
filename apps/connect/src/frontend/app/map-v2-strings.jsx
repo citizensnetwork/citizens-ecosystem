@@ -116,12 +116,11 @@
       tag: { online: 'Online', noFixedPlace: 'No fixed place' },
       alsoReaching: 'Also reaching this area',
       // the globe button on the map (one labelled button, then the list)
-      here: 'Online here',
-      button: (n) => 'Online in this area, ' + n,
-      // under the sheet title: the area being served, never "on the map"
-      subtitle: (area) => 'Serving ' + area + ' \u00b7 not a physical venue',
+      button: (n) => 'Online in this area: ' + n + (n === 1 ? ' listing' : ' listings'),
+      // under the sheet title: honest about what the list is (C21: never "on the map")
+      subtitle: (area) => 'Online or no fixed place · ' + area,
       count: (n) => n + (n === 1 ? ' listing' : ' listings'),
-      closeSheet: 'Close online list',
+      closeSheet: 'Close the online list',
       // the main list is grouped by how specific the area they chose is, then A to Z
       groups: { suburb: 'This suburb', place: 'This city or town', province: 'The whole province' },
       rowMeta: (tag, area) => tag + ' · ' + area,

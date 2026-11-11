@@ -260,7 +260,7 @@ describe("nothing is drawn when nothing serves the area in view", () => {
     installApi({ [PTA]: { main: [], also_served_by: [] } });
     const { map } = await mountGlobe();
     expect(globeBtn()).toBeNull();
-    expect(map.controls).toHaveLength(0); // the globe is not a map control, and nothing empty is drawn
+    expect(map.controls).toHaveLength(0); // no empty gap among the zoom and locate buttons
     expect(requests.filter((r) => r.startsWith("/api/v1/serving"))).toHaveLength(1);
   });
   it("is off entirely with the constant off: no button, no control, NO request at all", async () => {
@@ -275,22 +275,25 @@ describe("nothing is drawn when nothing serves the area in view", () => {
 });
 
 describe("the globe button", () => {
-  it("is ONE labelled button in the overlay, with the count and no tap needed to read it", async () => {
+  it("is ONE labelled button among the map's controls, bottom right, with the count and no tap needed to read it", async () => {
     installApi({ [PTA]: { main: [person(10, "Daily Word Online"), person(11, "Faith and Work Podcast")], also_served_by: [alsoP(20, "Midrand Care Vans")] } });
     const { map } = await mountGlobe();
-    expect(map.controls).toHaveLength(0);
+    expect(map.controls).toHaveLength(1);
+    expect(map.controls[0]!.pos).toBe("bottom-right");
+    expect(map.controls[0]!.ctl.onAdd(map).className).toContain("maplibregl-ctrl-group"); // it shares zoom and locate's look
     const b = globeBtn()!;
     expect(b.getAttribute("aria-label")).toBe(S().button(3));
-    expect(b.getAttribute("aria-label")).toBe("Online in this area, 3");
-    expect(b.textContent).toContain("Online here");
+    expect(b.getAttribute("aria-label")).toBe("Online in this area: 3 listings");
+    expect(b.getAttribute("aria-haspopup")).toBe("dialog");
     expect(b.getAttribute("aria-expanded")).toBe("false");
     expect(b.querySelector("[data-mv2='globe-count']")!.textContent).toBe("3");
+    expect(b.querySelector("[data-icon='Globe']")).not.toBeNull();
     expect(document.querySelectorAll("[data-mv2='globe']")).toHaveLength(1);
   });
-  it("says the count for one", async () => {
+  it("says '1 listing' for one", async () => {
     installApi({ [PTA]: { main: [person(10, "Daily Word Online")], also_served_by: [] } });
     await mountGlobe();
-    expect(globeBtn()!.getAttribute("aria-label")).toBe("Online in this area, 1");
+    expect(globeBtn()!.getAttribute("aria-label")).toBe("Online in this area: 1 listing");
   });
   it("asks for the list of ONE area by id: no coordinates are ever sent", async () => {
     installApi({ [PTA]: { main: [person(10, "Daily Word Online")], also_served_by: [] } });
@@ -370,7 +373,7 @@ describe("the list", () => {
     expect(dlg.getAttribute("role")).toBe("dialog");
     expect(globeBtn()!.getAttribute("aria-expanded")).toBe("true");
     expect(within(dlg).getByRole("heading", { level: 2 }).textContent).toBe("Online in this area");
-    expect(dlg.textContent).toContain("Serving Pretoria · not a physical venue");
+    expect(dlg.textContent).toContain("Online or no fixed place · Pretoria · 6 listings");
     expect(dlg.textContent).not.toMatch(/on the map/i);
     expect(JSON.stringify(S())).not.toMatch(/on the map/i);
     expect(document.activeElement).toBe(within(dlg).getByRole("heading", { level: 2 })); // focus moves to the title

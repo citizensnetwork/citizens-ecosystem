@@ -10,7 +10,7 @@ import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, t
 
 type C = { id: string; contributor_slug: string; full_name: string; physical_longitude: number; physical_latitude: number };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[] };
-const sheet = (page: Page) => page.locator(".cn-big");
+const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 type MapHook = { jumpTo: (o: object, d: object) => void };
 
 async function openContributor(page: Page, index: number, detail: Parameters<typeof mockContributorDetail>[2] = {}) {

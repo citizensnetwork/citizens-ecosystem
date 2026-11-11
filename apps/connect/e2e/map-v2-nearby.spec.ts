@@ -36,7 +36,7 @@ function expected(s: Seed, from: Thing): { name: string; m: number }[] {
     .slice(0, 8);
 }
 
-const SHEET = ".cn-big";
+const SHEET = "[data-mv2='sheet']";
 const NEARBY = "[data-mv2='nearby']";
 const sheet = (page: Page) => page.locator(SHEET);
 const snapOf = (page: Page) => sheet(page).getAttribute("data-snap");

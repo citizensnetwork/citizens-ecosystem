@@ -583,15 +583,14 @@ describe("the stylesheet and the wiring", () => {
     }
     expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261101c");
     const home = read("src/frontend/app/home.jsx");
-    expect(home).toContain("ConnectChrome.MapChrome");
-    expect(home).toContain("map-overlay-stack");
+    expect(home).toContain("X.matchesFilter(pill, intent, m)");
+    expect(home).toContain("onIntent: (id) => { setPill('all'); setIntent(id); }");
+    expect(home).toContain("onPill: (id) => { setIntent(null); setPill(id); }");
   });
 
-  it("the crown rail and glow dock replace the folding nav: no bottom bar is left in the shell", () => {
+  it("the folding nav is the only nav: no bottom bar is left in the shell", () => {
     const shell = read("src/frontend/app/shell.jsx");
-    expect(shell).toContain("chrome.Nav");
-    expect(shell).not.toContain("React.createElement(window.MapV2Nav)");
+    expect(shell).toContain("React.createElement(window.MapV2Nav)");
     expect(shell).not.toContain("BottomNav");
-    expect(shell).not.toContain("React.createElement(CreateFab)");
   });
 });

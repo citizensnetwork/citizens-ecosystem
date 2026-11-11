@@ -131,6 +131,29 @@ export interface VerifiedCdnScript {
 /** Files the pipeline compiles/generates itself — excluded from the generic copy. */
 export declare const DEFAULT_SPECIAL_FILES: readonly string[];
 
+/** Options for buildAppBundle. */
+export interface BuildAppBundleOptions {
+  /** The host app's own esbuild module. */
+  esbuild: BuildFrontendOptions['esbuild'];
+  /** The frontend source directory (holds app/). */
+  srcDir: string;
+  /** The output directory; the bundle is written to <dest>/app/. */
+  dest: string;
+  /** app/ file names in load order; a name may sit in a subfolder ("look-2026/home.jsx"). */
+  appFileOrder: readonly string[];
+  /** Receives esbuild's warnings. Default console.warn. */
+  warn?: (message: string) => void;
+  /** "bundle" (default) or "bundle-<lowercase letters or digits>". */
+  name?: string;
+}
+
+/**
+ * Compile app/ screens into ONE minified, content-hashed file and return its name
+ * ("<name>.<hash>.js"). buildFrontend calls it for the main bundle; an app may call it again,
+ * after buildFrontend, for a second bundle built from a different file list.
+ */
+export declare function buildAppBundle(options: BuildAppBundleOptions): string;
+
 /** Run the full pipeline (copy → compile → hash → index.html rewrite → config.js). */
 export declare function buildFrontend(options: BuildFrontendOptions): BuildFrontendResult;
 

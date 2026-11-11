@@ -13,7 +13,7 @@ type Row = Record<string, unknown>;
 type C = { id: string; contributor_slug: string; physical_longitude: number; physical_latitude: number; website_url: string | null; full_name: string };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[] };
 
-const SHEET = ".cn-big";
+const SHEET = "[data-mv2='sheet']";
 const sheet = (page: Page) => page.locator(SHEET);
 const pinOf = (page: Page, id: string) => page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
 

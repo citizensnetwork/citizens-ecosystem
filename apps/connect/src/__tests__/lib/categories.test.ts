@@ -78,8 +78,8 @@ describe("CATEGORY_COLORS", () => {
     }
   });
 
-  it("uses the worship group colour for church-services", () => {
-    expect(CATEGORY_COLORS["church-services"]).toBe("#7040b5");
+  it("uses brand gold for church-services", () => {
+    expect(CATEGORY_COLORS["church-services"]).toBe("#F2BD22");
   });
 });
 

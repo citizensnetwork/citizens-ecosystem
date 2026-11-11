@@ -96,17 +96,18 @@ test.describe("the globe on a phone (real touch)", () => {
     await expect(page.locator("[data-mv2='globe-host']")).toHaveCount(0);
   });
 
-  test("a globe appears with a count in the overlay stack, one labelled button, not a second map control", async ({ page }) => {
+  test("a globe appears with a count, among the map's controls, the size of the map's own buttons (36 px), one labelled button, and it stays when the zoom buttons hide", async ({ page }) => {
     await openAtPretoria(page, { [PTA]: TWO });
     await expect(globe(page)).toHaveCount(1);
-    await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area, 3");
-    await expect(globe(page)).toContainText("Online here");
+    await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area: 3 listings");
     await expect(globe(page).locator("[data-mv2='globe-count']")).toHaveText("3");
     const b = (await globe(page).boundingBox())!;
-    expect(b.height).toBeGreaterThanOrEqual(36);
-    expect(b.height).toBeLessThanOrEqual(48);
-    await expect(page.locator(".map-overlay-stack").locator(GLOBE)).toHaveCount(1);
-    await expect(page.locator("[data-mv2='globe-host']")).toHaveCount(0);
+    expect(b.width).toBeGreaterThanOrEqual(35.5);
+    expect(b.height).toBeGreaterThanOrEqual(35.5);
+    // it sits in the bottom-right control stack, in the same column as the zoom buttons, above them
+    const zoomIn = (await page.locator(".maplibregl-ctrl-zoom-in").boundingBox())!;
+    expect(Math.abs(b.x - zoomIn.x)).toBeLessThanOrEqual(2);
+    expect(b.y).toBeLessThan(zoomIn.y);
     await expect(globe(page)).toBeVisible();
   });
 
@@ -118,7 +119,7 @@ test.describe("the globe on a phone (real touch)", () => {
     await expect(sheet(page)).toBeVisible();
     await expect(globe(page)).toHaveAttribute("aria-expanded", "true");
     await expect(sheet(page).getByRole("heading", { level: 2 })).toHaveText("Online in this area");
-    await expect(sheet(page)).toContainText("Serving Pretoria · not a physical venue");
+    await expect(sheet(page)).toContainText("Online or no fixed place · Pretoria");
     await expect(sheet(page)).not.toContainText(/on the map/i);
 
     await tapTouch(cdp, await at(page, "[data-online='close']"));
@@ -193,7 +194,7 @@ test.describe("the globe on a phone (real touch)", () => {
     expect(servingRequests(api)).toHaveLength(1); // five pans, still the same area: nothing more asked
 
     await jump(page, 28.1894, -25.8603, 11); // Centurion
-    await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area, 1");
+    await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area: 1 listing");
     expect(servingRequests(api)).toEqual(["/api/v1/serving?area=" + PTA, "/api/v1/serving?area=" + CEN]);
 
     await jump(page, 30.9, -29.0, 8); // KwaZulu-Natal: nobody there
