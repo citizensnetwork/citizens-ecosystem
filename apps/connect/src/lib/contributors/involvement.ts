@@ -20,7 +20,7 @@ export const INVOLVEMENT_COLORS: Record<InvolvementLevel, string> = {
   Seed: "#2563EB",
   Shepherd: "#16A34A",
   Pillar: "#7C3AED",
-  Beacon: "#D4AF37",
+  Beacon: "#F2BD22",
 };
 
 /** Short, human description of what each tier reflects (for tooltips/a11y). */

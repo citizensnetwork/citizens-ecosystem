@@ -71,7 +71,7 @@
     const isContributor = item.type === 'contributor';
 
     const cat = window.DATA.getItemCategory(item);
-    const hex = cat ? cat.hex : '#D4AF37';
+    const hex = cat ? cat.hex : '#F2BD22';
     // A label on the category colour: white or near-black, whichever has the better WORST contrast over the colours it
     // sits on (WCAG relative luminance). Light colours (the crown gold, yellows) get near-black; dark ones keep white.
     const rgb = (() => { const n = parseInt(String(hex).replace('#', '').slice(0, 6), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; })();
