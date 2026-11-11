@@ -205,7 +205,7 @@
           h('label', null, 'Website', h('input', { placeholder: 'Your site, if you have one', value: site, onChange: (e) => setSite(e.target.value) })),
           h('label', null, 'WhatsApp', h('input', { value: wa, onChange: (e) => setWa(e.target.value) })),
           h('button', {
-            type: 'button', className: 'cn-primary cs-plate', style: { '--acc': '#d4af37' },
+            type: 'button', className: 'cn-primary cs-plate', style: { '--acc': '#f2bd22' },
             onClick: () => onSave({ name: name.trim(), bio: about, homeArea: home, website: site, instagram: ig, whatsapp: wa, seenBy: seen }),
           }, 'Save'))));
   }
