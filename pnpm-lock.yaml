@@ -102,6 +102,9 @@ importers:
       '@capacitor/status-bar':
         specifier: ^8.0.2
         version: 8.0.2(@capacitor/core@8.5.3)
+      '@citizens/central':
+        specifier: workspace:*
+        version: link:../../packages/central
       '@citizens/utils':
         specifier: workspace:*
         version: link:../../packages/utils

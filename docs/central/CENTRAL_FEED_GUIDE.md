@@ -230,6 +230,32 @@ The registry is served by `GET /api/v1/central/apps`. The TypeScript type is `Ce
 registry rows exist only in `packages/central/src/fixtures.ts` (tests and the reference page)
 and in the seed of migration 203.
 
+### 4.5 Until the tables exist: the live Connect source
+
+The normalised table (4.2, design A) is the lasting design, and its migrations are drafted but
+not applied. So that Central can show **real content today, with no database change**, the feed
+API has a second source that needs nothing new:
+
+- `apps/connect/src/lib/central/connectSource.ts` reads Connect's **own** public events, places
+  and contributors, on the ordinary request client (RLS and column grants apply; no
+  service_role), with **exactly the visibility filters of the public `/api/v1` routes**:
+  events `status = published` and `visibility = public`; places `status = published`;
+  contributors approved and not hidden. It selects only the columns the adapter needs.
+- It maps the rows with the same adapter (`connectToFeedItems`) and hands them to the same
+  `buildEdition`. Ranking, the finite edition, paging and the response are identical.
+- The registry and the kicker lines come from `apps/connect/src/lib/central/registry.ts`, the
+  same rows as the seed of migration 203.
+
+This is Connect reading Connect inside Connect's own API, so rule R2 holds. **No other app may
+copy this shortcut**: a sibling app always publishes through the table. The response says which
+source answered (`meta.source`: `connect-live` now, `table` later), and the screen never needs
+to know. Limits of the live source: no pause cards and no Today's Encouragement (they are
+Central's own items and need the table), 300 rows per kind, and an event that began more than
+a day ago is not read.
+
+If a visibility rule changes in one of the public routes, change `connectSource.ts` in the same
+commit. `apps/connect/src/__tests__/api/v1/central-feed.test.ts` asserts the filters.
+
 ---
 
 ## 5. Sourcing and ranking
@@ -658,12 +684,12 @@ refused.
 
 **service_role uses (each one is a surface):**
 
-| Where                                   | Why it needs service_role                               | What limits it                                                                                   |
-| --------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `GET /api/v1/central/feed`              | not started                                             | build step 2; every piece it needs is built and tested                                           |
-| `GET /api/v1/central/apps`              | not started                                             | build step 2                                                                                     |
-| `POST` / `DELETE /api/v1/central/items` | The publish and remove functions are service_role only. | API key required, bound to one app; validation; quota; rate limit.                               |
-| Connect's own publisher (sync job)      | Same function, called in-process.                       | Runs only behind the existing cron secret; publishes only rows the public v1 API already serves. |
+| Where                                   | Why it needs service_role                               | What limits it                                                                                    |
+| --------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `GET /api/v1/central/feed`              | built                                                   | `apps/connect/src/app/api/v1/central/feed/route.ts`; live Connect source (section 4.5); 12 tests  |
+| `GET /api/v1/central/apps`              | built                                                   | transitional registry (`apps/connect/src/lib/central/registry.ts`) until migration 203 is applied |
+| `POST` / `DELETE /api/v1/central/items` | The publish and remove functions are service_role only. | API key required, bound to one app; validation; quota; rate limit.                                |
+| Connect's own publisher (sync job)      | Same function, called in-process.                       | Runs only behind the existing cron secret; publishes only rows the public v1 API already serves.  |
 
 The service-role client must be created only in server files, never imported by anything under
 `src/frontend`.
@@ -714,12 +740,11 @@ they must be added to `apps/connect/docs/api-v1.md` in the same change (R2.3).
     "caughtUp": false,
     "nextEditionAt": "2026-11-22T02:00:00.000Z"
   },
-  "meta": { "status": "ok" }
+  "meta": { "status": "ok", "source": "connect-live" }
 }
 ```
 
-- `meta.status` is `ok`, or `not_ready` while the migrations are not applied: `items: []`,
-  `caughtUp: true`, HTTP 200. **No sample content is ever served.**
+- `meta.status` is `ok`, or `partial` when one of the reads failed and the rest was served. `meta.source` is `connect-live` until the tables are in use (section 4.5). With nothing to show the answer is an empty, caught-up page. **No sample content is ever served.**
 - Errors: `400 invalid_cursor`, `409 edition_changed` (start again without a cursor), `429`
   from the gate, `503 feed_unavailable` if the database call fails for any other reason.
 - Caching: `Cache-Control: public, s-maxage=300, stale-while-revalidate=600`. Safe because the
@@ -740,6 +765,11 @@ FeedItemInput[] }` (no `app` field), at most 100. Response `{ "accepted": n, "re
 
 ## 11. Build steps for other models
 
+> **Where things stand (2026-11-11).** The feed API is built and serves Connect's real public
+> content with no database change (section 4.5). **The next step is 5: the feed on screen.**
+> Steps 1 to 4 are the lasting, many-apps path and are no longer needed for Central to show
+> Connect's content.
+
 Do them in order. Each is one small pull request. For every step: run `pnpm lint && pnpm
 typecheck && pnpm test && pnpm build` from the repo root, stage explicit paths only, and never
 apply a migration or merge without the founder's yes.
@@ -752,17 +782,17 @@ template: border radius, padding of the text block, font size / weight / letter-
 kicker, title and summary, the gap between cards, the column count, and the background and text
 colours in both themes. They must equal the values in section 7. Then check: columns are staggered (card edges do not line up across columns), no column has an empty space with a card below it, wide cards cover exactly two columns, the feed ends in "You're all caught up", and no card changes position when the next page arrives.
 
-| #   | Task                                                                                                                                                                                                                                                                    | Files                                                                                   | Done when                                                                                                                                                          |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | Founder reviews the three drafted migrations; apply them one at a time                                                                                                                                                                                                  | `supabase/migrations/203` to `205`                                                      | Rolled-back probe passes (section 8); advisor 0 ERROR, no unexpected finding; `SHARED_DB_CONTRACT.md` section 1 and 9 gain the `central` schema in the same change |
-| 2   | Build `GET /api/v1/central/feed` and `/apps` (section 10): `gateV1`, the service-role client, `central_feed_candidates`, then `buildEdition` and `pageOfEdition` from `@citizens/central`. Return `not_ready` (HTTP 200, no items) when the functions do not exist yet  | `apps/connect/src/app/api/v1/central/`                                                  | `meta.status` is `ok` on a preview; `api-v1.md` documents both                                                                                                     |
-| 3   | Publish endpoint                                                                                                                                                                                                                                                        | `apps/connect/src/app/api/v1/central/items/route.ts` + tests                            | A bound key can publish and remove; an unbound key gets 403; over-quota gets 429; tests cover each rejection reason                                                |
-| 4   | Connect's publisher: read Connect's own public events, places and contributors, map with `connectToFeedItems` (pass Connect's real share-link builders as `links` and the founder-approved kicker lines as `kickers`), publish; run on a schedule and after create/edit | `apps/connect/src/lib/central/publish.ts`, a cron route beside the existing one         | Real Connect content appears in the feed; a cancelled event disappears within one run                                                                              |
-| 5   | The feed component (shared by both surfaces): fetch pages, `layoutBatch`, templates, states. Columns from a `ResizeObserver` on the feed container                                                                                                                      | hub: `apps/hub/src/components/central/`; styles in `apps/hub/src/styles/`               | Measured equal to the reference at 390 / 1280, light / dark; property "nothing moves on append" holds in a Playwright check                                        |
-| 6   | Citizens landing: place the component under the hero and lead row; sticky bar and Crown **after** the founder answers O1                                                                                                                                                | `apps/hub/src/pages/citizens/index.tsx`                                                 | Hub tests pass; page works with `meta.status: not_ready` (quiet empty line, no errors)                                                                             |
-| 7   | Central inside Connect, behind the look switch chosen for the facelift                                                                                                                                                                                                  | Connect's frontend, on the facelift branch that owns the shell                          | Same measurements; Connect's Playwright suite passes                                                                                                               |
-| 8   | A second source app (Wear is the first candidate): adapter + key + registry `publish_enabled`                                                                                                                                                                           | inside that app                                                                         | Its cards appear with its accent, with no change to Central's code                                                                                                 |
-| 9   | New kinds the founder named: music, books, community initiatives, business updates                                                                                                                                                                                      | registry rows + adapters; a new template only if the four existing ones cannot carry it | Founder has said which app owns each (O6)                                                                                                                          |
+| #   | Task                                                                                                                                                                                                                                                                                                             | Files                                                                                   | Done when                                                                                                                                                          |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Founder reviews the three drafted migrations; apply them one at a time                                                                                                                                                                                                                                           | `supabase/migrations/203` to `205`                                                      | Rolled-back probe passes (section 8); advisor 0 ERROR, no unexpected finding; `SHARED_DB_CONTRACT.md` section 1 and 9 gain the `central` schema in the same change |
+| 2   | Switch both routes to the tables once migration 205 is applied: call `central_feed_candidates` and `central_apps` with the service-role client, keep the live Connect source as the fallback when the function is missing (PostgREST `PGRST202`), set `meta.source` to `table`, delete the transitional registry | `apps/connect/src/app/api/v1/central/`, `apps/connect/src/lib/central/`                 | Same response shape; tests cover both sources                                                                                                                      |
+| 3   | Publish endpoint                                                                                                                                                                                                                                                                                                 | `apps/connect/src/app/api/v1/central/items/route.ts` + tests                            | A bound key can publish and remove; an unbound key gets 403; over-quota gets 429; tests cover each rejection reason                                                |
+| 4   | Connect's publisher: read Connect's own public events, places and contributors, map with `connectToFeedItems` (pass Connect's real share-link builders as `links` and the founder-approved kicker lines as `kickers`), publish; run on a schedule and after create/edit                                          | `apps/connect/src/lib/central/publish.ts`, a cron route beside the existing one         | Real Connect content appears in the feed; a cancelled event disappears within one run                                                                              |
+| 5   | The feed component (shared by both surfaces): fetch pages, `layoutBatch`, templates, states. Columns from a `ResizeObserver` on the feed container                                                                                                                                                               | hub: `apps/hub/src/components/central/`; styles in `apps/hub/src/styles/`               | Measured equal to the reference at 390 / 1280, light / dark; property "nothing moves on append" holds in a Playwright check                                        |
+| 6   | Citizens landing: place the component under the hero and lead row; sticky bar and Crown **after** the founder answers O1                                                                                                                                                                                         | `apps/hub/src/pages/citizens/index.tsx`                                                 | Hub tests pass; page works with `meta.status: not_ready` (quiet empty line, no errors)                                                                             |
+| 7   | Central inside Connect, behind the look switch chosen for the facelift                                                                                                                                                                                                                                           | Connect's frontend, on the facelift branch that owns the shell                          | Same measurements; Connect's Playwright suite passes                                                                                                               |
+| 8   | A second source app (Wear is the first candidate): adapter + key + registry `publish_enabled`                                                                                                                                                                                                                    | inside that app                                                                         | Its cards appear with its accent, with no change to Central's code                                                                                                 |
+| 9   | New kinds the founder named: music, books, community initiatives, business updates                                                                                                                                                                                                                               | registry rows + adapters; a new template only if the four existing ones cannot carry it | Founder has said which app owns each (O6)                                                                                                                          |
 
 **Common ways to get this wrong**
 
