@@ -54,6 +54,16 @@ export const HERO = {
 };
 
 /**
+ * Central's own heading block above the feed (the approved Central design, guide section 7.3). On this page it is a
+ * level-2 heading, since the page hero holds the h1; it is styled with the design's h1 values.
+ */
+export const CENTRAL_HERO = {
+  kicker: 'Citizens · Connecting the Kingdom',
+  title: 'A little closer, every day.',
+  body: 'A place to experience life together — encouragement, connection and possibilities already among us.',
+};
+
+/**
  * A real photograph for the hero (the design shows a smiling Citizen in front of a crowd). None is shipped yet: the
  * founder supplies community photography (with consent), a file goes in public/ and this becomes `{ src, alt }`.
  * Until then the hero shows its drawn art. The same goes for `photo` on a platform card.
