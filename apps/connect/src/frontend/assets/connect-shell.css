@@ -1269,3 +1269,10 @@
 /* ── Step 0 corrections (2026-11-11). Each is one rule: delete the rule to go back. ── */
 /* Headings: index.html still gives every h1-h4 the retired serif. Inside the shell they use the shell's own sans. */
 .connect-frame h1,.connect-frame h2,.connect-frame h3,.connect-frame h4{font-family:inherit}
+/* Preview card: the action row no longer scrolls inside the card. The card keeps its height; a third row of pills uses the space under the row. */
+.connect-shell .cn-preview>.cn-actions{max-height:none;overflow:visible}
+/* Me, phone: three tiles are 58px wide at 390px and "Messages" needs 58px of text, so they sit two to a row; the tile, its type and padding are unchanged. */
+.phone-review .me-space-links{grid-template-columns:repeat(2,minmax(0,1fr))}
+.phone-review .me-space-links b{flex-wrap:wrap}
+/* Avatar edit badge: the icon fills the 22px badge's own inner box (22 - 2x4 padding - 2x1 border) instead of the default 26px. */
+.me-avatar-edit .inline-icon{inline-size:12px}
