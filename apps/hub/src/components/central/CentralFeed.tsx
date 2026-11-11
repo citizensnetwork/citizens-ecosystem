@@ -12,7 +12,7 @@
  * Guardrails (guide section 1): the feed is finite and stops for good at `caughtUp` (no load-more button, no loop,
  * no retry); nothing is counted, badged, autoplayed or stored about the reader; no location is sent.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import {
   CARD_GAP,
@@ -88,7 +88,11 @@ export function CentralFeed({ fetchImpl }: CentralFeedProps) {
   /** The engine's state and how many of `items` it has been given, for the current width. */
   const engine = useRef<{ width: number; state: LayoutState; fed: number } | null>(null);
 
-  const doFetch = fetchImpl ?? (typeof fetch === 'function' ? fetch.bind(globalThis) : undefined);
+  // Stable across renders: the first-page effect depends on it, and a new function each render would refetch forever.
+  const doFetch = useMemo(
+    () => fetchImpl ?? (typeof fetch === 'function' ? fetch.bind(globalThis) : undefined),
+    [fetchImpl],
+  );
 
   /** Add a page's cards, skipping any id already on screen (a repeated id would break the layout's bookkeeping). */
   const receive = useCallback(

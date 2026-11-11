@@ -286,6 +286,25 @@ describe('Central feed: paging', () => {
     expect(host.querySelector('button')).toBeNull();
   });
 
+  it('uses the page’s own fetch once per page, however often it re-renders', async () => {
+    const fetchMock = mockFetch([
+      { items: [card(1), card(2)], caughtUp: false },
+      { items: [card(3)], caughtUp: true },
+    ]);
+    vi.stubGlobal('fetch', fetchMock);
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root!.render(<CentralFeed />));
+    await settle();
+    await act(async () => root!.render(<CentralFeed />));
+    await settle();
+    await scrollToEnd();
+    expect(feedCalls(fetchMock)).toBe(2);
+    expect(fetchMock.mock.calls.filter(([u]) => String(u).endsWith('/apps'))).toHaveLength(1);
+    expect(line()).toBe(FEED_LINES.caughtUp);
+  });
+
   it('treats a page with no cursor as the end, never as a reason to loop', async () => {
     const body = { data: { items: [card(1)], caughtUp: false, nextCursor: null, lead: {} } };
     const page = await fetchFeedPage(null, (async () => ({
@@ -411,6 +430,16 @@ describe('Central feed: guardrails in the source', () => {
       expect(source).not.toMatch(/app\s*===|\.app\s*==/);
       expect(source).not.toMatch(/#[0-9a-f]{6}\b/i);
     }
+  });
+
+  it('builds with webpack, so the strict script-src stays as it is', () => {
+    // Turbopack writes an inline chunk-loader script into every page that has JavaScript; the front door's CSP
+    // (script-src 'self', config/hub-config.js) blocks it and the feed never starts. Webpack emits only external
+    // scripts and the non-executed __NEXT_DATA__ JSON. Changing this means changing the CSP: a founder decision.
+    const scripts = JSON.parse(read('../package.json')).scripts as Record<string, string>;
+    expect(scripts.build).toMatch(/^next build --webpack/);
+    expect(scripts.dev).toMatch(/^next dev --webpack/);
+    expect(read('../next.config.js')).toMatch(/transpilePackages: \['@citizens\/central'\]/);
   });
 
   it('stores nothing about the reader and asks for no location (G8, guide 5.1)', () => {

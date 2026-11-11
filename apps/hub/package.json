@@ -4,8 +4,8 @@
   "private": true,
   "description": "The front door of the shared Citizens domain: the /citizens landing page, the coming-soon pages and the rewrites that serve each app at /citizens/<app>.",
   "scripts": {
-    "dev": "next dev -p 3000",
-    "build": "next build",
+    "dev": "next dev --webpack -p 3000",
+    "build": "next build --webpack",
     "start": "next start -p 3000",
     "lint": "eslint src config test scripts",
     "typecheck": "tsc --noEmit",
