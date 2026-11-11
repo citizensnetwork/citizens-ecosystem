@@ -14,6 +14,43 @@ import type { CentralApp, FeedItem } from '@citizens/central/contract';
 /** Where Central's API lives: under the app that owns `/api/v1`. Not the source app of any card. */
 export const CENTRAL_API = `${appPath('connect')}/api/v1/central`;
 
+/**
+ * Card pictures go through the same app's image service, on the same origin (the founder's choice, guide O13): the
+ * front door's CSP allows pictures only from itself (`img-src 'self' data:`), and the service also resizes them.
+ */
+export const IMAGE_SERVICE = `${appPath('connect')}/_next/image`;
+
+/**
+ * The picture sources that service accepts: exactly `images.remotePatterns` in apps/connect/next.config.ts (a test
+ * keeps the two equal). A picture anywhere else cannot be shown, so its card is drawn without one.
+ */
+export const IMAGE_SERVICE_SOURCES: ReadonlyArray<{ hostname: string; pathPrefix: string }> = [
+  { hostname: 'xyiajtrvhlxaeplsiajj.supabase.co', pathPrefix: '/storage/v1/object/public/' },
+];
+
+/** Widths from Next's default `deviceSizes`; the service refuses any other. Quality 75 is its only default quality. */
+export const IMAGE_WIDTHS = [640, 1080, 1920] as const;
+
+/** `src` and `srcSet` for a card picture through the image service, or null when the service cannot serve it. */
+export function servedImage(url: string): { src: string; srcSet: string } | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const allowed = IMAGE_SERVICE_SOURCES.some(
+    (s) =>
+      parsed.protocol === 'https:' &&
+      parsed.hostname === s.hostname &&
+      parsed.port === '' &&
+      parsed.pathname.startsWith(s.pathPrefix),
+  );
+  if (!allowed) return null;
+  const at = (w: number) => `${IMAGE_SERVICE}?url=${encodeURIComponent(parsed.href)}&w=${w}&q=75`;
+  return { src: at(IMAGE_WIDTHS[0]), srcSet: IMAGE_WIDTHS.map((w) => `${at(w)} ${w}w`).join(', ') };
+}
+
 export interface FeedPage {
   items: FeedItem[];
   encouragement: FeedItem | null;

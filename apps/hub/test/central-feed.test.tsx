@@ -6,6 +6,7 @@
  * measuring copy a height and the feed a width.
  */
 import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -15,7 +16,13 @@ import { cardWidth, columnWidth } from '@citizens/central/layout';
 import type { FeedItem } from '@citizens/central/contract';
 import { CentralFeed, FEED_LINES } from '../src/components/central/CentralFeed';
 import { safeHref } from '../src/components/central/FeedCard';
-import { CENTRAL_API, fetchFeedPage } from '../src/components/central/feedApi';
+import {
+  CENTRAL_API,
+  IMAGE_SERVICE,
+  IMAGE_SERVICE_SOURCES,
+  fetchFeedPage,
+  servedImage,
+} from '../src/components/central/feedApi';
 import { CentralIcon } from '../src/components/central/icons';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -415,6 +422,70 @@ describe('Central feed: kickers and lead', () => {
     act(() => r.render(<CentralIcon name="calendar" />));
     expect(div.querySelector('svg')).toBeNull();
     act(() => r.unmount());
+  });
+});
+
+describe('Central feed: pictures through the image service (O13)', () => {
+  const STORED =
+    'https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/event-images/a b/1.jpg';
+
+  it('builds same-origin addresses at the service’s own widths and quality', () => {
+    const served = servedImage(STORED)!;
+    const encoded = encodeURIComponent(new URL(STORED).href);
+    expect(served.src).toBe(`${IMAGE_SERVICE}?url=${encoded}&w=640&q=75`);
+    expect(served.src.startsWith('/citizens/connect/_next/image?')).toBe(true);
+    expect(served.srcSet.split(', ').map((s) => s.split(' ')[1])).toEqual([
+      '640w',
+      '1080w',
+      '1920w',
+    ]);
+  });
+
+  it('refuses every picture the service would refuse', () => {
+    for (const bad of [
+      'https://images.unsplash.com/photo-1',
+      'http://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/x.jpg',
+      'https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/sign/x.jpg',
+      'https://xyiajtrvhlxaeplsiajj.supabase.co:8443/storage/v1/object/public/x.jpg',
+      'https://xyiajtrvhlxaeplsiajj.supabase.co.evil.test/storage/v1/object/public/x.jpg',
+      'not a url',
+    ]) {
+      expect(servedImage(bad), bad).toBeNull();
+    }
+  });
+
+  it('draws a served picture, and a text card when the picture cannot be served', async () => {
+    const withPicture = { ...card(1), image: { url: STORED, alt: 'Hall' } } as FeedItem;
+    const elsewhere = {
+      ...card(2),
+      image: { url: 'https://images.unsplash.com/p', alt: '' },
+    } as FeedItem;
+    await mount(
+      mockFetch([{ items: [withPicture, elsewhere], caughtUp: true }]) as unknown as typeof fetch,
+    );
+    const img = host.querySelector<HTMLImageElement>('.feed > .fc[data-id="connect:event:1"] img')!;
+    expect(img.getAttribute('src')).toBe(servedImage(STORED)!.src);
+    expect(img.getAttribute('alt')).toBe('Hall');
+    expect(img.getAttribute('sizes')).toBe(`${Math.ceil(columnWidth(360, 2))}px`);
+    expect(host.querySelector('.feed > .fc[data-id="connect:event:2"] img')).toBeNull();
+  });
+
+  it('accepts exactly the sources in Connect’s images.remotePatterns, and Connect keeps the default widths', () => {
+    const config = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../../connect/next.config.ts'),
+      'utf8',
+    );
+    const block = /remotePatterns:\s*\[([\s\S]*?)\]/.exec(config)?.[1] ?? '';
+    const patterns = [...block.matchAll(/hostname:\s*"([^"]+)",\s*pathname:\s*"([^"]+)"/g)].map(
+      ([, hostname, pathname]) => ({
+        hostname,
+        pathPrefix: (pathname as string).replace(/\*\*$/, ''),
+      }),
+    );
+    expect(patterns.length).toBeGreaterThan(0);
+    expect([...IMAGE_SERVICE_SOURCES]).toEqual(patterns);
+    expect(block).toMatch(/protocol:\s*"https"/);
+    expect(config).not.toMatch(/deviceSizes|qualities|unoptimized|loaderFile/);
   });
 });
 

@@ -285,6 +285,7 @@ export function CentralFeed({ fetchImpl }: CentralFeedProps) {
               app={registry.get(item.app)}
               span={box.span}
               style={style}
+              width={box.width}
             />
           );
         })}
@@ -300,6 +301,7 @@ export function CentralFeed({ fetchImpl }: CentralFeedProps) {
                     span={span}
                     measureKey={measureKey(item.id, span)}
                     style={{ width: `${cardWidth(geometry.colWidth, span, CARD_GAP)}px` }}
+                    width={cardWidth(geometry.colWidth, span, CARD_GAP)}
                   />
                 ));
               })

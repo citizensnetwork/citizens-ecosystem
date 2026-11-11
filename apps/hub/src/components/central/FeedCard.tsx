@@ -8,6 +8,7 @@
  */
 import type { CSSProperties } from 'react';
 import type { CentralApp, FeedItem } from '@citizens/central/contract';
+import { servedImage } from './feedApi';
 import { CentralIcon, hasCentralIcon } from './icons';
 
 /** The contract's href rule, checked again on screen: the API is trusted, but not with where a tap goes. */
@@ -32,22 +33,22 @@ export interface FeedCardProps {
   style?: CSSProperties;
   /** For the measuring copy: the key the feed reads its height by. */
   measureKey?: string;
+  /** The card's width in CSS pixels, so the browser picks a picture of the right size. */
+  width?: number;
 }
 
-export function FeedCard({ item, app, span, style, measureKey }: FeedCardProps) {
+export function FeedCard({ item, app, span, style, measureKey, width }: FeedCardProps) {
   const isPause = item.kind === 'pause';
   const classes = ['fc'];
   if (span === 2) classes.push('wide');
   if (isPause) classes.push('rest');
   const href = safeHref(item.href);
-  // Images are `https:` only (contract section 3).
-  const image =
-    !isPause &&
-    item.image &&
-    typeof item.image.url === 'string' &&
-    item.image.url.startsWith('https://')
-      ? item.image
+  // A picture is shown only when the image service can serve it (guide O13); otherwise the card is a text card.
+  const served =
+    !isPause && item.image && typeof item.image.url === 'string'
+      ? servedImage(item.image.url)
       : null;
+  const image = served && item.image ? { ...served, alt: item.image.alt ?? '' } : null;
   const list = !isPause && Array.isArray(item.list) && item.list.length ? item.list : null;
 
   const body = isPause ? (
@@ -100,7 +101,14 @@ export function FeedCard({ item, app, span, style, measureKey }: FeedCardProps) 
       {image ? (
         // The image's height comes from CSS (guide 7.5), never from the file, so a late picture cannot move a card.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image.url} alt={image.alt ?? ''} loading="lazy" decoding="async" />
+        <img
+          src={image.src}
+          srcSet={image.srcSet}
+          sizes={width ? `${Math.ceil(width)}px` : undefined}
+          alt={image.alt}
+          loading="lazy"
+          decoding="async"
+        />
       ) : null}
       {body}
     </>
