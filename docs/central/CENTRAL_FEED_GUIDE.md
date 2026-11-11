@@ -89,8 +89,8 @@ Step by step:
 4. **Sourcing and ranking.** The feed API asks the database for candidates near the viewer's
    coarse place and inside the time horizon, then ranks them in pure TypeScript (section 5).
 5. **Today's edition.** A deterministic, finite, ordered list for one day and one coarse place.
-6. **Layout engine.** A pure function that turns the ordered items and a column count into grid
-   placements (section 6).
+6. **Layout engine.** A pure function that turns the ordered items, their measured heights and a column count into
+   placements in staggered columns (section 6).
 7. **Card templates.** A template is chosen by what data the item carries (image, icon, list,
    pause), never by which app it came from (section 7).
 8. **Screen.** The hub landing and Connect's Central render the same component.
@@ -321,7 +321,10 @@ The approved reference has three, and all three are data:
 
 - **2 columns on phones, 4 on desktop.**
 - A **landscape** card spans **two** columns. A **square** card spans **one**.
-- **No holes**: no empty cell with a card after it.
+- **Staggered columns, not rows.** Cards keep their own heights, so the columns do not line up
+  across, exactly as in the approved design check. (The first draft of this guide packed cards
+  into equal-height rows. The founder corrected it on 2026-11-11: "I meant columns, and not rows".)
+- **No holes**: inside a column there is never an empty space with a card below it.
 
 The column count comes from the **width of the feed container**, not the window: 4 columns at
 1000px and wider, otherwise 2 (the 1000px step is the reference's). The reference also had a
@@ -330,112 +333,132 @@ The column count comes from the **width of the feed container**, not the window:
 
 ### 6.2 The algorithm, exactly
 
-`layoutBatch(state, items, { final })` in `packages/central/src/layout.ts`. A card's width is 2
-cells for landscape and 1 for square.
+`layoutBatch(state, items, measure, { final })` in `packages/central/src/layout.ts`. The
+engine does only arithmetic. The caller passes `measure(item, span)`, which returns the height
+in pixels of that item's card when it is drawn `span` columns wide (section 6.5 says how).
+
+Each column remembers its **bottom** (where its next card starts: the last card's bottom plus
+one 12px gap) and its **tail** (its lowest card).
 
 ```
-queue = state.held followed by the new items          (rank order)
-row = empty, used = 0
-for each item at position i in queue:
-    w = width(item)
-    if used + w <= cols:
-        put item in row; used += w
-    else:                                   # a landscape and exactly one cell is left
-        next = queue[i + 1]
-        if next is a square:                # SWAP: the square fills the cell,
-            put next in row; used += 1      #       the landscape opens the next row
-            swap queue[i] and queue[i + 1]
-        else if next is a landscape:        # DEMOTE: show this landscape as a square
-            put item in row as a square; used += 1
-        else (no next item yet):
-            if final: put item in row as a square; used += 1
-            else:     stop; keep the row and this item in state.held
-    if used == cols: emit the row; row = empty; used = 0
+for each item, in rank order:
 
-after the loop, if the row is not empty:
-    if not final: keep its items in state.held        # only complete rows are ever emitted
-    else:                                             # last row of the edition
-        from the right, widen squares to landscape (+1 cell each) until the row is full
-        emit the row; if it is still not full, set raggedEnd = true
+  SQUARE     put it in the shortest column (the leftmost one on a tie).
+
+  LANDSCAPE  look at every pair of neighbouring columns. A pair QUALIFIES when
+               - its two columns are level, or
+               - the shorter one ends in a one-column card (that card can grow).
+             Take the qualifying pair whose taller column is lowest (leftmost on a tie).
+             If the two columns are not level, GROW the shorter column's last card until
+             they are. Put the landscape card on both columns at that height.
+
+             If no pair qualifies:
+               - the next item is a square: place that square first, then look again;
+                 if a pair qualifies now, place the landscape; if not, draw it as a square;
+               - the next item is a landscape, or this is the end: draw it as a square;
+               - the next item is not known yet (more pages to come): keep the landscape
+                 in state.held until the next batch arrives.
 ```
+
+A pair does not qualify when its shorter column is empty or ends in a two-column card: neither
+can grow without leaving a hole or covering a neighbour.
 
 Guarantees (each is a property test in `packages/central/test/layout.test.ts`):
 
 1. **Every item is placed exactly once** (after the final batch).
-2. **No holes.** Every emitted row is completely full. The single exception is the very last
-   row of the edition when it cannot be filled even after widening (only possible with 3 or
-   more columns, for example one card alone in a 4-column row). It is reported as
-   `raggedEnd: true` and sits directly above the caught-up line.
-3. **A landscape is never split** across rows.
-4. **Bounded reordering.** A card's reading position differs from its rank by at most **1**.
-5. **Appending never moves earlier cards.** A placement, once emitted, is never changed.
-   Items that do not yet complete a row wait in `state.held` (at most `cols` items) and are
-   placed when the next batch arrives, or when `final` is true.
+2. **No holes, no overlaps.** In every column the cards follow each other from the top with
+   exactly one gap between them.
+3. **A landscape card sits on two neighbouring columns at one height.**
+4. **Rank order is kept**, except that one square may be placed in front of one landscape.
+5. **A placed card never moves.** Its column and top never change. Only its **height** may grow,
+   when it is the card that closes the gap under a landscape card; the engine reports these in
+   `extended`.
 6. **Same input, same output**, however the stream is split into batches.
+
+The columns end at different heights at the very end of the feed, as in the design check. That
+is not a hole: nothing comes below. The "all caught up" line sits under the tallest column.
 
 ### 6.3 Worked example, 2 columns
 
-Ranked items: `a`(square) `b`(landscape) `c`(square) `d`(square) `e`(landscape) `f`(landscape)
-`g`(square), final batch.
+Gap 12. Ranked items and their measured heights: `a` square 200, `b` square 260, `c` landscape
+180, `d` square 220, `e` landscape 180, `f` square 240, `g` square 200.
 
-```
-row 0:  [ a ][ c ]      b did not fit beside a; the next item c is a square: SWAP
-row 1:  [    b    ]
-row 2:  [ d ][ e ]      e did not fit; the next item f is also a landscape: e is shown square
-row 3:  [    f    ]
-row 4:  [    g    ]      last row of the edition: g is widened to fill it
-```
+| Step | What happens                                                                                                                                                                                   |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a    | column 0, top 0. Column 0's bottom is 212.                                                                                                                                                     |
+| b    | column 1 (the shortest), top 0. Its bottom is 272.                                                                                                                                             |
+| c    | landscape. Column 0 is shorter (212 against 272) and ends in `a`, a one-column card: the pair qualifies. `a` grows from 200 to **260**. `c` sits at top **272** on both columns. Bottoms: 464. |
+| d    | columns are level, so column 0, top 464. Its bottom is 696.                                                                                                                                    |
+| e    | landscape. Column 1 is shorter (464) but ends in `c`, a two-column card: no pair qualifies. The next item `f` is a square, so `f` goes first.                                                  |
+| f    | column 1 (the shortest), top 464. Its bottom is 716.                                                                                                                                           |
+| e    | again. Column 0 is shorter (696 against 716) and ends in `d`: qualifies. `d` grows from 220 to **240**. `e` sits at top **716**. Bottoms: 908.                                                 |
+| g    | column 0, top 908. The feed is 1108 tall.                                                                                                                                                      |
 
-Reading order `a c b d e f g`: only `b` and `c` changed places.
+Order on the page: `a b c d f e g`. Only `e` and `f` changed places.
 
 ### 6.4 Worked example, 4 columns
 
-Ranked items: `a`(landscape) `b`(square) `c`(landscape) `d`(square) `e`(square) `f`(square)
-`g`(landscape) `h`(square) `i`(square) `j`(square) `k`(square) `l`(square), final batch.
+Gap 12. `a` landscape 180, `b` square 200, `c` square 260, `d` square 220, `e` landscape 180.
 
-```
-row 0:  [    a    ][ b ][ d ]      c did not fit in the last cell; d is a square: SWAP
-row 1:  [    c    ][ e ][ f ]
-row 2:  [    g    ][ h ][ i ]
-row 3:  [ j ][ k ][    l    ]      last row: three squares, l is widened to fill the row
-```
+| Step | What happens                                                                                                                                                                                                      |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a    | all columns are level: the leftmost pair. Columns 0 and 1, top 0. Their bottoms are 192.                                                                                                                          |
+| b    | column 2 (empty), top 0. Bottom 212.                                                                                                                                                                              |
+| c    | column 3 (empty), top 0. Bottom 272.                                                                                                                                                                              |
+| d    | columns 0 and 1 are the shortest (192): column 0, top 192. Bottom 424.                                                                                                                                            |
+| e    | landscape. Pairs 0+1 and 1+2 do not qualify (their shorter column, column 1, ends in the two-column card `a`). Pair 2+3 qualifies: `b` grows from 200 to **260**, and `e` sits on columns 2 and 3 at top **272**. |
 
-### 6.5 How it maps to CSS grid
+### 6.5 How it maps to the page
+
+The feed is a positioned box and every card is placed by the numbers the engine returns.
 
 ```css
 .feed {
-  display: grid;
-  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
-  gap: 12px;
-}
+  position: relative;
+} /* height: set from result.height */
 .fc {
-  grid-column: span 1;
-}
-.fc.wide {
-  grid-column: span 2;
+  position: absolute;
+  display: flex;
+  flex-direction: column;
 }
 ```
 
-- Render cards in **placement order** (row by row). Because every row is exactly full, the
-  browser's normal row flow reproduces the engine's rows. Do **not** use `grid-auto-flow:
-dense`: it would let the browser reorder.
-- A card gets `.wide` from the placement's `span` (2), **not** from the item's `shape`: the
-  engine may have changed it.
-- Cards in a row have equal height (grid's default stretch). The image area takes the spare
-  height (section 7.5).
-- For server rendering use 2 columns as the first paint, then measure the container.
+For each page of items:
+
+1. Work out `cols = columnsForWidth(feedWidth)` and `colWidth = columnWidth(feedWidth, cols)`.
+2. Call `layoutBatch(state, items, measure, { final })`. Your `measure(item, span)` must: build
+   the card, set its width to `cardWidth(colWidth, span)`, add it to the feed **hidden**
+   (`visibility: hidden`), and return its height. Keep that element: it is the card.
+3. For every placement set `left = cardLeft(col, colWidth)`, `top`, `height`, and show the card.
+   A card is drawn two columns wide when the placement's `span` is 2, **not** when the item's
+   `shape` says landscape: the engine may have drawn a landscape as a square.
+4. For every entry in `extended`, set that earlier card's new `height`. Nothing else changes.
+5. Set the feed's height to `result.height`, and keep `result.state` for the next page.
+
+A card's height must not depend on a file that has not loaded yet: the image area gets its
+proportion from CSS (section 7.5), never from the picture itself. When the feed's width changes,
+start again from an empty layout and lay out everything that is on screen.
+
+A grown card is taller than its content: its image area takes the extra height (`flex: 1`); on
+a card without an image the extra is empty space under the text.
+
+`docs/central/reference/central-reference.html` does exactly this in about 40 lines of plain
+script. Copy its approach, not its code style.
 
 ### 6.6 What changed from the reference, and why
 
-The reference page is the approved **look**. Its feed **script** is demo-grade and is replaced:
+The reference page is the approved **look**, staggered columns included. Only these parts of its
+demo script are replaced:
 
-| In the reference (demo)                                                   | Replaced by                                                         |
-| ------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Flex columns; each card dropped into the shortest column (masonry)        | The row packer above, on CSS grid (the founder's 2 / 4 / span rule) |
-| Per-item image heights in pixels inside the sample data (170 to 300px)    | Proportion by span (section 7.5)                                    |
-| 12 sample cards repeated for 6 rounds, then a note that the preview stops | The real, finite edition and "You're all caught up"                 |
-| 2, 3 or 4 columns by container width                                      | 2 or 4 (3 is OPEN)                                                  |
-| App names and colours in a script constant                                | The registry                                                        |
+| In the reference (demo)                                                   | Replaced by                                             |
+| ------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Every card one column wide                                                | A landscape card spans two columns (the founder's rule) |
+| Per-item image heights in pixels inside the sample data (170 to 300px)    | Proportion by span (section 7.5)                        |
+| 12 sample cards repeated for 6 rounds, then a note that the preview stops | The real, finite edition and "You're all caught up"     |
+| 2, 3 or 4 columns by container width                                      | 2 or 4 (3 is OPEN)                                      |
+| App names and colours in a script constant                                | The registry                                            |
+
+What stays exactly as the demo did it: a one-column card goes to the shortest column.
 
 ---
 
@@ -535,17 +558,15 @@ Templates, chosen by the data present (never by app):
 | **list**  | the item has a `list`   | kicker, title, then the list: no bullets, margin `4px 0 0`, grid gap `6px`, `13px`; each line is flex, gap `8px`, `padding-top 6px`, 1px hairline on top, with a `16px` icon in front                                                                                                                                                                                        |
 | **pause** | kind `pause`            | no kicker line. `min-height 230px`, content at the bottom (`align-content: end`). Light `linear-gradient(170deg,#e9e3d3,#d9d6c8)`, text `#272a25`, edge `#ffffffb8`. Dark `linear-gradient(170deg,#2a2a22,#1f211b)`, text `#f7f6f1`, edge `#ffffff1a`. Small line first (the `summary`, "A slower moment"), then the title (`26px`, weight `500`, `letter-spacing -.045em`). |
 
-### 7.5 Card proportion (where the engine replaces the demo)
+### 7.5 Card proportion
 
-The reference gave each sample image a pixel height. Real data has none, so:
+The reference gave each sample image a pixel height. Real data has none, so the image area's
+proportion follows the card's span: `1 / 1` on a one-column card, `2 / 1` on a two-column
+card. That is the image's **least** height: when a card grows to close the gap under a landscape
+card (section 6.2), its image area takes the extra height.
 
-- The image area fills the card's spare height (`flex: 1`), so cards in one row line up.
-- Its **minimum** proportion follows the span: `1 / 1` for a one-column card, `2 / 1` for a
-  two-column card. With the 12px gap this makes a square card and a landscape card in the same
-  row nearly the same height, which is what lets rows close without gaps.
-
-This proportion is this guide's reading, needed to make the founder's layout rule work. It is
-listed as an open question with this default (section 12, O3).
+This proportion is this guide's reading, listed as an open question with this default (section
+12, O3).
 
 ### 7.6 States
 
@@ -729,9 +750,7 @@ alone: measure. With the browser's inspector (or a throwaway Playwright spec tha
 `getComputedStyle` and `getBoundingClientRect`), compare for at least one card of each
 template: border radius, padding of the text block, font size / weight / letter-spacing of the
 kicker, title and summary, the gap between cards, the column count, and the background and text
-colours in both themes. They must equal the values in section 7. Then check: no empty cell
-before the last row, wide cards span exactly two columns, the feed ends in "You're all caught
-up", and nothing moves when the next page arrives.
+colours in both themes. They must equal the values in section 7. Then check: columns are staggered (card edges do not line up across columns), no column has an empty space with a card below it, wide cards cover exactly two columns, the feed ends in "You're all caught up", and no card changes position when the next page arrives.
 
 | #   | Task                                                                                                                                                                                                                                                                    | Files                                                                                   | Done when                                                                                                                                                          |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -747,14 +766,15 @@ up", and nothing moves when the next page arrives.
 
 **Common ways to get this wrong**
 
-1. **Rebuilding masonry.** Dropping cards into the shortest column is the demo's script. It
-   breaks the span rule and reorders cards on every load. Use `layoutBatch`.
-2. **Using `grid-auto-flow: dense`** or letting the item's `shape` decide the span. The
-   placement's `span` decides.
-3. **Re-laying out everything when a page arrives.** Keep the returned `state` and pass only
-   the new items. Earlier cards must not move.
-4. **Rendering held items early.** Items that do not complete a row are not on screen until the
-   next batch or `final`. That is intended.
+1. **Putting cards in rows.** An earlier draft did (CSS grid, equal-height rows). The founder
+   corrected it: Central is **staggered columns**. Do not use `display: grid` rows for the feed.
+2. **Letting the item's `shape` decide the width.** The placement's `span` decides. The engine
+   may have drawn a landscape as a square.
+3. **Laying everything out again when a page arrives.** Keep the returned `state` and pass only
+   the new items. A placed card never moves; only the heights listed in `extended` change.
+4. **Measuring wrongly.** Measure the card at the width it will be drawn, with its content in,
+   and with the image height coming from CSS. If a card's height changes after layout (a late
+   image, a late font), cards overlap or gaps open.
 5. **Inventing styling for an OPEN item** (the Crown's panels, the empty state, tablet columns).
    Ask the founder.
 6. **Using `#d4af37`** or any gold other than `#f2bd22`. Loading a web font. Using a serif.
@@ -783,36 +803,36 @@ up", and nothing moves when the next page arrives.
 See the table at the end of this file's pull request description for the state at hand-over;
 this table is updated by every change that moves a row.
 
-| Piece                                           | State       | Notes                                                                                            |
-| ----------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------ |
-| This guide                                      | built       |                                                                                                  |
-| Layout engine + property tests                  | built       | `packages/central/src/layout.ts`; seeded property tests of all six guarantees                    |
-| Reference page (Central only)                   | built       | `docs/central/reference/central-reference.html`; measured at 390px and 1280px, light and dark    |
-| Feed item + registry contracts, validators      | built       | `packages/central/src/contract.ts`                                                               |
-| Edition (ranking, finite, cursor)               | not started | `packages/central/src/edition.ts`                                                                |
-| Connect adapter + fixtures                      | built       | `packages/central/src/adapters/connect.ts`; pure mapping, not yet scheduled (build step 4)       |
-| Migrations 203 to 205                           | drafted     | files exist; **never executed anywhere**; the founder reviews, probes and applies (build step 1) |
-| `GET /api/v1/central/feed`                      | not started |                                                                                                  |
-| `GET /api/v1/central/apps`                      | not started |                                                                                                  |
-| `POST` / `DELETE /api/v1/central/items`         | not started | build step 3                                                                                     |
-| Connect publisher (sync job)                    | not started | build step 4                                                                                     |
-| Feed component (hub)                            | not started | build step 5                                                                                     |
-| Citizens landing integration, sticky bar, Crown | not started | build step 6; needs O1                                                                           |
-| Central inside Connect                          | not started | build step 7                                                                                     |
+| Piece                                           | State       | Notes                                                                                                                                            |
+| ----------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| This guide                                      | built       |                                                                                                                                                  |
+| Layout engine + property tests                  | built       | `packages/central/src/layout.ts`; staggered columns (revised from rows on the founder's correction); seeded property tests of all six guarantees |
+| Reference page (Central only)                   | built       | `docs/central/reference/central-reference.html`; measured at 390px and 1280px, light and dark                                                    |
+| Feed item + registry contracts, validators      | built       | `packages/central/src/contract.ts`                                                                                                               |
+| Edition (ranking, finite, cursor)               | not started | `packages/central/src/edition.ts`                                                                                                                |
+| Connect adapter + fixtures                      | built       | `packages/central/src/adapters/connect.ts`; pure mapping, not yet scheduled (build step 4)                                                       |
+| Migrations 203 to 205                           | drafted     | files exist; **never executed anywhere**; the founder reviews, probes and applies (build step 1)                                                 |
+| `GET /api/v1/central/feed`                      | not started |                                                                                                                                                  |
+| `GET /api/v1/central/apps`                      | not started |                                                                                                                                                  |
+| `POST` / `DELETE /api/v1/central/items`         | not started | build step 3                                                                                                                                     |
+| Connect publisher (sync job)                    | not started | build step 4                                                                                                                                     |
+| Feed component (hub)                            | not started | build step 5                                                                                                                                     |
+| Citizens landing integration, sticky bar, Crown | not started | build step 6; needs O1                                                                                                                           |
+| Central inside Connect                          | not started | build step 7                                                                                                                                     |
 
 ### Open questions for the founder
 
-| #   | Question                                                                                                                                                            | Recommended default                                                                                                                      |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| O1  | The Crown's roll-out panels and both sticky bars are decided in words but not drawn. May a design check be made for them first?                                     | Yes: one small design check for the bar and the Crown, approved before code, as was done for the feed.                                   |
-| O2  | Tablet widths (680 to 1000px): 2 columns, or the reference's 3?                                                                                                     | 2 columns below 1000px, 4 from 1000px: exactly the rule as written.                                                                      |
-| O3  | Image proportion: a one-column card's image is at least square, a two-column card's at least 2:1, and it stretches to fill the row.                                 | Accept. It is what makes rows close without gaps.                                                                                        |
-| O4  | When a single card is left for the last row on desktop, two cells stay empty above "You're all caught up".                                                          | Accept. The alternative (a card four columns wide) is a new shape.                                                                       |
-| O5  | "This hour around you" shows weather in the reference, marked as sample. Is there to be a weather source?                                                           | Leave weather out for now; show time, date and place.                                                                                    |
-| O6  | Who writes Today's Encouragement and the pause cards, and which apps will own music, books, community initiatives, business updates?                                | Encouragement and pause cards: entered by an admin as Central's own items. The four content types wait until their app is named.         |
-| O7  | Should each app have a list of allowed link hosts for its cards?                                                                                                    | Yes, add it when the second app joins.                                                                                                   |
-| O8  | Edition size (48 cards a day) and the 04:00 turnover.                                                                                                               | Keep both; review after two weeks of real use.                                                                                           |
-| O9  | Which apps does the Crown list: only live ones, or also the announced ones, faded?                                                                                  | Live ones first, announced ones faded with "coming soon", matching the Do panel decision.                                                |
-| O10 | Gold text in dark mode on Central (the reference defines `#836100` for light paper only).                                                                           | Do not use gold text on Central until decided.                                                                                           |
-| O11 | The short line after "Connect" on its cards (for example "Happening this week", "A place near you", "People serving nearby") is public copy. Who approves it?       | The founder approves one line per kind before Connect's publisher is switched on; the adapter takes them as options, so no code changes. |
-| O12 | An item published during the day waits for the next edition (04:00), so that the order does not shift under someone scrolling. Is a wait of up to a day acceptable? | Yes. It is what makes "all caught up" true. Revisit if contributors ask for same-day cards.                                              |
+| #   | Question                                                                                                                                                              | Recommended default                                                                                                                      |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| O1  | The Crown's roll-out panels and both sticky bars are decided in words but not drawn. May a design check be made for them first?                                       | Yes: one small design check for the bar and the Crown, approved before code, as was done for the feed.                                   |
+| O2  | Tablet widths (680 to 1000px): 2 columns, or the reference's 3?                                                                                                       | 2 columns below 1000px, 4 from 1000px: exactly the rule as written.                                                                      |
+| O3  | Image proportion: at least square on a one-column card, at least 2:1 on a two-column card. The design check used hand-set photo heights that real data does not have. | Accept.                                                                                                                                  |
+| O4  | When a landscape card arrives, the card above it in the shorter column grows (its photo, or empty space under its text) so that no gap is left.                       | Accept. The alternative is a visible gap or dropping the two-column card.                                                                |
+| O5  | "This hour around you" shows weather in the reference, marked as sample. Is there to be a weather source?                                                             | Leave weather out for now; show time, date and place.                                                                                    |
+| O6  | Who writes Today's Encouragement and the pause cards, and which apps will own music, books, community initiatives, business updates?                                  | Encouragement and pause cards: entered by an admin as Central's own items. The four content types wait until their app is named.         |
+| O7  | Should each app have a list of allowed link hosts for its cards?                                                                                                      | Yes, add it when the second app joins.                                                                                                   |
+| O8  | Edition size (48 cards a day) and the 04:00 turnover.                                                                                                                 | Keep both; review after two weeks of real use.                                                                                           |
+| O9  | Which apps does the Crown list: only live ones, or also the announced ones, faded?                                                                                    | Live ones first, announced ones faded with "coming soon", matching the Do panel decision.                                                |
+| O10 | Gold text in dark mode on Central (the reference defines `#836100` for light paper only).                                                                             | Do not use gold text on Central until decided.                                                                                           |
+| O11 | The short line after "Connect" on its cards (for example "Happening this week", "A place near you", "People serving nearby") is public copy. Who approves it?         | The founder approves one line per kind before Connect's publisher is switched on; the adapter takes them as options, so no code changes. |
+| O12 | An item published during the day waits for the next edition (04:00), so that the order does not shift under someone scrolling. Is a wait of up to a day acceptable?   | Yes. It is what makes "all caught up" true. Revisit if contributors ask for same-day cards.                                              |

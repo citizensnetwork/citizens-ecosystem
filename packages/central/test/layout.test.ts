@@ -1,25 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import {
+  cardLeft,
+  cardWidth,
+  columnWidth,
   columnsForWidth,
   createLayout,
   layoutAll,
   layoutBatch,
   type CardShape,
   type LayoutItem,
+  type MeasureCard,
   type Placement,
 } from '../src/layout';
 
 const S = (id: string): LayoutItem => ({ id, shape: 'square' });
 const L = (id: string): LayoutItem => ({ id, shape: 'landscape' });
 
-/** Rows as strings: a lower-case id is a one-column card, an upper-case id a two-column card. */
-function rows(placements: Placement[]): string[] {
-  const out: string[] = [];
-  for (const p of placements) {
-    out[p.row] = (out[p.row] ?? '') + (p.span === 2 ? p.id.toUpperCase() : p.id);
-  }
-  return out;
-}
+/** A measure function from a table of heights (the same height at either width). */
+const heights =
+  (table: Record<string, number>): MeasureCard =>
+  (item) =>
+    table[item.id] as number;
+
+const find = (placements: Placement[], id: string): Placement =>
+  placements.find((p) => p.id === id) as Placement;
 
 /** Small seeded generator (mulberry32) so the property checks are repeatable. */
 function rng(seed: number): () => number {
@@ -33,6 +37,13 @@ function rng(seed: number): () => number {
   };
 }
 
+/** A repeatable height for an item at a width: whole numbers, different for each width. */
+const fakeMeasure: MeasureCard = (item, span) => {
+  let h = span * 7919;
+  for (let i = 0; i < item.id.length; i += 1) h = (Math.imul(h, 31) + item.id.charCodeAt(i)) >>> 0;
+  return span === 2 ? 120 + (h % 140) : 90 + (h % 260);
+};
+
 function randomItems(next: () => number, count: number, landscapeShare: number): LayoutItem[] {
   return Array.from({ length: count }, (_, n) => ({
     id: `i${n}`,
@@ -40,113 +51,133 @@ function randomItems(next: () => number, count: number, landscapeShare: number):
   }));
 }
 
-/** Feed `items` to the engine in random batches. Returns each call's placements. */
-function inBatches(items: LayoutItem[], cols: number, next: () => number): Placement[][] {
+/** Feed `items` to the engine in random batches and return every card's final placement. */
+function inBatches(items: LayoutItem[], cols: number, next: () => number): Placement[] {
   let state = createLayout(cols);
-  const calls: Placement[][] = [];
+  const all: Placement[] = [];
   let at = 0;
-  while (at < items.length) {
+  do {
     const size = 1 + Math.floor(next() * 9);
     const batch = items.slice(at, at + size);
     at += size;
-    const result = layoutBatch(state, batch, { final: at >= items.length });
-    expect(result.state.held.length).toBeLessThanOrEqual(cols);
-    calls.push(result.placements);
+    const before = all.map((p) => ({ ...p }));
+    const result = layoutBatch(state, batch, fakeMeasure, { final: at >= items.length });
+    expect(result.state.held.length).toBeLessThanOrEqual(1);
+    for (const grown of result.extended) {
+      const earlier = find(all, grown.id);
+      expect(earlier.span).toBe(1);
+      expect(grown.height).toBeGreaterThan(earlier.height);
+      earlier.height = grown.height;
+    }
+    // Guarantee 5: nothing placed earlier moved; only the listed heights grew.
+    before.forEach((was, k) => {
+      const now = all[k] as Placement;
+      expect({ ...now, height: 0 }).toEqual({ ...was, height: 0 });
+      if (!result.extended.some((g) => g.id === was.id)) expect(now.height).toBe(was.height);
+    });
+    all.push(...result.placements);
     state = result.state;
-  }
-  if (items.length === 0) calls.push(layoutBatch(state, [], { final: true }).placements);
-  return calls;
+  } while (at < items.length);
+  return all;
 }
 
 describe('worked examples from the guide', () => {
   it('2 columns (guide section 6.3)', () => {
-    const result = layoutAll([S('a'), L('b'), S('c'), S('d'), L('e'), L('f'), S('g')], 2);
-    expect(rows(result.placements)).toEqual(['ac', 'B', 'de', 'F', 'G']);
-    expect(result.placements.map((p) => p.id).join('')).toBe('acbdefg');
-    expect(result.raggedEnd).toBe(false);
-    const e = result.placements.find((p) => p.id === 'e');
-    expect(e).toMatchObject({ span: 1, shape: 'square', hinted: 'landscape', row: 2, col: 1 });
-    const g = result.placements.find((p) => p.id === 'g');
-    expect(g).toMatchObject({ span: 2, shape: 'landscape', hinted: 'square', row: 4, col: 0 });
+    const items = [S('a'), S('b'), L('c'), S('d'), L('e'), S('f'), S('g')];
+    const measure = heights({ a: 200, b: 260, c: 180, d: 220, e: 180, f: 240, g: 200 });
+    const result = layoutAll(items, 2, measure);
+    const p = result.placements;
+    expect(p.map((x) => x.id).join('')).toBe('abcdfeg');
+    // a grew from 200 to 260 so that c sits level on both columns.
+    expect(find(p, 'a')).toMatchObject({ col: 0, span: 1, top: 0, height: 260 });
+    expect(find(p, 'b')).toMatchObject({ col: 1, span: 1, top: 0, height: 260 });
+    expect(find(p, 'c')).toMatchObject({ col: 0, span: 2, top: 272, height: 180 });
+    // e could not sit under c and d (the shorter column ended in a two-column card),
+    // so the square f went first; then d grew from 220 to 240.
+    expect(find(p, 'd')).toMatchObject({ col: 0, span: 1, top: 464, height: 240 });
+    expect(find(p, 'f')).toMatchObject({ col: 1, span: 1, top: 464, height: 240 });
+    expect(find(p, 'e')).toMatchObject({ col: 0, span: 2, top: 716, height: 180 });
+    expect(find(p, 'g')).toMatchObject({ col: 0, span: 1, top: 908, height: 200 });
+    expect(result.height).toBe(1108);
+    expect(result.extended).toEqual([]);
   });
 
   it('4 columns (guide section 6.4)', () => {
-    const items = [
-      L('a'),
-      S('b'),
-      L('c'),
-      S('d'),
-      S('e'),
-      S('f'),
-      L('g'),
-      S('h'),
-      S('i'),
-      S('j'),
-      S('k'),
-      S('l'),
-    ];
-    const result = layoutAll(items, 4);
-    expect(rows(result.placements)).toEqual(['Abd', 'Cef', 'Ghi', 'jkL']);
-    expect(result.raggedEnd).toBe(false);
-    expect(result.placements.find((p) => p.id === 'l')).toMatchObject({ col: 2, span: 2 });
+    const items = [L('a'), S('b'), S('c'), S('d'), L('e')];
+    const measure = heights({ a: 180, b: 200, c: 260, d: 220, e: 180 });
+    const p = layoutAll(items, 4, measure).placements;
+    expect(find(p, 'a')).toMatchObject({ col: 0, span: 2, top: 0 });
+    expect(find(p, 'b')).toMatchObject({ col: 2, span: 1, top: 0, height: 260 });
+    expect(find(p, 'c')).toMatchObject({ col: 3, span: 1, top: 0, height: 260 });
+    expect(find(p, 'd')).toMatchObject({ col: 0, span: 1, top: 192, height: 220 });
+    expect(find(p, 'e')).toMatchObject({ col: 2, span: 2, top: 272, height: 180 });
   });
 
-  it('reports a ragged end when one card is left for the last 4-column row', () => {
-    const result = layoutAll([S('a'), S('b'), S('c'), S('d'), S('e')], 4);
-    expect(rows(result.placements)).toEqual(['abcd', 'E']);
-    expect(result.raggedEnd).toBe(true);
+  it('draws a landscape as a square when nothing can make room for it', () => {
+    const measure = heights({ a: 200, b: 150, c: 150 });
+    const p = layoutAll([S('a'), L('b'), L('c')], 2, measure).placements;
+    expect(find(p, 'b')).toMatchObject({ col: 1, span: 1, shape: 'square', hinted: 'landscape' });
+    expect(find(p, 'c')).toMatchObject({ col: 0, span: 2, top: 212, shape: 'landscape' });
+    // b (150) grew to 200 to be level with a.
+    expect(find(p, 'b').height).toBe(200);
+    const alone = layoutAll([S('a'), L('b')], 2, measure).placements;
+    expect(find(alone, 'b')).toMatchObject({ col: 1, span: 1, top: 0 });
   });
 });
 
 describe('batches', () => {
-  it('emits only complete rows until the final batch', () => {
-    let state = createLayout(4);
-    const first = layoutBatch(state, [S('a'), S('b'), S('c')]);
-    expect(first.placements).toEqual([]);
-    expect(first.state.held.map((h) => h.id)).toEqual(['a', 'b', 'c']);
-    state = first.state;
+  it('holds a landscape that needs the next item, and reports a card that grows later', () => {
+    const measure = heights({ a: 200, b: 150, c: 260 });
+    const first = layoutBatch(createLayout(2), [S('a'), L('b')], measure);
+    expect(first.placements.map((p) => p.id)).toEqual(['a']);
+    expect(first.state.held.map((h) => h.id)).toEqual(['b']);
 
-    const second = layoutBatch(state, [L('d')]);
-    // d does not fit in the last cell and the next item is unknown: everything waits.
-    expect(second.placements).toEqual([]);
-    expect(second.state.held.map((h) => h.id)).toEqual(['a', 'b', 'c', 'd']);
-    state = second.state;
-
-    const third = layoutBatch(state, [S('e'), S('f')]);
-    expect(rows(third.placements)).toEqual(['abce']);
-    expect(third.state.held.map((h) => h.id)).toEqual(['d', 'f']);
-
-    const last = layoutBatch(third.state, [], { final: true });
-    expect(rows(last.placements)[1]).toBe('DF');
-    expect(last.placements.map((p) => p.row)).toEqual([1, 1]);
-    expect(last.placements.find((p) => p.id === 'f')).toMatchObject({ span: 2, col: 2 });
-    expect(last.state.done).toBe(true);
+    const second = layoutBatch(first.state, [S('c')], measure, { final: true });
+    expect(second.placements.map((p) => p.id)).toEqual(['c', 'b']);
+    expect(find(second.placements, 'c')).toMatchObject({ col: 1, top: 0, height: 260 });
+    expect(find(second.placements, 'b')).toMatchObject({ col: 0, span: 2, top: 272 });
+    // a was placed by the first call: its new height comes back in `extended`.
+    expect(second.extended).toEqual([{ id: 'a', height: 260 }]);
+    expect(second.height).toBe(422);
+    expect(second.state.done).toBe(true);
   });
 
   it('refuses another batch after the final one, and bad input', () => {
-    const done = layoutBatch(createLayout(2), [S('a')], { final: true }).state;
-    expect(() => layoutBatch(done, [S('b')])).toThrow(/already finished/);
+    const one: MeasureCard = () => 100;
+    const done = layoutBatch(createLayout(2), [S('a')], one, { final: true }).state;
+    expect(() => layoutBatch(done, [S('b')], one)).toThrow(/already finished/);
     expect(() => createLayout(1)).toThrow(RangeError);
     expect(() => createLayout(2.5)).toThrow(RangeError);
     expect(() => createLayout(13)).toThrow(RangeError);
+    expect(() => createLayout(2, -1)).toThrow(RangeError);
     expect(() =>
-      layoutBatch(createLayout(2), [{ id: 'x', shape: 'portrait' as CardShape }]),
+      layoutBatch(createLayout(2), [{ id: 'x', shape: 'tall' as CardShape }], one),
     ).toThrow(TypeError);
+    expect(() => layoutBatch(createLayout(2), [S('a')], () => 0)).toThrow(RangeError);
+    expect(() => layoutBatch(createLayout(2), [S('a')], () => Number.NaN)).toThrow(RangeError);
   });
 
   it('an empty edition lays out to nothing', () => {
-    const result = layoutAll([], 2);
-    expect(result.placements).toEqual([]);
-    expect(result.raggedEnd).toBe(false);
+    const result = layoutAll([], 2, () => 100);
+    expect(result).toMatchObject({ placements: [], extended: [], height: 0 });
   });
 });
 
-describe('column count', () => {
-  it('is 2 below 1000px of container width and 4 from 1000px', () => {
+describe('sizes', () => {
+  it('is 2 columns below 1000px of container width and 4 from 1000px', () => {
     expect(columnsForWidth(358)).toBe(2);
     expect(columnsForWidth(999)).toBe(2);
     expect(columnsForWidth(1000)).toBe(4);
     expect(columnsForWidth(1200)).toBe(4);
+  });
+
+  it('gives column and card widths and offsets', () => {
+    expect(columnWidth(1200, 4)).toBe(291);
+    expect(columnWidth(358, 2, 12)).toBe(173);
+    expect(cardWidth(291, 1)).toBe(291);
+    expect(cardWidth(291, 2)).toBe(594);
+    expect(cardLeft(0, 291)).toBe(0);
+    expect(cardLeft(2, 291)).toBe(606);
   });
 });
 
@@ -156,42 +187,47 @@ describe('properties (seeded random streams)', () => {
     for (const share of [0, 0.25, 0.5, 0.8, 1]) cases.push({ cols, share });
 
   it.each(cases)('cols=$cols landscape share=$share', ({ cols, share }) => {
+    const gap = 12;
     for (let seed = 1; seed <= 60; seed += 1) {
       const next = rng(seed * 7919 + cols * 131 + Math.round(share * 100));
       const items = randomItems(next, Math.floor(next() * 70), share);
-      const whole = layoutAll(items, cols);
+      const whole = layoutAll(items, cols, fakeMeasure);
       const placed = whole.placements;
 
       // 1. every item placed exactly once
       expect(placed.map((p) => p.id).sort()).toEqual(items.map((it) => it.id).sort());
 
-      // 2 + 3. rows are full, cards stay inside their row, no overlap, no hole
-      const lastRow = placed.length ? (placed[placed.length - 1] as Placement).row : -1;
-      for (let r = 0; r <= lastRow; r += 1) {
-        const inRow = placed.filter((p) => p.row === r);
-        let col = 0;
-        for (const p of inRow) {
-          expect(p.col).toBe(col);
-          expect(p.col + p.span).toBeLessThanOrEqual(cols);
-          col += p.span;
+      // 2 + 3. in every column the cards follow each other from the top with exactly one gap:
+      // no hole, no overlap; a two-column card has one top for both of its columns.
+      let tallest = 0;
+      for (let c = 0; c < cols; c += 1) {
+        const inColumn = placed
+          .filter((p) => p.col <= c && c < p.col + p.span)
+          .sort((a, b) => a.top - b.top);
+        let expectedTop = 0;
+        for (const p of inColumn) {
+          expect(p.top).toBe(expectedTop);
+          expectedTop = p.top + p.height + gap;
         }
-        if (r < lastRow || !whole.raggedEnd) expect(col).toBe(cols);
-        else expect(col).toBeLessThan(cols);
+        tallest = Math.max(tallest, expectedTop - gap);
       }
-      if (cols === 2) expect(whole.raggedEnd).toBe(false);
+      expect(whole.height).toBe(Math.max(0, tallest));
 
-      // 4. bounded reordering: reading position is within 1 of the rank
+      // 4. rank order, except that one square may go in front of one landscape
       placed.forEach((p, position) => {
         expect(Math.abs(position - p.index)).toBeLessThanOrEqual(1);
         expect(items[p.index]?.id).toBe(p.id);
         expect(p.hinted).toBe(items[p.index]?.shape);
         expect(p.shape).toBe(p.span === 2 ? 'landscape' : 'square');
+        expect(p.col + p.span).toBeLessThanOrEqual(cols);
+        // A card only ever grows from its measured height.
+        expect(p.height).toBeGreaterThanOrEqual(fakeMeasure(items[p.index] as LayoutItem, p.span));
+        if (p.span === 2) expect(p.height).toBe(fakeMeasure(items[p.index] as LayoutItem, 2));
       });
 
-      // 5 + 6. batches: the calls' placements, joined, equal the one-call layout exactly,
-      // so nothing emitted earlier was moved by a later batch.
-      const calls = inBatches(items, cols, next);
-      expect(calls.flat()).toEqual(placed);
+      // 5 + 6. batches: same final layout as the one-call layout (the helper checks that no
+      // earlier card moved along the way).
+      expect(inBatches(items, cols, next)).toEqual(placed);
     }
   });
 });

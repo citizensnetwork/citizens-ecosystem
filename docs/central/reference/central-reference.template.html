@@ -57,10 +57,9 @@
       .hour .kicker{display:block;max-width:calc(100% - 72px);margin-bottom:10px}
       @container (min-width:760px){.cen .lead2{grid-template-columns:1.7fr 1fr}}
 
-      /* ENGINE: CSS grid driven by the layout engine's placements (guide section 6.5). */
-      .feed{display:grid;grid-template-columns:repeat(var(--cols,2),minmax(0,1fr));gap:12px}
-      .fc{grid-column:span 1;display:flex;flex-direction:column}
-      .fc.wide{grid-column:span 2}
+      /* ENGINE: staggered columns. The layout engine gives every card its column, top and height (guide section 6.5). */
+      .feed{position:relative}
+      .fc{position:absolute;display:flex;flex-direction:column}
 
       /* Card anatomy (guide section 7.4) */
       .fc{width:100%;text-align:left;padding:0;border-radius:24px;overflow:hidden;background:var(--card);border:1px solid var(--edge);box-shadow:var(--sh);color:var(--tx);animation:usher .35s ease-out}
@@ -179,26 +178,49 @@
       const EDITION = [0, 1].flatMap((round) => DATA.feed.map((item) => ({ ...item, id: item.id + '/' + round })));
       const PAGE = 12;
       const feed = $('feed');
-      let state; let shown; let cols;
+      const GAP = 12;
+      const BY_ID = Object.fromEntries(EDITION.map((item) => [item.id, item]));
+      const drawn = new Map();
+      let state; let shown; let cols; let colW; let feedW;
+
+      /* The engine asks how tall a card is at the width it will be drawn. Draw it out of sight and read it. */
+      function measureCard(item, span) {
+        const c = card(BY_ID[item.id], span);
+        c.style.width = Layout.cardWidth(colW, span, GAP) + 'px';
+        c.style.visibility = 'hidden';
+        feed.append(c);
+        drawn.set(item.id, c);
+        return c.getBoundingClientRect().height;
+      }
 
       function addPage() {
         if (shown >= EDITION.length) return;
         const batch = EDITION.slice(shown, shown + PAGE);
         shown += batch.length;
         const final = shown >= EDITION.length;
-        const result = Layout.layoutBatch(state, batch, { final });
+        const result = Layout.layoutBatch(state, batch, measureCard, { final });
         state = result.state;
-        const byId = Object.fromEntries(EDITION.map((item) => [item.id, item]));
-        for (const place of result.placements) feed.append(card(byId[place.id], place.span));
+        for (const place of result.placements) {
+          const c = drawn.get(place.id);
+          c.style.left = Layout.cardLeft(place.col, colW, GAP) + 'px';
+          c.style.top = place.top + 'px';
+          c.style.height = place.height + 'px';
+          c.style.visibility = '';
+        }
+        /* A card placed earlier may grow to close the gap under a landscape card. It never moves. */
+        for (const grown of result.extended) drawn.get(grown.id).style.height = grown.height + 'px';
+        feed.style.height = result.height + 'px';
         $('more').textContent = final ? 'You’re all caught up' : 'More is arriving…';
         $('next').disabled = final;
         $('facts').textContent = cols + ' columns · ' + feed.children.length + ' of ' + EDITION.length + ' cards on screen' + (state.held.length ? ' · ' + state.held.length + ' waiting for a full row' : '');
       }
       function start() {
-        cols = Layout.columnsForWidth(feed.clientWidth);
-        feed.style.setProperty('--cols', cols);
+        feedW = feed.clientWidth;
+        cols = Layout.columnsForWidth(feedW);
+        colW = Layout.columnWidth(feedW, cols, GAP);
         feed.replaceChildren();
-        state = Layout.createLayout(cols);
+        drawn.clear();
+        state = Layout.createLayout(cols, GAP);
         shown = 0;
         addPage();
       }
@@ -223,7 +245,7 @@
         else { $('stage').style.width = b.dataset.v ? b.dataset.v + 'px' : ''; }
       }));
       /* Columns follow the feed container's width. A change of column count lays the edition out again. */
-      new ResizeObserver(() => { if (Layout.columnsForWidth(feed.clientWidth) !== cols) start(); }).observe(feed);
+      new ResizeObserver(() => { if (feed.clientWidth !== feedW) start(); }).observe(feed);
       start();
     </script>
   </body>
