@@ -1266,3 +1266,6 @@
 .category-tiles>button>.photo-fallback{position:absolute;inset:0}
 .connect-map>.listing-profile{position:absolute;inset:0;z-index:32;overflow:auto;background:#f7f6f1}
 [data-theme='dark'] .connect-map>.listing-profile{background:#1b1c18}
+/* ── Step 0 corrections (2026-11-11). Each is one rule: delete the rule to go back. ── */
+/* Headings: index.html still gives every h1-h4 the retired serif. Inside the shell they use the shell's own sans. */
+.connect-frame h1,.connect-frame h2,.connect-frame h3,.connect-frame h4{font-family:inherit}
