@@ -49,6 +49,18 @@ Asked as the eight questions in section 7 of the plan, answered in the session b
 | 7   | The engine's name?                     | **The code name `engine` for now.** It is never shown to users. A real name can be chosen any time before the Superuser console is built (E6). | Package and project names use `engine`.                                                                                                  |
 | 8   | A line for the engine in `VISION.md`?  | **Yes: the session drafts it, the founder approves it.** Nothing is added to `VISION.md` until the founder agrees to the wording.              | The draft is in Appendix A. `VISION.md` is not changed by this pull request.                                                             |
 
+**Added by the founder later the same day**, after reading this record:
+
+- **219 owns the engine, for now.** This answers open item O1 as far as the owner goes. 219 is the engine owner in
+  every sentence below, the Superuser acts for 219, and 219 is the service provider a tenant's legal page names.
+- **Paying clients come before launch.** The paid plans start when a client pays. Until then the aim is working
+  test software that can be shown to possible clients, built on the free plans. Open item O3 still has to settle
+  whether the free plans' terms allow that.
+- **Yes to the free build project** (decision 1, step 1). It is created once its region is chosen (open item O4)
+  and the engine organisation exists.
+- **The paused Citizens project (Vision's old database) is no longer needed.** The founder will approve its
+  removal when asked. It is not removed by this record.
+
 ---
 
 ## 3. Decisions
@@ -114,7 +126,7 @@ Today the Citizens organisation is on the free plan with one active project and 
 account has exactly **one free project slot left**.
 
 1. **Build:** the pilot tenant's project takes that one slot. It is created in a new, free, engine organisation,
-   only after the founder's explicit yes (step E5). It holds test data only.
+   only after the founder's explicit yes, which was given on 2026-11-11. It holds test data only.
 2. **The control plane has no free slot.** Until launch its schema is built and proven in CI, on a throwaway
    Postgres container (GitHub's runners have Docker; the founder's PC does not). Its real project is created at
    the launch gate.
@@ -131,7 +143,8 @@ What the free build phase cannot do, so nobody is surprised:
 - **No branching**, so there is no throwaway copy of the database to try a migration on. CI's build-from-empty
   proof (decision 5) stands in for it.
 - **One slot only.** While the pilot project is active, the paused Citizens project (Vision's old database)
-  cannot be resumed, and no third free project can be made.
+  cannot be resumed, and no third free project can be made. The founder has said that project is no longer
+  needed.
 - Logs are kept for one day, and the database is capped at 500 MB.
 
 Rejected: opening a second Supabase account to get more free projects. The limit is per person, and working
@@ -435,7 +448,7 @@ Points for the attorney:
   at creation, and the other services are abroad too. The tenant's privacy notice must say so, and the region
   cannot be changed later.
 - **The legal page** (answer 6): the tenant's privacy notice and terms name the engine owner as its service
-  provider. See open item O1 for which legal name that is.
+  provider. The owner is 219 for now; open item O1 covers its registered name.
 - **Location is personal information.** Live location and "near me" need a clear purpose and consent in the
   tenant's own wording. The engine's clean-up of live locations supports keeping them no longer than needed.
 - **Marketing messages** from a tenant to its users (push, email) fall under section 69's consent rules, and they
@@ -523,16 +536,16 @@ $10, and its measured usage.
 
 For the founder. None of them blocks E2 or E3.
 
-| #   | Question                                                                                                                                                                                                                                                                                                                                                                               | Needed by              |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| O1  | **Which legal entity owns the engine and signs operator agreements?** Its registered name is what a tenant's legal page shows (answer 6). If that entity is the Citizens organisation, its name appears in a tenant's world after all, and renting software may sit oddly with its status. A question for the founder's attorney and accountant.                                       | Before the launch gate |
-| O2  | **Should the engine's code stay in a public repository** once tenants pay to use it? Separately: a private operations repository will be needed for fan-out at about three tenants.                                                                                                                                                                                                    | Before a second tenant |
-| O3  | **The build phase on free plans.** Vercel's free plan and MapTiler's free plan are both for non-commercial use. Either the build runs on paid plans from the first deployment the tenant sees ($20 and $30 a month), or the founder judges that a private build with test data is within the free terms. The cautious reading is to pay from the first deployment shown to the tenant. | Step E8                |
-| O4  | **Which cloud region for the pilot's project?** It fixes where the tenant's data is stored (decision 7) and cannot be changed.                                                                                                                                                                                                                                                         | Step E5                |
-| O5  | A one-line scope note in the shared-database contract: "engine tenants are outside this contract".                                                                                                                                                                                                                                                                                     | Any time               |
-| O6  | Break-glass default in the contract: notify-and-show, or the tenant approves first.                                                                                                                                                                                                                                                                                                    | Operator agreement     |
-| O7  | Second-factor sign-in on the accounts that hold the engine (database, hosting, code, email, map). One login will reach both Citizens and every tenant.                                                                                                                                                                                                                                 | Before the launch gate |
-| O8  | The engine's real name (answer 7 defers it).                                                                                                                                                                                                                                                                                                                                           | Before E6's console    |
+| #   | Question                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Needed by              |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- |
+| O1  | **Which legal entity owns the engine and signs operator agreements?** Answered in part on 2026-11-11: **219 owns the engine, for now.** Still open: 219's registered legal name (it is what a tenant's legal page shows, answer 6), that this entity signs the operator agreements, and how renting software sits with its status. A question for the founder's attorney and accountant.                                                                                                                     | Before the launch gate |
+| O2  | **Should the engine's code stay in a public repository** once tenants pay to use it? Separately: a private operations repository will be needed for fan-out at about three tenants.                                                                                                                                                                                                                                                                                                                          | Before a second tenant |
+| O3  | **The build phase on free plans.** Vercel's free plan and MapTiler's free plan are both for non-commercial use. The founder's aim (2026-11-11) is to show working test software to possible clients before any of them pays. Either that runs on paid plans from the first deployment a possible client sees ($20 and $30 a month), or the founder judges that an unpaid trial with test data is within the free terms. The cautious reading is to pay from the first deployment shown to a possible client. | Step E8                |
+| O4  | **Which cloud region for the pilot's project?** It fixes where the tenant's data is stored (decision 7) and cannot be changed.                                                                                                                                                                                                                                                                                                                                                                               | Step E5                |
+| O5  | A one-line scope note in the shared-database contract: "engine tenants are outside this contract".                                                                                                                                                                                                                                                                                                                                                                                                           | Any time               |
+| O6  | Break-glass default in the contract: notify-and-show, or the tenant approves first.                                                                                                                                                                                                                                                                                                                                                                                                                          | Operator agreement     |
+| O7  | Second-factor sign-in on the accounts that hold the engine (database, hosting, code, email, map). One login will reach both Citizens and every tenant.                                                                                                                                                                                                                                                                                                                                                       | Before the launch gate |
+| O8  | The engine's real name (answer 7 defers it).                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Before E6's console    |
 
 ---
 
