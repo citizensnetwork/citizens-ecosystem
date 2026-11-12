@@ -13,6 +13,9 @@
 >
 > **Verified against live** Supabase project `xyiajtrvhlxaeplsiajj` (`Citizens-Connect`,
 > eu-central, migration head **134**) on 2026-06-17. See §9 for the verification snapshot.
+>
+> **Scope (added 2026-11-11, founder-approved, no rule changed):** engine tenants are outside this
+> contract; they are not ecosystem apps (see [`docs/engine/ADR-001-engine-architecture.md`](../../../docs/engine/ADR-001-engine-architecture.md)).
 
 ---
 
