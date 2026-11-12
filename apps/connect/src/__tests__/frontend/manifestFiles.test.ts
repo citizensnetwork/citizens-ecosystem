@@ -2,21 +2,23 @@
  * The home-screen app's files exist (2026-11-12). Until then `manifest.json` and `sw.js` named
  * `icons/icon-192.png` and `icons/icon-512.png`, which were never committed, and the page did not
  * link the manifest at all, so a phone that saved Connect to its home screen got no icon. Nothing
- * failed: the service worker swallows a missing file. This test is the alarm that was missing.
+ * failed: the service worker swallowed a missing file. This test is the alarm that was missing.
  *
- *  - every file the manifest, the page's manifest and touch-icon links, and the service worker's
- *    pre-cache list name is in `public/`;
+ *  - every file the manifest and the page's manifest and touch-icon links name is in `public/`;
  *  - each icon is a PNG of exactly its declared size, opaque (a maskable icon is cropped to any
  *    shape, so a transparent corner would show as black or white);
  *  - the manifest's paths are relative: Connect runs under /citizens/connect/ on 219.co.za, and
- *    a path that starts with "/" would point at the 219 root instead.
+ *    a path that starts with "/" would point at the 219 root instead;
+ *  - `public/sw.js` is the retired service worker: it only removes the worker phones picked up
+ *    between April and June 2026, and nothing in the app registers one.
  */
 import { describe, it, expect } from "vitest";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const APP = process.cwd();
 const PUBLIC = join(APP, "public");
+const FRONTEND = join(APP, "src", "frontend");
 const read = (rel: string) => readFileSync(join(APP, rel), "utf8");
 
 interface ManifestIcon {
@@ -91,11 +93,33 @@ describe("the home-screen app's files", () => {
     }
   });
 
-  it("every file the service worker pre-caches exists", () => {
-    const list = /const SHELL_ASSETS = \[([^\]]*)\]/.exec(read("public/sw.js"))?.[1];
-    expect(list, "SHELL_ASSETS in public/sw.js").toBeTruthy();
-    const paths = [...list!.matchAll(/["']([^"']+)["']/g)].map((match) => match[1]);
-    expect(paths.length).toBeGreaterThan(0);
-    for (const path of paths) expect(existsSync(join(PUBLIC, path.replace(/^\//, ""))), `${path} is missing from public/`).toBe(true);
+});
+
+describe("the retired service worker", () => {
+  // Comments describe what the file must not do, so only the code is checked.
+  const code = read("public/sw.js")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  it("removes the old store and unregisters itself", () => {
+    expect(code).toMatch(/addEventListener\(\s*["']activate["']/);
+    expect(code).toContain("caches.delete(");
+    expect(code).toContain("self.registration.unregister()");
+    // Without this a phone keeps the old worker until every Connect tab is closed.
+    expect(code).toContain("self.skipWaiting()");
+  });
+
+  it("never answers a request and stores nothing", () => {
+    expect(code).not.toMatch(/addEventListener\(\s*["']fetch["']/);
+    expect(code).not.toMatch(/respondWith|caches\.open|\.put\(|\.add(All)?\(|clients\.claim/);
+  });
+
+  it("nothing in the app registers a service worker", () => {
+    const sources = readdirSync(FRONTEND, { recursive: true, encoding: "utf8" })
+      .filter((file) => /\.(jsx?|html)$/.test(file) && !/(^|[\\/])vendor[\\/]/.test(file))
+      .map((file) => [file, readFileSync(join(FRONTEND, file), "utf8")] as const);
+    expect(sources.length).toBeGreaterThan(20);
+    const registering = sources.filter(([, text]) => /serviceWorker\s*\.\s*register/.test(text)).map(([file]) => file);
+    expect(registering).toEqual([]);
   });
 });

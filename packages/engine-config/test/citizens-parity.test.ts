@@ -342,7 +342,6 @@ describe('vocabulary', () => {
     'screen.loading': { file: `${APP}/auth.jsx`, wrap: (text) => `'aria-label': '${text}'` },
     'screen.wordmark.primary': { file: shell, wrap: (text) => `font-display' }, '${text}')` },
     'screen.wordmark.secondary': { file: shell, wrap: (text) => `uppercase mt-0.5' }, '${text}')` },
-    'screen.offline.body': { file: `${CONNECT}/public/sw.js` },
     'screen.admin.tab.partners': {
       file: `${APP}/admin.jsx`,
       wrap: (text) => `value: 'contributors', label: '${text}'`,
@@ -408,9 +407,18 @@ describe('vocabulary', () => {
   /** Messages with nothing to compare: the text is empty in Connect today. */
   const EMPTY_TODAY: readonly MessageKey[] = ['meta.description'];
 
+  /**
+   * Messages Connect does not show today. The offline page was written by the service worker,
+   * which was retired on 2026-11-12; the message stays in the catalogue for a world that has one.
+   */
+  const NOT_SHOWN_TODAY: readonly MessageKey[] = ['screen.offline.body'];
+
   it('every message is tied to the place Connect writes it', () => {
-    const untied = MESSAGE_KEYS.filter((key) => !SOURCES[key] && !EMPTY_TODAY.includes(key));
+    const untied = MESSAGE_KEYS.filter(
+      (key) => !SOURCES[key] && !EMPTY_TODAY.includes(key) && !NOT_SHOWN_TODAY.includes(key),
+    );
     expect(untied).toEqual([]);
+    for (const key of NOT_SHOWN_TODAY) expect(SOURCES[key], key).toBeUndefined();
     for (const key of EMPTY_TODAY) expect(world.t(key), key).toBe('');
   });
 

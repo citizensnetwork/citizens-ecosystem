@@ -90,7 +90,6 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/connect/public/manifest.json",
-        "$TURBO_ROOT$/apps/connect/public/sw.js",
         "$TURBO_ROOT$/apps/connect/src/frontend/index.html",
         "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
         "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
@@ -105,7 +104,6 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/connect/public/manifest.json",
-        "$TURBO_ROOT$/apps/connect/public/sw.js",
         "$TURBO_ROOT$/apps/connect/src/frontend/index.html",
         "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
         "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
