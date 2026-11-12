@@ -571,4 +571,25 @@ test.describe("The server serves the app under the prefix and nowhere else", () 
     expect((await request.get(`${BASE}/assets/citizens-crown.png`)).status()).toBe(200);
     expect((await request.get(`${BASE}/vendor/maplibre-gl/maplibre-gl.css`)).status()).toBe(200);
   });
+
+  test("the home-screen app's manifest, icons and start address all resolve under the prefix", async ({ request, baseURL }) => {
+    const html = await (await request.get(`${BASE}/`)).text();
+    const base = new URL(/<base href="([^"]+)"/.exec(html)![1], baseURL);
+    expect(base.pathname).toBe(`${BASE}/`);
+    // index.html writes rel before href on every <link>.
+    const links = new Map([...html.matchAll(/<link\b[^>]*\brel="([^"]+)"[^>]*\bhref="([^"]+)"/g)].map((match) => [match[1], new URL(match[2], base)]));
+    const manifestUrl = links.get("manifest")!;
+    expect(manifestUrl.pathname).toBe(`${BASE}/manifest.json`);
+    expect(links.get("apple-touch-icon")!.pathname).toBe(`${BASE}/icons/icon-192.png`);
+
+    const manifest = await (await request.get(manifestUrl.pathname)).json();
+    expect(new URL(manifest.start_url, manifestUrl).pathname).toBe(`${BASE}/`);
+    for (const icon of manifest.icons) {
+      const url = new URL(icon.src, manifestUrl);
+      expect(url.pathname.startsWith(`${BASE}/icons/`), url.pathname).toBe(true);
+      const response = await request.get(url.pathname);
+      expect(response.status(), url.pathname).toBe(200);
+      expect(response.headers()["content-type"]).toContain("image/png");
+    }
+  });
 });
