@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════
 --  188_moments: P2-05 Moments, ADAPTED. Authored as docs/proposals/p2-05-moments.sql on 2026-10-17; applied the same day
---  through MCP apply_migration as `188_moments` on Stephen's yes in chat (one yes per file; pre-apply tag
---  `connect-pre-mig188-moments`). The live reports_target_type_check was re-read first (five targets, as the file assumes).
+--  through MCP apply_migration as `188_moments` on Stephen's yes in chat (no pre-apply git tag; the file need not be named).
+--  The live reports_target_type_check was re-read first (five targets, as the file assumes).
 --
 --  A Moment is a short note (up to 280 characters, one optional image) that clears itself after a day. It has NO unseen ring and
 --  NO countdown (tracker Q4, the attention test): nothing records who has seen what, and a Contributor is never shown who or how

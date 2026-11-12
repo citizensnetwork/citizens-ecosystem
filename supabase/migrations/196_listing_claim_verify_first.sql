@@ -1,6 +1,6 @@
 -- 196 — C10: verify-first attach for Google Form approvals and Admin Create.
 --
--- APPLIED 2026-10-21 (live version 20261021202339, pre-apply tag connect-pre-mig196-listing-claim). 195 (service areas) was applied a few seconds later.
+-- APPLIED 2026-10-21 (live version 20261021202339, after the founder's yes in chat; no pre-apply git tag; the file need not be named). 195 (service areas) was applied a few seconds later.
 --
 -- The problem (GitHub #159, tracker C10)
 -- --------------------------------------
@@ -421,10 +421,10 @@ on conflict do nothing;
 
 -- ── 7. ROLLBACK (keep with the migration; do not run as part of the apply) ───────────────────
 -- Restores the pre-C10 bodies (mig 179 claim, mig 173 mark_own) and removes the ledger. Take the bodies
--- from those two files (git show <tag>:supabase/migrations/179_... and 173_...) rather than retyping them.
+-- from those two files (git show <commit>:supabase/migrations/179_... and 173_...) rather than retyping them.
 --   drop function if exists public.decline_listing_claim();
 --   drop function if exists public.peek_claimable_listing();
 --   -- re-create claim_admin_created_contributor() from mig 179 and mark_own_listing_claimed() from mig 173
 --   --   (CREATE OR REPLACE; restate `set search_path to ''` and the grants)
 --   drop table if exists public.listing_claims;
---   -- The pre-apply git tag is the restore point: connect-pre-mig196-listing-claim (name follows the final number).
+--   -- Restore from git history of this file. There is no pre-apply git tag.

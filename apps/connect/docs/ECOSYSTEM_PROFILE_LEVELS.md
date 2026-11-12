@@ -171,7 +171,8 @@ deliberately narrower than 143's blanket pattern — no anon, no authenticated w
 5. Follow-up (app-side, after apply): Wear `/api/admin/*` routes gated on `wear.is_moderator()`
    + a minimal triage screen; grants issued by founder via MCP/SQL until an admin UI exists.
 
-**Applied per protocol** (SHARED_DB_CONTRACT R7): pre-apply tag `connect-pre-mig145` →
+**Applied** (SHARED_DB_CONTRACT R7; the founder's yes in chat. R7.4, 2026-11-01, dropped the
+pre-apply git tag and the requirement that the founder name the file):
 `apply_migration` (145, then 146 grants fix) → advisors **0 ERROR / 0 new findings** (72 WARN /
 3 INFO = mig-144 baseline byte-for-byte) → smoke-verified via rolled-back prod transactions
 (plain user: 0 reports / 0 roles visible, self-escalation INSERT denied; moderator: queue

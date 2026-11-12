@@ -2,7 +2,7 @@
 --  195_service_areas: serving areas for online and no-fixed-location Contributors (issue #259, option 3 "the globe").
 --
 --  APPLIED 2026-10-21 through MCP apply_migration as `195_service_areas` (remote version 20261021202404), on Stephen's yes in
---  chat naming this file (pre-apply tag `connect-pre-mig195-service-areas`). The statements applied are this file's, with the
+--  chat (no pre-apply git tag; the file need not be named). The statements applied are this file's, with the
 --  comments left out. Rollback-only probe docs/audit/probes/195_service_areas.probe.sql.
 --
 --  KNOWN DEFECT, FIXED BY 197_service_areas_anon_read.sql (APPLIED 2026-10-21, see its header): the probe run on the live
