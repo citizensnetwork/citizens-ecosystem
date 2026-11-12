@@ -12,8 +12,8 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
-    "test": "node --test scripts/vercel-ignore.test.mjs && turbo run test",
-    "test:coverage": "node --test scripts/vercel-ignore.test.mjs && turbo run test:coverage",
+    "test": "node --test scripts/vercel-ignore.test.mjs scripts/cutover-preflight.test.mjs && turbo run test",
+    "test:coverage": "node --test scripts/vercel-ignore.test.mjs scripts/cutover-preflight.test.mjs && turbo run test:coverage",
     "test:e2e": "turbo run test:e2e",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\""

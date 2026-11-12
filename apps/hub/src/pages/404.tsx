@@ -8,7 +8,7 @@ export const config = { unstable_runtimeJS: false };
 
 const NotFound: NextPage = () => (
   <Layout title={NOT_FOUND_TITLE} description={NOT_FOUND_BODY} noindex>
-    <section className="soon" aria-labelledby="notfound-title">
+    <section className="wrap prose" aria-labelledby="notfound-title">
       <h1 id="notfound-title">{NOT_FOUND_TITLE}</h1>
       <p className="lead">{NOT_FOUND_BODY}</p>
       <a className="button" href={PATH_ROOT}>

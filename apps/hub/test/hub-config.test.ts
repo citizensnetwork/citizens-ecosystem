@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { APP_SLUGS, COMING_SOON, PRODUCTION_ORIGINS, SITE_ORIGIN } from '@citizens/ecosystem';
 import {
+  CONNECT_ROOT_PAGES,
   HUB_PAGES,
   contentSecurityPolicy,
   hubHeaders,
@@ -111,8 +112,86 @@ describe('proxyRewrites', () => {
 });
 
 describe('hubRedirects', () => {
+  const rules = hubRedirects();
+  // The first rule whose compiled source matches, as Next applies them (first match wins).
+  const firstMatch = (path: string) => rules.find((rule) => toRegExp(rule.source).test(path));
+
   it('sends / to /citizens as a 302 (not permanent, so the root stays free)', () => {
-    expect(hubRedirects()).toEqual([{ source: '/', destination: '/citizens', statusCode: 302 }]);
+    expect(rules[0]).toEqual({ source: '/', destination: '/citizens', statusCode: 302 });
+  });
+
+  it('forwards Connect’s old root addresses (2026-11-01 to 11-03) to the same screen under its prefix, permanently', () => {
+    for (const path of [
+      '/c/a-church',
+      '/e/42',
+      '/p/7',
+      '/dashboard',
+      '/dashboard/saved',
+      '/discover',
+      '/upgrade/t0k/decline',
+      '/index.html',
+    ]) {
+      const rule = firstMatch(path);
+      expect(rule, path).toBeDefined();
+      expect(rule?.statusCode, path).toBe(308);
+      expect(rule?.destination.startsWith('/citizens/connect/'), path).toBe(true);
+    }
+  });
+
+  it('leaves the hub’s own addresses, the apps’ prefixes, /api and near-misses alone', () => {
+    const own = [
+      '/citizens',
+      '/citizens/connect',
+      '/citizens/c/x',
+      '/_next/static/x.css',
+      '/favicon.ico',
+      '/icon.svg',
+      '/robots.txt',
+      '/sitemap.xml',
+      '/citizens-crown.png',
+      '/api/intake/google-form',
+      '/cx',
+      '/discovery',
+      '/index.htm',
+      '/index.html/x',
+    ];
+    for (const path of own) expect(firstMatch(path), path).toBeUndefined();
+  });
+
+  it('forwards exactly the pages in Connect’s route table (apps/connect/next.config.ts), so none lands on a 404', () => {
+    const config = readFileSync(
+      fileURLToPath(new URL('../../connect/next.config.ts', import.meta.url)),
+      'utf8',
+    );
+    const appPages = config.match(/const APP_PAGES = \[([\s\S]*?)\]/)?.[1] ?? '';
+    const segments = new Set<string>([
+      ...[...appPages.matchAll(/"([a-z-]+)"/g)].map((m) => m[1] as string),
+      ...[...config.matchAll(/toApp\("\/([a-z-]+)\/:/g)].map((m) => m[1] as string),
+    ]);
+    expect(segments.size, 'the route table could not be read').toBeGreaterThan(10);
+    expect([...CONNECT_ROOT_PAGES].sort()).toEqual([...segments].sort());
+  });
+
+  it('gives a bare page and a longer path each an exact destination: one hop, no trailing slash', () => {
+    // An empty `:rest*` in a destination becomes a trailing slash on Vercel (/citizens/connect/discover/), and Connect
+    // then redirects a second time. A destination may only use required parameters.
+    for (const rule of rules) expect(rule.destination, rule.source).not.toMatch(/:[a-z]+[*?]/);
+    expect(firstMatch('/discover')?.destination).toBe('/citizens/connect/:page');
+    expect(firstMatch('/dashboard/saved')?.destination).toBe('/citizens/connect/:page/:rest+');
+  });
+
+  it('never forwards a path the hub serves itself', () => {
+    const publicFiles = [
+      'favicon.ico',
+      'icon.svg',
+      'robots.txt',
+      'sitemap.xml',
+      'citizens-crown.png',
+    ];
+    for (const page of CONNECT_ROOT_PAGES) {
+      expect(['citizens', '_next', 'api', ...publicFiles], page).not.toContain(page);
+      expect(page, page).toMatch(/^[a-z]+$/);
+    }
   });
 });
 
@@ -171,6 +250,10 @@ describe('hubHeaders', () => {
     for (const path of [
       '/',
       '/citizens',
+      '/citizens/ecosystem',
+      '/citizens/how-it-works',
+      '/citizens/philosophy',
+      '/citizens/get-involved',
       '/citizens/learn',
       '/citizens/play',
       '/citizens/move',
@@ -228,8 +311,23 @@ describe('robots.txt and sitemap.xml', () => {
   });
 
   it('the sitemap lists the hub’s own indexable pages only (no app, no noindex page)', () => {
-    expect([...HUB_PAGES]).toEqual(['/citizens']);
+    expect([...HUB_PAGES]).toEqual([
+      '/citizens',
+      '/citizens/ecosystem',
+      '/citizens/how-it-works',
+      '/citizens/philosophy',
+      '/citizens/get-involved',
+    ]);
     const locs = [...sitemapXml().matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-    expect(locs).toEqual([`${SITE_ORIGIN}/citizens`]);
+    expect(locs).toEqual([...HUB_PAGES].map((page) => `${SITE_ORIGIN}${page}`));
+  });
+
+  it('no hub page shares its slug with an app, built or coming soon (a page would hide the app, or the app the page)', () => {
+    const taken = new Set<string>([...APP_SLUGS, ...COMING_SOON.map((app) => app.slug)]);
+    for (const page of HUB_PAGES) {
+      const slug = page.split('/').pop() as string;
+      if (page === '/citizens') continue;
+      expect(taken.has(slug), `${page} collides with an app slug`).toBe(false);
+    }
   });
 });

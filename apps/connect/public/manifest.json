@@ -2,7 +2,7 @@
   "name": "Citizens Connect",
   "short_name": "Citizens",
   "description": "Discover faith-based events, places, and community near you. Connecting the Kingdom.",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f7f6f3",
   "theme_color": "#f2bd22",
@@ -10,13 +10,13 @@
   "categories": ["social", "lifestyle"],
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

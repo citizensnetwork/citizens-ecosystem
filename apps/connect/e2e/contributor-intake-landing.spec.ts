@@ -95,7 +95,6 @@ test.describe("Listing link /c/<slug>", () => {
 // ── Real-mode session against a fake Supabase project ─────────────────
 
 async function signedInAs(page: Page, profile: { role: string; contributor_status: string }, waiting = false) {
-  const claimCalls: number[] = [];
   await mockApp(page, { supabaseUrl: FAKE_PROJECT, anonKey: "e2e-anon-key" });
   const rpcCalls = await signInToFakeProject(page, {
     user: { id: OWNER_ID, email: "daniel@gracepointchurch.org.za", fullName: LISTING.full_name },

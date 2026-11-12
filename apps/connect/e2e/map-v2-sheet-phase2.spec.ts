@@ -126,7 +126,8 @@ test.describe("P2-08 count buckets: shown only from 100, never below", () => {
 });
 
 test.describe("P2-06 QR code per Contributor", () => {
-  const URL_OF = (slug: string) => `https://www.citizenscentral.co.za/c/${slug}`;
+  // The shared domain; this run serves Connect at the root, so no prefix (the front door forwards /c/<slug>).
+  const URL_OF = (slug: string) => `https://219.co.za/c/${slug}`;
 
   test("the sheet has a QR code action that opens a labelled dialog with the listing's public link", async ({ page }) => {
     const { c } = await openContributor(page, 0);

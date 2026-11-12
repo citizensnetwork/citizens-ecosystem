@@ -25,6 +25,12 @@
 <base href="/" />
 <title>Citizens Connect</title>
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<!-- Home-screen app (founder yes 2026-11-12): the manifest and the iPhone icon. Every path here and inside
+     manifest.json is relative, so it resolves under the base tag above, which is /citizens/connect/ on 219.co.za.
+     The icons are the crown on the manifest's background colour, full-bleed, the crown inside the maskable
+     safe zone. manifestFiles.test.ts fails if a listed file goes missing or a path turns absolute. -->
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

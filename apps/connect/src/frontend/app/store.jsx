@@ -2142,7 +2142,7 @@
           collaborators: null, createdAt: today(), lat: null, lng: null,
         };
         setIdeas((prev) => [local, ...prev]);
-        toast('Idea posted to the board (demo) — sign in to make it real.', 'gold');
+        toast('Need added to the board (demo) — sign in to make it real.', 'gold');
         if (done) done(true);
         return;
       }
@@ -2161,7 +2161,7 @@
           });
           const json = await res.json().catch(() => ({}));
           if (!res.ok) { toast(json.error || 'Could not post your idea.', 'red'); if (done) done(false); return; }
-          toast('Idea posted to the board! 💡', 'green');
+          toast('Need suggested! 💡', 'green');
           fetchIdeas();
           if (done) done(true);
         } catch (e) {

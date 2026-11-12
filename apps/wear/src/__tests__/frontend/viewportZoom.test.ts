@@ -5,7 +5,7 @@
  * uses --fs-3 (18px), the smallest token at or above that floor.
  */
 import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const root = process.cwd();
@@ -138,7 +138,15 @@ function textControls(): Control[] {
         if (style && style.includes("display: 'none'")) continue;
         const raw = style ? resolvedFontSize(source, call.index!, style) : null;
         const line = source.slice(0, call.index!).split('\n').length;
-        out.push({ file: p.slice(dir.length + 1), line, px: fontSizePx(raw) });
+        // Forward slashes on every OS: join() gives backslashes on Windows, and the checks below name 'app/<file>'.
+        out.push({
+          file: p
+            .slice(dir.length + 1)
+            .split(sep)
+            .join('/'),
+          line,
+          px: fontSizePx(raw),
+        });
       }
     }
   };
