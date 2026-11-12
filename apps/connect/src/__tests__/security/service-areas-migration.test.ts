@@ -46,7 +46,7 @@ describe("the migration is one transaction with a way back", () => {
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     expect(raw).toMatch(/APPLIED 2026-10-21/);
-    expect(raw).toMatch(/pre-apply tag `connect-pre-mig195-service-areas`/);
+    expect(raw).toMatch(/no pre-apply git tag; the file need not be named/);
     expect(raw).toMatch(/-- Rollback/);
     expect(raw).toMatch(/drop table public\.service_areas;/);
   });
@@ -170,7 +170,7 @@ describe("197, the fix: the public (anon) read policies never touch the team hel
   };
   it("records its apply and what it fixes", () => {
     expect(fix).toMatch(/APPLIED 2026-10-21/);
-    expect(fix).toMatch(/pre-apply tag `connect-pre-mig197-service-areas-anon-read`/);
+    expect(fix).toMatch(/no pre-apply git tag; the file need not be named/);
     expect(fix).toMatch(/permission denied for function is_active_team_member/);
     expect(fix).toMatch(/-- Rollback/);
   });

@@ -2,7 +2,7 @@
 --  197_service_areas_anon_read: a fix to migration 195's three read policies.
 --
 --  APPLIED 2026-10-21 through MCP apply_migration as `197_service_areas_anon_read` (remote version 20261021205449), on Stephen's
---  yes in chat naming this file (pre-apply tag `connect-pre-mig197-service-areas-anon-read`). The statements applied are this
+--  yes in chat (no pre-apply git tag; the file need not be named). The statements applied are this
 --  file's, with the comments left out. The number is 197 because another session applied `196_listing_claim_verify_first` first.
 --  Rollback-only probe docs/audit/probes/195_service_areas.probe.sql is the probe for 195 and 197 together: run live AFTER this
 --  apply, every line PASSed and nothing persisted (26 areas, no links, no probe users left). Security advisor after: unchanged

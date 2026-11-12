@@ -1,7 +1,7 @@
 /**
- * Migration 202 is a proposal. It is not applied here. These checks pin the
- * Let's cap, the category lock, the empty search_path, and the anon revoke
- * so a later edit cannot quietly drop them. 201 is 201_open_to_collaborate.sql.
+ * These checks pin the Let's cap, the category lock, the empty search_path,
+ * and the anon revoke so a later edit cannot quietly drop them.
+ * 201 is 201_open_to_collaborate.sql.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -16,12 +16,12 @@ function starterIds(source: string): string[] {
   return [...source.matchAll(/'(evangelise|run|pray|worship|social|clean-up|coffee|flashmob)'/g)].map((m) => m[1]);
 }
 
-describe("migration 202 (not applied)", () => {
+describe("migration 202", () => {
   it("is 202, and 201 is not taken by this change", () => {
     expect(existsSync(join(root, "supabase/migrations/202_lets_gatherings.sql"))).toBe(true);
     expect(existsSync(join(root, "supabase/migrations/201_open_to_collaborate.sql"))).toBe(true);
-    expect(sql).toMatch(/NOT APPLIED/);
-    expect(sql).toMatch(/Do not apply/);
+    expect(sql).toMatch(/no pre-apply git tag/);
+    expect(sql).toMatch(/Do not apply it from an agent session/);
   });
 
   it("caps Let's rows at four, keeps the ordinary cap, and uses the same starter ids as the app", () => {

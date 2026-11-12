@@ -22,7 +22,7 @@
 --  DRY-RUN DONE (2026-10-17, nothing was applied): these statements were run inside a transaction that always rolls back,
 --  with synthetic users: 21 of 21 checks passed (listed at the foot of this file).
 --
---  If approved: pre-apply git tag, MCP apply_migration (<next free number>_moments), get_advisors (0 ERROR; list any new
+--  If approved: the founder's yes in chat (no pre-apply git tag; the file need not be named), MCP apply_migration (<next free number>_moments), get_advisors (0 ERROR; list any new
 --  WARN), rollback-only probe, move this file to supabase/migrations/ in the same PR. RE-READ the live
 --  reports_target_type_check first (five targets on 2026-10-17: event, user, place, comment, conversation).
 -- ════════════════════════════════════════════════════════════════════
