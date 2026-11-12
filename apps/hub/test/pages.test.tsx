@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { APP_SLUGS, COMING_SOON, PATH_ROOT, SITE_ORIGIN } from '@citizens/ecosystem';
 import { CONNECT_ROOT_PAGES, HUB_PAGES } from '../config/hub-config';
 import { hasAppIcon } from '../src/components/Icons';
-import Landing, { config as landingConfig } from '../src/pages/citizens/index';
+import Landing from '../src/pages/citizens/index';
+import * as landingModule from '../src/pages/citizens/index';
 import Ecosystem, { config as ecosystemConfig } from '../src/pages/citizens/ecosystem';
 import HowItWorks, { config as howConfig } from '../src/pages/citizens/how-it-works';
 import Philosophy, { config as philosophyConfig } from '../src/pages/citizens/philosophy';
@@ -96,7 +97,8 @@ const involved = html(<GetInvolved />);
 const notFound = html(<NotFound />);
 
 const everyPage = [
-  { name: '/citizens', markup: landing, config: landingConfig },
+  // The landing page is the one page with JavaScript: the Central feed (docs/central/CENTRAL_FEED_GUIDE.md).
+  { name: '/citizens', markup: landing, config: (landingModule as { config?: unknown }).config },
   { name: '/citizens/ecosystem', markup: ecosystem, config: ecosystemConfig },
   { name: '/citizens/how-it-works', markup: how, config: howConfig },
   { name: '/citizens/philosophy', markup: philosophy, config: philosophyConfig },
@@ -118,7 +120,7 @@ const knownAddresses = new Set<string>([
 ]);
 const markupByPath = new Map(everyPage.map((page) => [page.name, page.markup]));
 
-describe.each(everyPage)('every page: $name', ({ markup, config }) => {
+describe.each(everyPage)('every page: $name', ({ name, markup, config }) => {
   it('has one h1 and never skips a heading level', () => {
     expect(markup.match(/<h1\b/g)).toHaveLength(1);
     const levels = headingLevels(markup);
@@ -144,8 +146,9 @@ describe.each(everyPage)('every page: $name', ({ markup, config }) => {
     expect(markup).not.toMatch(/(?:src|href)="(?:https?:)?\/\//i);
   });
 
-  it('ships no JavaScript at all', () => {
-    expect(config).toEqual({ unstable_runtimeJS: false });
+  it('ships no JavaScript, except the landing page, which runs only the Central feed', () => {
+    if (name === PATH_ROOT) expect(config).toBeUndefined();
+    else expect(config).toEqual({ unstable_runtimeJS: false });
   });
 
   it('gives every image alt text and a size, and hides every svg from assistive technology', () => {

@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Central reference (sample content)</title>
+    <!--
+      The Central feed reference. SAMPLE CONTENT ONLY.
+
+      GENERATED FILE: central-reference.html is built from central-reference.template.html by
+      build.mjs, which inlines the real layout engine (packages/central/src/layout.ts) and the
+      sample data (packages/central/src/fixtures.ts). Edit the template, then run
+        node docs/central/reference/build.mjs
+
+      Every value in the stylesheet below is quoted from the approved design check and listed in
+      docs/central/CENTRAL_FEED_GUIDE.md, section 7. The three rules marked ENGINE replace the
+      design check's demo column script (guide sections 6.5 and 7.5). Do not restyle anything here.
+    -->
+    <style>
+      :root{--gold:#f2bd22;--pg:#efece2;--t:#272a25}
+      html[data-theme=dark]{--pg:#16170f;--t:#f7f6f1}
+      *{box-sizing:border-box}
+      body{margin:0;background:var(--pg);color:var(--t);font:16px/1.6 ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;transition:background .28s,color .28s}
+      button{font:inherit;color:inherit;cursor:pointer}
+      h1,h3,p{margin:0}
+      svg,img{display:block}
+      .kicker{font-size:11px;font-weight:600;letter-spacing:.17em;text-transform:uppercase}
+
+      /* Study controls: not part of Central. */
+      .study{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:8px 14px;font-size:12px;background:var(--pg);border-bottom:1px dashed #8884}
+      .study b{font-weight:600}
+      .study span{display:inline-flex;gap:4px;align-items:center}
+      .study button{border:1px solid #8886;background:transparent;border-radius:999px;padding:4px 11px;font-size:12px}
+      .study button.on{background:var(--t);color:var(--pg)}
+      .stage{margin:14px auto 60px;max-width:100%;transition:width .2s}
+      .cen-wrap{container-type:inline-size}
+
+      /* Central (guide section 7.1) */
+      .cen{--bg:#f7f6f1;--tx:#272a25;--tx2:#272a25a6;--hr:#272a2514;--card:linear-gradient(125deg,#f7f6f1e8,#f7f6f1a6 70%,#f7f6f170);--edge:#ffffffb8;--sh:0 12px 35px #272a2509;--raised:#fffdf8;min-height:100%;color:var(--tx);background:radial-gradient(ellipse at 100% 0%,color-mix(in srgb,var(--gold) 7%,transparent),transparent 50%),var(--bg);transition:background .28s,color .28s}
+      html[data-theme=dark] .cen{--bg:#1b1c18;--tx:#f7f6f1;--tx2:#f7f6f1b3;--hr:#f7f6f11f;--card:linear-gradient(125deg,#23251ff2,#2a2c26d8);--edge:#ffffff1a;--sh:0 12px 35px #00000059;--raised:#23251f}
+
+      /* Around the feed (guide section 7.3) */
+      .cen .in{padding:0 clamp(12px,4cqw,40px) 60px}
+      .cen .hero{padding:clamp(30px,6cqw,70px) 4px clamp(18px,3cqw,34px);max-width:860px}
+      .cen h1{font-size:clamp(36px,6.3cqw,63px);font-weight:500;letter-spacing:-.055em;line-height:1.04;margin:14px 0 14px}
+      .cen .hero p{font-size:16px;line-height:1.75;max-width:60ch;color:var(--tx2);margin:0}
+      .cen .lead2{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:12px}
+      .enc{border-radius:28px;padding:22px 24px;background:var(--card);border:1px solid var(--edge);box-shadow:var(--sh);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
+      .enc p{font-size:clamp(18px,2.3cqw,23px);font-weight:500;letter-spacing:-.03em;line-height:1.3;margin:10px 0 10px}
+      .enc small,.fc small{font-size:12px;color:var(--tx2)}
+      .hour{position:relative;border-radius:28px;padding:20px 22px;min-height:190px;overflow:hidden;border:1px solid var(--edge);box-shadow:var(--sh);color:#272a25;background:linear-gradient(160deg,#dfe5e8,#c9d2d6 55%,#b9c3c4);display:grid;align-content:space-between}
+      html[data-theme=dark] .hour{color:#f7f6f1;background:linear-gradient(160deg,#2b3236,#23292b 55%,#1d2221)}
+      .hour .time{font-size:54px;font-weight:400;letter-spacing:-.05em;line-height:1}
+      .hour .wx{position:absolute;right:18px;top:16px;width:58px;color:#6f8793}
+      html[data-theme=dark] .hour .wx{color:#a9bcc6}
+      .hour small{font-size:12.5px;opacity:.75}
+      .hour .kicker{display:block;max-width:calc(100% - 72px);margin-bottom:10px}
+      @container (min-width:760px){.cen .lead2{grid-template-columns:1.7fr 1fr}}
+
+      /* ENGINE: staggered columns. The layout engine gives every card its column, top and height (guide section 6.5). */
+      .feed{position:relative}
+      .fc{position:absolute;display:flex;flex-direction:column}
+
+      /* Card anatomy (guide section 7.4) */
+      .fc{width:100%;text-align:left;padding:0;border-radius:24px;overflow:hidden;background:var(--card);border:1px solid var(--edge);box-shadow:var(--sh);color:var(--tx);animation:usher .35s ease-out}
+      /* ENGINE: the image fills the card's spare height; its least proportion follows the span (guide section 7.5). */
+      .fc img{width:100%;object-fit:cover;flex:1 0 auto;aspect-ratio:1/1}
+      .fc.wide img{aspect-ratio:2/1}
+      .fc .tx{padding:13px 15px 16px;display:grid;gap:6px}
+      .fc .pl{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:11.5px;color:var(--tx2)}
+      .fc .pl b{display:inline-flex;align-items:center;gap:6px;color:var(--tx);font-weight:600;text-decoration:underline;text-decoration-color:var(--hr);text-underline-offset:3px}
+      .fc .pl i{width:8px;height:8px;border-radius:50%;background:var(--a)}
+      .fc h3{font-size:18px;font-weight:600;letter-spacing:-.03em;line-height:1.15;margin:0}
+      .fc .ico{width:22px;color:var(--tx)}
+      .fc ol{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:6px;font-size:13px}
+      .fc ol li{display:flex;gap:8px;align-items:center;padding-top:6px;border-top:1px solid var(--hr)}
+      .fc ol .ico{width:16px}
+      .fc.rest{background:linear-gradient(170deg,#e9e3d3,#d9d6c8);color:#272a25;border-color:#ffffffb8;min-height:230px;display:grid;align-content:end}
+      html[data-theme=dark] .fc.rest{background:linear-gradient(170deg,#2a2a22,#1f211b);color:#f7f6f1;border-color:#ffffff1a}
+      .fc.rest h3{font-size:26px;font-weight:500;letter-spacing:-.045em}
+      .fc.rest small{color:inherit;opacity:.65}
+
+      /* States (guide section 7.6) */
+      .more{padding:22px 0 8px;text-align:center;font-size:12.5px;color:var(--tx2)}
+      @keyframes usher{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+      @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+    </style>
+  </head>
+  <body>
+    <div class="study" aria-label="Study controls, not part of Central">
+      <b>Central reference</b>
+      <span>sample content · real layout engine</span>
+      <span data-ctl="theme"><button type="button" data-v="light" class="on">Light</button><button type="button" data-v="dark">Dark</button></span>
+      <span data-ctl="width"><button type="button" data-v="390">Phone 390</button><button type="button" data-v="1280">Desktop 1280</button><button type="button" data-v="" class="on">Window</button></span>
+      <span><button type="button" id="next">Load next page</button></span>
+      <span id="facts"></span>
+    </div>
+    <div class="stage" id="stage">
+      <div class="cen-wrap">
+        <div class="cen">
+          <div class="in">
+            <div class="hero">
+              <span class="kicker">Citizens · Connecting the Kingdom</span>
+              <h1>A little closer, every day.</h1>
+              <p>A place to experience life together — encouragement, connection and possibilities already among us.</p>
+            </div>
+            <div class="lead2">
+              <div class="enc"><span class="kicker" id="enc-k"></span><p id="enc-t"></p><small id="enc-s"></small></div>
+              <div class="hour"><span class="wx" id="wx"></span><div><span class="kicker">Central · This hour around you</span><div class="time" id="clock">--:--</div></div><small id="date"></small></div>
+            </div>
+            <div class="feed" id="feed"></div>
+            <div class="more" id="more">More is arriving…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const Layout = /*__ENGINE__*/ null;
+      const DATA = /*__DATA__*/ null;
+
+      /* Icons: 24-unit outline set from the approved design check (guide section 7.6). */
+      const svg = (inner) => '<svg viewBox="0 0 24 24" width="100%" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + inner + '</svg>';
+      const p = (d) => '<path d="' + d + '"/>';
+      const ICON = {
+        run: svg(p('M14 22V16.9612C14 16.3537 13.7238 15.7791 13.2494 15.3995L11.5 14M11.5 14L13 7.5M11.5 14L10 13M13 7.5L11 7M13 7.5L15.0426 10.7681C15.3345 11.2352 15.8062 11.5612 16.3463 11.6693L18 12M10 13L11 7M10 13L9.40011 16.2994C9.18673 17.473 8.00015 18.2 6.85767 17.8573L4 17M11 7L8.10557 8.44721C7.428 8.786 7 9.47852 7 10.2361V12M14.5 3.5C14.5 4.05228 14.0523 4.5 13.5 4.5C12.9477 4.5 12.5 4.05228 12.5 3.5C12.5 2.94772 12.9477 2.5 13.5 2.5C14.0523 2.5 14.5 2.94772 14.5 3.5Z')),
+        volume: svg(p('M11 5L6 9H3v6h3l5 4z') + p('M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13')),
+        notes: svg(p('M9 18V6l10-2v12') + '<circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>'),
+        book: svg(p('M12 10.4V20M12 10.4C12 8.16 12 7.04 11.56 6.18C11.18 5.43 10.57 4.82 9.82 4.44C8.96 4 7.84 4 5.6 4H4.6C4.04 4 3.76 4 3.55 4.11C3.36 4.2 3.2 4.36 3.11 4.55C3 4.76 3 5.04 3 5.6V16.4C3 16.96 3 17.24 3.11 17.45C3.2 17.64 3.36 17.8 3.55 17.89C3.76 18 4.04 18 4.6 18H7.55C8.09 18 8.36 18 8.62 18.05C8.85 18.09 9.08 18.16 9.29 18.25C9.54 18.36 9.76 18.51 10.21 18.81L12 20M12 10.4C12 8.16 12 7.04 12.44 6.18C12.82 5.43 13.43 4.82 14.18 4.44C15.04 4 16.16 4 18.4 4H19.4C19.96 4 20.24 4 20.45 4.11C20.64 4.2 20.8 4.36 20.89 4.55C21 4.76 21 5.04 21 5.6V16.4C21 16.96 21 17.24 20.89 17.45C20.8 17.64 20.64 17.8 20.45 17.89C20.24 18 19.96 18 19.4 18H16.45C15.91 18 15.64 18 15.38 18.05C15.15 18.09 14.92 18.16 14.71 18.25C14.46 18.36 14.24 18.51 13.79 18.81L12 20')),
+        bag: svg(p('M8 8H7.71C6.75 8 6.27 8 5.88 8.18C5.53 8.33 5.24 8.58 5.03 8.89C4.79 9.25 4.71 9.72 4.55 10.67L3.62 16.27C3.41 17.56 3.3 18.2 3.49 18.7C3.65 19.13 3.96 19.5 4.37 19.73C4.83 20 5.48 20 6.78 20H17.22C18.52 20 19.17 20 19.63 19.73C20.04 19.5 20.35 19.13 20.51 18.7C20.7 18.2 20.59 17.56 20.38 16.28L19.45 10.67C19.29 9.72 19.21 9.25 18.97 8.89C18.76 8.58 18.47 8.33 18.12 8.18C17.73 8 17.25 8 16.29 8H16M8 8H16M8 8C8 5.79 9.79 4 12 4C14.21 4 16 5.79 16 8')),
+        cloud: svg(p('M7 18a4 4 0 0 1-.6-7.96A6 6 0 0 1 18 9.5 4.25 4.25 0 0 1 17.5 18Z')),
+      };
+
+      /* Photo stand-ins: blurred colour, no real images (as in the approved design check). */
+      const PAIRS = [['#e2a86b', '#6b4b8a'], ['#b9a6d6', '#5b4a7a'], ['#d9b07a', '#5d6b4a'], ['#c98f6a', '#3f4a5c'], ['#e6c9a0', '#8a5a44'], ['#a9c0a0', '#46584c'], ['#e8b98a', '#7a4a52'], ['#bcc7d6', '#4a566e']];
+      function standIn(url) {
+        const n = Number((/(\d+)$/.exec(url) || [0, 0])[1]);
+        const c = PAIRS[n % PAIRS.length];
+        const s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="' + c[0] + '"/><stop offset="1" stop-color="' + c[1] + '"/></linearGradient><filter id="b"><feGaussianBlur stdDeviation="22"/></filter></defs><rect width="400" height="300" fill="url(#g)"/><g filter="url(#b)" opacity=".6"><circle cx="' + (80 + ((n * 67) % 220)) + '" cy="' + (70 + ((n * 41) % 110)) + '" r="70" fill="#fff3d6"/><circle cx="' + (320 - ((n * 53) % 180)) + '" cy="' + (230 - ((n * 29) % 90)) + '" r="95" fill="' + c[1] + '"/><ellipse cx="200" cy="300" rx="260" ry="60" fill="#1c241c"/></g></svg>';
+        return 'data:image/svg+xml,' + encodeURIComponent(s);
+      }
+
+      const $ = (id) => document.getElementById(id);
+      const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+      const APPS = Object.fromEntries(DATA.apps.map((a) => [a.slug, a]));
+
+      /* One card. The template is chosen by the data the item carries, never by its app.
+         `span` comes from the layout engine's placement, not from the item's own shape. */
+      function card(item, span) {
+        const c = el('button', 'fc' + (span === 2 ? ' wide' : '') + (item.kind === 'pause' ? ' rest' : ''));
+        c.type = 'button';
+        c.dataset.id = item.id;
+        const tx = el('span', 'tx');
+        if (item.kind === 'pause') {
+          tx.append(el('small', '', item.summary || ''), el('h3', '', item.title));
+          c.append(tx);
+          return c;
+        }
+        if (item.image) { const img = el('img'); img.src = standIn(item.image.url); img.alt = item.image.alt; c.append(img); }
+        const app = APPS[item.app];
+        const pl = el('span', 'pl');
+        const name = el('b');
+        if (app.accent) { const dot = el('i'); name.style.setProperty('--a', app.accent); name.append(dot); }
+        name.append(app.name);
+        pl.append(name, '· ' + item.kicker);
+        tx.append(pl);
+        if (!item.image && item.icon && ICON[item.icon]) { const ic = el('span', 'ico'); ic.innerHTML = ICON[item.icon]; tx.append(ic); }
+        tx.append(el('h3', '', item.title));
+        if (item.list) {
+          const ol = el('ol');
+          for (const line of item.list) { const li = el('li'); const ic = el('span', 'ico'); ic.innerHTML = ICON.notes; li.append(ic, line); ol.append(li); }
+          tx.append(ol);
+        } else if (item.summary) tx.append(el('small', '', item.summary));
+        c.append(tx);
+        return c;
+      }
+
+      /* The sample edition: the twelve sample cards, twice (24 cards, 2 pages of 12). Finite. */
+      const EDITION = [0, 1].flatMap((round) => DATA.feed.map((item) => ({ ...item, id: item.id + '/' + round })));
+      const PAGE = 12;
+      const feed = $('feed');
+      const GAP = 12;
+      const BY_ID = Object.fromEntries(EDITION.map((item) => [item.id, item]));
+      const drawn = new Map();
+      let state; let shown; let cols; let colW; let feedW;
+
+      /* The engine asks how tall a card is at the width it will be drawn. Draw it out of sight and read it. */
+      function measureCard(item, span) {
+        const c = card(BY_ID[item.id], span);
+        c.style.width = Layout.cardWidth(colW, span, GAP) + 'px';
+        c.style.visibility = 'hidden';
+        feed.append(c);
+        drawn.set(item.id, c);
+        return c.getBoundingClientRect().height;
+      }
+
+      function addPage() {
+        if (shown >= EDITION.length) return;
+        const batch = EDITION.slice(shown, shown + PAGE);
+        shown += batch.length;
+        const final = shown >= EDITION.length;
+        const result = Layout.layoutBatch(state, batch, measureCard, { final });
+        state = result.state;
+        for (const place of result.placements) {
+          const c = drawn.get(place.id);
+          c.style.left = Layout.cardLeft(place.col, colW, GAP) + 'px';
+          c.style.top = place.top + 'px';
+          c.style.height = place.height + 'px';
+          c.style.visibility = '';
+        }
+        /* A card placed earlier may grow to close the gap under a landscape card. It never moves. */
+        for (const grown of result.extended) drawn.get(grown.id).style.height = grown.height + 'px';
+        feed.style.height = result.height + 'px';
+        $('more').textContent = final ? 'You’re all caught up' : 'More is arriving…';
+        $('next').disabled = final;
+        $('facts').textContent = cols + ' columns · ' + feed.children.length + ' of ' + EDITION.length + ' cards on screen' + (state.held.length ? ' · ' + state.held.length + ' waiting for a full row' : '');
+      }
+      function start() {
+        feedW = feed.clientWidth;
+        cols = Layout.columnsForWidth(feedW);
+        colW = Layout.columnWidth(feedW, cols, GAP);
+        feed.replaceChildren();
+        drawn.clear();
+        state = Layout.createLayout(cols, GAP);
+        shown = 0;
+        addPage();
+      }
+
+      $('enc-k').textContent = DATA.encouragement.kicker;
+      $('enc-t').textContent = '“' + DATA.encouragement.title + '”';
+      $('enc-s').textContent = DATA.encouragement.summary;
+      $('wx').innerHTML = ICON.cloud;
+      function tick() {
+        const d = new Date();
+        const f = (o) => new Intl.DateTimeFormat('en-GB', Object.assign({ timeZone: 'Africa/Johannesburg' }, o)).format(d);
+        $('clock').textContent = f({ hour: '2-digit', minute: '2-digit' });
+        $('date').textContent = 'Pretoria · ' + f({ weekday: 'long', day: 'numeric', month: 'long' });
+      }
+      tick(); setInterval(tick, 20000);
+
+      $('next').addEventListener('click', addPage);
+      document.querySelectorAll('.study [data-ctl]').forEach((group) => group.addEventListener('click', (e) => {
+        const b = e.target.closest('button'); if (!b) return;
+        group.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        if (group.dataset.ctl === 'theme') document.documentElement.dataset.theme = b.dataset.v;
+        else { $('stage').style.width = b.dataset.v ? b.dataset.v + 'px' : ''; }
+      }));
+      /* Columns follow the feed container's width. A change of column count lays the edition out again. */
+      new ResizeObserver(() => { if (feed.clientWidth !== feedW) start(); }).observe(feed);
+      start();
+    </script>
+  </body>
+</html>
