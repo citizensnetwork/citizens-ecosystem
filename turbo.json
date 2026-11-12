@@ -81,6 +81,41 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "@engine/config#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@engine/config#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/connect/public/manifest.json",
+        "$TURBO_ROOT$/apps/connect/public/sw.js",
+        "$TURBO_ROOT$/apps/connect/src/frontend/index.html",
+        "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
+        "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
+        "$TURBO_ROOT$/apps/connect/src/lib/**",
+        "$TURBO_ROOT$/apps/connect/src/app/api/**",
+        "$TURBO_ROOT$/supabase/migrations/**",
+        "$TURBO_ROOT$/supabase/functions/notify-nearby-rsvp/**"
+      ]
+    },
+    "@engine/config#test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/connect/public/manifest.json",
+        "$TURBO_ROOT$/apps/connect/public/sw.js",
+        "$TURBO_ROOT$/apps/connect/src/frontend/index.html",
+        "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
+        "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
+        "$TURBO_ROOT$/apps/connect/src/lib/**",
+        "$TURBO_ROOT$/apps/connect/src/app/api/**",
+        "$TURBO_ROOT$/supabase/migrations/**",
+        "$TURBO_ROOT$/supabase/functions/notify-nearby-rsvp/**"
+      ],
+      "outputs": ["coverage/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
