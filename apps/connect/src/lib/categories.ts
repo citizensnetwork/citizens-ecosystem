@@ -45,7 +45,7 @@ export const CATEGORY_LABELS_SHORT: Record<EventCategory, string> = {
 /** Hex colour per category — used for calendar, map markers, badges. */
 export const CATEGORY_HEX: Record<EventCategory, string> = {
   "worship-prayer": "#B8860B",
-  "church-services": "#F2BD22",
+  "church-services": "#7040b5",
   "outreach-missions": "#1ABC9C",
   "markets-expos": "#F39C12",
   "sport-recreation": "#2ECC71",
@@ -121,8 +121,7 @@ export const EVENT_CATEGORIES: { value: EventCategory; label: string }[] = [
  * event category so `window.DATA.getItemCategory` can return them; a test keeps
  * the two copies equal. Cards read those fields and do not name a group.
  *
- * The Members Only group label is "Access", as decided. Whether "Members" would
- * read more clearly is an open note for the Designer, not a second label here.
+ * Members Only sits with Audiences, the same group the map uses.
  */
 export const EVENT_GROUPS = [
   { id: "worship-church", label: "Worship & church" },
@@ -130,7 +129,6 @@ export const EVENT_GROUPS = [
   { id: "learn-grow", label: "Learn & grow" },
   { id: "culture-fun", label: "Culture & fun" },
   { id: "audiences", label: "Audiences" },
-  { id: "access", label: "Access" },
 ] as const;
 
 export type EventGroupId = (typeof EVENT_GROUPS)[number]["id"];
@@ -153,7 +151,7 @@ export const EVENT_CATEGORY_GROUP: Record<EventCategory, EventGroupId> = {
   "womens-community": "audiences",
   "youth-students": "audiences",
   kids: "audiences",
-  "members-only": "access",
+  "members-only": "audiences",
 };
 
 export function eventCategoryGroup(
@@ -211,7 +209,7 @@ export const PLACE_CATEGORY_DESCRIPTIONS: Record<PlaceCategory, string> = {
 
 /** Hex colour per place category. */
 export const PLACE_CATEGORY_HEX: Record<PlaceCategory, string> = {
-  "churches-ministries": "#F2BD22",
+  "churches-ministries": "#7040b5",
   "hospitality-cafes": "#8B4513",
   "recreation-sport": "#2ECC71",
   "media-broadcasting": "#9B59B6",
@@ -219,7 +217,7 @@ export const PLACE_CATEGORY_HEX: Record<PlaceCategory, string> = {
   "health-wellness": "#E74C3C",
   "education-training": "#3498DB",
   "arts-creative": "#FF6B35",
-  "christian-businesses": "#A67C00",
+  "christian-businesses": "#687d20",
   "safe-spaces": "#B59CD9",
 };
 
@@ -269,10 +267,10 @@ export const CONTRIBUTOR_TYPES: readonly {
   hex: string;
   icon: string;
 }[] = [
-  { value: "churches-ministries", label: "Church", hex: "#F2BD22", icon: "Church" },
+  { value: "churches-ministries", label: "Church", hex: "#7040B5", icon: "Church" },
   { value: "outreach-missions", label: "Outreach / Mission", hex: "#1ABC9C", icon: "Globe" },
   { value: "markets-expos", label: "Market / Expo", hex: "#F39C12", icon: "Store" },
-  { value: "christian-businesses", label: "Business", hex: "#A67C00", icon: "Store" },
+  { value: "christian-businesses", label: "Business", hex: "#687D20", icon: "Store" },
   { value: "sport-recreation", label: "Sport & Recreation", hex: "#2ECC71", icon: "CircleDot" },
   { value: "social-gatherings", label: "Social Gathering", hex: "#E91E63", icon: "Wine" },
   { value: "arts-culture", label: "Arts & Culture", hex: "#FF6B35", icon: "Palette" },

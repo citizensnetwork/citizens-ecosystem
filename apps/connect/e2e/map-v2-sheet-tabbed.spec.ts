@@ -7,7 +7,7 @@ import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, smallSeed, FI
 type C = { id: string; contributor_slug: string; physical_longitude: number; physical_latitude: number; full_name: string };
 type Seed = MapSeed & { contributors: C[]; places: { id: string; longitude: number; latitude: number }[]; events: { id: string; longitude: number; latitude: number }[] };
 
-const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
+const sheet = (page: Page) => page.locator(".cn-big");
 
 type MapHook = { jumpTo: (o: object, d: object) => void };
 const jump = (page: Page, lng: number, lat: number, zoom: number) =>

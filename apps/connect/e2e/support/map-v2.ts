@@ -98,28 +98,25 @@ export async function mapSettled(page: Page) {
  * screen (a spec that centres the map on a pin puts it right behind the row); the card is then pressed for real,
  * by a mouse or, with `how: "tap"`, by a touch tap, so the gesture that opens the sheet is a real one.
  */
-export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
+export async function openListing(page: Page, id: string, _how: "click" | "tap" = "click") {
   await mapSettled(page);
-  const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"][data-selected] [data-mv2='card2']`);
-  // a closed sheet leaves its card outlined; pressing the pin again would toggle that off, so press it only when needed
-  if (!(await card.count())) await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
-  await card.waitFor({ state: "visible", timeout: 10_000 });
-  // the row glides the card to its start; press it once it has stopped
-  await page.waitForFunction(
-    (sel) => {
-      const el = document.querySelector(sel);
-      if (!el) return false;
-      const w = window as unknown as { __mv2x?: number };
-      const x = el.getBoundingClientRect().left;
-      const still = w.__mv2x === x;
-      w.__mv2x = x;
-      return still;
-    },
-    `[data-mv2='explore'] [data-explore-id="${id}"] [data-mv2='card2']`,
-    { polling: 100, timeout: 5_000 },
-  );
-  if (how === "tap") await card.tap();
-  else await card.click();
+  const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
+  await pin.waitFor({ state: "attached", timeout: 15_000 });
+  // A marker MapLibre has panned off the screen cannot be clicked through the viewport.
+  // Two clicks: the first selects the Ink marker and opens the conveyor, the second opens the big preview.
+  await pin.evaluate((el) => {
+    const hit = el.querySelector(".marker-hit");
+    const target = hit instanceof HTMLElement ? hit : el;
+    if (target instanceof HTMLElement) target.click();
+  });
+  await page.locator(".cn-conveyor").waitFor({ state: "visible", timeout: 10_000 });
+  await pin.evaluate((el) => {
+    const hit = el.querySelector(".marker-hit");
+    const target = hit instanceof HTMLElement ? hit : el;
+    if (target instanceof HTMLElement) target.click();
+  });
+  await page.locator(".cn-big").waitFor({ state: "visible", timeout: 10_000 });
+  void _how;
 }
 
 /**
@@ -130,13 +127,19 @@ export async function openListing(page: Page, id: string, how: "click" | "tap" =
  */
 export async function toCleanMap(page: Page) {
   await page.evaluate(() => (window as unknown as { __cc: { go: (p: string, q: object) => void } }).__cc.go("home", { view: "map" }));
-  await page.locator("[data-mv2='explore']").waitFor({ state: "detached", timeout: 10_000 });
+  await page.locator("[data-screen='discover']").waitFor({ state: "visible", timeout: 10_000 });
 }
 export async function openPinSheet(page: Page, id: string, how: "click" | "tap" = "click") {
-  if (await page.locator("[data-mv2='explore']").count()) await toCleanMap(page);
+  await toCleanMap(page);
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
+  await pin.waitFor({ state: "visible", timeout: 15_000 });
+  // One tap opens the conveyor. A second tap opens the big preview.
   if (how === "tap") await pin.tap({ force: true });
   else await pin.click({ force: true });
+  await page.locator(".cn-conveyor").waitFor({ state: "visible", timeout: 10_000 });
+  if (how === "tap") await pin.tap({ force: true });
+  else await pin.click({ force: true });
+  await page.locator(".cn-big").waitFor({ state: "visible", timeout: 10_000 });
 }
 
 /**
@@ -223,7 +226,7 @@ export async function mockContributorDetail(
  * right before EVERY tap: a toast or a label change can move things between two taps.
  */
 export async function stillBox(page: Page, locator: Locator, { samples = 4, gapMs = 60 } = {}) {
-  const sheet = page.locator("[data-mv2='sheet']");
+  const sheet = page.locator(".cn-big");
   await expect
     .poll(
       async () => {

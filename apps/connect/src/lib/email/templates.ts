@@ -12,7 +12,7 @@ import { escapeHtml } from "@/lib/email/send";
 
 export type Email = { subject: string; html: string; text: string };
 
-const GOLD = "#F2BD22"; // the crown gold: the button and the rule beside a note
+const GOLD = "#D4AF37"; // the crown gold: the button and the rule beside a note
 const GOLD_INK = "#836100"; // gold text and links (4.5:1 on white; the crown gold itself is 1.74:1)
 const SIGN_OFF_HTML =
   "Connecting the Kingdom — one citizen, one contributor, one need at a time.<br>The Citizens Connect team";

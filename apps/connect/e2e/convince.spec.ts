@@ -233,7 +233,7 @@ test.describe("on the Map v2 sheet", () => {
     await page.waitForFunction(() => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= 3, undefined, { timeout: 20_000 });
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [ev.longitude, ev.latitude]);
     await openListing(page, ev.id);
-    const sheet = page.locator("[data-mv2='sheet']");
+    const sheet = page.locator(".cn-big");
     await expect(sheet).toBeVisible();
     await expect(sheet.locator("[data-consider-note]")).toBeVisible();
     await expect(sheet.locator('[data-convince="row"]')).toBeVisible();
@@ -257,13 +257,13 @@ test.describe("#183 the half sheet with the Convince row, on two phones", () => 
       await page.waitForFunction(() => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= 3, undefined, { timeout: 20_000 });
       await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [ev.longitude, ev.latitude]);
       await openPinSheet(page, ev.id); // #210: the half sheet is what a pin opens on the clean map; a card opens the full one
-      const sheet = page.locator("[data-mv2='sheet']");
+      const sheet = page.locator(".cn-big");
       await expect(sheet).toBeVisible();
       await expect(sheet).toHaveAttribute("data-snap", "half");
       const row = sheet.locator('[data-convince="row"]');
       await expect(row).toBeVisible();
-      await page.waitForFunction(() => document.querySelector("[data-mv2='sheet']")?.getAnimations({ subtree: true }).every((a) => a.playState !== "running"));
-      const parts: Record<string, string> = { sheet: "[data-mv2='sheet']", header: "[data-mv2='head']", actions: "[data-mv2='actions']", convince: '[data-convince="row"]' };
+      await page.waitForFunction(() => document.querySelector(".cn-big")?.getAnimations({ subtree: true }).every((a) => a.playState !== "running"));
+      const parts: Record<string, string> = { sheet: ".cn-big", header: "[data-mv2='head']", actions: "[data-mv2='actions']", convince: '[data-convince="row"]' };
       const boxes: Record<string, { top: number; bottom: number } | null> = {};
       for (const [name, sel] of Object.entries(parts)) {
         const b = await page.locator(sel).first().boundingBox();

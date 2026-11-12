@@ -15,7 +15,7 @@ import { touchSession, tapTouch, throttleCpu } from "./support/touch";
 type C = { id: string; contributor_slug: string; full_name: string; physical_longitude: number; physical_latitude: number };
 type P = { id: string; name: string; longitude: number; latitude: number };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[]; places: P[] };
-const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
+const sheet = (page: Page) => page.locator(".cn-big");
 type MapHook = { jumpTo: (o: object, d: object) => void };
 
 async function open(page: Page, kind: "contributor" | "place", index: number, followers?: number) {
@@ -33,7 +33,7 @@ async function open(page: Page, kind: "contributor" | "place", index: number, fo
   return { seed, t };
 }
 
-const followBtn = (page: Page) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: /^Follow(ing)?$/ });
+const followBtn = (page: Page) => page.locator(".cn-big .cn-actions button", { hasText: /^Follow(ing)?$/ });
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -68,7 +68,7 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
 
   test("Follow sits next to Directions and Share in the action row, and half still shows the header and the row", async ({ page }) => {
     await open(page, "contributor", 0);
-    const labels = await page.locator("[data-mv2='actions'] [data-mv2='action']").allTextContents();
+    const labels = await page.locator(".cn-big .cn-actions button").allTextContents();
     expect(labels).toContain("Follow");
     expect(labels.indexOf("Follow")).toBeLessThan(labels.indexOf("Share"));
     const vh = page.viewportSize()!.height;

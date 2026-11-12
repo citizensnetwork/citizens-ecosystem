@@ -18,7 +18,7 @@ type C = { id: string; contributor_slug: string; full_name: string; physical_lon
 type P = { id: string; name: string; longitude: number; latitude: number };
 type E = { id: string; title: string; longitude: number; latitude: number };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[]; places: P[]; events: E[] };
-const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
+const sheet = (page: Page) => page.locator(".cn-big");
 type MapHook = { jumpTo: (o: object, d: object) => void };
 type Kind = "contributor" | "place" | "event";
 
@@ -44,7 +44,7 @@ async function open(page: Page, kind: Kind, index: number, tweak?: (seed: Return
   return { seed, ...(await pick(page, seed, kind, index)) };
 }
 
-const actionBtn = (page: Page, re: RegExp) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: re });
+const actionBtn = (page: Page, re: RegExp) => page.locator(".cn-big .cn-actions button", { hasText: re });
 
 const saveBtn = (page: Page) => actionBtn(page, /^Saved?$/);
 const followBtn = (page: Page) => actionBtn(page, /^Follow(ing)?$/);
@@ -94,7 +94,7 @@ test.describe("P2-04 Save on the sheet", () => {
 
   test("Save comes right after Follow on a Contributor and stays on screen at half", async ({ page }) => {
     await open(page, "contributor", 0);
-    const labels = await page.locator("[data-mv2='actions'] [data-mv2='action']").allTextContents();
+    const labels = await page.locator(".cn-big .cn-actions button").allTextContents();
     expect(labels.indexOf("Follow")).toBeGreaterThanOrEqual(0);
     expect(labels.indexOf("Save")).toBe(labels.indexOf("Follow") + 1);
     expect(labels.indexOf("Save")).toBeLessThan(labels.indexOf("Share"));
@@ -115,7 +115,7 @@ test.describe("P2-04 Save on the sheet", () => {
     await pick(page, seed0(), "event", 0);
     await expect(saveBtn(page)).toHaveCount(0);
     await expect(followBtn(page)).toHaveCount(0);
-    const row = page.locator("[data-mv2='actions'] [data-mv2='action']");
+    const row = page.locator(".cn-big .cn-actions button");
     await expect(row.filter({ hasText: /^Connect(ed)?$/ })).toHaveCount(1);
     await expect(row.filter({ hasText: /^Consider(ing)?$/ })).toHaveCount(1);
   });

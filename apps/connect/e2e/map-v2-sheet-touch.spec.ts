@@ -17,7 +17,7 @@ import {
 type C = { id: string; contributor_slug: string; physical_longitude: number; physical_latitude: number; full_name: string };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[] };
 
-const SHEET = "[data-mv2='sheet']";
+const SHEET = ".cn-big";
 const sheet = (page: Page) => page.locator(SHEET);
 const scroller = (page: Page) => page.locator("[data-mv2='scroller']");
 const snapOf = (page: Page) => sheet(page).getAttribute("data-snap");
@@ -216,7 +216,7 @@ test.describe("R7 swipes with real touch (phone, portrait)", () => {
     await goTo(page, "full");
     await settledAt(page, (await innerH(page)) * 0.1);
     const probe = await page.evaluate(() => {
-      const root = document.querySelector("[data-mv2='sheet']") as HTMLElement;
+      const root = document.querySelector(".cn-big") as HTMLElement;
       const target = document.querySelector("[data-mv2='scroller'] [data-mv2='actions']") as HTMLElement;
       const r = target.getBoundingClientRect();
       const ev = (type: string, y: number) => new PointerEvent(type, { pointerId: 11, pointerType: "touch", isPrimary: true, clientX: r.x + 20, clientY: y, bubbles: true, cancelable: true });
