@@ -1,6 +1,7 @@
 # ADR-001: Engine architecture
 
-Status: proposed on 2026-11-11 (engine step E1). The founder's eight answers in section 2 are decided. The other
+Status: proposed on 2026-11-11 (engine step E1). The founder's answers in section 2 are decided, including the
+answers to the open items given in step E2 the same day (section 5). The other
 choices are this session's recommendations; they become decided when this pull request is merged, and each one
 stays reversible until the step that builds it.
 
@@ -60,6 +61,28 @@ Asked as the eight questions in section 7 of the plan, answered in the session b
   and the engine organisation exists.
 - **The paused Citizens project (Vision's old database) is no longer needed.** The founder will approve its
   removal when asked. It is not removed by this record.
+
+**Added by the founder on 2026-11-11, step E2**, answering the open items of section 5 by question cards:
+
+- **O1:** 219's registered legal name is left for the founder's attorney. It is needed before the launch gate.
+- **O2:** the engine's code stays in this public repository for now; the founder decides before a second tenant.
+- **O3:** **free plans until a client pays.** The founder judges that test software with test data, shown to
+  possible clients before anyone pays, is within the free plans' non-commercial terms. This was not the
+  recommended option (pay $20 + $30 a month from the first deployment a possible client sees). The paid plans
+  start when a client pays, and in any case at the launch gate.
+- **O4:** the pilot's project goes in **eu-central-1 (Frankfurt)**, the region Citizens already uses. Supabase
+  offers 16 regions and none in Africa.
+- **O4b:** the free build project is **created when step E5 starts**, not before. An idle free project pauses
+  after a week, and nothing uses it before E5.
+- **O5:** yes. The shared-database contract gets a one-line scope note (added in the E2 pull request).
+- **O6:** break-glass defaults to **notify-and-show**. A tenant can still switch on "ask me first".
+- **O7:** the founder will switch on second-factor sign-in for every account that holds the engine **before the
+  engine organisation is created**.
+- **O8:** the code name `engine` stays until step E6.
+- **Appendix A:** `VISION.md` is left alone. The draft stays in this record only.
+- **Vision's old database:** the founder removed the paused Citizens-Vision project in the Supabase dashboard on
+  2026-11-11, after a check that no code, configuration or environment file pointed at it. The Citizens
+  organisation now holds one project.
 
 ---
 
@@ -142,9 +165,8 @@ What the free build phase cannot do, so nobody is surprised:
   asleep.
 - **No branching**, so there is no throwaway copy of the database to try a migration on. CI's build-from-empty
   proof (decision 5) stands in for it.
-- **One slot only.** While the pilot project is active, the paused Citizens project (Vision's old database)
-  cannot be resumed, and no third free project can be made. The founder has said that project is no longer
-  needed.
+- **One slot only.** While the pilot project is active, no third free project can be made. (The paused Citizens
+  project, Vision's old database, was removed by the founder on 2026-11-11.)
 - Logs are kept for one day, and the database is capped at 500 MB.
 
 Rejected: opening a second Supabase account to get more free projects. The limit is per person, and working
@@ -523,29 +545,30 @@ $10, and its measured usage.
 **Things this record does not change**
 
 - The Citizens project, its organisation, its `supabase/` lineage and its apps.
-- `apps/connect/docs/SHARED_DB_CONTRACT.md`. Its rules R1.1 (a new ecosystem app gets a schema, not a project)
-  and R6.1 (one identity) are about ecosystem apps. A tenant is not an ecosystem app, so those rules do not reach
-  it. A one-line scope note in the contract would stop a later session reading them the other way; the contract
-  is locked, so that edit needs the founder's yes (open item O5).
-- `VISION.md` (Appendix A is a draft only).
+- The rules of `apps/connect/docs/SHARED_DB_CONTRACT.md`. Its rules R1.1 (a new ecosystem app gets a schema, not
+  a project) and R6.1 (one identity) are about ecosystem apps. A tenant is not an ecosystem app, so those rules do
+  not reach it. The founder approved a one-line scope note saying so (open item O5, 2026-11-11); it was added in
+  step E2's pull request and changes no rule.
+- `VISION.md`. The founder chose to leave it alone (Appendix A stays a draft).
 - The facelift (pull requests 348 to 351) and Central.
 
 ---
 
 ## 5. Open items
 
-For the founder. None of them blocks E2 or E3.
+Asked in step E2 on 2026-11-11 and answered by the founder (section 2 has the dated note). What is still open is
+marked.
 
-| #   | Question                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Needed by              |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------- |
-| O1  | **Which legal entity owns the engine and signs operator agreements?** Answered in part on 2026-11-11: **219 owns the engine, for now.** Still open: 219's registered legal name (it is what a tenant's legal page shows, answer 6), that this entity signs the operator agreements, and how renting software sits with its status. A question for the founder's attorney and accountant.                                                                                                                     | Before the launch gate |
-| O2  | **Should the engine's code stay in a public repository** once tenants pay to use it? Separately: a private operations repository will be needed for fan-out at about three tenants.                                                                                                                                                                                                                                                                                                                          | Before a second tenant |
-| O3  | **The build phase on free plans.** Vercel's free plan and MapTiler's free plan are both for non-commercial use. The founder's aim (2026-11-11) is to show working test software to possible clients before any of them pays. Either that runs on paid plans from the first deployment a possible client sees ($20 and $30 a month), or the founder judges that an unpaid trial with test data is within the free terms. The cautious reading is to pay from the first deployment shown to a possible client. | Step E8                |
-| O4  | **Which cloud region for the pilot's project?** It fixes where the tenant's data is stored (decision 7) and cannot be changed.                                                                                                                                                                                                                                                                                                                                                                               | Step E5                |
-| O5  | A one-line scope note in the shared-database contract: "engine tenants are outside this contract".                                                                                                                                                                                                                                                                                                                                                                                                           | Any time               |
-| O6  | Break-glass default in the contract: notify-and-show, or the tenant approves first.                                                                                                                                                                                                                                                                                                                                                                                                                          | Operator agreement     |
-| O7  | Second-factor sign-in on the accounts that hold the engine (database, hosting, code, email, map). One login will reach both Citizens and every tenant.                                                                                                                                                                                                                                                                                                                                                       | Before the launch gate |
-| O8  | The engine's real name (answer 7 defers it).                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Before E6's console    |
+| #   | Question                                                                                       | Answer (2026-11-11)                                                                                                                                                                                                    | Still open                                                                                                                                                                                           | Needed by                      |
+| --- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| O1  | Which legal entity owns the engine and signs operator agreements?                              | **219 owns the engine, for now.** Its registered legal name is left for the founder's attorney.                                                                                                                        | 219's registered name (what a tenant's legal page shows, answer 6), that it signs the operator agreements, and how renting software sits with its status: questions for the attorney and accountant. | Before the launch gate         |
+| O2  | Should the engine's code stay in a public repository once tenants pay?                         | **Public for now.** The founder decides before a second tenant.                                                                                                                                                        | The decision itself; separately, a private operations repository for fan-out at about three tenants.                                                                                                 | Before a second tenant         |
+| O3  | The build phase on free plans (Vercel's and MapTiler's free plans are for non-commercial use). | **Free plans until a client pays**, by the founder's judgement that an unpaid trial on test data is within the terms. Not the recommended option ($20 + $30 a month from the first deployment a possible client sees). | None. The paid plans start when a client pays, and at the launch gate at the latest. MapTiler's free plan pauses the map at 100,000 requests a month and shows its logo.                             | Step E8                        |
+| O4  | Which cloud region for the pilot's project?                                                    | **eu-central-1 (Frankfurt)**, where Citizens runs. Supabase offers 16 regions, none in Africa. The project is created when step E5 starts.                                                                             | None. The tenant's privacy notice must say its data is stored in the EU (decision 7).                                                                                                                | Step E5                        |
+| O5  | A one-line scope note in the shared-database contract.                                         | **Yes.** Added in step E2's pull request.                                                                                                                                                                              | None.                                                                                                                                                                                                | Done                           |
+| O6  | Break-glass default in the contract.                                                           | **Notify-and-show.** A tenant can switch on "ask me first".                                                                                                                                                            | Wording in the operator agreement.                                                                                                                                                                   | Operator agreement             |
+| O7  | Second-factor sign-in on the accounts that hold the engine.                                    | **Yes**, switched on by the founder before the engine organisation is created.                                                                                                                                         | None in this record.                                                                                                                                                                                 | Before the engine organisation |
+| O8  | The engine's real name.                                                                        | **Keep the code name `engine`** until step E6.                                                                                                                                                                         | The name.                                                                                                                                                                                            | Before E6's console            |
 
 ---
 
@@ -565,7 +588,7 @@ Section 6 of [`ENGINE_PLAN.md`](./ENGINE_PLAN.md) is updated in the same pull re
 
 ---
 
-## Appendix A: draft line for `VISION.md` (for the founder's approval; not applied)
+## Appendix A: draft line for `VISION.md` (not applied: the founder chose on 2026-11-11 to leave `VISION.md` alone)
 
 Proposed as a short section after "The ecosystem (one north star, many channels)":
 
@@ -607,4 +630,5 @@ All fetched on 2026-11-11 unless a date is given.
 
 Not confirmed in this session: which Vercel plan the Citizens team is on; whether MapTiler meters a MapLibre
 client in sessions or requests; store-app fees; that an email sending key can be limited to one domain (to check
-in E8); the Supabase regions on offer.
+in E8). The Supabase regions on offer were confirmed in step E2 from the Supabase management tools' project
+creation options (16 regions, none in Africa).

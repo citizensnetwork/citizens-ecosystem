@@ -1,12 +1,14 @@
 -- ════════════════════════════════════════════════════════════════════
 --  200_lock_anon_secdef_execute
 --
---  NOT APPLIED. The owner applies this file after an explicit yes
---  (pre-apply tag, rollback-only probe
---  docs/audit/probes/200_lock_anon_secdef_execute.probe.sql,
---  advisor diff: 0 ERROR, and the anon SECURITY DEFINER count drops
---  by the four functions locked below). Commit only. Do not apply
---  from a pull request.
+--  APPLIED (live version 20261101163103, after the founder's yes in chat).
+--  Rule from 2026-11-01: apply after the founder says yes in chat. The
+--  founder does not name the file, and there is no pre-apply git tag.
+--  After applying, run
+--  docs/audit/probes/200_lock_anon_secdef_execute.probe.sql
+--  and the security advisor (0 ERROR, no unexpected new finding; the
+--  anon SECURITY DEFINER count drops by the four functions locked
+--  below). Database, auth and security changes still need that yes.
 --
 --  199 is not this file. An open pull request reserved 199.
 --

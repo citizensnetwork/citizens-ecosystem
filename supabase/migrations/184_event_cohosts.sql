@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════
 --  184_event_cohosts: P2-09 Co-hosted events. APPLIED 2026-10-17 through MCP apply_migration as `184_event_cohosts`, on
---  Stephen's yes in chat (pre-apply tag `connect-pre-mig184-event-cohosts`; rollback-only probe
+--  Stephen's yes in chat (no pre-apply git tag; the file need not be named; rollback-only probe
 --  docs/audit/probes/184_event_cohosts.probe.sql, 39 of 39 PASS against the live objects). The live
 --  notifications_type_check was re-read first (25 kinds) and this file re-states it with the two new kinds (27).
 --  Security advisor: 0 ERROR; 3 new WARN, the three functions below, callable by signed-in users on purpose (each checks

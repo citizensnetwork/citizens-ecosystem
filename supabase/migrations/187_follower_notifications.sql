@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════
 --  187_follower_notifications: P2-04 Follow, follower notifications. Authored as docs/proposals/p2-04-follower-notifications.sql
 --  on 2026-10-17; applied the same day through MCP apply_migration as `187_follower_notifications` on Stephen's yes in chat
---  (one yes per file; pre-apply tag `connect-pre-mig187-follower-notifications`). The live notifications_type_check was
+--  (no pre-apply git tag; the file need not be named). The live notifications_type_check was
 --  re-read first (27 kinds, as this file's list minus its two new ones).
 --
 --  Stephen's answer (2026-10-17): a Contributor you follow notifies you of a new event or news post BY DEFAULT. The one
