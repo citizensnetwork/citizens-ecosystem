@@ -38,7 +38,7 @@ describe("migration 192 is one transaction", () => {
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
     expect(raw).toMatch(/-- ── ROLLBACK/);
-    expect(raw).toMatch(/NOT APPLIED/);
+    expect(raw).toMatch(/no pre-apply git tag/);
   });
 });
 

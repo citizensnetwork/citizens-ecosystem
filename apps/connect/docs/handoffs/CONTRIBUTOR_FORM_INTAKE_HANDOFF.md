@@ -177,7 +177,7 @@ Owner signs in with Google (same email) → auto-linked → lands on /dashboard
 
 ### 4.1 Migration `173_contributor_form_intake.sql` (via MCP `apply_migration`)
 Protocol (monorepo CLAUDE.md):
-- Tag a pre-apply git tag first.
+- The founder's yes in chat comes first. The founder does not name the file, and there is no pre-apply git tag (R7.4, 2026-11-01).
 - Read the **live** definitions before replacing anything: `select pg_get_functiondef('public.protect_role_column'::regproc)` and the same for `admin_create_contributor_profile`.
 - After applying, run the security advisors: **0 ERROR / 0 unexpected new findings**.
 - **Known footguns (§3AE, migs 165/166):** `CREATE OR REPLACE FUNCTION` **drops** the `SET search_path = ''` hardening unless restated, and `CREATE OR REPLACE VIEW` **drops** `security_invoker`. Restate both.

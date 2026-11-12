@@ -31,11 +31,11 @@ function fn(name: string): { header: string; text: string } {
   return { header, text: code.slice(bodyStart, bodyEnd).replace(/\s+/g, " ").toLowerCase() };
 }
 
-describe("migration 194 is one unapplied transaction", () => {
-  it("begins and commits once, and says it is not applied", () => {
+describe("migration 194 is one transaction", () => {
+  it("begins and commits once, and records the apply rule", () => {
     expect(start).toBeGreaterThanOrEqual(0);
     expect(end).toBeGreaterThan(start);
-    expect(raw).toMatch(/NOT APPLIED/);
+    expect(raw).toMatch(/no pre-apply git tag/);
     expect(raw).toMatch(/-- ── ROLLBACK/);
   });
 });
