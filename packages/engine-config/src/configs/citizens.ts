@@ -52,14 +52,13 @@ export const citizensConfiguration: Configuration = {
     backgroundColor: '#f7f6f3',
     display: 'standalone',
     orientation: 'portrait-primary',
-    startUrl: '/',
     storeCategories: ['social', 'lifestyle'],
     icons: [
-      { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
-      { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+      { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+      { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
     ],
-    faviconSrc: '/icons/icon.svg',
-    logoSrc: '/assets/citizens-crown.png',
+    faviconSrc: 'icons/icon.svg',
+    logoSrc: 'assets/citizens-crown.png',
   },
 
   legal: {},

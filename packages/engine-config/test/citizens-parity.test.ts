@@ -21,6 +21,7 @@ import {
   messageDefinition,
   RESERVED_ADDRESS_WORDS,
   type MessageKey,
+  type WebManifest,
 } from '../src/index';
 
 const ROOT = fileURLToPath(new URL('../../..', import.meta.url));
@@ -89,15 +90,25 @@ beforeAll(async () => {
 });
 
 describe('the home-screen app', () => {
-  it('builds exactly the app file Connect serves', () => {
-    expect(world.manifest()).toEqual(JSON.parse(raw(`${CONNECT}/public/manifest.json`)));
+  it('builds the app file Connect serves', () => {
+    // The contract writes app paths from the world's root with no leading slash, so they also
+    // resolve under a prefix. Connect's own manifest is moving from "/icons/…" to "icons/…" for
+    // the same reason. At the site root the two forms are one address, so paths are compared as
+    // the addresses they resolve to, and every other field must be equal as written.
+    const at = (path: string) => new URL(path, 'https://world.test/manifest.json').pathname;
+    const resolved = (manifest: WebManifest) => ({
+      ...manifest,
+      start_url: at(manifest.start_url),
+      icons: manifest.icons.map((icon) => ({ ...icon, src: at(icon.src) })),
+    });
+    const served = JSON.parse(raw(`${CONNECT}/public/manifest.json`)) as WebManifest;
+    expect(resolved(world.manifest())).toEqual(resolved(served));
+    expect(at(world.manifest().start_url)).toBe('/');
   });
 
   it('points at the favicon and the mark Connect has', () => {
-    expect(raw(`${CONNECT}/src/frontend/index.html`)).toContain(
-      `href="${config.app.faviconSrc.slice(1)}"`,
-    );
-    expect(existsSync(resolve(ROOT, `${CONNECT}/src/frontend${config.app.logoSrc}`))).toBe(true);
+    expect(raw(`${CONNECT}/src/frontend/index.html`)).toContain(`href="${config.app.faviconSrc}"`);
+    expect(existsSync(resolve(ROOT, `${CONNECT}/src/frontend/${config.app.logoSrc}`))).toBe(true);
   });
 
   it('has no legal page and no description tag, as today', () => {

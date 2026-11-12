@@ -71,8 +71,12 @@ const asEnum = <T extends string>(keys: readonly T[]) => z.enum(keys as [T, ...T
 const SINGLE_LINE_RE = /^[^<>\p{Cc}\u2028\u2029]*$/u;
 const ID_RE = /^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$/;
 const ICON_RE = /^[A-Z][A-Za-z0-9]{0,39}$/;
-/** A file on the world's own site: /icons/icon-192.png. No "..", no "//", no other host. */
-const SITE_PATH_RE = /^\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$/;
+/**
+ * A file on the world's own site, as a path from the world's root: icons/icon-192.png.
+ * It has no leading slash, so it also resolves when a world is served under a prefix.
+ * No other host, no "..", no "//", no query.
+ */
+const SITE_PATH_RE = /^(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)+$/;
 
 const line = (max: number) =>
   z.string().min(1).max(max).regex(SINGLE_LINE_RE, 'Use one line of plain text.');
@@ -83,7 +87,10 @@ const anyColor = z.string().max(40).regex(COLOR_RE, 'Use a hex colour or an rgb(
 const sitePath = z
   .string()
   .max(200)
-  .regex(SITE_PATH_RE, 'Use the path of a file on the world’s own site, such as /icons/icon.png.');
+  .regex(
+    SITE_PATH_RE,
+    'Use the path of a file on the world’s own site, from its root, such as icons/icon.png.',
+  );
 const keywords = z.array(line(60)).max(200).optional();
 const contract = z.string().max(20);
 
@@ -217,7 +224,6 @@ const appSchema = z.strictObject({
   backgroundColor: solidColor,
   display: z.enum(['standalone', 'minimal-ui', 'fullscreen', 'browser']),
   orientation: z.enum(['any', 'portrait', 'portrait-primary', 'landscape', 'landscape-primary']),
-  startUrl: z.literal('/'),
   /** The kinds of app this is, for a phone's app list ("social", "lifestyle"). */
   storeCategories: z.array(z.string().regex(/^[a-z]{2,24}$/)).max(6),
   icons: z

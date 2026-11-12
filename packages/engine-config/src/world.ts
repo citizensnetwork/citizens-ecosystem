@@ -150,7 +150,8 @@ export function createWorld(configuration: Configuration, entitlements: Entitlem
       name: t('manifest.name'),
       short_name: t('manifest.shortName'),
       description: t('manifest.description'),
-      start_url: app.startUrl,
+      // The world's own root, relative to the file, so it is right under a prefix too.
+      start_url: './',
       display: app.display,
       background_color: app.backgroundColor,
       theme_color: app.themeColor,

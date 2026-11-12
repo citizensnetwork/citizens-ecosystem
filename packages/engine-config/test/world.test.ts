@@ -193,15 +193,15 @@ describe('a world’s categories, theme and home-screen app', () => {
       name: 'Quillfern Commons',
       short_name: 'Quillfern',
       description: 'Find makers, gardens and get-togethers near you.',
-      start_url: '/',
+      start_url: './',
       display: 'standalone',
       background_color: '#f4f7f5',
       theme_color: '#0f766e',
       orientation: 'any',
       categories: ['lifestyle'],
       icons: [
-        { src: '/icons/sample-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-        { src: '/icons/sample-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+        { src: 'icons/sample-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+        { src: 'icons/sample-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
       ],
     });
   });

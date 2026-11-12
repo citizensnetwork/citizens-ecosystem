@@ -39,14 +39,13 @@ export const sampleConfiguration: Configuration = {
     backgroundColor: '#f4f7f5',
     display: 'standalone',
     orientation: 'any',
-    startUrl: '/',
     storeCategories: ['lifestyle'],
     icons: [
-      { src: '/icons/sample-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/icons/sample-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      { src: 'icons/sample-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: 'icons/sample-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
-    faviconSrc: '/icons/sample.svg',
-    logoSrc: '/assets/sample-mark.svg',
+    faviconSrc: 'icons/sample.svg',
+    logoSrc: 'assets/sample-mark.svg',
   },
 
   // The only place a tenant's world names the engine owner.
