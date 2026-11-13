@@ -106,9 +106,10 @@ do $probe$ begin
   raise exception 'PROBE FAILED: a visitor read home locations';
 end; $probe$;
 do $probe$ begin
-  begin perform 1 from public.get_my_profile_private();
-  exception when insufficient_privilege then return; end;
-  raise exception 'PROBE FAILED: a visitor could call the private profile reader';
+  -- Looked up, not exercised: see the note at the top of probe 02.
+  if has_function_privilege('public.get_my_profile_private()', 'execute') then
+    raise exception 'PROBE FAILED: a visitor may call the private profile reader';
+  end if;
 end; $probe$;
 do $probe$ begin
   begin update public.profiles set bio = 'x';

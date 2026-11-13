@@ -48,10 +48,10 @@ jobs:
         run: |
           docker run -d --name engine-db -e POSTGRES_PASSWORD="$PGPASSWORD" "$PG_IMAGE"
           for attempt in $(seq 1 90); do
-            if docker exec engine-db pg_isready -q -h localhost -U supabase_admin; then
+            if docker exec engine-db pg_isready -q -h localhost -U supabase_admin -d postgres; then
               # The image restarts once after its own set-up: make sure it stays up.
               sleep 3
-              if docker exec engine-db pg_isready -q -h localhost -U supabase_admin; then exit 0; fi
+              if docker exec engine-db pg_isready -q -h localhost -U supabase_admin -d postgres; then exit 0; fi
             fi
             sleep 2
           done
@@ -110,6 +110,23 @@ jobs:
           docker exec -e PGPASSWORD engine-db \
             psql -X -q -v ON_ERROR_STOP=1 -h localhost -U supabase_admin -d postgres \
             -c "select part, hash from engine.schema_fingerprint() order by part"
+
+      # For the record only; it never fails the job. On 2026-11-13 this image ended its server
+      # process when a role called a function it has no right to call from inside a DO block with
+      # an exception handler. The probes therefore look such rights up. This step records how the
+      # image answers the plain call, which is the form the data API sends.
+      - name: Platform note, a refused function call (never fails the job)
+        if: always()
+        continue-on-error: true
+        run: |
+          answer=$(printf '%s\n' 'set role anon;' "select public.publish_engine_configuration('{}'::jsonb);" \
+            | docker exec -i -e PGPASSWORD engine-db \
+              psql -X -q -h localhost -U supabase_admin -d postgres 2>&1 || true)
+          echo "$answer"
+          case "$answer" in
+            *"permission denied for function"*) echo "The plain call is refused cleanly." ;;
+            *) echo "::warning::A refused function call was not answered with a plain permission error on this image." ;;
+          esac
 
       - name: Database log, when something failed
         if: failure()

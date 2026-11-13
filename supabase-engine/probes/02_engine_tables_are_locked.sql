@@ -2,6 +2,11 @@
 -- configuration, or reach the engine's private schema. Not a visitor, not a signed-in person, and
 -- (for what the world is allowed) not even the world's own server.
 
+-- A right to CALL a function, or to USE a schema, is looked up here and not exercised: on the
+-- hosted Postgres image a refused function call inside a block like these ended the server
+-- process (seen in CI on 2026-11-13), which would hide every result after it. Rights on tables
+-- are exercised for real.
+
 select engine.write_entitlements(pg_temp.probe_entitlements());
 select public.publish_engine_configuration(pg_temp.probe_configuration(1));
 select pg_temp.probe_user('alice');
@@ -49,14 +54,15 @@ do $probe$ begin
   raise exception 'PROBE FAILED: a visitor read the wording table directly';
 end; $probe$;
 do $probe$ begin
-  begin perform public.publish_engine_configuration('{}'::jsonb);
-  exception when insufficient_privilege then return; end;
-  raise exception 'PROBE FAILED: a visitor could call the publish function';
-end; $probe$;
-do $probe$ begin
-  begin perform 1 from engine.schema_migrations;
-  exception when insufficient_privilege then return; end;
-  raise exception 'PROBE FAILED: a visitor read the private schema';
+  if has_function_privilege('public.publish_engine_configuration(jsonb, jsonb, uuid)', 'execute') then
+    raise exception 'PROBE FAILED: a visitor may call the publish function';
+  end if;
+  if has_schema_privilege('engine', 'usage') then
+    raise exception 'PROBE FAILED: a visitor may use the private schema';
+  end if;
+  if not has_function_privilege('public.engine_feature_on(text)', 'execute') then
+    raise exception 'PROBE FAILED: a visitor cannot ask whether a feature is on';
+  end if;
 end; $probe$;
 do $probe$ begin
   begin truncate public.profiles;
@@ -91,14 +97,12 @@ do $probe$ begin
   raise exception 'PROBE FAILED: a signed-in person wrote the wording table';
 end; $probe$;
 do $probe$ begin
-  begin perform public.publish_engine_configuration('{}'::jsonb);
-  exception when insufficient_privilege then return; end;
-  raise exception 'PROBE FAILED: a signed-in person could call the publish function';
-end; $probe$;
-do $probe$ begin
-  begin perform engine.write_entitlements('{}'::jsonb);
-  exception when insufficient_privilege then return; end;
-  raise exception 'PROBE FAILED: a signed-in person reached the private schema';
+  if has_function_privilege('public.publish_engine_configuration(jsonb, jsonb, uuid)', 'execute') then
+    raise exception 'PROBE FAILED: a signed-in person may call the publish function';
+  end if;
+  if has_schema_privilege('engine', 'usage') then
+    raise exception 'PROBE FAILED: a signed-in person may use the private schema';
+  end if;
 end; $probe$;
 do $probe$ begin
   begin insert into public.categories (name, slug) values ('Mine', 'mine');
@@ -127,9 +131,9 @@ do $probe$ begin
   raise exception 'PROBE FAILED: the service role wrote a configuration without publishing';
 end; $probe$;
 do $probe$ begin
-  begin perform engine.write_entitlements('{}'::jsonb);
-  exception when insufficient_privilege then return; end;
-  raise exception 'PROBE FAILED: the service role reached the private schema';
+  if has_schema_privilege('engine', 'usage') then
+    raise exception 'PROBE FAILED: the service role may use the private schema';
+  end if;
 end; $probe$;
 do $probe$
 begin
