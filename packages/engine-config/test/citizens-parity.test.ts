@@ -379,9 +379,35 @@ describe('vocabulary', () => {
       file: migration('179_approve_resets_hidden_and_review_fixes'),
     },
     'notification.followedPartner.fallbackName': { file: migration('187_follower_notifications') },
+    'notification.followedPartner.newEvent': { file: migration('187_follower_notifications') },
+    'notification.followedPartner.newUpdate': { file: migration('187_follower_notifications') },
     'notification.ideaGoalReached.title': { file: migration('132_kingdom_projects_flow') },
+    'notification.ideaGoalReached.body': { file: migration('132_kingdom_projects_flow') },
+    'notification.ideaGoalReached.fallbackTitle': {
+      file: migration('132_kingdom_projects_flow'),
+      wrap: (text) => `coalesce(v_idea.title, '${text}')`,
+    },
+    'notification.ideaLead.title': { file: migration('132_kingdom_projects_flow') },
     'notification.ideaLead.body': { file: migration('132_kingdom_projects_flow') },
+    'notification.ideaLead.fallbackTitle': {
+      file: migration('132_kingdom_projects_flow'),
+      wrap: (text) => `coalesce(v_idea.title, '${text}')`,
+    },
     'notification.ideaScheduled.title': { file: migration('132_kingdom_projects_flow') },
+    'notification.ideaScheduled.body': { file: migration('132_kingdom_projects_flow') },
+    'notification.ideaScheduled.fallbackTitle': {
+      file: migration('132_kingdom_projects_flow'),
+      wrap: (text) => `coalesce(v_idea.title, '${text}')`,
+    },
+    'screen.ideas.eventTitle': {
+      file: migration('132_kingdom_projects_flow'),
+      wrap: (text) => `coalesce(v_idea.title, '${text}')`,
+    },
+    'screen.ideas.eventNote': { file: migration('132_kingdom_projects_flow') },
+    'screen.ideas.eventLocation': {
+      file: migration('132_kingdom_projects_flow'),
+      wrap: (text) => `, '${text}')`,
+    },
     'meta.title': {
       file: `${CONNECT}/src/frontend/index.html`,
       wrap: (text) => `<title>${text}</title>`,

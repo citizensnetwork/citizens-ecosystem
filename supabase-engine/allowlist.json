@@ -1,0 +1,429 @@
+{
+  "$comment": "The engine baseline allow-list (step E5). An object that is not listed under \"engine\" is out. Source: docs/engine/BOUNDARY_INVENTORY.md section 4, confirmed against a structure dump of the Citizens database pinned at the head named below.",
+  "pinned": {
+    "citizensHead": "202_lets_gatherings",
+    "by": "file name (202 was applied before 201)"
+  },
+  "tables": {
+    "engine": [
+      "activity_log",
+      "admin_actions",
+      "analytics_daily",
+      "app_settings",
+      "broadcast_messages",
+      "broadcast_reactions",
+      "bubble_dismissals",
+      "categories",
+      "comments",
+      "consider_joins",
+      "contributor_access_requests",
+      "contributor_analytics",
+      "contributor_applications",
+      "contributor_drafts",
+      "contributor_keywords",
+      "contributor_locations",
+      "contributor_service_areas",
+      "contributor_service_presence",
+      "contributor_service_radius",
+      "contributor_type_change_requests",
+      "conversation_participants",
+      "conversations",
+      "convinces",
+      "event_cohosts",
+      "event_impressions",
+      "event_interest_tags",
+      "event_photos",
+      "event_tag_assignments",
+      "event_tags",
+      "event_updates",
+      "event_views",
+      "events",
+      "follows",
+      "idea_votes",
+      "indemnity_signatures",
+      "indemnity_templates",
+      "interest_groups",
+      "interests",
+      "listing_claims",
+      "map_bubbles",
+      "messages",
+      "moments",
+      "news_posts",
+      "notifications",
+      "pending_admin_elevations",
+      "place_follows",
+      "place_media",
+      "places",
+      "planning_ideas",
+      "planning_tasks",
+      "profiles",
+      "provinces",
+      "push_tokens",
+      "reports",
+      "reviews",
+      "rsvp_cancellations",
+      "rsvps",
+      "saved_items",
+      "search_term_stats",
+      "service_areas",
+      "shares",
+      "specialised_services",
+      "suggestions",
+      "team_memberships",
+      "team_owner_transfers",
+      "user_blocks",
+      "user_interests",
+      "user_locations",
+      "volunteer_applications"
+    ],
+    "changed": {
+      "profiles": "Ten columns cut (sibling apps, billing, the listing helper); the fixed partner-kind list becomes a format check.",
+      "app_settings": "Table in, rows out.",
+      "contributor_applications": "Kept for the open application flow, which is off unless a world switches it on; the fixed partner-kind list becomes a format check.",
+      "contributor_type_change_requests": "The fixed partner-kind list becomes a format check.",
+      "events": "Three triggers cut (content labels, billing tally); the fixed category and starter lists become format checks; no default category.",
+      "places": "Two triggers cut (content labels, billing tally).",
+      "categories": "Table in, rows out: publishing a configuration fills it. UNIQUE(name) relaxed (the slug is the identity).",
+      "event_tags": "Table in, rows out.",
+      "service_areas": "Table in, rows out.",
+      "provinces": "Table in, rows out.",
+      "indemnity_templates": "Table in, rows out.",
+      "suggestions": "The fixed ideas ladder becomes a format check; the ideas feature is off unless a world switches it on.",
+      "idea_votes": "Goes with the ideas feature.",
+      "interests": "Table in, rows out.",
+      "interest_groups": "Table in, rows out.",
+      "analytics_daily": "Checked in E5: nothing in it is written by or for a sibling app."
+    },
+    "citizensOnly": {
+      "contributor_analytics_snapshots": "Yearly roll-ups written for a sibling app.",
+      "contributor_billing": "Billing tally. The engine takes no payments.",
+      "content_labels": "Cross-app bridge for sibling apps.",
+      "api_keys": "Keys for the public data feed. A tenant gets no feed (founder, 2026-11-11).",
+      "ai_search_queries": "AI search (feature on the citizens line).",
+      "intake_upgrade_requests": "Intake from an outside sign-up form (feature on the citizens line).",
+      "listing_sources": "The listing helper (feature on the citizens line).",
+      "listing_suggestions": "The listing helper (feature on the citizens line).",
+      "kv_store_794cc4b9": "Created outside the migration lineage; used by no code.",
+      "kv_store_7f45c4c8": "Created outside the migration lineage; used by no code."
+    },
+    "readOnlyForDataApi": {
+      "categories": "Publishing a configuration is the only writer. A direct edit would be undone by the next publish."
+    }
+  },
+  "columns": {
+    "citizensOnly": {
+      "profiles": {
+        "wear_style_preferences": "sibling app",
+        "wear_wardrobe_visibility": "sibling app",
+        "learn_enrolled_listings": "sibling app",
+        "timezone": "cross-app column",
+        "billing_tier": "billing",
+        "billing_trial_started_at": "billing",
+        "auto_update_level": "listing helper",
+        "auto_update_consent_at": "listing helper",
+        "auto_update_consent_source": "listing helper",
+        "auto_update_nudged_at": "listing helper"
+      }
+    }
+  },
+  "constraints": {
+    "replaced": {
+      "events_category_check": "CHECK (category IS NULL OR category ~ '^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$'::text)",
+      "events_lets_starter_known": "CHECK (lets_starter IS NULL OR lets_starter ~ '^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$'::text)",
+      "profiles_contributor_kind_check": "CHECK (contributor_kind IS NULL OR contributor_kind ~ '^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$'::text)",
+      "contributor_applications_contributor_kind_check": "CHECK (contributor_kind IS NULL OR contributor_kind ~ '^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$'::text)",
+      "contributor_type_change_requests_requested_kind_check": "CHECK (requested_kind ~ '^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$'::text)",
+      "suggestions_tier_check": "CHECK (tier ~ '^[a-z][a-z0-9]*(?:[-_][a-z0-9]+)*$'::text)"
+    },
+    "dropped": {
+      "categories_name_key": "The slug is the identity; two lists may share a label."
+    }
+  },
+  "defaults": {
+    "dropped": {
+      "events.category": "A Citizens category. A world gives its own."
+    }
+  },
+  "views": {
+    "engine": [
+      "directory_contributors"
+    ],
+    "citizensOnly": {
+      "my_intake_upgrade": "Form intake."
+    }
+  },
+  "functions": {
+    "engine": [
+      "admin_change_contributor_slug",
+      "admin_create_contributor_profile",
+      "admin_list_citizens",
+      "aggregate_contributor_analytics_daily",
+      "approve_admin_elevation",
+      "approve_dashboard_access",
+      "backfill_contributor_analytics",
+      "bump_tag_usage_count",
+      "caller_may_read_private_event",
+      "check_max_dashboard_sessions",
+      "claim_admin_created_contributor",
+      "cleanup_stale_locations",
+      "count_friends",
+      "decline_listing_claim",
+      "delete_contributor_application",
+      "deny_dashboard_access",
+      "dismiss_map_bubble",
+      "enforce_at_least_one_admin",
+      "enforce_place_six_month_delete",
+      "enforce_tag_cap_per_event",
+      "ensure_contributor_self_owner",
+      "events_set_community_flag",
+      "find_conversation",
+      "find_or_create_conversation",
+      "followed_post_audience",
+      "follower_count_exact",
+      "follower_count_public",
+      "friends_considering_event",
+      "generate_contributor_slug",
+      "get_active_map_bubbles",
+      "get_category_trends",
+      "get_community_health",
+      "get_community_ideas",
+      "get_contributor_public_stats",
+      "get_mutual_followers",
+      "get_org_audience",
+      "get_org_event_stats",
+      "get_place_review_stats",
+      "get_public_contributor_analytics",
+      "get_public_team",
+      "get_search_autocomplete",
+      "get_top_search_terms",
+      "guard_open_to_collaborate",
+      "increment_broadcast_reaction",
+      "increment_contributor_metric",
+      "invite_event_cohost",
+      "is_active_team_member",
+      "is_admin",
+      "is_approved_contributor",
+      "is_blocked",
+      "is_considering_for_friend",
+      "is_conversation_participant",
+      "is_mutual_follow",
+      "is_organiser",
+      "log_search_term",
+      "mark_admin_viewing_started",
+      "mark_my_terms_accepted",
+      "mark_own_listing_claimed",
+      "moments_cap",
+      "notify_event_field_changes",
+      "notify_friends_on_rsvp_attending",
+      "notify_on_convince",
+      "on_role_change_side_effects",
+      "on_rsvp_cancellation_increment",
+      "peek_claimable_listing",
+      "propose_team_owner_transfer",
+      "purge_old_activity_logs",
+      "purge_old_analytics",
+      "purge_old_search_terms",
+      "recipient_follows_me",
+      "recompute_map_prominence",
+      "record_event_impression",
+      "reject_admin_elevation",
+      "remove_event_cohost",
+      "respond_event_cohost",
+      "respond_team_invite",
+      "respond_team_owner_transfer",
+      "safe_rsvp",
+      "sanitise_search_term",
+      "saved_items_cap",
+      "search_contributors",
+      "service_areas_check_parent",
+      "serving_area_listings",
+      "set_broadcast_audience_snapshot",
+      "set_contributor_hidden",
+      "set_rsvp_notify_updates",
+      "set_service_areas",
+      "sync_event_category_id",
+      "tg_bubble_from_broadcast",
+      "tg_bubble_from_event_update",
+      "toggle_consider",
+      "trending_events",
+      "update_contributor_public_profile",
+      "update_conversation_timestamp",
+      "update_notification_prefs"
+    ],
+    "changed": {
+      "admin_delete_citizen_account": "The checks against two sibling apps are removed.",
+      "admin_remove_contributor_listing": "The checks against two sibling apps are removed.",
+      "approve_contributor_application": "Notification text is read by key.",
+      "reject_contributor_application": "Notification text is read by key.",
+      "notify_followers_of_event": "Notification text is read by key.",
+      "notify_followers_of_news": "Notification text is read by key.",
+      "schedule_kingdom_project": "Text is read by key; the fallback category is one the world has; refuses while the ideas feature is off.",
+      "transition_idea_to_in_process": "Notification text is read by key.",
+      "guard_profile_server_columns": "The list of server-owned columns loses the cut columns; one error sentence is reworded.",
+      "handle_new_user": "The partner kinds a new account may ask for come from the configuration.",
+      "vote_on_idea": "The tiers that wait for staff come from a setting, not a fixed list; refuses while the ideas feature is off.",
+      "get_my_profile_private": "Returns no cut column.",
+      "log_team_editor_write": "A code comment named a cut table.",
+      "events_enforce_community_rate_limit": "Two error sentences are reworded.",
+      "protect_role_column": "One error sentence is reworded."
+    },
+    "citizensOnly": {
+      "billing": [
+        "stamp_billing_trial_on_approval",
+        "tally_contributor_event",
+        "tally_contributor_place",
+        "get_my_billing_context",
+        "contributor_event_rate"
+      ],
+      "siblingApps": [
+        "snapshot_contributor_analytics_for_vision",
+        "apply_event_content_labels",
+        "cleanup_content_labels_on_entity_delete",
+        "uuid_array_has_no_duplicates"
+      ],
+      "aiSearch": [
+        "ai_search_trim_rolling_50"
+      ],
+      "formIntake": [
+        "create_intake_upgrade_request",
+        "confirm_intake_upgrade",
+        "decline_intake_upgrade",
+        "preview_intake_upgrade",
+        "resend_intake_upgrade",
+        "intake_upgrade_flag_admin",
+        "intake_upgrade_statuses",
+        "clear_intake_upgrade_storage",
+        "intake_create_contributor_profile"
+      ],
+      "publicApi": [
+        "create_api_key",
+        "revoke_api_key",
+        "resolve_api_key"
+      ],
+      "listingAutomation": [
+        "get_my_automation_settings",
+        "set_my_automation_level",
+        "guard_profile_automation_columns",
+        "reset_automation_on_listing_loss",
+        "decide_listing_suggestion",
+        "edit_listing_suggestion",
+        "enforce_listing_sources_cap"
+      ]
+    }
+  },
+  "triggers": {
+    "engine": [
+      "auth.users.on_auth_user_created",
+      "broadcast_messages.trg_broadcast_audience_snapshot",
+      "broadcast_messages.trg_bubble_from_broadcast",
+      "convinces.trg_notify_on_convince",
+      "event_tag_assignments.event_tag_assignments_bump_count",
+      "event_tag_assignments.event_tag_assignments_enforce_cap",
+      "event_updates.trg_bubble_from_event_update",
+      "events.events_enforce_community_rate_limit_before_write",
+      "events.events_set_community_flag_before_insert",
+      "events.sync_event_category_id_trigger",
+      "events.trg_log_team_editor_events",
+      "events.trg_notify_event_field_changes",
+      "events.trg_notify_followers_of_event_insert",
+      "events.trg_notify_followers_of_event_publish",
+      "messages.on_message_sent",
+      "moments.moments_cap_before_insert",
+      "news_posts.trg_log_team_editor_news",
+      "news_posts.trg_notify_followers_of_news",
+      "places.trg_enforce_place_six_month_delete",
+      "places.trg_log_team_editor_places",
+      "profiles.protect_role_on_update",
+      "profiles.trg_enforce_one_admin_delete",
+      "profiles.trg_enforce_one_admin_update",
+      "profiles.trg_ensure_contributor_self_owner",
+      "profiles.trg_guard_open_to_collaborate",
+      "profiles.trg_guard_profile_server_columns",
+      "profiles.trg_profiles_role_change_side_effects",
+      "rsvp_cancellations.trg_cancellation_count",
+      "rsvps.trg_notify_friends_on_rsvp_attending",
+      "saved_items.saved_items_cap_before_insert",
+      "service_areas.service_areas_check_parent",
+      "specialised_services.trg_log_team_editor_services"
+    ],
+    "citizensOnly": [
+      "ai_search_queries.ai_search_queries_trim_trigger",
+      "events.trg_apply_event_content_labels",
+      "events.trg_cleanup_content_labels_event",
+      "events.trg_tally_contributor_event",
+      "listing_sources.trg_listing_sources_cap",
+      "listing_sources.trg_log_team_editor_sources",
+      "places.trg_cleanup_content_labels_place",
+      "places.trg_tally_contributor_place",
+      "profiles.trg_cleanup_content_labels_profile",
+      "profiles.trg_guard_profile_automation_columns",
+      "profiles.trg_profiles_reset_automation",
+      "profiles.trg_stamp_billing_trial_on_approval"
+    ]
+  },
+  "scheduledJobs": {
+    "engine": [
+      "contributor-analytics-daily",
+      "contributor-analytics-purge",
+      "live-location-cleanup",
+      "map-prominence-recompute",
+      "messaging-purge-60d",
+      "moments-cleanup",
+      "search-term-stats-purge"
+    ],
+    "changed": {
+      "contributor-digest": "The address it calls is read from a per-project setting, never written into the job."
+    },
+    "citizensOnly": [
+      "contributor-analytics-vision-snapshot",
+      "impersonation-expiry-sweep",
+      "vision_advisory_eval",
+      "vision_daily_snapshots",
+      "vision_mv_refresh_daily",
+      "vision_refresh_activity_daily_aggregates",
+      "vision_refresh_org_dashboard_stats"
+    ]
+  },
+  "storageBuckets": {
+    "engine": [
+      "event-images",
+      "place-images"
+    ],
+    "citizensOnly": [
+      "wear-media"
+    ]
+  },
+  "realtime": {
+    "engine": [
+      "notifications",
+      "messages",
+      "event_updates",
+      "broadcast_messages",
+      "volunteer_applications",
+      "suggestions"
+    ]
+  },
+  "schemas": {
+    "citizensOnly": [
+      "vision",
+      "wear"
+    ]
+  },
+  "edgeFunctions": {
+    "changed": [
+      "notify-broadcast",
+      "notify-event-cancelled",
+      "notify-event-update",
+      "notify-interested-users",
+      "notify-nearby-rsvp",
+      "notify-new-follower",
+      "prompt-post-event-reviews",
+      "send-event-reminder",
+      "send-rsvp-reminders",
+      "send-daily-digest",
+      "send-contributor-digest",
+      "review-contributor-application",
+      "submit-contributor-application"
+    ]
+  }
+}
