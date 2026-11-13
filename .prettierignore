@@ -14,3 +14,7 @@ supabase
 
 # Vendored third-party code (patched braces@3.0.3): keeps upstream style so a diff against upstream stays minimal
 packages/braces-patched
+
+# Engine database line: its SQL is not prettier-managed, and its JSON files are written by tools
+# (the cut, the lock) or kept as one entry per line on purpose. Its README is checked.
+supabase-engine/**/*.json

@@ -1,0 +1,15 @@
+{
+  "$comment": "The SHA-256 of every engine migration file (line endings normalised). Written by `pnpm --filter @engine/db lock`. A test fails when a file differs from its entry: an applied migration never changes.",
+  "files": {
+    "0001_extensions_and_default_privileges.sql": "a6771556af4477b58c2e32f747d41f33ba60546630599505655eff625b4341b0",
+    "0002_tables.sql": "7c918dfde430ef3878d373c0273e1c415e5efde5903538c508397b82d61af122",
+    "0003_functions.sql": "9c07ea846535de1a2ca770c9633706efa67d309dfb486ae49d391854f8a4df0a",
+    "0004_engine_configuration.sql": "3a1d67bd99ef44c406fe4c05d05774e9e55b948e3bab15f439c0c15afa992e7c",
+    "0005_changed_functions.sql": "28a0f7906971c5831b7465a4e57a46460ce46454522e5c1be6778928d21489f2",
+    "0006_views_triggers_policies.sql": "dd7668208458955fedd69044a27108f9972be60006d76d4e7b61d722f3bc9c36",
+    "0007_grants.sql": "9f4cb47bc0992129f3f8b5e3e4bb4a9c4c57911288afe2d83515bc5528c31240",
+    "0008_storage_and_realtime.sql": "b83ed2bceba668b7abb06df788736f934d40fd717f82f01c29260bf88f7d0e25",
+    "0009_scheduled_jobs.sql": "a3e9c19cfe7b4237bfd5e9c3a70741a378db6dea0c62ad231c48904404b59781",
+    "0010_wording_seed.sql": "83efd56205461932d19c1dd02945299d9301840c976bb9635075344810618867"
+  }
+}

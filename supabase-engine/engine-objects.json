@@ -1,0 +1,24 @@
+{
+  "$comment": "What the engine line adds to schema public beyond the cut of the source database. Kept by hand: a migration that adds a table, a function, a trigger or a scheduled job adds its name here, and the catalogue check then expects it. Anything in a built database that is neither in baseline.lock.json nor here fails the check.",
+  "tables": ["engine_configuration", "engine_entitlements", "engine_wording"],
+  "functions": [
+    "engine_configuration_guard",
+    "engine_event_category_known",
+    "engine_feature_on",
+    "engine_text",
+    "publish_engine_configuration"
+  ],
+  "triggers": [
+    "engine_configuration.engine_configuration_guard",
+    "events.engine_event_category_known"
+  ],
+  "anonExecutable": ["engine_feature_on"],
+  "publicExecutable": [],
+  "privateSchemaFunctions": [
+    "call_edge_function",
+    "listed_categories",
+    "schema_fingerprint",
+    "write_entitlements"
+  ],
+  "privateSchemaTables": ["project_settings", "schema_migrations"]
+}

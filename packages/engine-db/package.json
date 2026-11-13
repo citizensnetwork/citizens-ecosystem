@@ -1,0 +1,43 @@
+{
+  "name": "@engine/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tools and proofs for the engine database line (supabase-engine/): the cut of the baseline from an allow-list, the build-from-empty proof, the leak check, the wording seed, the migration lock, the drift check against the Citizens line, and the provisioning and fan-out tools.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "cut": "node src/cli/cut-baseline.ts",
+    "lock": "node src/cli/lock.ts",
+    "drift": "node src/cli/drift.ts",
+    "provision": "node src/cli/provision.ts",
+    "fanout": "node src/cli/fanout.ts",
+    "wording": "vitest run test/wording-seed.test.ts"
+  },
+  "devDependencies": {
+    "@citizens/config": "workspace:*",
+    "@electric-sql/pglite": "0.5.13",
+    "@engine/config": "workspace:*",
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "@typescript-eslint/eslint-plugin": "8.72.1",
+    "@typescript-eslint/parser": "8.72.1",
+    "@vitest/coverage-v8": "^5.0.5",
+    "eslint": "10.13.0",
+    "eslint-config-prettier": "10.1.8",
+    "typescript": "5.5.4",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,116 @@
+name: Engine baseline
+
+# Builds the engine database line (supabase-engine/) from an empty Postgres and proves it:
+# the catalogue check, the security check and every rollback-only probe.
+#
+# The unit tests (the Verify job of the CI workflow) run the same SQL files against an in-memory
+# database, together with the leak check and the drift check. This job repeats the build on the
+# Postgres image that hosted projects run, where the real extensions and roles exist.
+#
+# It never touches a real project and uses no secret. Fan-out to tenant projects never runs in
+# this repository's workflows: the repository is public, and so are its logs.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase-engine/**'
+      - '.github/workflows/engine-baseline.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase-engine/**'
+      - '.github/workflows/engine-baseline.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-from-empty:
+    name: Build from empty, checks and probes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # The Postgres release hosted projects run (tag 17.6.1.104), pinned by digest so the image
+      # cannot change under the same tag. Throwaway password: the container lives only for this
+      # job and is reachable only from inside it.
+      PG_IMAGE: supabase/postgres@sha256:5deba92e50cd17bfacf8603834d317cdf3bfc1c016ec8293991997fa3b55fa3d
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start an empty Postgres
+        run: |
+          docker run -d --name engine-db -e POSTGRES_PASSWORD="$PGPASSWORD" "$PG_IMAGE"
+          for attempt in $(seq 1 90); do
+            if docker exec engine-db pg_isready -q -h localhost -U supabase_admin; then
+              # The image restarts once after its own set-up: make sure it stays up.
+              sleep 3
+              if docker exec engine-db pg_isready -q -h localhost -U supabase_admin; then exit 0; fi
+            fi
+            sleep 2
+          done
+          echo "Postgres did not become ready" >&2
+          docker logs --tail 60 engine-db >&2
+          exit 1
+
+      - name: Add what a hosted project already has (test-only shim)
+        run: |
+          docker exec -i -e PGPASSWORD engine-db \
+            psql -X -q -v ON_ERROR_STOP=1 -h localhost -U supabase_admin -d postgres \
+            < supabase-engine/test/platform-shim.sql
+
+      - name: Apply the engine migrations, in order, as the migration role
+        run: |
+          set -euo pipefail
+          for file in supabase-engine/migrations/*.sql; do
+            echo "::group::$file"
+            { echo 'set role postgres;'; cat "$file"; } | docker exec -i -e PGPASSWORD engine-db \
+              psql -X -q -v ON_ERROR_STOP=1 -h localhost -U supabase_admin -d postgres
+            echo "::endgroup::"
+          done
+
+      - name: Catalogue check (exactly the listed objects, nothing that stays out)
+        run: |
+          docker exec -i -e PGPASSWORD engine-db \
+            psql -X -q -v ON_ERROR_STOP=1 -h localhost -U supabase_admin -d postgres \
+            < supabase-engine/checks/catalogue.sql
+
+      - name: Security check
+        run: |
+          docker exec -i -e PGPASSWORD engine-db \
+            psql -X -q -v ON_ERROR_STOP=1 -h localhost -U supabase_admin -d postgres \
+            < supabase-engine/checks/security.sql
+
+      - name: Rollback-only probes
+        run: |
+          set -euo pipefail
+          for file in supabase-engine/probes/[0-9]*.sql; do
+            echo "::group::$file"
+            { echo 'begin;'; cat supabase-engine/probes/_setup.sql "$file"; echo 'rollback;'; } \
+              | docker exec -i -e PGPASSWORD engine-db \
+                psql -X -q -v ON_ERROR_STOP=1 -h localhost -U supabase_admin -d postgres
+            echo "::endgroup::"
+          done
+
+      - name: The probes left nothing behind
+        run: |
+          left=$(docker exec -e PGPASSWORD engine-db \
+            psql -X -q -t -A -v ON_ERROR_STOP=1 -h localhost -U supabase_admin -d postgres \
+            -c "select (select count(*) from auth.users) + (select count(*) from public.engine_configuration) + (select count(*) from public.notifications)")
+          if [ "$left" != "0" ]; then echo "The probes left $left rows behind" >&2; exit 1; fi
+
+      - name: Schema fingerprint (for the record)
+        run: |
+          docker exec -e PGPASSWORD engine-db \
+            psql -X -q -v ON_ERROR_STOP=1 -h localhost -U supabase_admin -d postgres \
+            -c "select part, hash from engine.schema_fingerprint() order by part"
+
+      - name: Database log, when something failed
+        if: failure()
+        run: docker logs --tail 80 engine-db

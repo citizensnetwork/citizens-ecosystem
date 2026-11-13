@@ -84,6 +84,14 @@ Asked as the eight questions in section 7 of the plan, answered in the session b
   2026-11-11, after a check that no code, configuration or environment file pointed at it. The Citizens
   organisation now holds one project.
 
+**Added on 2026-11-12, step E5:**
+
+- **O7 is done.** The founder switched on second-factor sign-in on the accounts that hold the engine (database,
+  code and hosting) on 2026-11-12.
+- **The engine organisation exists.** The founder created a new free organisation for the engine the same day,
+  separate from the Citizens organisation. A project first created inside the Citizens organisation by mistake was
+  deleted by the founder; the Citizens organisation holds one project again.
+
 ---
 
 ## 3. Decisions
