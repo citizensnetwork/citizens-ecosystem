@@ -111,16 +111,6 @@ jobs:
             psql -X -q -v ON_ERROR_STOP=1 -h localhost -U supabase_admin -d postgres \
             -c "select part, hash from engine.schema_fingerprint() order by part"
 
-      # For the record only; it never fails the job, and it runs after every proof above.
-      # On 2026-11-13 this image ended its server process when a role called a function it has no
-      # right to call. The probes therefore look such rights up. This step finds out when the image
-      # does that: which caller, which kind of function, which preloaded library.
-      - name: Platform diagnosis, a refused function call (never fails the job)
-        if: always()
-        continue-on-error: true
-        timeout-minutes: 8
-        run: bash supabase-engine/test/refused-call-diagnosis.sh engine-db || true
-
       - name: Database log, when something failed
         if: failure()
         run: docker logs --tail 80 engine-db

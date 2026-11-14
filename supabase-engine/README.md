@@ -182,6 +182,23 @@ keep their name and colour, and the app simply stops offering it for new ones.
 The unit tests are part of `pnpm test`. Each check has a test that breaks the database on purpose and expects the
 check to catch it.
 
+The first live engine project (a free build project, test data only) had the ten files applied on 2026-11-14.
+Its schema fingerprint is the same as the one from CI and from the unit tests, both checks and all six probes pass
+there, and the platform's security advisor reports 0 errors.
+
+### A trap when writing a probe
+
+On the hosted Postgres image, a session that is **logged in as the database owner**, switches to a lesser role
+(`set role anon`) and then calls a function that role may not call does not get a "permission denied": the
+server process ends and the whole database restarts. It happens for any function. It does **not** happen on the
+data API's own login role, which is the only route a visitor or a signed-in person has: there the call is refused
+cleanly (measured in CI on 2026-11-14, with three login roles, five kinds of function and several forms).
+
+So nobody using a world can cause it, but a probe or a hand-typed query run as the owner can restart a live
+database. The rule for every probe here and in any other line: **look up** the right to call a function or use a
+schema (`has_function_privilege`, `has_schema_privilege`) under the switched role, and never exercise the refusal.
+Rights on tables can be exercised for real; those refusals are clean on every login role.
+
 ## Provisioning beyond SQL
 
 `pnpm --filter @engine/db provision -- ...` prints the whole list for one tenant, in order, with the SQL for the

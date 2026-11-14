@@ -2,10 +2,11 @@
 -- configuration, or reach the engine's private schema. Not a visitor, not a signed-in person, and
 -- (for what the world is allowed) not even the world's own server.
 
--- A right to CALL a function, or to USE a schema, is looked up here and not exercised: on the
--- hosted Postgres image a refused function call inside a block like these ended the server
--- process (seen in CI on 2026-11-13), which would hide every result after it. Rights on tables
--- are exercised for real.
+-- A right to CALL a function, or to USE a schema, is looked up here and not exercised. On the
+-- hosted Postgres image, a session logged in as the database owner that switches to a lesser role
+-- and calls a function that role may not call ends the server process (measured in CI,
+-- 2026-11-14; the data API's own login role is refused cleanly). A probe runs as the owner, so
+-- exercising such a refusal could restart a live database. Rights on tables are exercised for real.
 
 select engine.write_entitlements(pg_temp.probe_entitlements());
 select public.publish_engine_configuration(pg_temp.probe_configuration(1));
