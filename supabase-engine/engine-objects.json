@@ -1,7 +1,15 @@
 {
   "$comment": "What the engine line adds to schema public beyond the cut of the source database. Kept by hand: a migration that adds a table, a function, a trigger or a scheduled job adds its name here, and the catalogue check then expects it. Anything in a built database that is neither in baseline.lock.json nor here fails the check.",
-  "tables": ["engine_configuration", "engine_entitlements", "engine_wording"],
+  "tables": [
+    "engine_configuration",
+    "engine_entitlements",
+    "engine_wording",
+    "support_session_reads",
+    "support_sessions"
+  ],
   "functions": [
+    "decide_support_session",
+    "end_support_session",
     "engine_configuration_guard",
     "engine_event_category_known",
     "engine_feature_on",
@@ -10,15 +18,37 @@
   ],
   "triggers": [
     "engine_configuration.engine_configuration_guard",
-    "events.engine_event_category_known"
+    "events.engine_event_category_known",
+    "support_session_reads.support_session_reads_guard",
+    "support_session_reads.support_session_reads_no_truncate",
+    "support_sessions.support_sessions_guard",
+    "support_sessions.support_sessions_no_truncate"
   ],
   "anonExecutable": ["engine_feature_on"],
   "publicExecutable": [],
   "privateSchemaFunctions": [
     "call_edge_function",
+    "close_support_session",
+    "finish_support_session",
     "listed_categories",
+    "open_support_session",
     "schema_fingerprint",
+    "support_access_mode",
+    "support_find_account",
+    "support_gate",
+    "support_list_conversations",
+    "support_log",
+    "support_notify",
+    "support_read_account",
+    "support_read_guard",
+    "support_read_location",
+    "support_read_notifications",
+    "support_read_thread",
+    "support_session_guard",
+    "support_session_report",
+    "sweep_support_sessions",
     "write_entitlements"
   ],
-  "privateSchemaTables": ["project_settings", "schema_migrations"]
+  "privateSchemaTables": ["project_settings", "schema_migrations"],
+  "jobs": ["support-session-expiry"]
 }

@@ -1,0 +1,62 @@
+{
+  "$comment": "Everything a built control plane holds, by name. Kept by hand: a migration that adds a table, a function or a trigger adds its name here, and the catalogue check then expects it. Anything in a built database that is not listed fails the check. apiFunctions are the functions in schema public: the only things the signed-in role may call.",
+  "tables": [
+    "audit_log",
+    "engine_releases",
+    "grantable_features",
+    "provisioning_runs",
+    "schema_migrations",
+    "superusers",
+    "support_access_grants",
+    "tenant_domains",
+    "tenant_entitlements",
+    "tenant_infrastructure",
+    "tenant_schema_state",
+    "tenants",
+    "usage_totals"
+  ],
+  "privateFunctions": [
+    "audit_log_guard",
+    "bootstrap_first_superuser",
+    "reason",
+    "require_superuser",
+    "support_grant_guard",
+    "tenant_for_change",
+    "write_audit"
+  ],
+  "apiFunctions": [
+    "audit_log_read",
+    "engine_release_record",
+    "engine_release_withdraw",
+    "provisioning_run_finish",
+    "provisioning_run_start",
+    "provisioning_step_record",
+    "superuser_add",
+    "superuser_revoke",
+    "superusers_list",
+    "support_grant_close",
+    "support_grant_delivery",
+    "support_grant_open",
+    "support_grants_list",
+    "support_reads_record",
+    "tenant_create",
+    "tenant_domain_add",
+    "tenant_domain_remove",
+    "tenant_entitlements_delivered",
+    "tenant_entitlements_set",
+    "tenant_get",
+    "tenant_infrastructure_set",
+    "tenant_schema_state_record",
+    "tenant_set_status",
+    "tenants_list",
+    "usage_totals_read",
+    "usage_totals_record",
+    "whoami"
+  ],
+  "triggers": [
+    "audit_log.audit_log_no_change",
+    "audit_log.audit_log_no_truncate",
+    "support_access_grants.support_access_grants_guard",
+    "support_access_grants.support_access_grants_no_truncate"
+  ]
+}

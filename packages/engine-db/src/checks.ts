@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { deniedColumns, deniedNames, type Allowlist } from './allowlist.ts';
 import type { EngineMigration } from './migrations.ts';
 import { BASELINE_LOCK_PATH, ENGINE_DIR } from './paths.ts';
+import { sqlLiteral } from './provision.ts';
 import { resolve } from 'node:path';
 
 export interface BaselineLock {
@@ -45,6 +46,8 @@ export interface EngineObjects {
   readonly publicExecutable: readonly string[];
   readonly privateSchemaFunctions: readonly string[];
   readonly privateSchemaTables: readonly string[];
+  /** Scheduled jobs the engine line adds beyond the cut. */
+  readonly jobs?: readonly string[];
 }
 
 export const ENGINE_OBJECTS_PATH = resolve(ENGINE_DIR, 'engine-objects.json');
@@ -81,6 +84,7 @@ export function expectedCatalogue(lock: BaselineLock, allowlist: Allowlist, engi
     jobs: sorted([
       ...allowlist.scheduledJobs.engine,
       ...Object.keys(allowlist.scheduledJobs.changed),
+      ...(engine.jobs ?? []),
     ]),
     buckets: sorted(allowlist.storageBuckets.engine),
     realtime: sorted(allowlist.realtime.engine),
@@ -89,11 +93,28 @@ export function expectedCatalogue(lock: BaselineLock, allowlist: Allowlist, engi
   };
 }
 
-const literal = (text: string) => `'${text.replaceAll("'", "''")}'`;
-const textArray = (values: readonly string[]) =>
+/** A list of texts as an SQL `text[]`, one entry per line. */
+export const sqlTextArray = (values: readonly string[]) =>
   values.length === 0
     ? 'array[]::text[]'
-    : `array[\n    ${values.map(literal).join(',\n    ')}\n  ]::text[]`;
+    : `array[\n    ${values.map(sqlLiteral).join(',\n    ')}\n  ]::text[]`;
+
+/**
+ * Two statements for a check's body: "not expected" and "missing" for one kind of object.
+ * `expectedVar` is a `text[]` variable of the block; `actualQuery` gives one column, `name`.
+ * The block must declare `v_problems text[]`.
+ */
+export const compareBlock = (label: string, expectedVar: string, actualQuery: string) => `
+  v_problems := v_problems || coalesce((
+    select array_agg(${sqlLiteral(`${label} not expected: `)} || a.name order by a.name)
+      from (${actualQuery}) a
+     where not (a.name = any (${expectedVar}))), array[]::text[]);
+  v_problems := v_problems || coalesce((
+    select array_agg(${sqlLiteral(`${label} missing: `)} || e.name order by e.name)
+      from unnest(${expectedVar}) e(name)
+     where not exists (select 1 from (${actualQuery}) a where a.name = e.name)), array[]::text[]);`;
+
+const textArray = sqlTextArray;
 
 export function catalogueCheckSql(
   lock: BaselineLock,
@@ -106,16 +127,7 @@ export function catalogueCheckSql(
   const columns = deniedColumns(allowlist);
   const versions = migrations.map((migration) => migration.version);
 
-  // "missing" and "not expected" for one kind of object, as two statements.
-  const compare = (label: string, expectedVar: string, actualQuery: string) => `
-  v_problems := v_problems || coalesce((
-    select array_agg(${literal(`${label} not expected: `)} || a.name order by a.name)
-      from (${actualQuery}) a
-     where not (a.name = any (${expectedVar}))), array[]::text[]);
-  v_problems := v_problems || coalesce((
-    select array_agg(${literal(`${label} missing: `)} || e.name order by e.name)
-      from unnest(${expectedVar}) e(name)
-     where not exists (select 1 from (${actualQuery}) a where a.name = e.name)), array[]::text[]);`;
+  const compare = compareBlock;
 
   const publicFunctions = `select p.proname::text as name, p.oid, p.proacl
         from pg_catalog.pg_proc p

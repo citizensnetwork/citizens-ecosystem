@@ -9,6 +9,8 @@
 --   4. a function that runs with its owner's rights but without a fixed search path
 --   5. a data API role able to write one of the engine's own tables, or to use the private schema
 --   6. the service role able to change what this world is allowed
+--   7. support access: a role inside the world able to write the support records or to call a
+--      private function, a visitor able to read them, or a guard that is missing or switched off
 
 do $security$
 declare
@@ -86,6 +88,47 @@ begin
   if pg_catalog.has_schema_privilege('service_role', 'engine', 'USAGE') then
     v_findings := v_findings || array['service_role can use the private schema']::text[];
   end if;
+
+  -- 7. Support access: nobody inside the world writes its records, a visitor cannot read them,
+  --    no role inside the world can call a private function, and the guards are in place.
+  foreach v_role in array array['anon', 'authenticated', 'service_role'] loop
+    foreach v_table in array array['support_sessions', 'support_session_reads'] loop
+      if pg_catalog.has_table_privilege(v_role, ('public.' || v_table)::regclass, 'INSERT, UPDATE, DELETE, TRUNCATE') then
+        v_findings := v_findings || array[v_role || ' can write ' || v_table]::text[];
+      end if;
+    end loop;
+    v_findings := v_findings || coalesce((
+      select array_agg(v_role || ' can call the private function ' || p.proname::text order by p.proname)
+        from pg_catalog.pg_proc p
+       where p.pronamespace = 'engine'::regnamespace
+         and pg_catalog.has_function_privilege(v_role, p.oid, 'EXECUTE')), array[]::text[]);
+  end loop;
+  foreach v_table in array array['support_sessions', 'support_session_reads'] loop
+    if pg_catalog.has_table_privilege('anon', ('public.' || v_table)::regclass, 'SELECT') then
+      v_findings := v_findings || array['anon can read ' || v_table]::text[];
+    end if;
+  end loop;
+  if pg_catalog.has_function_privilege('anon', 'public.decide_support_session(uuid, boolean)', 'EXECUTE')
+     or pg_catalog.has_function_privilege('anon', 'public.end_support_session(uuid)', 'EXECUTE') then
+    v_findings := v_findings || array['anon can answer or end a support session']::text[];
+  end if;
+  v_findings := v_findings || coalesce((
+    select array_agg('support guard missing or switched off: ' || e.name order by e.name)
+      from unnest(array[
+             'support_sessions.support_sessions_guard', 'support_sessions.support_sessions_no_truncate',
+             'support_session_reads.support_session_reads_guard', 'support_session_reads.support_session_reads_no_truncate'
+           ]) e(name)
+     where not exists (
+       select 1 from pg_catalog.pg_trigger t
+         join pg_catalog.pg_class c on c.oid = t.tgrelid
+        where c.relnamespace = 'public'::regnamespace
+          and c.relname::text || '.' || t.tgname::text = e.name
+          and t.tgenabled in ('O', 'A'))), array[]::text[]);
+  v_findings := v_findings || coalesce((
+    select array_agg('private function open to every role: ' || p.proname::text order by p.proname)
+      from pg_catalog.pg_proc p
+     where p.pronamespace = 'engine'::regnamespace
+       and exists (select 1 from pg_catalog.aclexplode(p.proacl) g where g.grantee = 0)), array[]::text[]);
 
   if pg_catalog.array_length(v_findings, 1) > 0 then
     raise exception 'SECURITY CHECK FAILED (% findings): %',

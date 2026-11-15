@@ -214,8 +214,25 @@ describe('a world’s categories, theme and home-screen app', () => {
 });
 
 describe('wording for code that cannot import this package', () => {
+  /**
+   * The support-access notices (ADR-001, decision 3) are not a feature and use no term of the
+   * vocabulary, so every world gets them as they are until it writes its own.
+   */
+  const supportAccess = {
+    'notification.supportAccess.opened.title': 'Support access opened',
+    'notification.supportAccess.opened.body':
+      'Your service provider opened read-only support access until {$until} UTC. Reason given: {$reason}',
+    'notification.supportAccess.requested.title': 'Support access needs your answer',
+    'notification.supportAccess.requested.body':
+      'Your service provider asks for read-only support access until {$until} UTC. Nothing can be read until a staff member approves it. Reason given: {$reason}',
+    'notification.supportAccess.ended.title': 'Support access ended',
+    'notification.supportAccess.ended.body':
+      'Read-only support access has ended. Reads made: {$reads}. Each one is listed in your support log.',
+  };
+
   it('gives the database its notification text, in the world’s words, with values left in place', () => {
     expect(citizens.wording('database')).toEqual({
+      ...supportAccess,
       'notification.partnerApproved.title': "You're live on Citizens Connect!",
       'notification.partnerApproved.body':
         'Your Contributor listing was approved. It is now on the map and in Kingdom Discovery.',
@@ -243,6 +260,7 @@ describe('wording for code that cannot import this package', () => {
 
   it('leaves out the text of a feature that is off', () => {
     expect(sample.wording('database')).toEqual({
+      ...supportAccess,
       'notification.followedPartner.fallbackName': 'a host you follow',
       'notification.followedPartner.newEvent': 'New event from {$name}',
       'notification.followedPartner.newUpdate': 'New update from {$name}',

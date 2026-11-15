@@ -27,6 +27,7 @@ A new migration goes into `migrations/` with the next four-digit number. An appl
 | `baseline.lock.json`        | Which dump the baseline was cut from (its hash, its pinned head) and what a built database must contain        |
 | `engine-objects.json`       | What the engine line adds beyond the cut (kept by hand)                                                        |
 | `migrations/0001` to `0010` | The baseline, in order (below)                                                                                 |
+| `migrations/0011`           | Break-glass support access, the tenant's side (its own section below)                                          |
 | `migrations.lock.json`      | The hash of every migration file                                                                               |
 | `citizens-line-ledger.json` | The drift ledger between the Citizens line and this one (below)                                                |
 | `checks/`                   | Two SQL files that raise an error when a built database is wrong: `catalogue.sql`, `security.sql`              |
@@ -127,8 +128,9 @@ every sentence by key.
 - **Rows.** `(key, source, renderer, text)`. `source` is `engine` (the neutral default) or `tenant` (the world's
   own words). `renderer` is `database` or `edge`: the same table serves the edge functions.
 - **The defaults** are seeded by `0010`, which is generated from the message catalogue in `@engine/config`
-  (every message a database or edge function writes out, 19 today). A test fails when the file and the catalogue
-  differ. A world must name itself, so the engine has no default name; a default row says "this app" where a
+  (every message a database or edge function writes out, 19 when the seed was written). A test fails when the
+  file and the catalogue differ. A message added after the seed was applied comes with the migration that needs
+  it (`0011` carries six), and the seed keeps the rows it was written with. A world must name itself, so the engine has no default name; a default row says "this app" where a
   world's name would go.
 - **A world's own words** are written by publishing: the server sends what `createWorld(...).wording(...)` gives,
   and the publish function replaces all `tenant` rows in the same transaction as the configuration. A key the
@@ -167,6 +169,42 @@ keep their name and colour, and the app simply stops offering it for new ones.
   are copied exactly as they are in the source; tightening them is for the security review (step E10).
 - **No object comments** are carried over: they cite the source's migration numbers and its framing.
 
+## Break-glass support access: migration `0011` (engine step E6)
+
+The engine owner has no standing access to a world's people, messages or locations. When support is needed, a
+grant is opened in the control plane ([`supabase-control/`](../supabase-control/README.md) has the whole path,
+step by step) and written into the world's database as a **support session**. This migration is the world's side.
+
+- **Two tables the world's staff can read and nobody inside the world can write**: `support_sessions` (who, why,
+  from when to when, how it ended) and `support_session_reads` (every read: what kind, about whom, when, and for a
+  private thread the reason). Not a visitor, not a signed-in person, not the world's own server. Triggers refuse
+  any edit, delete or truncate, for the owner of the database too.
+- **Readers** in the private schema (`engine.support_find_account`, `support_read_account`,
+  `support_list_conversations`, `support_read_thread`, `support_read_location`, `support_read_notifications`).
+  Each one checks the session, writes the log row and returns the data in one step, so a read that is not logged
+  does not exist. The list of conversations never holds what was said; opening a thread needs its own reason
+  every time. An account is found by its exact address or handle, never by a part of a name.
+- **Read-only, 30 minutes, one at a time.** There is no writing function. This database sets the time limit by
+  its own clock, whatever the grant says, and an index allows one open session.
+- **Expiry fails closed.** A reader reads the clock itself and refuses the moment the time has passed. The job
+  `support-session-expiry` (every 5 minutes) only tidies up: it closes abandoned sessions and makes sure the
+  staff get their notice.
+- **The staff are told** when a session opens and when it ends (notices of type `support_access`, in the world's
+  own words through the wording table), see both tables in their admin screens, and can end a session at once
+  (`end_support_session`).
+- **"Ask me first"** is the world's own setting (`app_settings`, key `support_access_mode`, value `"ask"`). With
+  it a session waits until a staff member approves it (`decide_support_session`); the 30 minutes include the wait.
+  Without it the default is notify-and-show.
+- **What goes back to the control plane** (`engine.support_session_report`) holds nothing about a person: each
+  read's number, time and kind, and a thread's reason.
+
+The same migration closes a gap in `0004`: the two checks on `engine_entitlements` let through a document that
+named no database line, or lacked a part (a comparison with something missing is neither true nor false, and a
+check lets that pass). Both now fail on a missing part.
+
+For step E7: the app shows a `support_access` notice with its title and body like any other; a screen for the two
+tables and the two staff functions is still to build.
+
 ## Proving it
 
 | Proof                  | What fails it                                                                                                                                                                            | Where it runs                                                                                  |
@@ -182,9 +220,13 @@ keep their name and colour, and the app simply stops offering it for new ones.
 The unit tests are part of `pnpm test`. Each check has a test that breaks the database on purpose and expects the
 check to catch it.
 
-The first live engine project (a free build project, test data only) had the ten files applied on 2026-11-14.
-Its schema fingerprint is the same as the one from CI and from the unit tests, both checks and all six probes pass
-there, and the platform's security advisor reports 0 errors.
+Probe `07` proves the support-access promises above, and the security check also fails when someone inside the
+world can write the support records or call a private function, or when a guard is missing or switched off.
+
+The first live engine project (a free build project, test data only) had the ten baseline files applied on
+2026-11-14. Its schema fingerprint was the same as the one from CI and from the unit tests, both checks and the
+six probes of that day passed there, and the platform's security advisor reported 0 errors. **Migration `0011`
+has not been applied to it**: that waits for the founder's yes, like every change to a live database.
 
 ### A trap when writing a probe
 

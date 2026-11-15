@@ -83,6 +83,8 @@ export const SIGN_IN_SETTINGS: readonly { readonly setting: string; readonly val
 export function provisioningPlan(
   input: ProvisioningInput,
   allowlist: Allowlist,
+  /** Jobs the engine line adds beyond the cut (`engine-objects.json`, `jobs`). */
+  addedJobs: readonly string[] = [],
 ): ProvisioningStep[] {
   for (const [label, value] of [
     ['project address', input.projectUrl],
@@ -151,7 +153,7 @@ export function provisioningPlan(
       id: 'jobs',
       kind: 'check',
       title: 'Scheduled jobs',
-      detail: `Created by the migrations: ${[...allowlist.scheduledJobs.engine, ...Object.keys(allowlist.scheduledJobs.changed)].join(', ')}. Check each is active.`,
+      detail: `Created by the migrations: ${[...allowlist.scheduledJobs.engine, ...Object.keys(allowlist.scheduledJobs.changed), ...addedJobs].join(', ')}. Check each is active.`,
     },
     {
       id: 'secrets',
