@@ -217,7 +217,13 @@ describe('the message catalogue', () => {
     const database = messageKeysRenderedBy('database');
     expect(database).toContain('notification.partnerApproved.title');
     expect(database).toContain('notification.ideaLead.body');
-    expect(database.every((key) => messageDefinition(key).channel === 'notification')).toBe(true);
+    // The database writes notifications, and the text of the one event it creates itself (the
+    // kickoff of a scheduled project).
+    expect(database.filter((key) => messageDefinition(key).channel !== 'notification')).toEqual([
+      'screen.ideas.eventTitle',
+      'screen.ideas.eventNote',
+      'screen.ideas.eventLocation',
+    ]);
   });
 
   it('knows its own keys', () => {

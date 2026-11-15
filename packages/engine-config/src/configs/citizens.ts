@@ -94,6 +94,8 @@ export const citizensConfiguration: Configuration = {
       'screen.settings.weeklyDigest': 'A weekly summary of Kingdom activity',
       'email.signOff':
         'Connecting the Kingdom — one citizen, one contributor, one need at a time.\nThe Citizens Connect team',
+      'notification.ideaScheduled.body':
+        '"{$title}" has a kickoff date — you\'re connected automatically.',
       'manifest.description':
         'Discover faith-based events, places, and community near you. Connecting the Kingdom.',
     },

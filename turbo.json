@@ -85,6 +85,29 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "@engine/db#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@engine/db#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/supabase-engine/**",
+        "$TURBO_ROOT$/supabase/migrations/**",
+        "$TURBO_ROOT$/packages/engine-config/src/**"
+      ]
+    },
+    "@engine/db#test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/supabase-engine/**",
+        "$TURBO_ROOT$/supabase/migrations/**",
+        "$TURBO_ROOT$/packages/engine-config/src/**"
+      ],
+      "outputs": ["coverage/**"]
+    },
     "@engine/config#test": {
       "dependsOn": ["^build"],
       "inputs": [

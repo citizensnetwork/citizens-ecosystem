@@ -221,16 +221,31 @@ describe('wording for code that cannot import this package', () => {
         'Your Contributor listing was approved. It is now on the map and in Kingdom Discovery.',
       'notification.partnerDeclined.title': 'About your Contributor application',
       'notification.followedPartner.fallbackName': 'a Contributor you follow',
+      'notification.followedPartner.newEvent': 'New event from {$name}',
+      'notification.followedPartner.newUpdate': 'New update from {$name}',
       'notification.ideaGoalReached.title': 'Kingdom Project: goal reached!',
+      'notification.ideaGoalReached.body':
+        '"{$title}" reached its vote goal and is now In Process.',
+      'notification.ideaGoalReached.fallbackTitle': 'An idea you voted for',
+      'notification.ideaLead.title': 'Your idea reached its goal!',
       'notification.ideaLead.body':
         'You are the project lead for "{$title}". Schedule the kickoff from the Kingdom Projects board.',
+      'notification.ideaLead.fallbackTitle': 'your idea',
       'notification.ideaScheduled.title': 'Kingdom Project scheduled',
+      'notification.ideaScheduled.body':
+        '"{$title}" has a kickoff date — you\'re connected automatically.',
+      'notification.ideaScheduled.fallbackTitle': 'A project you voted for',
+      'screen.ideas.eventTitle': 'Kingdom Project',
+      'screen.ideas.eventNote': 'This is a confirmed Kingdom Project.',
+      'screen.ideas.eventLocation': 'Community project location',
     });
   });
 
   it('leaves out the text of a feature that is off', () => {
     expect(sample.wording('database')).toEqual({
       'notification.followedPartner.fallbackName': 'a host you follow',
+      'notification.followedPartner.newEvent': 'New event from {$name}',
+      'notification.followedPartner.newUpdate': 'New update from {$name}',
     });
     expect(sample.wording('edge')).toEqual({
       'notification.nearbyRsvp': 'A few neighbours near you just RSVPed.',
