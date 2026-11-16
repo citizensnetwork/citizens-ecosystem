@@ -53,17 +53,12 @@ const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const BROWSER_BUNDLE_RE = /^[a-z][a-z0-9-]*\.js$/;
 const RESERVED_BUNDLE_NAMES = new Set(['auth-client.js', 'capacitor-bridge.js', 'config.js']);
 
-// Both helpers take a name BROWSER_BUNDLE_RE accepted, so the dot is its only special character.
-/** `<script src="name.js"></script>` (optionally `?v=…`) on a line of its own, for one entry. */
-function browserBundleTagRe(name) {
-  const escaped = name.replace(/\./g, '\\.');
-  return new RegExp(`^([ \\t]*)<script src="${escaped}(?:\\?v=[^"]*)?"></script>$`, 'gm');
-}
-/** The content-hashed output name of one entry: `engine-world.js` → `engine-world.<hash>.js`. */
-function hashedBundleRe(name) {
-  const stem = name.slice(0, -'.js'.length);
-  return new RegExp(`^${stem}\\.[0-9a-f]{10}\\.js$`);
-}
+// Both patterns are fixed: the entry name is compared with what they capture, never built into one.
+/** `<script src="name.js"></script>` (optionally `?v=…`) on a line of its own: indent, name. */
+const BROWSER_BUNDLE_TAG_RE =
+  /^([ \t]*)<script src="([a-z][a-z0-9-]*\.js)(?:\?v=[^"]*)?"><\/script>$/gm;
+/** A content-hashed output of one entry: `engine-world.<hash>.js` → `engine-world.js`. */
+const HASHED_BROWSER_BUNDLE_RE = /^([a-z][a-z0-9-]*)\.[0-9a-f]{10}\.js$/;
 
 /** Opening <script> tags, any case (attributes only — bodies are never inspected). */
 const SCRIPT_OPEN_TAG_RE = /<script\b([^>]*)>/gi;
@@ -326,9 +321,13 @@ function readLocalConfig(srcDir, envGlobalName) {
 /** Remove stale content-hashed outputs from a previous build (filenames change per build). */
 function cleanHashedOutputs(dest, browserBundles = []) {
   if (!fs.existsSync(dest)) return;
-  const bundled = browserBundles.map(hashedBundleRe);
+  const bundled = new Set(browserBundles);
+  const isOldBundle = (name) => {
+    const match = HASHED_BROWSER_BUNDLE_RE.exec(name);
+    return match !== null && bundled.has(`${match[1]}.js`);
+  };
   for (const name of fs.readdirSync(dest)) {
-    if (HASHED_SINGLE_RE.test(name) || bundled.some((re) => re.test(name))) {
+    if (HASHED_SINGLE_RE.test(name) || isOldBundle(name)) {
       fs.unlinkSync(path.join(dest, name));
     }
   }
@@ -473,15 +472,16 @@ function rewriteIndexHtml(
 ) {
   assertBasePath(basePath);
   // Each browser bundle loads where its own tag stands, so the page decides the order.
-  for (const [name, file] of Object.entries(browserBundleFiles)) {
-    let found = 0;
-    html = html.replace(browserBundleTagRe(name), (_tag, indent) => {
-      found += 1;
-      return `${indent}<script src="${file}"></script>`;
-    });
-    if (found !== 1) {
+  const found = new Map(Object.keys(browserBundleFiles).map((name) => [name, 0]));
+  html = html.replace(BROWSER_BUNDLE_TAG_RE, (tag, indent, name) => {
+    if (!found.has(name)) return tag;
+    found.set(name, found.get(name) + 1);
+    return `${indent}<script src="${browserBundleFiles[name]}"></script>`;
+  });
+  for (const [name, count] of found) {
+    if (count !== 1) {
       throw new Error(
-        `[frontend-build] index.html must load ${name} with exactly one <script src="${name}"></script> tag of its own (found ${found})`,
+        `[frontend-build] index.html must load ${name} with exactly one <script src="${name}"></script> tag of its own (found ${count})`,
       );
     }
   }
