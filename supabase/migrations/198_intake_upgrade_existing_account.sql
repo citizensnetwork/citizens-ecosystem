@@ -1,10 +1,13 @@
 -- ════════════════════════════════════════════════════════════════════
 --  198_intake_upgrade_existing_account
 --
---  NOT APPLIED. The owner applies this file after an explicit yes
---  (pre-apply tag, rollback-only probe
---  docs/audit/probes/198_intake_upgrade_existing_account.probe.sql,
---  advisor 0 ERROR). Commit only. Do not apply from a pull request.
+--  APPLIED (live version 20261026055042, after the founder's yes in chat).
+--  Rule from 2026-11-01: apply after the founder says yes in chat. The
+--  founder does not name the file, and there is no pre-apply git tag.
+--  After applying, run
+--  docs/audit/probes/198_intake_upgrade_existing_account.probe.sql
+--  and the security advisor (0 ERROR, no unexpected new finding).
+--  Database, auth and security changes still need that yes.
 --
 --  Google Form intake currently refuses an owner email that already
 --  has a Citizens account. This file is the confirm-and-upgrade the

@@ -1,12 +1,14 @@
 -- ════════════════════════════════════════════════════════════════════
 --  201_open_to_collaborate
 --
---  NOT APPLIED. This file is a proposal in a draft pull request.
+--  APPLIED (live version 20261101211229, after the founder's yes in chat).
 --  The founder approved the change (issue #314, 2026-11-01). The
---  Builder does not apply it. Apply only after a pre-apply git tag
---  is pushed, then run
+--  Builder does not apply it. Rule from 2026-11-01: apply after the
+--  founder says yes in chat. The founder does not name the file, and
+--  there is no pre-apply git tag. After applying, run
 --  docs/audit/probes/201_open_to_collaborate.probe.sql (it rolls
 --  itself back) and the security advisor (0 ERROR, no new finding).
+--  Database, auth and security changes still need that yes.
 --
 --  WHAT THIS ADDS
 --   public.profiles.open_to_collaborate boolean not null default false.

@@ -2,11 +2,12 @@
 --  199_edit_listing_suggestion: let the owner (or an active editor) change the text of a
 --  listing suggestion that is still waiting, without publishing it.
 --
---  NOT APPLIED. This file is a PROPOSAL in a draft pull request. It is applied only on the
---  founder's yes in chat naming this file, with a pre-apply git tag pushed first and the
---  security advisor checked afterwards (0 ERROR, no unexpected new finding). Number 199 is
---  free between 198 (intake upgrade) and 200 (lock anon security-definer execute); take the
---  next free number from a fresh `list_migrations` at apply time.
+--  APPLIED (live version 20261101171030, after the founder's yes in chat).
+--  Rule from 2026-11-01: apply after the founder says yes in chat. The
+--  founder does not name the file, and there is no pre-apply git tag.
+--  After applying, run this migration's probe and the security advisor
+--  (0 ERROR, no unexpected new finding). Database, auth and security
+--  changes still need that yes.
 --
 --  WHY. Since migration 181 the owner can only READ a suggestion (listing_suggestions has a
 --  SELECT grant and nothing else), and every decision goes through decide_listing_suggestion().

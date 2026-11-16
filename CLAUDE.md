@@ -38,8 +38,10 @@ sessions opened inside that app dir); where they overlap, they are the same rule
 
 - **`supabase/` at the root is THE migration lineage** for all three apps
   (schemas `public` / `vision` / `wear`, one shared Supabase project). Numbering is
-  sequential across apps; apply via MCP `apply_migration` with a pre-apply git tag and a
-  security-advisor check (0 ERROR / 0 new findings). Contract:
+  sequential across apps. A migration is applied to the live database after the founder
+  says yes in chat. Database, auth and security changes still need that yes. The founder
+  does not name the file, and there is no pre-apply git tag. After applying, run that
+  migration's probe and the security advisor (0 ERROR / 0 new findings). Contract:
   [`apps/connect/docs/SHARED_DB_CONTRACT.md`](./apps/connect/docs/SHARED_DB_CONTRACT.md).
 - **Cross-app data goes through Connect's `/api/v1`** — never read a sibling app's
   tables directly (contract R2).

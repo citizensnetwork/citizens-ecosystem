@@ -1,8 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════
 --  191_friends_considering: the read side of Convince (FEAT-04) and the one switch that goes with it. Authored 2026-10-18 as
 --  docs/proposals/friends-considering.sql; APPLIED 2026-10-18 through MCP apply_migration as `191_friends_considering` (version
---  20261018131800) on the founder's yes in chat for this file (pre-apply tag `connect-pre-mig191-friends-considering`, on origin/main
---  1525287). The stored migration statement is byte-for-byte this file's body (md5 880e213f4cf2db23000087f7c86c245f, 6727 characters).
+--  20261018131800) on the founder's yes in chat (no pre-apply git tag; the file need not be named).
+--  The stored migration statement is byte-for-byte this file's body (md5 880e213f4cf2db23000087f7c86c245f, 6727 characters).
 --  Evidence: the rollback-only dry run docs/audit/probes/friends_considering.probe.sql, 41 of 41 PASS before the apply (its first two
 --  lines reproduced the two gaps on the live objects); after the apply docs/audit/probes/191_friends_considering.probe.sql, 39 of 39
 --  PASS against the live objects, rolled back, nothing left behind (no probe users, profiles, events, convinces or notifications).

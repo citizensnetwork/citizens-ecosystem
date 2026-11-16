@@ -5,9 +5,10 @@
 -- decision brief §6 row 4b). Adds the assigned-authority moderator/admin
 -- tier, a reports triage lifecycle, and moderator takedown policies.
 --
--- Applied per SHARED_DB_CONTRACT R7: pre-apply tag `connect-pre-mig145` →
--- apply_migration on xyiajtrvhlxaeplsiajj → get_advisors(security)
--- 0 ERROR / 0 unexpected findings → contract §9 re-stamped.
+-- Applied per SHARED_DB_CONTRACT R7 after the founder's yes in chat
+-- (no pre-apply git tag; the file need not be named): apply_migration,
+-- then get_advisors(security) 0 ERROR / 0 unexpected findings, then
+-- contract §9 re-stamped.
 --
 -- Design notes (why this shape — ECOSYSTEM_PROFILE_LEVELS.md P2.1–P2.3):
 --  * SEPARATE service_role-managed table, not a role column on wear.users:

@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════
 --  186_search_contributors_bucketed: S13 step 2 of 4. Authored as docs/proposals/s13b-search-contributors-bucketed.sql on
 --  2026-10-17; applied the same day through MCP apply_migration as `186_search_contributors_bucketed` on Stephen's yes in
---  chat (one yes per file; pre-apply tag `connect-pre-mig186-search-contributors-bucketed`).
+--  chat (no pre-apply git tag; the file need not be named).
 --
 --  public.search_contributors (the SQL behind GET /api/contributors/search, callable by the public key) used to return
 --  `followers_count` as an EXACT number and rank by it. It now calls public.follower_count_public (migration 185): 0 below

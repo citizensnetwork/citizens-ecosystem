@@ -5,12 +5,17 @@
 --  NOT a live apply. Do not run this until migration 202 is applied.
 --
 --  It checks: a citizen's second ordinary event in the window is
---  refused; four Let's events are allowed and a fifth is refused;
---  those Let's rows do not use up the ordinary cap; a contributor is
---  not capped; an unknown starter is refused; a non-admin cannot
+--  refused; an unknown starter is refused; four Let's events are
+--  allowed and a fifth is refused; those Let's rows do not use up
+--  the ordinary cap; a contributor is not capped; a non-admin cannot
 --  change the category or clear the marker, and can still edit the
 --  title; anon and authenticated cannot execute the function;
 --  search_path is empty.
+--
+--  The unknown starter is inserted before any Let's row is stored.
+--  The rate-limit trigger runs before the check constraint, so the
+--  same insert after four Let's rows is refused as over the cap and
+--  never reaches the starter check.
 -- ════════════════════════════════════════════════════════════════════
 do $probe$
 declare
@@ -34,6 +39,16 @@ begin
 
   update public.profiles set role = 'citizen' where id = citizen;
   update public.profiles set role = 'contributor' where id = host;
+
+  begin
+    insert into public.events (title, date, created_by, lets_starter)
+    values ('Probe unknown starter', now() + interval '8 days', citizen, 'not-a-starter');
+    res := array_append(res, 'FAIL an unknown starter was stored');
+  exception when check_violation then
+    res := array_append(res, 'PASS an unknown starter is refused');
+  when others then
+    res := array_append(res, 'FAIL unknown starter raised ' || sqlerrm);
+  end;
 
   insert into public.events (title, date, created_by, status, visibility)
   values ('Probe ordinary one', now() + interval '3 days', citizen, 'published', 'public');
@@ -97,16 +112,6 @@ begin
   insert into public.events (title, date, created_by, status, visibility)
   values ('Probe host two', now() + interval '4 days', host, 'published', 'public');
   res := array_append(res, 'PASS a contributor can create five Let''s events and two ordinary events');
-
-  begin
-    insert into public.events (title, date, created_by, lets_starter)
-    values ('Probe unknown starter', now() + interval '8 days', citizen, 'not-a-starter');
-    res := array_append(res, 'FAIL an unknown starter was stored');
-  exception when check_violation then
-    res := array_append(res, 'PASS an unknown starter is refused');
-  when others then
-    res := array_append(res, 'FAIL unknown starter raised ' || sqlerrm);
-  end;
 
   select category into before_cat
     from public.events

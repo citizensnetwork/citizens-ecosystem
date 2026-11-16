@@ -122,7 +122,7 @@ One set, two orderings. **The set:** the open Connect work (section C), the miss
   `tools/google-forms/intake.gs` is now the corrected, wording-matched script (#85); **C10 starts from it**, never from the old
   number-matching copy (it misread the consent question after the Section 7 reorder). Both designs agree: the
   database is the source of truth, consent comes first, and no Google Sheet sits in the data path.
-- *Process:* needs a migration (ask the founder first, pre-apply tag, rollback-only probe, advisor diff). Read the founder's planning-session files first (untracked, local): `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md`, `intake-v2.gs` and `PLANNING_SESSION_HANDOFF_2026-10-02.md` (decisions D-8 to D-11).
+- *Process:* needs a migration (the founder's yes in chat first; the founder does not name the file, and there is no pre-apply git tag; after applying, run the probe and the security advisor). Read the founder's planning-session files first (untracked, local): `docs/handoffs/CONNECT_LISTING_AUTOMATION_PHASE1_HANDOFF.md`, `intake-v2.gs` and `PLANNING_SESSION_HANDOFF_2026-10-02.md` (decisions D-8 to D-11).
 
 **C19 status:** see the C19 row; the 2026-10-12 status block is in the archive.
 

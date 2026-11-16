@@ -742,7 +742,7 @@ begin
 end $$;
 
 -- ============================================================================
--- Post-apply record (APPLIED 2026-07-17, tag wear-pre-mig163 @8cd6314):
+-- Post-apply record (APPLIED 2026-07-17, after the founder's yes in chat; no pre-apply git tag):
 --  * get_advisors(security) = 0 ERROR / 110 WARN / 3 INFO. The +8 WARNs vs the
 --    head-162 baseline (0/102/3) are EXACTLY the INTENTIONAL SECDEF EXECUTE
 --    grants to authenticated on: impersonation_start, impersonation_end, and

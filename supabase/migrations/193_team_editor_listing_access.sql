@@ -1,9 +1,14 @@
 -- ════════════════════════════════════════════════════════════════════
 --  193_team_editor_listing_access
 --
---  NOT APPLIED. The owner applies this file after review (pre-apply tag,
---  rollback-only probe docs/audit/probes/193_team_editor_listing_access.probe.sql,
---  advisor 0 ERROR). Expected advisor change: +1 WARN for
+--  APPLIED (live version 20261019172904, after the founder's yes in chat).
+--  Rule from 2026-11-01: apply after the founder says yes in chat. The
+--  founder does not name the file, and there is no pre-apply git tag.
+--  After applying, run
+--  docs/audit/probes/193_team_editor_listing_access.probe.sql
+--  and the security advisor (0 ERROR, no unexpected new finding).
+--  Database, auth and security changes still need that yes.
+--  Expected advisor change: +1 WARN for
 --  public.is_active_team_member (SECURITY DEFINER, executable by
 --  authenticated on purpose: the new write policies call it). It returns
 --  only a boolean, and false when there is no JWT.

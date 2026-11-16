@@ -276,7 +276,7 @@ binds a `wear`-scoped `supabase-js` client to that token, so **RLS keys off the 
 
 1. ~~**mig 163**: the two audit tables + enum(s) + `account_accessed_by_admin` notification value +
    the SECDEF start/append/end functions + close-notify trigger~~ ✅ **SHIPPED (mig 163 APPLIED
-   2026-07-17, tag `wear-pre-mig163`)** — advisors **0 ERROR / 110 WARN / 3 INFO**: the +8 WARNs
+   2026-07-17, after the founder's yes in chat)** — advisors **0 ERROR / 110 WARN / 3 INFO**: the +8 WARNs
    vs head-162 are the intentional EXECUTE grants on `impersonation_start`/`_end` + the six
    per-view readers (§7.6a ratified per-view SECDEF; each writes its own audit row before
    returning data — an unaudited read is structurally impossible). 18/18 rolled-back prod smokes
