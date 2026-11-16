@@ -328,7 +328,6 @@
     { page: 'community', title: 'Kingdom Projects', line: 'A shared need, a shared response' },
     { page: 'apply', title: 'List an organisation', line: 'Be easier to discover' },
   ];
-  const WIDE_MQ = '(min-width: 1024px)';
   const FINE_MQ = '(min-width: 1024px) and (pointer: fine)';
   const HOUR = 60 * 60 * 1000;
   const DAY = 24 * HOUR;
