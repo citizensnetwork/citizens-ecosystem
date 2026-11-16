@@ -354,6 +354,24 @@ export const MESSAGES = {
     default: 'Organisation name',
     feature: 'partnerApplications',
   },
+  // Also the staff form that creates a listing for its owner, so it belongs to no one feature.
+  'screen.apply.namePlaceholder': {
+    channel: 'screen',
+    renderedBy: 'app',
+    default: 'The name people know it by',
+  },
+  'screen.apply.fallbackName': {
+    channel: 'screen',
+    renderedBy: 'app',
+    default: 'Your organisation',
+    feature: 'partnerApplications',
+  },
+  'screen.apply.teamSubtitle': {
+    channel: 'screen',
+    renderedBy: 'app',
+    default: 'Add the people and channels behind your organisation.',
+    feature: 'partnerApplications',
+  },
   'screen.apply.pendingTitle': {
     channel: 'screen',
     renderedBy: 'app',

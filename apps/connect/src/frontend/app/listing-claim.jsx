@@ -21,6 +21,7 @@
 //  trapped, focus returned). Styles: assets/listing-claim.css (tokens only).
 // ════════════════════════════════════════════════════════════════════
 (function () {
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const h = React.createElement;
   const { useState, useEffect, useRef } = React;
   const useBackGuard = window.useBackGuard || function () {};
@@ -30,10 +31,10 @@
   const STR = {
     attachTitle: (name) => 'Attach “' + name + '” to your account?',
     selfTitle: (name) => 'Is “' + name + '” your listing?',
-    attachBody: 'A listing was made for the email address you signed in with, and it is already live on Citizens Connect. '
+    attachBody: 'A listing was made for the email address you signed in with, and it is already live on ' + W.term('world') + '. '
       + 'If it is yours, confirm and it becomes the listing on your account. Nothing on your account changes unless you confirm.',
-    selfBody: 'A listing was made for the email address you signed in with, and it is already live on Citizens Connect. '
-      + 'If it is yours, confirm and you can manage it from your Contributor Portal.',
+    selfBody: 'A listing was made for the email address you signed in with, and it is already live on ' + W.term('world') + '. '
+      + 'If it is yours, confirm and you can manage it from your ' + W.t('screen.portal.title') + '.',
     cannotAttach: 'You already have a listing on this account, so this one cannot be attached to it. '
       + 'If it is not yours, tap Not me and we will hide it.',
     notMeHelp: 'Not me hides the listing straight away and lets our team know. Nothing on your account changes.',

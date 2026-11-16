@@ -62,6 +62,7 @@
   "devDependencies": {
     "@citizens/ecosystem": "workspace:*",
     "@citizens/frontend-build": "workspace:*",
+    "@engine/config": "workspace:*",
     "@eslint/compat": "^2.1.1",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",

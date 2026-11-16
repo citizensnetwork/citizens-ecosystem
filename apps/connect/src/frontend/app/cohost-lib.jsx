@@ -11,6 +11,7 @@
 //  Public surface: window.CCCohosts = { MAX, reasonText, invite, respond, remove, listForEvent, myInvitations, isHostOf }.
 // ════════════════════════════════════════════════════════════════════
 (function () {
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const MAX = 3;
   const GENERIC = 'Something went wrong. Please try again.';
   // The database's reasons, in plain words. Two are deliberately vague: a hidden or blocked person is never named as such.
@@ -18,7 +19,7 @@
     not_authenticated: 'Please sign in first.',
     cannot_cohost_self: 'You are already the host of this event.',
     not_event_owner: 'Only the person who created the event can invite a co-host.',
-    not_a_contributor: 'That person is not a Contributor on Citizens Connect.',
+    not_a_contributor: 'That person is not ' + W.term('partner', 'a') + ' on ' + W.term('world') + '.',
     not_allowed: 'That invitation cannot be sent.',
     too_many_cohosts: 'An event can have up to ' + MAX + ' co-hosts.',
     already_invited: 'You have already invited them.',

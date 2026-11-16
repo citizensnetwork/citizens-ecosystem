@@ -58,7 +58,7 @@
           toast('You already have ' + M.MAX_LIVE + ' notes up. Take one down to post another.', 'red');
           await refresh();
         } else if (r.status === 'not_allowed') {
-          toast('Only an approved Contributor can post a note.', 'red');
+          toast('Only an approved ' + window.WORLD.term('partner') + ' can post a note.', 'red');
         } else {
           toast(r.status === 'too_long' ? 'That note is too long.' : 'Write something first.', 'red');
         }

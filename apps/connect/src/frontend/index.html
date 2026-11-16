@@ -212,6 +212,9 @@
      lockfile version with SRI — never a floating @2. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="config.js"></script>
+<!-- The world's words, categories and switches (engine step E7): the build bundles this
+     ESM entry into one hashed script. It runs before auth-client.js and the screens. -->
+<script src="engine-world.js"></script>
 
 <!-- Cache-busting for our own no-build scripts. The static host (python
      http.server / Capacitor) sends no cache headers, so browsers serve stale
