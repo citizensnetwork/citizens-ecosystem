@@ -133,6 +133,13 @@ begin
     'function the service role can call',
     'v_nothing',
     callableBy('service_role', publicFunctions),
+  )}${compareBlock(
+    'private function a data API role can call',
+    'v_nothing',
+    `select f.name || ' (' || r.role || ')' as name
+        from (${privateFunctions}) f
+        cross join unnest(array['anon', 'authenticated', 'service_role']) r(role)
+       where pg_catalog.has_function_privilege(r.role, f.oid, 'execute')`,
   )}${compareBlock('function open to every role', 'v_nothing', openToAll(publicFunctions))}${compareBlock(
     'private function open to every role',
     'v_nothing',

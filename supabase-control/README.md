@@ -94,7 +94,9 @@ The account is invited and has enrolled its authenticator app first. The functio
 role of the data API can reach it, it writes its own audit row, and it refuses as soon as the list has ever held
 anyone. So it cannot add a second person and cannot be used to come back after a revocation. Everyone after the
 first is added by a Superuser with `superuser_add` (with a reason). Nobody removes themselves, so the list can
-never become empty. A revoked person stays on the list as revoked: the audit log keeps pointing at somebody, and
+never become empty. That holds at the same moment too: before revoking someone, `superuser_revoke` locks the
+caller's own row, so two Superusers who revoke each other at once cannot both succeed (one waits, then finds itself
+revoked and stops). This one is argued, not probed: a probe runs on one connection. A revoked person stays on the list as revoked: the audit log keeps pointing at somebody, and
 the account cannot be deleted from the sign-in system underneath it.
 
 **Two things to do when the project is created, because they are not in a migration:**
@@ -126,7 +128,8 @@ Choices worth knowing:
 
 - **A tenant moves along one path.** Building to live; live to suspended and back; any of them to retired.
   Suspending deletes nothing. Retiring is final, and the function refuses it until the caller confirms that an
-  export or a transfer of the project was offered first. Nothing about a retired tenant changes afterwards.
+  export or a transfer of the project was offered first, and while a provisioning run is still running or a
+  support grant is still open (finish or close them first). Nothing about a retired tenant changes afterwards.
 - **Identifiers, never secrets.** Each column of `tenant_infrastructure` accepts only the shape of an identifier
   (a 20-character project reference, a hosting project id, a domain, the _name_ a map key has in the map account).
   A token, a key or an address does not have that shape, so the table refuses it. Keys live in each tenant's own
@@ -182,7 +185,9 @@ Choices worth knowing:
 - **A tenant's staff can end a session at once** (`public.end_support_session`). The ADR did not ask for it; it
   costs nothing and it is the tenant's own off switch.
 - **What is copied back here holds nothing about a person**: for each read its number, time and kind, and for a
-  private thread the reason given. The account that was read stays in the tenant's own log.
+  private thread the reason given. The account that was read stays in the tenant's own log. The database
+  holds this itself: `support_reads_record` refuses an entry that carries any other part (an account, a name,
+  what was looked up), together with the whole list it came in, so a bug in the tooling cannot copy one.
 - **A grant's facts are fixed.** Its tenant, reason, time box and read-only access cannot be changed after it is
   opened, an ended grant cannot be opened again, and no grant is ever deleted.
 
@@ -200,19 +205,19 @@ Choices worth knowing:
 
 ## Proving it
 
-| Proof                  | What fails it                                                                                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Build from empty       | A migration that does not apply to an empty database                                                                                              |
-| `checks/catalogue.sql` | Something missing or unlisted; a function that a visitor, the service role or everyone can call; a function the signed-in role cannot call        |
-| `checks/security.sql`  | A table without row security; any policy; any privilege for a data API role; a function without the caller check; a missing or switched-off guard |
-| `probes/01`            | Anyone but a listed Superuser with a second factor gets in (every function is tried)                                                              |
-| `probes/02`            | A change without exactly one audit row; a refused change that leaves something; a read that writes                                                |
-| `probes/03`            | The audit log or a grant's facts can be changed, even by the owner                                                                                |
-| `probes/04`            | A tenant leaves its path; a secret-shaped value is stored as an identifier                                                                        |
-| `probes/05`            | A document for another line, or a feature the engine line cannot carry, is accepted                                                               |
-| `probes/06`            | A grant without a reason, longer than 30 minutes, or a second one; a read copied twice                                                            |
-| `probes/07`            | The bootstrap works twice; someone removes themselves; a revoked person gets in                                                                   |
-| Migration lock         | An edited migration                                                                                                                               |
+| Proof                  | What fails it                                                                                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Build from empty       | A migration that does not apply to an empty database                                                                                                                                      |
+| `checks/catalogue.sql` | Something missing or unlisted; a function that a visitor, the service role or everyone can call; a private function any data API role can call; a function the signed-in role cannot call |
+| `checks/security.sql`  | A table without row security; any policy; any privilege for a data API role; a function without the caller check; a missing or switched-off guard                                         |
+| `probes/01`            | Anyone but a listed Superuser with a second factor gets in (every function is tried)                                                                                                      |
+| `probes/02`            | A change without exactly one audit row; a refused change that leaves something; a read that writes                                                                                        |
+| `probes/03`            | The audit log or a grant's facts can be changed, even by the owner                                                                                                                        |
+| `probes/04`            | A tenant leaves its path, or is retired with a run or a grant still open; a secret-shaped value is stored as an identifier                                                                |
+| `probes/05`            | A document for another line, or a feature the engine line cannot carry, is accepted                                                                                                       |
+| `probes/06`            | A grant without a reason, longer than 30 minutes, or a second one; a read copied twice; a copied read that names a person                                                                 |
+| `probes/07`            | The bootstrap works twice; someone removes themselves; a revoked person gets in                                                                                                           |
+| Migration lock         | An edited migration                                                                                                                                                                       |
 
 Both run in `pnpm --filter @engine/db test` (in-memory Postgres) and in the `Engine baseline` workflow, job
 "Control plane" (the hosted Postgres image). Each check has a test that breaks the database on purpose and

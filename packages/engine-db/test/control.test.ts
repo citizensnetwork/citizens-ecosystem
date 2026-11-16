@@ -197,6 +197,13 @@ describe('the control-plane catalogue check catches what it must', () => {
         'grant execute on function control.bootstrap_first_superuser(uuid, text) to public;',
       ),
     ).toMatch(/private function open to every role not expected: bootstrap_first_superuser/);
+    expect(
+      await broken(
+        'grant execute on function control.write_audit(control.superusers, text, uuid, text, jsonb, text) to authenticated;',
+      ),
+    ).toMatch(
+      /private function a data API role can call not expected: write_audit \(authenticated\)/,
+    );
   });
 
   it('a missing table, function or guard', async () => {

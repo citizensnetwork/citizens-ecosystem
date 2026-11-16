@@ -13,6 +13,8 @@ set local role authenticated;
 do $probe$
 declare
   v_alpha constant uuid := current_setting('probe.alpha')::uuid;
+  v_run uuid;
+  v_grant uuid;
 begin
   begin
     perform public.tenant_set_status(v_alpha, 'suspended', 'Skipping a step.');
@@ -33,6 +35,23 @@ begin
   exception when object_not_in_prerequisite_state then
     if sqlerrm <> 'export_or_transfer_must_be_offered_first' then raise; end if;
   end;
+  -- Nothing is left half done when a tenant is retired: not a provisioning run, not a support grant.
+  v_run := public.provisioning_run_start(v_alpha, 'retire', 'Taking the tenant down.');
+  begin
+    perform public.tenant_set_status(v_alpha, 'retired', 'The tenant is leaving.', true);
+    raise exception 'PROBE FAILED: a tenant was retired while a provisioning run was still running';
+  exception when object_not_in_prerequisite_state then
+    if sqlerrm <> 'tenant_has_open_work' then raise; end if;
+  end;
+  perform public.provisioning_run_finish(v_run);
+  v_grant := (public.support_grant_open(v_alpha, 'One last question before the end.', 5) ->> 'grant')::uuid;
+  begin
+    perform public.tenant_set_status(v_alpha, 'retired', 'The tenant is leaving.', true);
+    raise exception 'PROBE FAILED: a tenant was retired while a support grant was still open';
+  exception when object_not_in_prerequisite_state then
+    if sqlerrm <> 'tenant_has_open_work' then raise; end if;
+  end;
+  perform public.support_grant_close(v_grant);
   perform public.tenant_set_status(v_alpha, 'retired', 'The tenant is leaving.', true);
 
   -- Retired is final: nothing about the tenant changes any more, and no support access opens.

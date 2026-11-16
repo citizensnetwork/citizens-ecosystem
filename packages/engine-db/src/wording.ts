@@ -18,6 +18,7 @@ import {
   type Entitlements,
   type MessageKey,
 } from '@engine/config';
+import { sqlLiteral } from './provision.ts';
 
 /** The two kinds of code that read their text from the table. */
 export const TABLE_RENDERERS = ['database', 'edge'] as const;
@@ -65,8 +66,6 @@ export function engineWordingRows(): WordingRow[] {
   }
   return rows.sort((a, b) => a.key.localeCompare(b.key, 'en'));
 }
-
-const sqlLiteral = (text: string) => `'${text.replaceAll("'", "''")}'`;
 
 /** One statement that writes the given default rows, replacing a row that is already there. */
 export function wordingUpsertSql(rows: readonly WordingRow[]): string {

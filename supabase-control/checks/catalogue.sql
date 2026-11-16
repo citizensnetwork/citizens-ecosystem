@@ -196,6 +196,22 @@ begin
        where p.pronamespace = 'public'::regnamespace
          and not exists (select 1 from pg_catalog.pg_depend d where d.objid = p.oid and d.deptype = 'e')) f where pg_catalog.has_function_privilege('service_role', f.oid, 'execute')) a where a.name = e.name)), array[]::text[]);
   v_problems := v_problems || coalesce((
+    select array_agg('private function a data API role can call not expected: ' || a.name order by a.name)
+      from (select f.name || ' (' || r.role || ')' as name
+        from (select p.proname::text as name, p.oid, p.proacl
+        from pg_catalog.pg_proc p where p.pronamespace = 'control'::regnamespace) f
+        cross join unnest(array['anon', 'authenticated', 'service_role']) r(role)
+       where pg_catalog.has_function_privilege(r.role, f.oid, 'execute')) a
+     where not (a.name = any (v_nothing))), array[]::text[]);
+  v_problems := v_problems || coalesce((
+    select array_agg('private function a data API role can call missing: ' || e.name order by e.name)
+      from unnest(v_nothing) e(name)
+     where not exists (select 1 from (select f.name || ' (' || r.role || ')' as name
+        from (select p.proname::text as name, p.oid, p.proacl
+        from pg_catalog.pg_proc p where p.pronamespace = 'control'::regnamespace) f
+        cross join unnest(array['anon', 'authenticated', 'service_role']) r(role)
+       where pg_catalog.has_function_privilege(r.role, f.oid, 'execute')) a where a.name = e.name)), array[]::text[]);
+  v_problems := v_problems || coalesce((
     select array_agg('function open to every role not expected: ' || a.name order by a.name)
       from (select f.name from (select p.proname::text as name, p.oid, p.proacl
         from pg_catalog.pg_proc p

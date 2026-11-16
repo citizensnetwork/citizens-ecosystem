@@ -287,6 +287,15 @@ begin
   if _status = 'retired' and _export_offered is not true then
     raise exception 'export_or_transfer_must_be_offered_first' using errcode = '55000';
   end if;
+  -- Nothing may be left half done on a retired tenant: a provisioning run still running could go
+  -- on recording steps, and an open support grant could still be used. Finish or close them first.
+  -- (A grant whose time has passed is no longer open: it cannot be used.)
+  if _status = 'retired' and (
+       exists (select 1 from control.provisioning_runs r where r.tenant_id = _tenant and r.status = 'running')
+       or exists (select 1 from control.support_access_grants g
+                   where g.tenant_id = _tenant and g.ended_at is null and g.expires_at > now())) then
+    raise exception 'tenant_has_open_work' using errcode = '55000';
+  end if;
   update control.tenants t
      set status = _status,
          live_at = case when _status = 'live' and t.live_at is null then now() else t.live_at end,

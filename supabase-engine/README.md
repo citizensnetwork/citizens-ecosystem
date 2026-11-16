@@ -191,7 +191,9 @@ step by step) and written into the world's database as a **support session**. Th
   staff get their notice.
 - **The staff are told** when a session opens and when it ends (notices of type `support_access`, in the world's
   own words through the wording table), see both tables in their admin screens, and can end a session at once
-  (`end_support_session`).
+  (`end_support_session`). A read and an end never overlap: the gate holds a shared lock on the session while
+  the read runs, and ending needs that lock, so a read already under way finishes first and the next one is
+  refused. (Argued, not probed: a probe runs on one connection.)
 - **"Ask me first"** is the world's own setting (`app_settings`, key `support_access_mode`, value `"ask"`). With
   it a session waits until a staff member approves it (`decide_support_session`); the 30 minutes include the wait.
   Without it the default is notify-and-show.
