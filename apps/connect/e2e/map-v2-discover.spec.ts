@@ -52,7 +52,7 @@ test.describe("on a phone", () => {
     await network(page);
     await openMap(page, "/", 5);
     await page.locator("[data-mv2='explore-crown']").tap();
-    await page.getByRole("button", { name: "See all of Explore" }).tap();
+    await page.getByRole("button", { name: "Explore more" }).tap();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page$(page)).toBeVisible();
     await expect.poll(() => page.title()).toBe("Explore · Citizens Connect");
@@ -206,7 +206,7 @@ test.describe("on a phone", () => {
     await network(page);
     await openMap(page, "/", 5);
     await page.locator("[data-mv2='explore-crown']").tap();
-    await page.getByRole("button", { name: "See all of Explore" }).tap();
+    await page.getByRole("button", { name: "Explore more" }).tap();
     await expect.poll(() => page.locator("[data-mv2='discover-row']").count(), { timeout: 20_000 }).toBeGreaterThan(2);
     await page.getByRole("button", { name: "Events", exact: true }).tap();
     await listOf(page, "near").evaluate((e) => { e.scrollLeft = 280; });
@@ -246,7 +246,7 @@ test.describe("on a laptop", () => {
     await network(page);
     await openMap(page, "/", 5);
     await page.locator("[data-mv2='explore-crown']").click();
-    await page.getByRole("button", { name: "See all of Explore" }).click();
+    await page.getByRole("button", { name: "Explore more" }).click();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page$(page)).toBeVisible();
     await page.locator("aside").getByRole("button", { name: "Kingdom Exploration" }).click();

@@ -312,7 +312,7 @@
       panel: {
         where: 'Where to…',
         peek: 'Where to…',
-        around: 'Around you now…',
+        around: 'Near and Now…',
         aroundHint: 'Live, starting soon, and places nearby',
         weekend: 'This weekend',
         weekendHint: 'Saturday and Sunday',
@@ -322,7 +322,7 @@
         freshHint: 'Added in the last 30 days',
         more: 'More near you',
         moreHint: 'Closest of every kind',
-        seeAll: 'See all of Explore',
+        seeAll: 'Explore more',
         seeAllHint: 'The full page: every type, area and group',
         allTypes: 'All types',
         nearCount: (n) => n + ' near you',

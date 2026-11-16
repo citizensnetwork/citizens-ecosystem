@@ -311,6 +311,14 @@
     if (pin && !!dim !== pin.hasAttribute('data-dim')) { if (dim) pin.setAttribute('data-dim', ''); else pin.removeAttribute('data-dim'); }
   }
 
+  function applyLit(wrap, lit, quiet) {
+    const pin = wrap.querySelector('.mv2-pin');
+    if (!pin) return;
+    pin.classList.toggle('is-lit', !!lit);
+    if (quiet) pin.setAttribute('data-quiet', '');
+    else pin.removeAttribute('data-quiet');
+  }
+
   function applySelected(wrap, selected) {
     const pin = wrap.querySelector('.mv2-pin');
     if (pin) pin.classList.toggle('is-selected', !!selected);
@@ -362,6 +370,6 @@
 
   window.MapV2Pins = {
     photoShown, glyphColor, ariaLabelFor, comparePriority, overlapGroups, hiddenLabels,
-    build, makeOperable, ensureLogo, applyDim, applySelected, layoutOnIdle, OVERLAP_PX,
+    build, makeOperable, ensureLogo, applyDim, applySelected, applyLit, layoutOnIdle, OVERLAP_PX,
   };
 })();

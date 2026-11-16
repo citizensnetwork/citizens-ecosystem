@@ -42,7 +42,7 @@ test.describe("the map home", () => {
     await expect(sheet(page)).toHaveAttribute("data-open", "");
     await expect(page.getByRole("heading", { name: "Where to…" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Coffee" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Around you now…" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Near and Now…" })).toBeVisible();
 
     await page.getByRole("button", { name: "Coffee" }).click();
     const tab = page.getByRole("tab", { name: "Coffee" });
@@ -53,7 +53,7 @@ test.describe("the map home", () => {
     await page.getByRole("button", { name: "All types" }).click();
     await expect(page.getByRole("tab", { name: "Coffee" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "See all of Explore" }).click();
+    await page.getByRole("button", { name: "Explore more" }).click();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page.locator("[data-screen='explore']")).toBeVisible();
   });
@@ -76,9 +76,10 @@ test.describe("desktop", () => {
 
   test("the sheet is a centred bottom sheet no wider than 720px, and the sidebar stays", async ({ page }) => {
     await open(page);
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.locator("[data-mv2='desktop-nav']")).toBeVisible();
+    await expect(page.locator("aside")).toHaveCount(0);
     await expect(page.locator("[data-mv2='nav-toggle']")).toHaveCount(0);
-    await crown(page).click();
+    await page.locator("[data-mv2='desktop-item'][data-nav='explore']").click();
     const box = await sheet(page).boundingBox();
     expect(box!.width).toBeLessThanOrEqual(724);
     expect(box!.width).toBeGreaterThan(480);
@@ -97,9 +98,9 @@ test.describe("pin mix", () => {
     await expect(page.locator("[data-cc-pin='contributor']")).toHaveCount(0);
     const ring = await page.locator(".mv2-pin--event [data-mv2='disc']").first().evaluate((e) => parseFloat(getComputedStyle(e).borderTopWidth));
     const placeRing = await page.locator("[data-cc-pin='place'] [data-mv2='shape']").first().evaluate((e) => parseFloat(getComputedStyle(e).strokeWidth));
-    for (const w of [ring, placeRing]) {
-      expect(w).toBeGreaterThan(0.5);
-      expect(w).toBeLessThan(2);
-    }
+    expect(ring).toBeGreaterThan(2);
+    expect(ring).toBeLessThan(4);
+    expect(placeRing).toBeGreaterThan(0.5);
+    expect(placeRing).toBeLessThan(2);
   });
 });

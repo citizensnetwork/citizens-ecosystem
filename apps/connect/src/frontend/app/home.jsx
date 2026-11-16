@@ -94,6 +94,9 @@
     const [selType, setSelType] = useState('event');
     const [showIdeas, setShowIdeas] = useState(false);
     const [query, setQuery] = useState('');
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [group, setGroup] = useState('');
+    const [litId, setLitId] = useState(null);
     // Which entity types the current zoom is showing ('all' | 'places' |
     // 'none' — see map.jsx zoomBandFor). The map owns the
     // thresholds and only reports when the band actually changes, so this is
@@ -118,6 +121,10 @@
     const tileTest = useMemo(() => (
       tileRec && !tileRec.ideas && X.tileMatches ? (m) => X.tileMatches(tile, m) : null
     ), [X, tile, tileRec]);
+    const pinFilter = useMemo(() => {
+      if (!tileTest && !group) return null;
+      return (m) => (tileTest ? tileTest(m) : true) && (!group || (X.groupOf && X.groupOf(m) === group));
+    }, [tileTest, group, X]);
     // The panel's height goes straight onto the screen as a CSS variable (the map's controls and credit sit above it): no re-render.
     // The data is framed again as the panel grows, but never because the person lowered or raised it (the map would jump).
     const onExploreHeight = useCallback((px) => {
@@ -165,7 +172,7 @@
     const tapCard = (id, t) => {
       if (t === 'idea') { setSheet(null); setSelected(id); setSelType(t); return; }
       chosen.current = { id, type: t };
-      setSelected(id); setSelType(t);
+      setSelected(id); setSelType(t); setLitId(id);
       if (mapApi.current) mapApi.current.focusSelected(openMapPad(rootRef.current), CARD_ZOOM);
       openSheet(id, t);
     };
@@ -173,9 +180,9 @@
     const ideaMarkers = ideas.filter((i) => i.status === 'voting').filter(matches).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY, createdAt: i.createdAt }));
     const XS = window.MapV2Strings.explore;
     return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-crown': clean ? undefined : '', 'data-explore-min': (!clean && !panelOpen) ? '' : undefined },
-      React.createElement('div', { className: 'absolute inset-0', onClick: () => { setSelected(null); setSheet(null); } },
+      React.createElement('div', { className: 'absolute inset-0', onClick: () => { setSelected(null); setSheet(null); setSearchOpen(false); } },
         React.createElement(window.StylizedMap, {
-          markers, filterCategory: tileTest, selectedId: selected, apiRef: mapApi,
+          markers, filterCategory: pinFilter, selectedId: selected, litId: litId, apiRef: mapApi,
           // #210: a pin chooses its card in the Explore panel (the panel scrolls to it); the card's second tap opens the
           // full listing. The clean map (the nav's Map) has no panel, so there a pin opens the sheet as before. Ideas keep their panel.
           onSelect: (id, t) => {
@@ -184,7 +191,7 @@
             const a = document.activeElement;
             const byKey = !!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })());
             // A pin chooses itself. The keyboard follows into the sheet; a finger tap leaves the sheet where it is.
-            setSheet(null); setSelected(id); setSelType(t); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 }));
+            setSheet(null); setSelected(id); setSelType(t); setLitId(null); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 }));
           },
           onDismissBubble: dismissBubble,
           onZoomBandChange: setZoomBand,
@@ -193,15 +200,24 @@
       // top: search and the account button, round and glassy (#210). The category choice is inside the Explore panel now.
       React.createElement('div', { 'data-mv2': 'home-top' },
         React.createElement('div', { 'data-mv2': 'home-bar' },
-          React.createElement('label', { 'data-mv2': 'home-search' },
+          React.createElement('div', { 'data-mv2': 'home-search', 'data-open': searchOpen ? '' : undefined, onClick: () => setSearchOpen(true) },
             React.createElement(Icon, { name: 'Search', size: 18 }),
-            React.createElement('input', { value: query, onChange: (e) => setQuery(e.target.value), placeholder: XS.search, 'aria-label': XS.search }),
-            query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 16 }))),
+            React.createElement('input', {
+              value: query, onChange: (e) => setQuery(e.target.value), onFocus: () => setSearchOpen(true),
+              placeholder: XS.search, 'aria-label': XS.search, 'aria-expanded': searchOpen ? 'true' : 'false',
+            }),
+            query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 16 })),
+            searchOpen && React.createElement('div', { 'data-mv2': 'home-filters', role: 'radiogroup', 'aria-label': 'Filter the map by category' },
+              (X.GROUPS || []).map((id) => React.createElement('button', {
+                key: id, type: 'button', role: 'radio', 'data-mv2': 'filter-row', 'aria-checked': group === id ? 'true' : 'false',
+                style: { '--chip': 'var(--grp-' + id + ')' },
+                onClick: (e) => { e.stopPropagation(); setGroup((cur) => (cur === id ? '' : id)); },
+              }, React.createElement('span', { 'data-mv2': 'filter-dot', 'aria-hidden': 'true' }), (XS.groups && XS.groups[id]) || id)))),
           React.createElement(window.AccountButton, { variant: 'round' }))),
 
       // zoom-gate hint + the MapTiler logo, kept above the Explore row (MapTiler's Free plan needs the logo bottom-left)
       React.createElement('div', { 'data-mv2': 'home-corner' },
-        zoomBand !== 'all' && React.createElement('div', { 'data-mv2': 'zoom-hint', 'data-zoom-hint': zoomBand },
+        zoomBand !== 'all' && !tile && !group && React.createElement('div', { 'data-mv2': 'zoom-hint', 'data-zoom-hint': zoomBand },
           React.createElement(Icon, { name: 'ZoomIn', size: 16 }),
           React.createElement('span', null,
             zoomBand === 'none' ? 'Zoom in to see events and places'
@@ -215,7 +231,16 @@
       !clean && React.createElement(X.Explore, {
         hidden: !!sheet,
         markers: rowMarkers, ideas: ideaMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, reveal,
-        onTile: (id) => { setTile(id); const t = id && X.tileOf && X.tileOf(id); setShowIdeas(!!(t && t.ideas)); },
+        onTile: (id) => {
+          setTile(id);
+          const t = id && X.tileOf && X.tileOf(id);
+          setShowIdeas(!!(t && t.ideas));
+          if (!mapApi.current) return;
+          if (!id) { if (mapApi.current.restore) mapApi.current.restore(); return; }
+          const v = mapApi.current.view ? mapApi.current.view() : null;
+          const c = v && (v.user || v.centre);
+          if (c && mapApi.current.survey) mapApi.current.survey(c.lat, c.lng, 7);
+        },
         onOpenChange: onPanel,
         onOpen: tapCard, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
         onGo: (page, params) => app.go(page, params),

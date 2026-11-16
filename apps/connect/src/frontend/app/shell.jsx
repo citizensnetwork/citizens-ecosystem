@@ -328,7 +328,7 @@
     // the loading splash instead, so a returning member sees no "sign in" flash.
     if (!authed && !guestMode) return React.createElement(authResolved ? window.AuthScreen : window.LoadingSplash);
     return React.createElement('div', { className: 'flex h-full w-full overflow-hidden bg-background' },
-      React.createElement(Sidebar),
+      !onMapHome && React.createElement(Sidebar),
       React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },
         React.createElement(AssistBanner),
         React.createElement(CurrentPage)),

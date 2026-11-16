@@ -249,12 +249,12 @@ describe("Explore panel", () => {
     expect(screen.getByRole("button", { name: "Coffee" })).toBeTruthy();
   });
 
-  it("See all of Explore calls onSeeAll, and a card tap reports that listing", () => {
+  it("Explore more calls onSeeAll, and a card tap reports that listing", () => {
     const onSeeAll = vi.fn();
     const onOpen = vi.fn();
     render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "two", onOpen, onSeeAll }));
     fireEvent.click(screen.getByRole("button", { name: "Open Explore" }));
-    fireEvent.click(screen.getByRole("button", { name: "See all of Explore" }));
+    fireEvent.click(screen.getByRole("button", { name: "Explore more" }));
     expect(onSeeAll).toHaveBeenCalled();
     const sel = document.querySelector("[data-row='more'] [data-explore-id='two']")!;
     expect(sel.hasAttribute("data-selected")).toBe(true);
@@ -426,14 +426,14 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261116b"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261116c"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261116b");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261116c");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");

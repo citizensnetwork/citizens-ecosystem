@@ -267,7 +267,7 @@
     }
   }
 
-  function StylizedMap({ markers, filterCategory, selectedId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
+  function StylizedMap({ markers, filterCategory, selectedId, litId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     // mapRef is a ref, so setting it alone doesn't re-run the pin-rendering
@@ -307,7 +307,7 @@
       markerObjs.current.forEach((mk) => {
         const w = mk.getElement();
         if (!w) return;
-        const hidden = markerHidden(mk._ccType, z, selectedRef.current === mk._ccId);
+        const hidden = !mk._ccKeep && markerHidden(mk._ccType, z, selectedRef.current === mk._ccId);
         w.style.display = hidden ? 'none' : '';
       });
       const band = zoomBandFor(z);
@@ -508,9 +508,11 @@
         }
         mk._ccType = m.type;
         mk._ccId = m.id;
+        mk._ccKeep = typeof filterCategory === 'function' && !!filterCategory(m);
         mk._ccMeta = { title: m.title, nextEventAt: m.nextEventAt, lastActivityAt: m.lastActivityAt };
         P.applyDim(mk.getElement(), dim);
         P.applySelected(mk.getElement(), selected);
+        P.applyLit(mk.getElement(), litId === m.id, !!(litId && litId !== m.id));
       }
 
       // ── individual pins — show them all ──
@@ -539,7 +541,7 @@
       // they were actually added at.
       applyZoomGates();
       layoutV2();
-    }, [markers, filterCategory, selectedId, applyZoomGates, layoutV2, mapReady]);
+    }, [markers, filterCategory, selectedId, litId, applyZoomGates, layoutV2, mapReady]);
 
     // Map v2: the sheet tells the map how much of it the sheet covers; the map eases the selected pin into the
     // middle of what is left visible (tracker E5: about 27 % from the top with the sheet at 46 %). An imperative
@@ -586,6 +588,18 @@
           const items = framedItemsRef.current;
           if (!mp || userMovedRef.current || !items || !items.length) return;
           frameData(mp, items, containerRef.current);
+        },
+        survey(lat, lng, zoom) {
+          const mp = mapRef.current;
+          if (!mp || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+          userMovedRef.current = true;
+          mp.easeTo({ center: [lng, lat], zoom: zoom, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+        },
+        restore() {
+          const mp = mapRef.current;
+          const items = framedItemsRef.current;
+          userMovedRef.current = false;
+          if (mp && items && items.length) frameData(mp, items, containerRef.current);
         },
       };
       return () => { apiRef.current = null; };

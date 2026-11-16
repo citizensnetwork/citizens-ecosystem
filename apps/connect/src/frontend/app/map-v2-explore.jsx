@@ -310,12 +310,26 @@
     return null;
   }
   const DOCK = [
-    { id: 'me', icon: 'User', page: 'profile', params: {} },
-    { id: 'map', icon: 'Map', close: true },
-    { id: 'central', letter: 'C', page: 'kingdom-discovery', params: {} },
     { id: 'do', icon: 'LayoutGrid', page: 'lets', params: {} },
+    { id: 'central', letter: 'C', page: 'kingdom-discovery', params: {} },
+    { id: 'map', icon: 'Map', close: true, emphasis: true },
     { id: 'explore', icon: 'Compass', page: 'explore', params: {} },
+    { id: 'me', icon: 'User', page: 'profile', params: {} },
   ];
+  const RAIL = [
+    { id: 'map', icon: 'Map', act: 'map', emphasis: true },
+    { id: 'explore', icon: 'Compass', act: 'open' },
+    { id: 'central', letter: 'C', act: 'go', page: 'kingdom-discovery' },
+    { id: 'do', icon: 'LayoutGrid', act: 'do' },
+    { id: 'me', icon: 'User', act: 'go', page: 'profile' },
+  ];
+  const DO_ROWS = [
+    { page: 'lets', title: 'Let\u2019s\u2026', line: 'Gather with people near you' },
+    { page: 'community', title: 'Kingdom Projects', line: 'A shared need, a shared response' },
+    { page: 'apply', title: 'List an organisation', line: 'Be easier to discover' },
+  ];
+  const WIDE_MQ = '(min-width: 1024px)';
+  const FINE_MQ = '(min-width: 1024px) and (pointer: fine)';
   const HOUR = 60 * 60 * 1000;
   const DAY = 24 * HOUR;
   const NEW_WINDOW = 30 * DAY;
@@ -375,8 +389,35 @@
         when ? h('small', null, when) : null));
   }
 
+  function XRow(props) {
+    const scroller = useRef(null);
+    const [edges, setEdges] = useState({ l: false, r: false });
+    const measure = () => {
+      const el = scroller.current;
+      if (!el) return;
+      const l = el.scrollLeft > 4;
+      const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+      setEdges((p) => (p.l === l && p.r === r ? p : { l: l, r: r }));
+    };
+    useEffect(() => {
+      measure();
+      const t = setTimeout(measure, 80);
+      return () => clearTimeout(t);
+    }, [props.children && props.children.length]);
+    const nudge = (dir) => {
+      const el = scroller.current;
+      if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+    };
+    const Icon = window.Icon;
+    return h('div', { 'data-mv2': 'xrow-wrap' },
+      props.fine && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': 'Scroll left', onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
+      h('div', { 'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure }, props.children),
+      props.fine && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': 'Scroll right', onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
+  }
+
   /**
-   * The home Explore sheet. Closed, its top edge sits on the crown's centre line.
+   * The home Explore sheet. A short Where to… strip leaves the map in view.
+   * Dragging it up opens the rest of the rows. The crown becomes the sticky nav.
    * Open, it scrolls carousels and the crown is the sticky nav. A tile becomes tabs.
    * props: markers, ideas, sources, apiRef, selectedId, reveal, hidden, onOpen, onSeeAll, onHeight, onTile, onOpenChange, onGo.
    */
@@ -384,6 +425,9 @@
     const api = props.apiRef;
     const [open, setOpen] = useState(false);
     const [tile, setTile] = useState('');
+    const [rail, setRail] = useState(true);
+    const [drawer, setDrawer] = useState(false);
+    const fine = useMedia(FINE_MQ);
     const [view, setView] = useState(() => (api && api.current ? api.current.view() : { centre: null, user: null }));
     const root = useRef(null);
     const tabsRef = useRef(null);
@@ -421,9 +465,9 @@
     }, [open, props.hidden]);
     useEffect(() => {
       if (!props.onHeight) return undefined;
-      props.onHeight(68);
+      props.onHeight(open ? 0 : (tile ? 292 : 168));
       return () => props.onHeight(0);
-    }, []);
+    }, [open, tile]);
 
     useEffect(() => {
       const row = tabsRef.current;
@@ -487,7 +531,7 @@
       else if (dy >= 24) setOpen(false);
       else setOpen((v) => !v);
     };
-    const cards = (id, list) => h('div', { 'data-mv2': 'xrow', 'data-row': id }, list.map((r) => h(XCard, {
+    const cards = (id, list) => h(XRow, { id: id, fine: fine, list: list }, list.map((r) => h(XCard, {
       key: id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
       groupWords: str.groups, distWords: distWords,
       selected: props.selectedId === r.m.id && (id === 'more' || id === 'tile'),
@@ -499,9 +543,34 @@
     const kindPlural = (current && P.kind && P.kind[pool.find((m) => tileMatches(current.id, m)) ? (pool.find((m) => tileMatches(current.id, m)).type) : '']) || 'listings';
     const kindWord = tileItems.length === 1 ? ({ events: 'event', places: 'place', contributors: 'contributor', ideas: 'idea', listings: 'listing' })[kindPlural] || kindPlural : kindPlural;
 
+    const railGo = (item) => {
+      if (item.act === 'map') { setOpen(false); setDrawer(false); return; }
+      if (item.act === 'open') { setOpen(true); setDrawer(false); return; }
+      if (item.act === 'do') { setDrawer((d) => !d); return; }
+      setDrawer(false);
+      if (item.page && props.onGo) props.onGo(item.page, {});
+    };
     return h('div', {
-      'data-mv2': 'explore-host', 'data-open': open ? '' : undefined, hidden: props.hidden || undefined,
+      'data-mv2': 'explore-host', 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined, hidden: props.hidden || undefined,
     },
+      !open && h('div', { 'data-mv2': 'desktop-nav' },
+        h('button', {
+          type: 'button', 'data-mv2': 'desktop-crown', 'aria-expanded': rail ? 'true' : 'false',
+          'aria-label': rail ? 'Hide navigation' : 'Show navigation',
+          onClick: () => { setRail((v) => !v); setDrawer(false); },
+        }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)),
+        rail && h('nav', { 'data-mv2': 'desktop-items', 'aria-label': P.dock || 'Connect' }, RAIL.map((item) => h('button', {
+          key: item.id, type: 'button', 'data-mv2': 'desktop-item', 'data-nav': item.id,
+          'data-emphasis': item.emphasis ? '' : undefined,
+          'aria-current': item.act === 'map' ? 'page' : undefined,
+          onClick: () => railGo(item),
+        },
+          item.letter ? h('span', { 'data-mv2': 'desktop-letter', 'aria-hidden': 'true' }, item.letter) : (Icon ? h(Icon, { name: item.icon, size: 20 }) : null),
+          h('small', null, (P.nav && P.nav[item.id]) || item.id)))),
+        drawer && h('div', { 'data-mv2': 'do-drawer', role: 'menu', 'aria-label': 'Do' }, DO_ROWS.map((row) => h('button', {
+          key: row.page, type: 'button', role: 'menuitem',
+          onClick: () => { setDrawer(false); if (props.onGo) props.onGo(row.page, {}); },
+        }, h('b', null, row.title), h('small', null, row.line))))),
       h('div', { 'data-mv2': 'explore-scrim', onClick: () => setOpen(false) }),
       h('section', {
         ref: root, 'data-mv2': 'explore', 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
@@ -538,17 +607,17 @@
                 h('small', null, P.matches ? P.matches(tileItems.length, kindWord) : '')),
               cards('tile', tileItems))
             : h('p', { 'data-mv2': 'explore-empty' }, P.emptyTile ? P.emptyTile(current.word) : '')) : null,
-          section('around', P.around || 'Around you now…', P.aroundHint, around),
+          section('around', P.around || 'Near and Now…', P.aroundHint, around),
           section('weekend', P.weekend || 'This weekend', P.weekendHint, weekendItems),
           section('online', P.online || 'Online', P.onlineHint, onlineItems),
           section('fresh', P.fresh || 'New on Connect', P.freshHint, freshItems),
           section('more', P.more || 'More near you', P.moreHint, more),
           h('button', {
-            type: 'button', 'data-mv2': 'explore-seeall', 'aria-label': P.seeAll || 'See all of Explore',
+            type: 'button', 'data-mv2': 'explore-more', 'aria-label': P.seeAll || 'Explore more',
             onClick: () => { if (props.onSeeAll) props.onSeeAll(); },
           },
-            h('span', null, h('b', null, P.seeAll || 'See all of Explore'), h('small', null, P.seeAllHint || '')),
-            h('span', { 'aria-hidden': 'true' }, '→')))),
+            h('span', { 'data-mv2': 'explore-more-ring' }, Icon ? h(Icon, { name: 'Compass', size: 22 }) : null),
+            h('small', null, P.seeAll || 'Explore more')))),
       h('div', { 'data-mv2': 'explore-dock' },
         h('button', {
           type: 'button', 'data-mv2': 'explore-crown', 'aria-label': P.open || 'Open Explore',
@@ -557,6 +626,7 @@
         h('div', { 'data-mv2': 'explore-items', role: 'navigation', 'aria-label': P.dock || 'Connect', 'aria-hidden': open ? undefined : 'true' },
           DOCK.map((item) => h('button', {
             key: item.id, type: 'button', 'data-mv2': 'explore-nav', 'data-nav': item.id,
+            'data-emphasis': item.emphasis ? '' : undefined,
             tabIndex: open ? 0 : -1,
             'aria-current': open && item.id === 'explore' ? 'page' : undefined,
             onClick: () => {
