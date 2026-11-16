@@ -95,7 +95,7 @@
     const [showIdeas, setShowIdeas] = useState(false);
     const [query, setQuery] = useState('');
     // Which entity types the current zoom is showing ('all' | 'places' |
-    // 'contributors' | 'none' — see map.jsx zoomBandFor). The map owns the
+    // 'none' — see map.jsx zoomBandFor). The map owns the
     // thresholds and only reports when the band actually changes, so this is
     // one state update per crossing, not one per zoom frame.
     const [zoomBand, setZoomBand] = useState('all');
@@ -134,14 +134,17 @@
 
     const q = query.trim().toLowerCase();
     const matches = (t) => !q || (t.title || t.name || '').toLowerCase().includes(q) || (t.organizerName || '').toLowerCase().includes(q);
+    // Owner display name from the contributors already loaded. No new request. Blank when the owner isn't in that list.
+    const ownerName = (id, fallback) => {
+      const row = id && contributors.find((c) => c.id === id);
+      return (row && row.name) || fallback || '';
+    };
     const now = Date.now();
     const markers = [
       // A finished event is history, not a place to turn up: it leaves the map
       // (it stays on its organiser's profile and dashboard, under "Past events").
-      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast, coverPhoto: e.coverPhoto, startsAt: e.startsAt, endsAt: e.endsAt, createdAt: e.createdAt, location: e.location, address: e.address })),
-      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast, coverPhoto: p.coverPhoto, openHours: p.openHours, createdAt: p.createdAt, location: p.location, address: p.address })),
-      // Contributors wear the place-circle pin. The photo still travels with the marker for cards.
-      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto, coverPhoto: c.coverPhoto, createdAt: c.createdAt })),
+      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast, coverPhoto: e.coverPhoto, startsAt: e.startsAt, endsAt: e.endsAt, createdAt: e.createdAt, location: e.location, address: e.address, ownerName: ownerName(e.organizerId, e.organizerName) })),
+      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast, coverPhoto: p.coverPhoto, openHours: p.openHours, createdAt: p.createdAt, location: p.location, address: p.address, ownerName: ownerName(p.organizerId, p.organizerName) })),
       ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY, createdAt: i.createdAt })) : []),
     ];
     // What decides which pin keeps its name label when two collide, and who heads a "+N" group:
@@ -201,8 +204,7 @@
         zoomBand !== 'all' && React.createElement('div', { 'data-mv2': 'zoom-hint', 'data-zoom-hint': zoomBand },
           React.createElement(Icon, { name: 'ZoomIn', size: 16 }),
           React.createElement('span', null,
-            zoomBand === 'none' ? 'Zoom in to see contributors, events and places'
-              : zoomBand === 'contributors' ? 'Zoom in to see events and places'
+            zoomBand === 'none' ? 'Zoom in to see events and places'
               : 'Zoom in to see places')),
         window.MapTilerLogo && React.createElement(window.MapTilerLogo)),
 

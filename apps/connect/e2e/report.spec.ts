@@ -142,7 +142,7 @@ test.describe("Report an event, a profile and a Moment", () => {
     });
     const { bodies, ready } = captureReports(page);
     await ready;
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[0];
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
     await openListing(page, c.id);

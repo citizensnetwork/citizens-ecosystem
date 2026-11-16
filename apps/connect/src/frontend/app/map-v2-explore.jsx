@@ -266,7 +266,6 @@
 
   // Pack 08. Action tiles over the live categories. The founder's twelve come first;
   // the rest are the categories those twelve do not already cover, so nothing on the map is unsuggested.
-  const PIN_HEX = { worship: '#7040b5', serve: '#087d69', culture: '#c14f2a', learn: '#245fba', audiences: '#b33272', business: '#687d20' };
   const TILES = [
     { id: 'coffee', word: 'Coffee', icon: 'Coffee', categories: ['hospitality-cafes'] },
     { id: 'church', word: 'Church', icon: 'Church', categories: ['churches-ministries'] },
@@ -310,12 +309,6 @@
     for (let i = 0; i < TILES.length; i++) if (tileMatches(TILES[i].id, m)) return TILES[i];
     return null;
   }
-  function pinHex(m) {
-    if (!m || m.type === 'idea') return '#F2BD22';
-    const g = groupOf(m);
-    return (g && PIN_HEX[g]) || PIN_HEX.business;
-  }
-
   const DOCK = [
     { id: 'me', icon: 'User', page: 'profile', params: {} },
     { id: 'map', icon: 'Map', close: true },
@@ -378,6 +371,7 @@
         (cat && cat.name) || (group && words[group]) ? h('span', { 'data-mv2': 'xcard-chip' }, h('i', { 'data-cat': group || undefined, 'aria-hidden': 'true' }), h('span', { 'data-mv2': 'card-chip-label' }, (cat && cat.name) || words[group])) : null,
         h('b', null, m.title || ''),
         dist ? h('small', { 'data-mv2': 'row-meta' }, dist) : null,
+        m.ownerName ? h('small', { 'data-mv2': 'xcard-by' }, ((window.MapV2Strings && window.MapV2Strings.sheet && window.MapV2Strings.sheet.by) || 'by') + ' ' + m.ownerName) : null,
         when ? h('small', null, when) : null));
   }
 
@@ -443,7 +437,7 @@
 
     const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
     const origin = view.user || view.centre;
-    const markers = Array.isArray(props.markers) ? props.markers : [];
+    const markers = (Array.isArray(props.markers) ? props.markers : []).filter((m) => m && m.type !== 'contributor');
     const ideas = Array.isArray(props.ideas) ? props.ideas : [];
     const pool = markers.concat(ideas.filter((m) => m && markers.every((x) => x.id !== m.id)));
     const distWords = view.user ? str : (str.centre || {});
@@ -584,7 +578,7 @@
   const useNarrow = () => useMedia(NARROW_MQ);
 
   window.MapV2Explore = {
-    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, PIN_HEX, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, pinHex, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore,
+    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore,
     lastView: () => lastView,
   };
 })();

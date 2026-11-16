@@ -50,7 +50,7 @@ test.describe("on a phone", () => {
 
   test("See all on the Explore row opens the Discover page at /explore; Back returns to the map", async ({ page }) => {
     await network(page);
-    await openMap(page, "/", 8);
+    await openMap(page, "/", 5);
     await page.locator("[data-mv2='explore-crown']").tap();
     await page.getByRole("button", { name: "See all of Explore" }).tap();
     await expect(page).toHaveURL(/\/explore$/);
@@ -63,7 +63,7 @@ test.describe("on a phone", () => {
 
   test("the nav's Explore opens it too, marked as the current item; Back returns to the map", async ({ page }) => {
     await network(page);
-    await openMap(page, "/", 8);
+    await openMap(page, "/", 5);
     await page.locator("[data-mv2='explore-crown']").tap();
     await page.getByRole("navigation", { name: "Connect" }).getByRole("button", { name: "Explore" }).tap();
     await expect(page).toHaveURL(/\/explore$/);
@@ -204,7 +204,7 @@ test.describe("on a phone", () => {
 
   test("leaving the page and coming Back restores the pill and every scroll", async ({ page }) => {
     await network(page);
-    await openMap(page, "/", 8);
+    await openMap(page, "/", 5);
     await page.locator("[data-mv2='explore-crown']").tap();
     await page.getByRole("button", { name: "See all of Explore" }).tap();
     await expect.poll(() => page.locator("[data-mv2='discover-row']").count(), { timeout: 20_000 }).toBeGreaterThan(2);
@@ -244,7 +244,7 @@ test.describe("on a laptop", () => {
 
   test("the sidebar keeps Kingdom Exploration at /discover; See all opens the Discover page", async ({ page }) => {
     await network(page);
-    await openMap(page, "/", 8);
+    await openMap(page, "/", 5);
     await page.locator("[data-mv2='explore-crown']").click();
     await page.getByRole("button", { name: "See all of Explore" }).click();
     await expect(page).toHaveURL(/\/explore$/);

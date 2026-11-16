@@ -110,7 +110,7 @@
   --pin-mid-scale: 0.8333;          /* the glyph pin below the photo zoom is 40 px of the 48 px disc */
   --pin-glyph-size: 22px;
   --label-max-w: 192px;
-  --pin-border-w: 3px;
+  --pin-border-w: 1.5px;             /* half the live 3px white ring; still visible on light and dark maps */
   --pin-ring-w: 3px;               /* the category-colour ring around a logo */
   --pin-badge: 14px;             /* category glyph badge on a logo pin */
   --pin-tail: 8px;
@@ -169,7 +169,6 @@
   --explore-body-min: 160px;                /* the least the panel holds, so the category list always has room */
   --ctrl-btn: 36px;                         /* the map's own zoom and locate buttons */
   --crown: 52px;                            /* the home button: a glass circle on a 1px gold ring */
-  --pin-ink: 24px;                          /* the place pin: a paper circle */
   --xp-max: 720px;                          /* the desktop Explore sheet */
   --xp-tile-size: 84px;                     /* a Where to… tile */
   --xp-dock-h: 64px;                        /* the sticky nav the crown becomes */
@@ -178,8 +177,6 @@
   --xp-tile-line: rgba(39, 42, 37, 0.1);
   --xp-tile-on: rgba(255, 255, 255, 0.94);  /* the selected tab: a more opaque grey plate, ink text, no gold */
   --xp-tile-ink: #272a25;
-  --xp-paper: #f7f6f1;                      /* the place pin's paper */
-  --xp-ink: #272a25;
   --xp-muted: #6d7067;
 }
 
@@ -233,8 +230,6 @@
   --xp-tile-line: rgba(247, 246, 241, 0.14);
   --xp-tile-on: rgba(90, 93, 98, 0.92);
   --xp-tile-ink: #f7f6f1;
-  --xp-paper: #2e3029;
-  --xp-ink: #f7f6f1;
   --xp-muted: #a9a89c;
 }
 
@@ -309,27 +304,16 @@
 .cc-map[data-cc-photo='1'] .mv2-pin--disc [data-mv2='body'] {
   --pin-scale: 1;
 }
-.mv2-pin--contributor [data-mv2='body'],
 .mv2-pin--place [data-mv2='body'],
 .mv2-pin--idea [data-mv2='body'] {
   transform-origin: 50% 50%;
 }
-.mv2-pin--contributor [data-mv2='body'] {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: var(--hit);
-  min-height: var(--hit);
-}
 .mv2-pin--disc.is-selected [data-mv2='body'] {
   --pin-scale: var(--pin-selected-scale);
 }
-.mv2-pin--contributor.is-selected [data-mv2='body'],
+.mv2-pin--place.is-selected [data-mv2='body'],
 .mv2-pin--idea.is-selected [data-mv2='body'] {
   --pin-scale: var(--pin-selected-scale-shape);
-}
-.mv2-pin--ink.is-selected [data-mv2='ink-frame'] {
-  box-shadow: var(--elev-1);
 }
 
 /* contributor: disc on a tail */
@@ -3813,32 +3797,4 @@ a[data-mv2='card2'],
 [data-mv2='explore-nav']:focus-visible {
   outline: var(--focus-w) solid var(--focus-ring);
   outline-offset: var(--focus-offset);
-}
-[data-mv2='ink'] {
-  display: block;
-  width: var(--pin-ink);
-  height: var(--pin-ink);
-}
-[data-mv2='ink-frame'] {
-  display: block;
-  box-sizing: border-box;
-  width: 100%;
-  height: 100%;
-  border: 1px solid var(--ink, var(--text-2));
-  border-radius: var(--radius-full);
-  background: var(--xp-paper);
-}
-[data-mv2='ink-face'] {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  border-radius: var(--radius-full);
-  background: var(--xp-paper);
-  color: var(--xp-ink);
-}
-[data-mv2='ink-face'] [data-mv2='glyph'] {
-  width: 78%;
-  height: 78%;
 }

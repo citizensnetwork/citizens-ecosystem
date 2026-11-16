@@ -25,7 +25,7 @@ async function openContributor(page: Page, index: number, detail: Parameters<typ
   const seed = seed0();
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, detail);
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   const c = seed.contributors[index];
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
   await openPinSheet(page, c.id);
@@ -113,7 +113,7 @@ test.describe("Moments: four tabs fit on a narrow phone", () => {
       }, posts);
       await mockMapNetwork(page, seed);
       await mockContributorDetail(page, seed, { gallery: 2, moments: [note("m1", "A note")] });
-      await openMap(page, "/?map=v2", 8);
+      await openMap(page, "/?map=v2", 5);
       await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
       await openPinSheet(page, c.id);
       await expect(sheet(page).getByRole("tab")).toHaveText(["Events", "News", "Gallery", "Today"]);

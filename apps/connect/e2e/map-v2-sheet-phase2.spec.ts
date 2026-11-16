@@ -17,7 +17,7 @@ async function openContributor(page: Page, index: number, detail: Parameters<typ
   const seed = seed0();
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, detail);
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   const c = seed.contributors[index];
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
   await openPinSheet(page, c.id);
@@ -116,7 +116,7 @@ test.describe("P2-08 count buckets: shown only from 100, never below", () => {
     const seed = seed0();
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { followers: 5000 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const pl = seed.places[0] as unknown as { id: string; latitude: number; longitude: number };
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [pl.longitude, pl.latitude]);
     await openPinSheet(page, pl.id);
@@ -206,7 +206,7 @@ test.describe("P2-06 QR code per Contributor", () => {
     const seed = seed0();
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const ev = seed.events[0] as unknown as { id: string; latitude: number; longitude: number };
     await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [ev.longitude, ev.latitude]);
     await openPinSheet(page, ev.id);

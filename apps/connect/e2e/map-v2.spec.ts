@@ -40,7 +40,7 @@ test.describe("P1-01 Map v2 is the map", () => {
     await page.emulateMedia({ colorScheme: "light" });
     await mockMapNetwork(page);
     const css = page.waitForResponse((r) => r.url().includes("/assets/map-v2.css") && r.ok());
-    await openMap(page, "/", 8);
+    await openMap(page, "/", 5);
     await css;
 
     await expect(page.locator("#cc-map-v2-badge")).toHaveCount(0); // removed at the founder's request (2026-10-12)
@@ -53,7 +53,7 @@ test.describe("P1-01 Map v2 is the map", () => {
 
   test("?map=v2 is the same as no query and stores nothing", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     expect(await theme(page)).not.toBeNull();
     expect(await stored(page)).toBeNull();
   });
@@ -62,7 +62,7 @@ test.describe("P1-01 Map v2 is the map", () => {
 test.describe("P1-03 motion tokens and reduced motion", () => {
   test("durations are 120 / 200 / 320 ms, and collapse to 0 under prefers-reduced-motion", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const read = () =>
       page.evaluate(() => {
         const cs = getComputedStyle(document.documentElement);
@@ -81,7 +81,7 @@ test.describe("P1-04 the pin", () => {
     const photo = "data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='#7040b5'/></svg>");
     (seed.events[0] as { image_url: string }).image_url = photo;
     await mockMapNetwork(page, seed);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const ev = seed.events[0] as { longitude: number; latitude: number; id: string };
     const pin = page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"] .mv2-pin`);
 
@@ -101,7 +101,7 @@ test.describe("P1-04 the pin", () => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     (seed.events[0] as { image_url: string }).image_url = "data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='#7040b5'/></svg>");
     await mockMapNetwork(page, seed);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const ev = seed.events[0] as { longitude: number; latitude: number; id: string };
     await jump(page, ev.longitude, ev.latitude, 12);
     await idle(page);
@@ -120,7 +120,7 @@ test.describe("P1-04 the pin", () => {
     (seed.events[0] as { image_url: string }).image_url = "https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/missing-logo.png";
     await page.route("**/missing-logo.png", (route) => route.fulfill({ status: 404, body: "" }));
     await mockMapNetwork(page, seed);
-    await openMap(page, "/", 8);
+    await openMap(page, "/", 5);
     const ev = seed.events[0] as { longitude: number; latitude: number; id: string };
     const pin = page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"] .mv2-pin`);
     await jump(page, ev.longitude, ev.latitude, 15.5);
@@ -133,7 +133,7 @@ test.describe("P1-04 the pin", () => {
 
   test("every pin is a labelled, focusable control", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const markers = page.locator(".maplibregl-marker");
     const n = await markers.count();
     for (let i = 0; i < n; i++) {
@@ -143,14 +143,14 @@ test.describe("P1-04 the pin", () => {
       await expect(m).toHaveAttribute("aria-label", /\S+, \S+/); // "{name}, {category}"
     }
     const labels = await markers.evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
-    expect(labels).toContain("Fixture Fellowship 1, Church");
+    expect(labels.some((l) => l && l.startsWith("Fixture Fellowship"))).toBe(false);
     expect(labels.some((l) => l && l.startsWith("Fixture Gathering 1, "))).toBe(true);
     expect(labels.some((l) => l && l.startsWith("Fixture Place 1, "))).toBe(true);
   });
 
   test("a keyboard user can open a pin with Enter and sees a focus ring on it", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const first = page.locator(".maplibregl-marker").first();
     await first.focus();
     await page.keyboard.press("Tab"); // move away and back with the keyboard so :focus-visible applies
@@ -159,7 +159,7 @@ test.describe("P1-04 the pin", () => {
     expect(outline).toBe("solid 2px");
     await page.keyboard.press("Enter");
     // #210: Enter selects the pin and outlines its card in the Explore row, where the keyboard follows; Enter there opens the sheet
-    await expect(page.locator("[data-mv2='explore'] [data-selected]")).toBeVisible();
+    await expect(page.locator("[data-mv2='explore'] [data-selected]").first()).toBeVisible();
     await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest("[data-explore-id][data-selected]"))).toBe(true);
     await page.keyboard.press("Enter");
     await expect(page.locator("[data-mv2='sheet']")).toBeVisible();
@@ -167,7 +167,7 @@ test.describe("P1-04 the pin", () => {
 
   test("the tap target of every pin is at least 44 x 44 CSS px", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     await idle(page);
     // the hit area is a transparent ::before, so measure by hit-testing 21 px either side of each pin's centre
     const bad = await page.evaluate(() => {
@@ -190,10 +190,10 @@ test.describe("P1-04 the pin", () => {
 
   test("only transform and opacity animate; reduced motion removes the transitions", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const read = () =>
       page.evaluate(() => {
-        const body = getComputedStyle(document.querySelector(".mv2-pin--contributor [data-mv2='body']") as Element);
+        const body = getComputedStyle(document.querySelector(".mv2-pin--disc [data-mv2='body']") as Element);
         const marker = getComputedStyle(document.querySelector(".mv2-pin") as Element);
         return { body: [body.transitionProperty, body.transitionDuration], marker: [marker.transitionProperty, marker.transitionDuration] };
       });
@@ -209,7 +209,7 @@ test.describe("P1-04 the pin", () => {
       s.places[0].longitude = s.events[0].longitude;
     });
     await mockMapNetwork(page, seed);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const ev = seed.events[0] as { longitude: number; latitude: number; id: string };
     await jump(page, ev.longitude, ev.latitude, 15.5);
     await idle(page);
@@ -226,7 +226,7 @@ test.describe("P1-04 the pin", () => {
       s.events[1].longitude = (s.events[0].longitude as number) + 0.00004;
     });
     await mockMapNetwork(page, seed);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const [e0, e1] = seed.events as { longitude: number; latitude: number; id: string }[];
     await jump(page, e0.longitude, e0.latitude, 16);
     await idle(page);
@@ -240,17 +240,18 @@ test.describe("P1-04 the pin", () => {
       .toEqual([true, false]); // events[0] starts first, so it keeps its label
   });
 
-  test("the pin hooks other specs rely on are all there: contributor, event and place", async ({ page }) => {
+  test("the pin hooks other specs rely on are event and place", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
-    for (const kind of ["contributor", "event", "place"]) await expect(page.locator(`[data-cc-pin="${kind}"]`).first()).toBeAttached();
+    await openMap(page, "/?map=v2", 5);
+    for (const kind of ["event", "place"]) await expect(page.locator(`[data-cc-pin="${kind}"]`).first()).toBeAttached();
+    await expect(page.locator("[data-cc-pin='contributor']")).toHaveCount(0);
   });
 });
 
 test.describe("E23 and the 12.3 states", () => {
   test("the locate and zoom buttons are 36 px (founder, 2026-10-30)", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const size = () => page.locator(".maplibregl-ctrl-group button").evaluateAll((els) => els.map((e) => [Math.round(e.getBoundingClientRect().width), Math.round(e.getBoundingClientRect().height)]));
     for (const wh of await size()) expect(wh).toEqual([36, 36]);
   });
@@ -258,10 +259,10 @@ test.describe("E23 and the 12.3 states", () => {
   test("an action has a hover state and a pressed state on top of its focus ring", async ({ page }) => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
-    await openMap(page, "/?map=v2", 8);
-    const c = seed.contributors[0] as { id: string; physical_longitude: number; physical_latitude: number };
-    await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-    await openListing(page, c.id);
+    await openMap(page, "/?map=v2", 5);
+    const p = seed.places[0] as { id: string; longitude: number; latitude: number };
+    await jump(page, p.longitude, p.latitude, 15.5);
+    await openListing(page, p.id);
     const share = page.locator("[data-mv2='sheet']").getByRole("button", { name: "Share" });
     await expect(share).toBeVisible();
     await share.hover();

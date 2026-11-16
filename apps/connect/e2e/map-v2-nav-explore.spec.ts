@@ -11,7 +11,7 @@ const seedOf = () => makeSeed({ contributors: 6, places: 6, events: 4, now: FIXE
 async function open(page: Page) {
   const seed = seedOf();
   await mockMapNetwork(page, seed);
-  await openMap(page, "/", 8);
+  await openMap(page, "/", 5);
   return seed;
 }
 
@@ -88,13 +88,18 @@ test.describe("desktop", () => {
 test.describe("pin mix", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("events wear the disc, contributors the circle, places the ink pin", async ({ page }) => {
+  test("events wear the disc, places wear the filled circle, and contributors are not pinned", async ({ page }) => {
     await open(page);
-    await expect(page.locator("[data-cc-pin='event']").first()).toBeAttached();
     await expect(page.locator(".mv2-pin--event [data-mv2='disc']").first()).toBeAttached();
-    await expect(page.locator("[data-cc-pin='contributor']").first()).toBeAttached();
-    await expect(page.locator(".mv2-pin--place [data-mv2='ink']").first()).toBeAttached();
-    await expect(page.locator(".mv2-pin--contributor [data-mv2='disc']")).toHaveCount(0);
-    await expect(page.locator(".mv2-pin--event [data-mv2='ink']")).toHaveCount(0);
+    await expect(page.locator(".mv2-pin--event [data-mv2='tail']").first()).toBeAttached();
+    await expect(page.locator("[data-cc-pin='place']").first()).toBeAttached();
+    await expect(page.locator(".mv2-pin--place [data-mv2='ink']")).toHaveCount(0);
+    await expect(page.locator("[data-cc-pin='contributor']")).toHaveCount(0);
+    const ring = await page.locator(".mv2-pin--event [data-mv2='disc']").first().evaluate((e) => parseFloat(getComputedStyle(e).borderTopWidth));
+    const placeRing = await page.locator("[data-cc-pin='place'] [data-mv2='shape']").first().evaluate((e) => parseFloat(getComputedStyle(e).strokeWidth));
+    for (const w of [ring, placeRing]) {
+      expect(w).toBeGreaterThan(0.5);
+      expect(w).toBeLessThan(2);
+    }
   });
 });

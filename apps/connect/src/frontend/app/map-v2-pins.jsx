@@ -178,8 +178,8 @@
    * deps: { lucideInner(name), icon (glyph name), hex (fill colour), strings (MapV2Strings.pin), onDismissBubble }
    * Returns the node; `.mv2-pin` carries data-state hooks the map toggles later.
    */
-  // Pack 08 pin mix. Events wear the contributor disc (tail, photo when selected).
-  // Contributors wear the place circle. Places wear the ink paper circle.
+  // Events wear the live disc and tail. Places wear the live filled circle.
+  // Contributors are not a pin: a profile status, shown through its places and events.
   function discBody(root, m, hex, glyphInner, pinType) {
     const bodyEl = document.createElement('span');
     bodyEl.setAttribute('data-mv2', 'body');
@@ -216,42 +216,22 @@
     return bodyEl;
   }
 
-  function inkBody(hex, glyphInner) {
-    const bodyEl = document.createElement('span');
-    bodyEl.setAttribute('data-mv2', 'body');
-    const ink = document.createElement('span');
-    ink.setAttribute('data-mv2', 'ink');
-    ink.setAttribute('data-cc-pin', 'place');
-    ink.style.setProperty('--ink', hex);
-    const frame = document.createElement('span');
-    frame.setAttribute('data-mv2', 'ink-frame');
-    const face = document.createElement('span');
-    face.setAttribute('data-mv2', 'ink-face');
-    face.appendChild(glyphSvg(glyphInner, 'glyph'));
-    frame.appendChild(face);
-    ink.appendChild(frame);
-    bodyEl.appendChild(ink);
-    return bodyEl;
-  }
-
   function build(m, deps) {
     const hex = deps.hex;
     const root = document.createElement('div');
     const disc = m.type === 'event';
-    const ink = m.type === 'place';
-    root.className = 'mv2-pin mv2-pin--' + m.type + (disc ? ' mv2-pin--disc' : '') + (ink ? ' mv2-pin--ink' : '');
+    root.className = 'mv2-pin mv2-pin--' + m.type + (disc ? ' mv2-pin--disc' : '');
     root.style.setProperty('--pin-cat', hex);
     root.style.setProperty('--pin-glyph', glyphColor(hex));
     const glyphInner = deps.lucideInner(deps.icon);
 
+    if (m.type === 'contributor') return root;
     if (disc) {
       root.appendChild(discBody(root, m, hex, glyphInner, 'event'));
-    } else if (ink) {
-      root.appendChild(inkBody(hex, glyphInner));
-    } else if (m.type === 'contributor') {
+    } else if (m.type === 'place') {
       const bodyEl = document.createElement('span');
       bodyEl.setAttribute('data-mv2', 'body');
-      bodyEl.appendChild(shapeSvg({ shape: 'place', hex, glyph: glyphInner, pinType: 'contributor' }));
+      bodyEl.appendChild(shapeSvg({ shape: 'place', hex, glyph: glyphInner, pinType: 'place' }));
       root.appendChild(bodyEl);
     } else {
       const bodyEl = document.createElement('span');

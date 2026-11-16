@@ -14,7 +14,7 @@ import { render, screen, fireEvent, cleanup, act } from "@testing-library/react"
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-type Marker = { id: string; type: string; title: string; category?: string; lat?: number; lng?: number; kind?: string };
+type Marker = { id: string; type: string; title: string; category?: string; lat?: number; lng?: number; kind?: string; ownerName?: string };
 type Ranked = { m: Marker; meters: number };
 type ExploreApi = {
   ROW_CAP: number;
@@ -217,7 +217,7 @@ describe("Pills", () => {
 describe("Explore panel", () => {
   const view = { centre: ORIGIN, user: null as null | { lat: number; lng: number } };
   const apiRef = { current: { view: () => view, onView: () => () => {} } };
-  const markers = [mk("one", 1, { title: "First church" }), mk("two", 3, { title: "Second café", category: "hospitality-cafes", type: "place" }), mk("three", 6, { title: "Third", type: "event", category: "kids" })];
+  const markers = [mk("one", 1, { title: "First church" }), mk("two", 3, { title: "Second café", category: "hospitality-cafes", type: "place", ownerName: "Anchor Community Church" }), mk("three", 6, { title: "Third", type: "event", category: "kids" })];
   const sources = { contributors: [{ id: "one", coverPhoto: "https://img.test/one.jpg" }], places: [], events: [] };
   const open = () => {
     render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn(), onTile: vi.fn(), onOpenChange: vi.fn() }));
@@ -233,6 +233,7 @@ describe("Explore panel", () => {
     expect(screen.getByRole("button", { name: "Coffee" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Church" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Kids" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Contributors" })).toBeNull();
   });
 
   it("turns a tile into grey tabs and a carousel of real matches, and All types brings the tiles back", () => {
@@ -241,6 +242,7 @@ describe("Explore panel", () => {
     const tab = screen.getByRole("tab", { name: "Coffee" });
     expect(tab.getAttribute("aria-selected")).toBe("true");
     expect(document.querySelector("[data-row='tile'] [data-explore-id='two']")).toBeTruthy();
+    expect(document.querySelector("[data-row='tile'] [data-explore-id='two'] [data-mv2='xcard-by']")!.textContent).toBe("by Anchor Community Church");
     expect(document.querySelector("[data-row='tile'] [data-explore-id='one']")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "All types" }));
     expect(screen.queryByRole("tab")).toBeNull();
@@ -267,7 +269,7 @@ describe("Explore panel", () => {
     expect(document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id")).toBe("three");
   });
 
-  it("puts every live category on exactly one tile, and the pin colours are the six group colours", () => {
+  it("puts every live category on exactly one tile", () => {
     const seen = new Set<string>();
     for (const t of (X as unknown as { TILES: { id: string; categories: string[] }[] }).TILES) {
       for (const c of t.categories) {
@@ -275,14 +277,9 @@ describe("Explore panel", () => {
         seen.add(c);
       }
     }
-    const groups = Object.keys(X.GROUP_OF);
-    for (const id of new Set(Object.keys(X.GROUP_OF).map((k) => k))) {
+    for (const id of new Set(Object.keys(X.GROUP_OF))) {
       if (!seen.has(id) && id !== "") expect(seen.has(id), id).toBe(true);
     }
-    expect((X as unknown as { pinHex: (m: unknown) => string }).pinHex({ type: "place", category: "hospitality-cafes" })).toBe("#687d20");
-    expect((X as unknown as { pinHex: (m: unknown) => string }).pinHex({ type: "event", category: "worship-prayer" })).toBe("#7040b5");
-    expect((X as unknown as { pinHex: (m: unknown) => string }).pinHex({ type: "idea", category: "kids" })).toBe("#F2BD22");
-    void groups;
   });
 });
 
@@ -429,14 +426,14 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261116a"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261116b"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261116a");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261116b");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");

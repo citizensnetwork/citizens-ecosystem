@@ -31,7 +31,7 @@ type DataGlobal = {
   socialsToRow: (socials: Record<string, string>, kind: string) => Record<string, string | null>;
 };
 type MapZoom = {
-  GATES: { place: number; event: number; contributor: number };
+  GATES: { place: number; event: number };
   LABELS: number;
   bandFor: (z: number) => string;
   hidden: (type: string, z: number, selected: boolean) => boolean;
@@ -170,26 +170,23 @@ describe("SOCIAL_PLATFORMS — one table for every surface", () => {
 });
 
 describe("map zoom gates", () => {
-  it("peels pins away as you zoom out: places, then events, then contributors", () => {
+  it("peels pins away as you zoom out: places, then events", () => {
     // z≈10-11 metro · z≈8-9 province · z≈6-7 several provinces · z<6 the country.
+    // Contributors are not a pin, so below the event gate the map is empty.
     expect(MAP_ZOOM.bandFor(11)).toBe("all");
     expect(MAP_ZOOM.bandFor(8.5)).toBe("places");
-    expect(MAP_ZOOM.bandFor(6.5)).toBe("contributors");
+    expect(MAP_ZOOM.bandFor(6.5)).toBe("none");
     expect(MAP_ZOOM.bandFor(5.5)).toBe("none");
 
     expect(MAP_ZOOM.hidden("place", 11, false)).toBe(false);
     expect(MAP_ZOOM.hidden("place", 8.5, false)).toBe(true);
     expect(MAP_ZOOM.hidden("event", 8.5, false)).toBe(false);
     expect(MAP_ZOOM.hidden("event", 6.5, false)).toBe(true);
-    expect(MAP_ZOOM.hidden("contributor", 6.5, false)).toBe(false);
-    expect(MAP_ZOOM.hidden("contributor", 5.5, false)).toBe(true);
   });
 
   it("hides each type exactly below its own gate and shows it at the gate", () => {
-    // Founder decision D1 (2026-10-02): Contributors hide below zoom 6 so the
-    // national view reads clean. They used to be permanent anchors.
-    expect(MAP_ZOOM.GATES).toEqual({ place: 9.5, event: 7.5, contributor: 6 });
-    for (const type of ["place", "event", "contributor"] as const) {
+    expect(MAP_ZOOM.GATES).toEqual({ place: 9.5, event: 7.5 });
+    for (const type of ["place", "event"] as const) {
       const gate = MAP_ZOOM.GATES[type];
       expect(MAP_ZOOM.hidden(type, gate - 0.01, false), `${type} just below`).toBe(true);
       expect(MAP_ZOOM.hidden(type, gate, false), `${type} at the gate`).toBe(false);
@@ -198,12 +195,11 @@ describe("map zoom gates", () => {
 
   it("reports a band that matches what is actually hidden, so the on-screen hint never lies", () => {
     for (const z of [3, 5.99, 6, 7.49, 7.5, 9.49, 9.5, 12]) {
-      const hiddenTypes = (["contributor", "event", "place"] as const).filter((t) => MAP_ZOOM.hidden(t, z, false));
+      const hiddenTypes = (["event", "place"] as const).filter((t) => MAP_ZOOM.hidden(t, z, false));
       const expected: Record<string, string[]> = {
         all: [],
         places: ["place"],
-        contributors: ["event", "place"],
-        none: ["contributor", "event", "place"],
+        none: ["event", "place"],
       };
       expect(hiddenTypes.sort(), `z=${z}`).toEqual(expected[MAP_ZOOM.bandFor(z)].sort());
     }
@@ -214,11 +210,10 @@ describe("map zoom gates", () => {
   });
 
   it("never gates the SELECTED pin — its preview panel is open", () => {
-    for (const type of ["place", "event", "contributor"]) expect(MAP_ZOOM.hidden(type, 3, true), type).toBe(false);
+    for (const type of ["place", "event"]) expect(MAP_ZOOM.hidden(type, 3, true), type).toBe(false);
   });
 
   it("keeps the gates ordered, with names appearing only once every pin type is on screen", () => {
-    expect(MAP_ZOOM.GATES.contributor).toBeLessThan(MAP_ZOOM.GATES.event);
     expect(MAP_ZOOM.GATES.event).toBeLessThan(MAP_ZOOM.GATES.place);
     expect(MAP_ZOOM.LABELS).toBeGreaterThan(MAP_ZOOM.GATES.place);
     // Founder decision D2: names from neighbourhood scale.

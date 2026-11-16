@@ -38,22 +38,19 @@
   //    z≈8–9   one province, e.g. Gauteng ("provincial")
   //    z≈10–11 one metro, e.g. Pretoria
   //    z≈13+   suburb / street
-  //  Founder's rule: places drop out at provincial scale, events with them at
-  //  wider scale still, and — so the national view reads clean and professional
-  //  rather than as a scatter of pins — Contributors too below zoom 6
-  //  (2026-10-02; they used to be permanent anchors that never gated).
+  //  Founder's rule: places drop out at provincial scale, events at a wider
+  //  scale still. Contributors are not a pin (a profile status). A contributor
+  //  shows up here only as a place or an event listing.
   //  This is the ONE place the thresholds live; each type hides when z < gate.
-  const ZOOM_GATES = { place: 9.5, event: 7.5, contributor: 6 };
+  const ZOOM_GATES = { place: 9.5, event: 7.5 };
   //  What the current zoom is showing — reported upward so the map screen can
   //  say WHY pins vanished instead of leaving it a mystery.
-  //    'all'          everything with coordinates
-  //    'places'       places gated out (provincial)
-  //    'contributors' events gated out too — only Contributors remain
-  //    'none'         Contributors gated out as well (national) — nothing drawn
+  //    'all'          places and events
+  //    'places'       places gated out (provincial) — events remain
+  //    'none'         events gated out too — nothing is pinned
   function zoomBandFor(z) {
     if (z >= ZOOM_GATES.place) return 'all';
     if (z >= ZOOM_GATES.event) return 'places';
-    if (z >= ZOOM_GATES.contributor) return 'contributors';
     return 'none';
   }
   // A pin is hidden only when its own type is gated out (Impact Ideas are an
@@ -487,8 +484,8 @@
         const label = P.ariaLabelFor(m, catLabel, S.pin);
         const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, m.coverPhoto, !!m.isLive, !!m.isBusy,
           m.broadcast ? m.broadcast.message + '|' + m.broadcast.bubbleId : '', catLabel].join('');
-        // Pack 08: every pin takes its group colour. Ideas stay on the brand gold.
-        const fill = (window.MapV2Explore && window.MapV2Explore.pinHex) ? window.MapV2Explore.pinHex(m) : (m.type === 'idea' ? '#F2BD22' : (cat ? cat.hex : '#F2BD22'));
+        // Category colour, as on main. Ideas stay on the brand gold.
+        const fill = m.type === 'idea' ? '#F2BD22' : (cat ? cat.hex : '#F2BD22');
         const build = () => P.build(m, { lucideInner, icon: pinIcon(m, cat), hex: fill, strings: S.pin, onDismissBubble: onDismissBubbleRef.current });
         let mk = markerObjs.current.get(m.id);
         if (mk && mk._ccAnchor === anchor) {
@@ -524,8 +521,9 @@
         // Map v2's pills (#210) pass a test per marker (a group, or "Events"); the old map passes one category id.
         const passes = typeof filterCategory === 'function' ? filterCategory(m) : m.category === filterCategory;
         const dim = !!(filterCategory && !passes && m.type !== 'idea');
+        if (m.type === 'contributor') return;
         const selected = selectedId === m.id;
-        // Events wear the tailed disc, so they hang from the point. Circles (contributors, places) sit on it.
+        // Events wear the tailed disc, so they hang from the point. Place circles sit on it.
         const anchor = m.type === 'event' ? 'bottom' : 'center';
         upsertPinV2(m, cat, coords, anchor, dim, selected);
       });

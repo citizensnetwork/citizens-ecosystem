@@ -63,7 +63,7 @@ async function setUp(page: Page, baseURL: string, o: { gallery?: number } = {}) 
   await installNews(page, [...postsFor(seed.contributors[0].id, 6), ...postsFor(seed.contributors[2].id, 2)]);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { gallery: o.gallery ?? 6 });
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   return seed;
 }
 

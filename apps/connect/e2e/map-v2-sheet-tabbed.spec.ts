@@ -47,7 +47,7 @@ test.describe("tabbed block on a phone", () => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 3 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[0];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(sheet(page).getByRole("tab", { name: "Gallery" })).toBeVisible();
@@ -93,7 +93,7 @@ test.describe("tabbed block on a phone", () => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 0 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[2];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(page.locator("[data-mv2='empty']")).toBeVisible();
@@ -118,7 +118,7 @@ test.describe("tabbed block on a phone", () => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 6, delayMs: 1200 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[2];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(page.locator("[data-mv2='tabbed'] [data-skeleton]").first()).toBeVisible();
@@ -171,7 +171,7 @@ test.describe("tabbed block on a phone", () => {
     }, posts);
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 3 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(sheet(page).getByRole("tab")).toHaveText(["Events", "News", "Gallery"]);
     await expect(page.locator("[data-mv2='nearby'] [data-near]").first()).toBeVisible();
@@ -426,7 +426,7 @@ test.describe("tabbed block keyboard and dark look", () => {
         expires_at: new Date(FIXED_NOW + 20 * 3_600_000).toISOString(),
       }],
     });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[2];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(sheet(page).getByRole("tab")).toHaveText(["Today"]);
@@ -455,7 +455,7 @@ test.describe("tabbed block keyboard and dark look", () => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 1 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[0];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(page.locator("[data-mv2='tabbed']")).toHaveCount(1);

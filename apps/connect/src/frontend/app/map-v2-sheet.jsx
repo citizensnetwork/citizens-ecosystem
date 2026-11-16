@@ -832,6 +832,9 @@
         h('span', { 'data-mv2': 'card-chip' },
           h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
           h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
+        type === 'place' && ((org && org.name) || item.organizerName)
+          ? h('span', { 'data-mv2': 'xcard-by' }, Str.by + ' ' + ((org && org.name) || item.organizerName))
+          : null,
         expanded && collabChip,
         facts.length > 0 && h('span', { 'data-mv2': 'sub' },
           facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), []))));
