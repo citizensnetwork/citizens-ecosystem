@@ -18,9 +18,9 @@
     { page: 'notifications', label: 'Notifications', icon: 'Bell' },
   ];
 
-  function roleBadge(role, level) {
+  function roleBadge(role) {
     if (role === 'admin') return { label: 'Admin', color: '#8E44AD', fg: '#FFFFFF', icon: 'Shield' };
-    if (role === 'contributor') return { label: level || 'Contributor', color: '#F2BD22', fg: '#0A0908', icon: 'Crown' };
+    if (role === 'contributor') return { label: 'Contributor', color: '#F2BD22', fg: '#0A0908', icon: 'Crown' };
     return null;
   }
 
@@ -93,8 +93,7 @@
         React.createElement('div', { className: 'flex items-center gap-1.5 mt-0.5' },
           role === 'admin' && React.createElement(Icon, { name: 'Shield', size: 11, className: 'text-[#8E44AD]' }),
           role === 'contributor' && React.createElement(Icon, { name: 'Crown', size: 11, className: 'text-gold' }),
-          React.createElement('span', { className: 'text-[10px] font-semibold text-muted-foreground capitalize' }, role),
-          role === 'contributor' && user.involvementLevel && React.createElement('span', { className: 'text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent text-gold-dark' }, user.involvementLevel)),
+          React.createElement('span', { className: 'text-[10px] font-semibold text-muted-foreground capitalize' }, role)),
         React.createElement('p', { className: 'text-xs text-muted-foreground mt-2 leading-relaxed line-clamp-2' }, user.bio),
 
         React.createElement('div', { className: 'mt-3 space-y-0.5 border-t border-border pt-3' },
@@ -177,7 +176,7 @@
 
     const badge = (p) => (p === 'notifications' ? unreadNotifs : p === 'messages' ? unreadMsgs : p === 'admin' && isAdmin ? app.applications.filter((a) => a.status === 'pending').length : 0);
     const active = (p) => nav.page === p || (p === 'home' && nav.page === 'event') || (p === 'home' && nav.page === 'place');
-    const rb = roleBadge(role, user.involvementLevel);
+    const rb = roleBadge(role);
 
     return React.createElement('aside', {
       className: cx('hidden md:flex flex-col glass border-r border-white/40 z-40 shrink-0 transition-all duration-300 relative', collapsed ? 'w-[74px]' : 'w-64'),

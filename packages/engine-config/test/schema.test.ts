@@ -14,6 +14,22 @@ import {
 } from '../src/index';
 import { checkSample, clone, expectIssue, issuesOf } from './helpers';
 
+/** A partner level ladder for the tests: Citizens has none since 2026-11-16. */
+const LEVELS: NonNullable<Configuration['partnerLevels']> = [
+  { id: 'new', label: 'New', color: '#2563eb', description: 'Just started', minScore: 0 },
+  { id: 'known', label: 'Known', color: '#16a34a', description: 'Known locally', minScore: 20 },
+];
+
+/** Citizens with the level badge switched on and allowed, to test the switch's own rules. */
+function citizensWithLevels() {
+  const configuration = clone(citizensConfiguration);
+  configuration.features.partnerLevels = true;
+  configuration.partnerLevels = clone(LEVELS);
+  const entitlements = clone(citizensEntitlements);
+  entitlements.features.partnerLevels = true;
+  return { configuration, entitlements };
+}
+
 describe('the two configurations in this repository', () => {
   it('the Citizens configuration is valid against the Citizens entitlements', () => {
     const result = validateConfiguration(citizensConfiguration, citizensEntitlements);
@@ -110,7 +126,7 @@ describe('the rule between the two layers', () => {
     expectIssue(
       checkSample((configuration) => {
         configuration.features.partnerLevels = true;
-        configuration.partnerLevels = clone(citizensConfiguration.partnerLevels);
+        configuration.partnerLevels = clone(LEVELS);
       }),
       'feature-not-entitled',
       'features.partnerLevels',
@@ -251,16 +267,17 @@ describe('features that need data', () => {
       'feature-needs-data',
       'categories.gatheringStarters',
     );
-    const configuration = clone(citizensConfiguration);
+    const { configuration, entitlements } = citizensWithLevels();
+    expect(validateConfiguration(configuration, entitlements).ok).toBe(true);
     delete configuration.partnerLevels;
     expectIssue(
-      validateConfiguration(configuration, citizensEntitlements),
+      validateConfiguration(configuration, entitlements),
       'feature-needs-data',
       'partnerLevels',
     );
     configuration.partnerLevels = [];
     expectIssue(
-      validateConfiguration(configuration, citizensEntitlements),
+      validateConfiguration(configuration, entitlements),
       'feature-needs-data',
       'partnerLevels',
     );
@@ -286,7 +303,7 @@ describe('features that need data', () => {
 
   it('partner levels start at 0 and rise', () => {
     const withLevels = (scores: number[]) => {
-      const configuration = clone(citizensConfiguration);
+      const { configuration, entitlements } = citizensWithLevels();
       configuration.partnerLevels = scores.map((minScore, i) => ({
         id: `level-${i}`,
         label: `Level ${i}`,
@@ -294,7 +311,7 @@ describe('features that need data', () => {
         description: 'A level',
         minScore,
       }));
-      return validateConfiguration(configuration, citizensEntitlements);
+      return validateConfiguration(configuration, entitlements);
     };
     expect(withLevels([0, 20, 80]).ok).toBe(true);
     expectIssue(withLevels([5, 20]), 'level-order', 'partnerLevels.0.minScore');

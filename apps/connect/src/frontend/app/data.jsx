@@ -305,20 +305,11 @@
     return out;
   };
 
-  // ── Contributor involvement tiers ──
-  const TIERS = [
-    { id: 'seed',     name: 'Seed',     min: 0,  desc: 'Newly approved contributor' },
-    { id: 'shepherd', name: 'Shepherd', min: 5,  desc: 'Growing presence in the community' },
-    { id: 'pillar',   name: 'Pillar',   min: 15, desc: 'A cornerstone of the community' },
-    { id: 'beacon',   name: 'Beacon',   min: 40, desc: 'Shining light across the Kingdom' },
-  ];
-
   window.DATA = {
     EVENT_CATEGORIES,
     PLACE_CATEGORIES,
     CONTRIBUTOR_TYPES,
     FILTER_CATEGORIES,
-    TIERS,
     getEventCategory,
     getPlaceCategory,
     getContributorType,
