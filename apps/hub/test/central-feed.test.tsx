@@ -13,9 +13,9 @@ import { createRoot } from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cardWidth, columnWidth } from '@citizens/central/layout';
-import type { FeedItem } from '@citizens/central/contract';
+import type { CentralApp, FeedItem } from '@citizens/central/contract';
 import { CentralFeed, FEED_LINES } from '../src/components/central/CentralFeed';
-import { safeHref } from '../src/components/central/FeedCard';
+import { FeedCard, safeHref } from '../src/components/central/FeedCard';
 import {
   CENTRAL_API,
   IMAGE_SERVICE,
@@ -422,6 +422,133 @@ describe('Central feed: kickers and lead', () => {
     act(() => r.render(<CentralIcon name="calendar" />));
     expect(div.querySelector('svg')).toBeNull();
     act(() => r.unmount());
+  });
+});
+
+describe('Central feed: templates chosen by data', () => {
+  const APP = APPS[0] as unknown as CentralApp;
+
+  function draw(item: FeedItem, app: CentralApp | undefined = APP, span: 1 | 2 = 1) {
+    const div = document.createElement('div');
+    const r = createRoot(div);
+    act(() => r.render(<FeedCard item={item} app={app} span={span} />));
+    const el = div.firstElementChild as HTMLElement;
+    return { el, done: () => act(() => r.unmount()) };
+  }
+
+  it('draws a pause card with no kicker line, its small line first, and no picture', () => {
+    const pause = {
+      ...card(1, 'square', 'central'),
+      kind: 'pause',
+      title: 'Time to Rest',
+      summary: undefined,
+      image: {
+        url: 'https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/p.jpg',
+        alt: '',
+      },
+    } as unknown as FeedItem;
+    const { el, done } = draw(pause);
+    expect(el.classList.contains('rest')).toBe(true);
+    expect(el.querySelector('.pl')).toBeNull();
+    expect(el.querySelector('img')).toBeNull();
+    expect(el.querySelector('.tx')!.firstElementChild!.tagName).toBe('SMALL');
+    expect(el.querySelector('small')!.textContent).toBe('');
+    expect(el.querySelector('h3')!.textContent).toBe('Time to Rest');
+    done();
+  });
+
+  it('draws a list card: title, then one line per entry with the notes icon, and no summary', () => {
+    const listed = { ...card(2), list: ['First song', 'Second song'] } as FeedItem;
+    const { el, done } = draw(listed, APP, 2);
+    expect(el.classList.contains('wide')).toBe(true);
+    expect([...el.querySelectorAll('ol li')].map((li) => li.textContent)).toEqual([
+      'First song',
+      'Second song',
+    ]);
+    expect(el.querySelectorAll('ol li svg')).toHaveLength(2);
+    expect(el.querySelector('.tx > small')).toBeNull();
+    done();
+  });
+
+  it('draws a text card with its icon, and without a summary line when there is none', () => {
+    const text = { ...card(3), icon: 'book', summary: undefined } as unknown as FeedItem;
+    const { el, done } = draw(text);
+    expect(el.querySelector('.tx > .ico svg')).not.toBeNull();
+    expect(el.querySelector('.tx > small')).toBeNull();
+    done();
+  });
+
+  it('draws no link for an unsafe href, and no dot for an accent that is not a colour', () => {
+    const unsafe = { ...card(4), href: 'javascript:alert(1)' } as FeedItem;
+    const { el, done } = draw(unsafe, { ...APP, accent: 'red;background:url(x)' });
+    expect(el.tagName).toBe('DIV');
+    expect(el.getAttribute('href')).toBeNull();
+    expect(el.querySelector('.pl i')).toBeNull();
+    expect(el.querySelector('.pl b')!.getAttribute('style')).toBeNull();
+    done();
+  });
+});
+
+describe('Central feed: environment and width', () => {
+  it('shows the quiet line and asks for nothing when the browser has no fetch', async () => {
+    vi.stubGlobal('fetch', undefined);
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => root!.render(<CentralFeed />));
+    await settle();
+    expect(line()).toBe(FEED_LINES.empty);
+    expect(placedCards()).toHaveLength(0);
+  });
+
+  it('lays everything out again when the feed’s width changes, and ignores a same-width report', async () => {
+    let resize: (() => void) | null = null;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(cb: () => void) {
+          resize = cb;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    const fetchMock = mockFetch([{ items: [card(1), card(2), card(3), card(4)], caughtUp: true }]);
+    await mount(fetchMock as unknown as typeof fetch);
+    expect(new Set(placedCards().map((c) => c.left)).size).toBe(2);
+    const before = placedCards().map((c) => c.left);
+    await act(async () => resize!());
+    expect(placedCards().map((c) => c.left)).toEqual(before);
+    feedWidth = 1200;
+    await act(async () => resize!());
+    await settle();
+    expect(new Set(placedCards().map((c) => c.left)).size).toBe(4);
+    expect(feedCalls(fetchMock)).toBe(1);
+  });
+
+  it('places nothing while the feed has no real size, instead of handing the engine a zero', async () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+      () => ({ x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 }) as DOMRect,
+    );
+    await mount(
+      mockFetch([{ items: [card(1), card(2)], caughtUp: true }]) as unknown as typeof fetch,
+    );
+    expect(placedCards()).toHaveLength(0);
+    expect(host.querySelectorAll('.fc-measure > .fc')).toHaveLength(2);
+  });
+
+  it('skips a card id that already arrived on an earlier page', async () => {
+    const fetchMock = mockFetch([
+      { items: [card(1), card(2)], caughtUp: false },
+      { items: [card(2), card(3)], caughtUp: true },
+    ]);
+    await mount(fetchMock as unknown as typeof fetch);
+    await scrollToEnd();
+    expect(
+      placedCards()
+        .map((c) => c.id)
+        .sort(),
+    ).toEqual(['connect:event:1', 'connect:event:2', 'connect:event:3']);
   });
 });
 
