@@ -65,28 +65,15 @@ interface ConnectCategories {
   EVENT_CATEGORY_KEYWORDS: Record<string, string[]>;
 }
 
-interface ConnectInvolvement {
-  INVOLVEMENT_COLORS: Record<string, string>;
-  INVOLVEMENT_DESCRIPTIONS: Record<string, string>;
-  computeInvolvementLevel(signals: {
-    followers: number;
-    events: number;
-    places: number;
-    teamSize: number;
-  }): string;
-}
-
 async function load<T>(path: string): Promise<T> {
   const url = pathToFileURL(resolve(ROOT, path)).href;
   return (await import(/* @vite-ignore */ url)) as T;
 }
 
 let connect: ConnectCategories;
-let involvement: ConnectInvolvement;
 
 beforeAll(async () => {
   connect = await load<ConnectCategories>(`${CONNECT}/src/lib/categories.ts`);
-  involvement = await load<ConnectInvolvement>(`${CONNECT}/src/lib/contributors/involvement.ts`);
 });
 
 describe('the home-screen app', () => {
@@ -345,7 +332,7 @@ describe('vocabulary', () => {
     'screen.communityEvents.rule': { file: pages },
     'screen.portal.title': { file: shell, wrap: (text) => `label: '${text}'` },
     'screen.claim.action': { file: shell },
-    'screen.role.partner': { file: shell, wrap: (text) => `label: level || '${text}'` },
+    'screen.role.partner': { file: shell, wrap: (text) => `{ label: '${text}', color:` },
     'screen.loading': { file: `${APP}/auth.jsx`, wrap: (text) => `'aria-label': '${text}'` },
     'screen.wordmark.primary': { file: shell, wrap: (text) => `font-display' }, '${text}')` },
     'screen.wordmark.secondary': { file: shell, wrap: (text) => `uppercase mt-0.5' }, '${text}')` },
@@ -666,17 +653,12 @@ describe('layout, map and the rest', () => {
     expect(tiers).toHaveLength(5);
   });
 
-  it('the partner levels are the ones Connect computes, with the same colours and thresholds', () => {
-    const levels = config.partnerLevels ?? [];
-    expect(levels.map((level) => level.label)).toEqual(Object.keys(involvement.INVOLVEMENT_COLORS));
-    const at = (followers: number) =>
-      involvement.computeInvolvementLevel({ followers, events: 0, places: 0, teamSize: 0 });
-    levels.forEach((level, index) => {
-      expect(level.color, level.id).toBe(involvement.INVOLVEMENT_COLORS[level.label]);
-      expect(level.description, level.id).toBe(involvement.INVOLVEMENT_DESCRIPTIONS[level.label]);
-      expect(at(level.minScore), level.id).toBe(level.label);
-      if (index > 0) expect(at(level.minScore - 1), level.id).toBe(levels[index - 1]?.label);
-    });
+  it('Connect has no partner level ladder (founder, 2026-11-16)', () => {
+    expect(config.partnerLevels).toBeUndefined();
+    expect(existsSync(resolve(ROOT, `${CONNECT}/src/lib/contributors/involvement.ts`))).toBe(false);
+    for (const file of ['store.jsx', 'profiles.jsx', 'shell.jsx', 'dashboard.jsx', 'data.jsx']) {
+      expect(raw(`${APP}/${file}`), file).not.toMatch(/involvementLevel|Shepherd|TIERS = \[/);
+    }
   });
 
   it('the three environment switches are recorded at Connect’s default (off)', () => {

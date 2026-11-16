@@ -27,7 +27,6 @@ export const citizensEntitlements: Entitlements = {
     communityIdeas: true,
     gatherings: true,
     liveLocation: true,
-    partnerLevels: true,
     googleSignIn: true,
     publicApi: true,
     aiSearch: true,
@@ -575,7 +574,6 @@ export const citizensConfiguration: Configuration = {
     communityEvents: true,
     communityIdeas: true,
     gatherings: true,
-    partnerLevels: true,
     googleSignIn: true,
     publicApi: true,
     listingAutomation: true,
@@ -595,7 +593,6 @@ export const citizensConfiguration: Configuration = {
       'ideasBoard',
       'partnerApplication',
       'listingClaim',
-      'partnerLevelBadge',
     ],
     navigation: ['map', 'discover', 'gatherings', 'messages', 'notifications'],
     controls: [
@@ -625,35 +622,4 @@ export const citizensConfiguration: Configuration = {
       { id: 'provincial_vision', label: 'Provincial Vision', min: 10000, max: 10000, fixed: true },
     ],
   },
-
-  partnerLevels: [
-    {
-      id: 'seed',
-      label: 'Seed',
-      color: '#2563EB',
-      description: 'Getting started in the community',
-      minScore: 0,
-    },
-    {
-      id: 'shepherd',
-      label: 'Shepherd',
-      color: '#16A34A',
-      description: 'Actively gathering and serving people',
-      minScore: 20,
-    },
-    {
-      id: 'pillar',
-      label: 'Pillar',
-      color: '#7C3AED',
-      description: 'A established, well-followed contributor',
-      minScore: 80,
-    },
-    {
-      id: 'beacon',
-      label: 'Beacon',
-      color: '#F2BD22',
-      description: 'A cornerstone contributor lighting the way',
-      minScore: 250,
-    },
-  ],
 };

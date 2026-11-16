@@ -117,7 +117,6 @@ describe('a world’s features', () => {
       'communityEvents',
       'communityIdeas',
       'gatherings',
-      'partnerLevels',
       'googleSignIn',
       'publicApi',
       'listingAutomation',
@@ -128,6 +127,10 @@ describe('a world’s features', () => {
     for (const off of ['liveLocation', 'personalisationGames', 'aiSearch'] as const) {
       expect(citizens.hasFeature(off), off).toBe(false);
     }
+    // The founder removed the partner level ladder from Citizens on 2026-11-16.
+    expect(citizens.hasFeature('partnerLevels')).toBe(false);
+    expect(citizens.shows('partnerLevelBadge')).toBe(false);
+    expect(citizens.configuration.partnerLevels).toBeUndefined();
   });
 });
 

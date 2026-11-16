@@ -284,7 +284,7 @@
 
   // API contributor row (public /api/v1/contributors → a profiles row) → app
   // contributor shape. The public directory is sparse, so anything it doesn't
-  // expose (follower counts, involvement tier, niche) gets honest, crash-safe
+  // expose (follower counts, niche) gets honest, crash-safe
   // defaults — never fabricated numbers (VISION: honour the small honestly).
   function adaptContributor(r) {
     const socials = window.DATA.socialsFromRow(r, window.DATA.SOCIAL_COLUMNS.contributor);
@@ -323,7 +323,6 @@
       noFixedLocation: !!r.no_fixed_location,
       openToCollaborate: r.open_to_collaborate === true,
       followerCount: 0,
-      involvementLevel: 'Shepherd',
       dominantNiche: '',
       socials,
       gallery: r.gallery_urls || [],
@@ -948,7 +947,7 @@
       || (myContributor && myContributor.id === activeContributorId ? myContributor : null)
       || contributors.find((c) => c.id === activeContributorId)
       || contributors[0]
-      || { id: 'c1', name: W.t('screen.fallback.ownPartnerName'), profilePhoto: '', coverPhoto: '', bio: '', involvementLevel: 'Shepherd', followerCount: 0, dominantNiche: '', website: '', location: '', socials: {}, gallery: [] };
+      || { id: 'c1', name: W.t('screen.fallback.ownPartnerName'), profilePhoto: '', coverPhoto: '', bio: '', followerCount: 0, dominantNiche: '', website: '', location: '', socials: {}, gallery: [] };
 
     const baseUser =
       role === 'admin' ? ADMIN_BASE
@@ -956,7 +955,7 @@
         ? {
             id: activeContributor.id, name: activeContributor.name, role: 'contributor',
             profilePhoto: activeContributor.profilePhoto, coverPhoto: activeContributor.coverPhoto,
-            bio: activeContributor.bio, involvementLevel: activeContributor.involvementLevel,
+            bio: activeContributor.bio,
             followerCount: activeContributor.followerCount, orgId: activeContributor.id,
           }
         : CITIZEN_BASE;
@@ -1107,7 +1106,7 @@
             location: mine.noFixedLocation ? '' : (mine.location || ''), members: [], followerCount: 0,
             noFixedLocation: !!mine.noFixedLocation,
             dominantNiche: (DATA.getItemCategory({ type: 'contributor', category: mine.category }) || { name: 'Community' }).name,
-            involvementLevel: 'Shepherd', collaborators: [], socials: mine.socials || {}, isMine: true, verified: true,
+            collaborators: [], socials: mine.socials || {}, isMine: true, verified: true,
             lat: geo ? geo.lat : null, lng: geo ? geo.lng : null,
           };
           setContributors((prev) => [...prev.filter((c) => c.id !== org.id), org]);
@@ -1496,7 +1495,7 @@
         location: form.noFixedLocation ? '' : (form.location || ''), members: form.members || [], followerCount: 0,
         noFixedLocation: !!form.noFixedLocation,
         dominantNiche: (DATA.getItemCategory({ type: 'contributor', category: form.category }) || { name: 'Community' }).name,
-        involvementLevel: 'Shepherd', collaborators: [], socials: form.socials || {}, isMine: true, verified: true,
+        collaborators: [], socials: form.socials || {}, isMine: true, verified: true,
       };
       if (!realUser) {
         // Demo mode still geocodes (same helper, same MapTiler key) so a
