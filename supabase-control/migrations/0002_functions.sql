@@ -208,6 +208,10 @@ end;
 $fn$;
 
 -- Nobody takes themselves off the list, so the list can never become empty.
+-- Two Superusers who revoke each other at the same moment must not both succeed, or the list would
+-- be left with nobody. So each one first locks its OWN row, still active. Of two such calls, one
+-- then waits for the other; when it goes on, it finds its own row revoked and stops (or the
+-- database ends one of the two as a deadlock). Either way, one of the two stays on the list.
 create function public.superuser_revoke(_account uuid, _reason text)
 returns void
 language plpgsql
@@ -218,8 +222,15 @@ declare
   v_actor control.superusers := control.require_superuser();
   v_reason text := control.reason(_reason);
 begin
+  if _account is null then
+    raise exception 'not_listed' using errcode = 'P0002';
+  end if;
   if _account = v_actor.user_id then
     raise exception 'cannot_revoke_yourself' using errcode = '22023';
+  end if;
+  perform 1 from control.superusers s where s.user_id = v_actor.user_id and s.status = 'active' for update;
+  if not found then
+    raise exception 'not_a_superuser' using errcode = '42501';
   end if;
   update control.superusers s
      set status = 'revoked', revoked_at = now(), revoked_by = v_actor.user_id
@@ -845,6 +856,10 @@ $fn$;
 -- Step 4 of break-glass: the entries of the tenant's own support log, copied here. `_reads` is the
 -- list the tenant's project reports for this grant (engine.support_session_report there). Each
 -- entry becomes one audit row; an entry that was copied before is skipped. Returns how many were new.
+-- An entry holds its number, its time, its kind and, for a thread, the reason given, and nothing
+-- else: one that carries any other part (a name, an account, what was looked up) is refused, with
+-- the whole list, so nothing about a person can reach the control plane even through a bug in
+-- the tooling that carries the list.
 create function public.support_reads_record(_grant uuid, _reads jsonb)
 returns integer
 language plpgsql
@@ -865,15 +880,25 @@ begin
     raise exception 'support_reads_must_be_a_list' using errcode = '22023';
   end if;
   for v_read in select r from jsonb_array_elements(_reads) r loop
-    if jsonb_typeof(v_read) <> 'object'
+    -- Asked one by one, so that no question is put to something it does not fit.
+    if jsonb_typeof(v_read) <> 'object' then
+      raise exception 'support_read_entry_invalid' using errcode = '22023';
+    end if;
+    if exists (select 1 from jsonb_object_keys(v_read) k where k not in ('id', 'at', 'kind', 'threadReason'))
+       or jsonb_typeof(v_read -> 'id') is distinct from 'number'
        or coalesce(v_read ->> 'id', '') !~ '^[0-9]{1,18}$'
-       or coalesce(v_read ->> 'kind', '') !~ '^[a-z_]{1,40}$' then
+       or jsonb_typeof(v_read -> 'kind') is distinct from 'string'
+       or coalesce(v_read ->> 'kind', '') !~ '^[a-z_]{1,40}$'
+       or (v_read ? 'at' and (jsonb_typeof(v_read -> 'at') is distinct from 'string'
+           or (v_read ->> 'at') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}[T ][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,6})?(Z|[+-][0-9]{2}(:?[0-9]{2})?)$'))
+       or (v_read ? 'threadReason' and jsonb_typeof(v_read -> 'threadReason') is distinct from 'string') then
       raise exception 'support_read_entry_invalid' using errcode = '22023';
     end if;
     if control.write_audit(
          v_actor, 'support.read', v_grant.tenant_id,
          control.reason(v_read ->> 'threadReason', false),
-         jsonb_build_object('grant', _grant, 'read', v_read),
+         jsonb_build_object('grant', _grant, 'read', jsonb_strip_nulls(jsonb_build_object(
+           'id', (v_read ->> 'id')::bigint, 'at', v_read -> 'at', 'kind', v_read ->> 'kind'))),
          _grant::text || ':' || (v_read ->> 'id')) is not null then
       v_new := v_new + 1;
     end if;

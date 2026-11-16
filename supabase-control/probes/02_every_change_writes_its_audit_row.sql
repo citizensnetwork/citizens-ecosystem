@@ -118,7 +118,7 @@ set local role authenticated;
 do $probe$
 begin
   if public.support_reads_record(current_setting('probe.grant')::uuid,
-       '[{"id": 1, "kind": "account", "subject": "00000000-0000-0000-0000-000000000001"},
+       '[{"id": 1, "kind": "account"},
          {"id": 2, "kind": "thread", "threadReason": "The partner asked about this thread."}]'::jsonb) <> 2 then
     raise exception 'PROBE FAILED: two reads were not copied as two';
   end if;

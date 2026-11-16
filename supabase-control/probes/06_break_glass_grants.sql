@@ -113,7 +113,7 @@ declare
   v_grant constant uuid := current_setting('probe.grant')::uuid;
   v_reads constant jsonb := '[
     {"id": 1, "at": "2026-01-01T10:00:00Z", "kind": "find_account"},
-    {"id": 2, "at": "2026-01-01T10:01:00Z", "kind": "account", "subject": "00000000-0000-0000-0000-000000000001"},
+    {"id": 2, "at": "2026-01-01T10:01:00.123456+00:00", "kind": "account"},
     {"id": 3, "at": "2026-01-01T10:02:00Z", "kind": "thread", "threadReason": "The partner asked about this thread."}
   ]'::jsonb;
 begin
@@ -160,6 +160,34 @@ begin
     raise exception 'PROBE FAILED: something that is not a list of reads was copied';
   exception when invalid_parameter_value then null;
   end;
+  -- Nothing about a person is copied: an entry that carries anything but its number, time, kind
+  -- and thread reason is refused, and so is the whole list it came in (the first entry is new
+  -- and valid, so a partial copy would show in the counts below).
+  begin
+    perform public.support_reads_record(v_grant,
+      '[{"id": 5, "kind": "location"}, {"id": 6, "kind": "account", "subject": "00000000-0000-0000-0000-000000000001"}]'::jsonb);
+    raise exception 'PROBE FAILED: a read that names a person was copied';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'support_read_entry_invalid' then raise; end if;
+  end;
+  begin
+    perform public.support_reads_record(v_grant, '[{"id": 7, "kind": "find_account", "lookup": "someone@example.org"}]'::jsonb);
+    raise exception 'PROBE FAILED: a read that carries what was looked up was copied';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'support_read_entry_invalid' then raise; end if;
+  end;
+  begin
+    perform public.support_reads_record(v_grant, '[{"id": 8, "kind": "account", "at": "someone@example.org"}]'::jsonb);
+    raise exception 'PROBE FAILED: a read whose time is not a time was copied';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'support_read_entry_invalid' then raise; end if;
+  end;
+  begin
+    perform public.support_reads_record(v_grant, '[{"id": 8, "kind": "thread", "threadReason": {"name": "someone"}}]'::jsonb);
+    raise exception 'PROBE FAILED: a thread reason that is not text was copied';
+  exception when invalid_parameter_value then
+    if sqlerrm <> 'support_read_entry_invalid' then raise; end if;
+  end;
 
   perform public.support_grant_close(v_grant);
   begin
@@ -198,6 +226,17 @@ begin
   end if;
   if (select count(*) from control.audit_log a where a.action = 'support.read' and a.detail ->> 'grant' = v_grant.id::text) <> 4 then
     raise exception 'PROBE FAILED: the audit log does not hold each read exactly once';
+  end if;
+  if exists (select 1 from control.audit_log a
+               cross join lateral jsonb_object_keys(a.detail -> 'read') k
+              where a.action = 'support.read' and k not in ('id', 'at', 'kind'))
+     or exists (select 1 from control.audit_log a
+                 where a.action = 'support.read' and a.detail ?| array['subject', 'lookup', 'account']) then
+    raise exception 'PROBE FAILED: a copied read holds more than its number, time and kind';
+  end if;
+  if (select a.reason from control.audit_log a
+       where a.action = 'support.read' and a.source_ref = v_grant.id::text || ':3') is distinct from 'The partner asked about this thread.' then
+    raise exception 'PROBE FAILED: the reason given for reading a thread was not kept';
   end if;
   select g.* into v_grant from control.support_access_grants g where g.id = current_setting('probe.stale_grant')::uuid;
   if v_grant.end_cause <> 'not_delivered' or v_grant.ended_at <> v_grant.expires_at then

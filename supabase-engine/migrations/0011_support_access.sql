@@ -322,16 +322,18 @@ $close$;
 -- Refuses unless the session is active and inside its time. It reads the clock itself, so it
 -- refuses the moment the time has passed, whether or not the job has run. It never changes
 -- anything: closing is the job's and the closing functions' work.
+-- It holds a shared lock on the session until the read is over. Ending a session needs that lock
+-- released first, so a read and an end never overlap: a read that started before a staff member
+-- ended the session finishes first, and one that starts after it sees the end and is refused.
 create function engine.support_gate(_session uuid)
 returns public.support_sessions
 language plpgsql
-stable
 set search_path = ''
 as $gate$
 declare
   v_session public.support_sessions;
 begin
-  select s.* into v_session from public.support_sessions s where s.id = _session;
+  select s.* into v_session from public.support_sessions s where s.id = _session for share;
   if not found then
     raise exception 'support_session_not_found' using errcode = 'P0002';
   end if;

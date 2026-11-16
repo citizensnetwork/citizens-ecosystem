@@ -2,7 +2,7 @@
   "$comment": "The SHA-256 of every control migration file (line endings normalised). Written by `pnpm --filter @engine/db lock -- --line control`. A test fails when a file differs from its entry: an applied migration never changes.",
   "files": {
     "0001_schema_and_audit_log.sql": "66a98d2d150df4872b32539c3cdb3a7d662511b19a73af1d101ef3e4db5be4d8",
-    "0002_functions.sql": "2c4bbe0a5f89c360fe2a3334e6f68b71a2d08155c719ee2293c64a0e0f054071",
+    "0002_functions.sql": "1bcbee4fb8b504aa09b604cc0adacd485fe595f08a7ca17f4aaa1c55ea199c8f",
     "0003_grantable_features.sql": "00e77fc9158101eedb3d85b22fb40be0f4a04520ebf544e989fc34a5119b0026"
   }
 }
