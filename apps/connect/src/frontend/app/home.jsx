@@ -104,21 +104,20 @@
     // lowered to its title strip, and which pin was just tapped (so the panel brings that card into view; a card tap
     // never does, the panel stays exactly where it is).
     const X = window.MapV2Explore;
-    const [pill, setPill] = useState('all');
-    // "Where to…" (C40): a saved set of categories. It replaces the pill while it is on.
-    const [intent, setIntent] = useState(null);
+    // Pack 08: a Where to… tile dims every pin that is not that kind. Ideas ride their own tile.
+    const [tile, setTile] = useState(null);
     const [sheet, setSheet] = useState(null);
-    const [min, setMin] = useState(false);
-    const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a second tap on a pin scrolls to its card again
+    const [panelOpen, setPanelOpen] = useState(false);
+    const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a keyboard pin brings its card into the sheet
     const rootRef = useRef(null);
     const skipFrame = useRef(false);
-    const minRef = useRef(false);
-    const chosen = useRef({ id: null, type: null });   // the latest choice, so a second tap never reads a render's old one
+    const chosen = useRef({ id: null, type: null });
     const narrow = X.useNarrow();
     const clean = !!(app.nav && app.nav.params && app.nav.params.view === 'map');
-    const pillTest = useMemo(() => (
-      (intent && X.intentOf(intent)) || (pill && pill !== 'all') ? (m) => X.matchesFilter(pill, intent, m) : null
-    ), [X, pill, intent]);
+    const tileRec = tile && X.tileOf ? X.tileOf(tile) : null;
+    const tileTest = useMemo(() => (
+      tileRec && !tileRec.ideas && X.tileMatches ? (m) => X.tileMatches(tile, m) : null
+    ), [X, tile, tileRec]);
     // The panel's height goes straight onto the screen as a CSS variable (the map's controls and credit sit above it): no re-render.
     // The data is framed again as the panel grows, but never because the person lowered or raised it (the map would jump).
     const onExploreHeight = useCallback((px) => {
@@ -129,11 +128,8 @@
       if (mapApi.current && mapApi.current.reframe) mapApi.current.reframe();
     }, []);
     // Lower or raise the panel (the handle, or a pin tap that needs its card). Only a real change skips the next framing.
-    const lower = useCallback((down) => {
-      if (minRef.current === down) return;
-      minRef.current = down;
-      skipFrame.current = true;
-      setMin(down);
+    const onPanel = useCallback((isOpen) => {
+      setPanelOpen(!!isOpen);
     }, []);
 
     const q = query.trim().toLowerCase();
@@ -142,14 +138,11 @@
     const markers = [
       // A finished event is history, not a place to turn up: it leaves the map
       // (it stays on its organiser's profile and dashboard, under "Past events").
-      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast })),
-      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
-      // Contributors: same marker shape, minus the event-only isLive/isBusy/
-      // broadcast fields (a Contributor pin is just a plain coloured pin —
-      // see V1_SCOPE.md, "leave live-pulse/broadcast as-is" was scoped to
-      // events only, contributors never had those states to begin with).
-      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto })),
-      ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
+      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast, coverPhoto: e.coverPhoto, startsAt: e.startsAt, endsAt: e.endsAt, createdAt: e.createdAt, location: e.location, address: e.address })),
+      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast, coverPhoto: p.coverPhoto, openHours: p.openHours, createdAt: p.createdAt, location: p.location, address: p.address })),
+      // Contributors wear the place-circle pin. The photo still travels with the marker for cards.
+      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto, coverPhoto: c.coverPhoto, createdAt: c.createdAt })),
+      ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY, createdAt: i.createdAt })) : []),
     ];
     // What decides which pin keeps its name label when two collide, and who heads a "+N" group:
     // an upcoming event first (soonest), then the most recent activity, then the name. Never popularity.
@@ -165,18 +158,21 @@
     // eases to its pin, clear of the search bar above and the panel below. The second tap on the chosen card opens the
     // full listing; closing that returns to this very panel and map (the map never moved for it).
     chosen.current = { id: selected, type: selType };
+    // A carousel card flies to the pin and opens the listing preview in one tap.
     const tapCard = (id, t) => {
-      if (chosen.current.id === id && chosen.current.type === t) { openSheet(id, t); return; }
+      if (t === 'idea') { setSheet(null); setSelected(id); setSelType(t); return; }
       chosen.current = { id, type: t };
-      setSheet(null); setSelected(id); setSelType(t);
+      setSelected(id); setSelType(t);
       if (mapApi.current) mapApi.current.focusSelected(openMapPad(rootRef.current), CARD_ZOOM);
+      openSheet(id, t);
     };
-    const rowMarkers = pillTest ? markers.filter((m) => m.type !== 'idea' && pillTest(m)) : markers.filter((m) => m.type !== 'idea');
+    const rowMarkers = markers.filter((m) => m.type !== 'idea');
+    const ideaMarkers = ideas.filter((i) => i.status === 'voting').filter(matches).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY, createdAt: i.createdAt }));
     const XS = window.MapV2Strings.explore;
-    return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-explore-min': min ? '' : undefined },
+    return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-crown': clean ? undefined : '', 'data-explore-min': (!clean && !panelOpen) ? '' : undefined },
       React.createElement('div', { className: 'absolute inset-0', onClick: () => { setSelected(null); setSheet(null); } },
         React.createElement(window.StylizedMap, {
-          markers, filterCategory: pillTest, selectedId: selected, apiRef: mapApi,
+          markers, filterCategory: tileTest, selectedId: selected, apiRef: mapApi,
           // #210: a pin chooses its card in the Explore panel (the panel scrolls to it); the card's second tap opens the
           // full listing. The clean map (the nav's Map) has no panel, so there a pin opens the sheet as before. Ideas keep their panel.
           onSelect: (id, t) => {
@@ -184,9 +180,8 @@
             if (clean) { openSheet(id, t); return; }
             const a = document.activeElement;
             const byKey = !!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })());
-            // A second tap on the same pin keeps it chosen (and brings its card back into view); a tap on the map clears it.
-            // A pin tap raises a lowered panel: its card has to be there to be chosen.
-            setSheet(null); setSelected(id); setSelType(t); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 })); lower(false);
+            // A pin chooses itself. The keyboard follows into the sheet; a finger tap leaves the sheet where it is.
+            setSheet(null); setSelected(id); setSelType(t); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 }));
           },
           onDismissBubble: dismissBubble,
           onZoomBandChange: setZoomBand,
@@ -217,11 +212,11 @@
       // stays mounted (hidden) under the listing, so it keeps its place and the card that opened it gets focus back.
       !clean && React.createElement(X.Explore, {
         hidden: !!sheet,
-        markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, reveal,
-        pill, onPill: (id) => { setIntent(null); setPill(id); },
-        intent, onIntent: (id) => { setPill('all'); setIntent(id); },
-        ideas: showIdeas, onIdeas: () => setShowIdeas((v) => !v), min, onMin: lower,
+        markers: rowMarkers, ideas: ideaMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, reveal,
+        onTile: (id) => { setTile(id); const t = id && X.tileOf && X.tileOf(id); setShowIdeas(!!(t && t.ideas)); },
+        onOpenChange: onPanel,
         onOpen: tapCard, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
+        onGo: (page, params) => app.go(page, params),
       }),
       // a chosen card tapped again opens the expanded sheet (#210: full, its cover and distance, swipe down back to the
       // panel; it never moves the map); the clean map's pin opens today's half sheet

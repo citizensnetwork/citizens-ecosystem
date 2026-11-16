@@ -264,37 +264,141 @@
       }));
   }
 
+  // Pack 08. Action tiles over the live categories. The founder's twelve come first;
+  // the rest are the categories those twelve do not already cover, so nothing on the map is unsuggested.
+  const PIN_HEX = { worship: '#7040b5', serve: '#087d69', culture: '#c14f2a', learn: '#245fba', audiences: '#b33272', business: '#687d20' };
+  const TILES = [
+    { id: 'coffee', word: 'Coffee', icon: 'Coffee', categories: ['hospitality-cafes'] },
+    { id: 'church', word: 'Church', icon: 'Church', categories: ['churches-ministries'] },
+    { id: 'worship', word: 'Worship', icon: 'Music', categories: ['church-services', 'conferences-summits'] },
+    { id: 'market', word: 'Market', icon: 'Store', categories: ['markets-expos'] },
+    { id: 'run', word: 'Run', icon: 'Footprints', categories: ['sport-recreation', 'recreation-sport'] },
+    { id: 'social', word: 'Social', icon: 'Users', categories: ['social-gatherings'] },
+    { id: 'relax', word: 'Relax', icon: 'Leaf', categories: ['retreat-healing', 'safe-spaces'] },
+    { id: 'learn', word: 'Learn', icon: 'BookOpen', categories: ['education-equipping', 'education-training'] },
+    { id: 'serve', word: 'Serve', icon: 'HandHeart', categories: ['outreach-missions', 'community-upliftment'] },
+    { id: 'pray', word: 'Pray', icon: 'HeartHandshake', categories: ['worship-prayer'] },
+    { id: 'create', word: 'Create', icon: 'Palette', categories: ['arts-culture', 'arts-creative'] },
+    { id: 'kids', word: 'Kids', icon: 'Candy', categories: ['kids', 'youth-students'] },
+    { id: 'family', word: 'Family', icon: 'Users', categories: ['marriage-family'] },
+    { id: 'care', word: 'Care', icon: 'HeartPulse', categories: ['care-recovery', 'health-wellness', 'clinic', 'rehab-development'] },
+    { id: 'men', word: 'Men', icon: 'User', categories: ['mens-community'] },
+    { id: 'women', word: 'Women', icon: 'UserRound', categories: ['womens-community'] },
+    { id: 'shop', word: 'Shop', icon: 'ShoppingBag', categories: ['retail-shopping', 'christian-businesses'] },
+    { id: 'media', word: 'Media', icon: 'Radio', categories: ['media-broadcasting'] },
+    { id: 'members', word: 'Members', icon: 'KeyRound', categories: ['members-only'] },
+    { id: 'ideas', word: 'Ideas', icon: 'Lightbulb', categories: [], ideas: true },
+  ];
+  const TILE_OF = Object.create(null);
+  TILES.forEach((tile) => {
+    const set = Object.create(null);
+    (tile.categories || []).forEach((id) => { set[id] = true; });
+    TILE_OF[tile.id] = set;
+  });
+  function tileOf(id) {
+    for (let i = 0; i < TILES.length; i++) if (TILES[i].id === id) return TILES[i];
+    return null;
+  }
+  function tileMatches(id, m) {
+    const tile = tileOf(id);
+    const set = id && Object.prototype.hasOwnProperty.call(TILE_OF, id) ? TILE_OF[id] : null;
+    if (!tile || !set || !m) return false;
+    if (tile.ideas) return m.type === 'idea';
+    return typeof m.category === 'string' && Object.prototype.hasOwnProperty.call(set, m.category) && set[m.category] === true;
+  }
+  function tileFor(m) {
+    for (let i = 0; i < TILES.length; i++) if (tileMatches(TILES[i].id, m)) return TILES[i];
+    return null;
+  }
+  function pinHex(m) {
+    if (!m || m.type === 'idea') return '#F2BD22';
+    const g = groupOf(m);
+    return (g && PIN_HEX[g]) || PIN_HEX.business;
+  }
+
+  const DOCK = [
+    { id: 'me', icon: 'User', page: 'profile', params: {} },
+    { id: 'map', icon: 'Map', close: true },
+    { id: 'central', letter: 'C', page: 'kingdom-discovery', params: {} },
+    { id: 'do', icon: 'LayoutGrid', page: 'lets', params: {} },
+    { id: 'explore', icon: 'Compass', page: 'explore', params: {} },
+  ];
+  const HOUR = 60 * 60 * 1000;
+  const DAY = 24 * HOUR;
+  const NEW_WINDOW = 30 * DAY;
+
+  function weekendBounds(now) {
+    const d = new Date(now);
+    const day = d.getDay();
+    const sat = new Date(d);
+    if (day === 0) sat.setDate(d.getDate() - 1);
+    else sat.setDate(d.getDate() + ((6 - day + 7) % 7));
+    sat.setHours(0, 0, 0, 0);
+    const end = new Date(sat);
+    end.setDate(sat.getDate() + 1);
+    end.setHours(23, 59, 59, 999);
+    return { start: sat.getTime(), end: end.getTime() };
+  }
+  function whenLine(m, rec) {
+    if (!m) return '';
+    if (m.type === 'place') return (rec && rec.openHours) || m.openHours || '';
+    const t = Date.parse(m.startsAt || (rec && rec.startsAt) || '');
+    if (isNaN(t)) return '';
+    const d = new Date(t);
+    return d.toLocaleDateString('en-GB', { weekday: 'short' }) + ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+  function looksOnline(m, rec) {
+    const bits = [m && m.location, m && m.address, rec && rec.location, rec && rec.address, rec && rec.website];
+    const socials = rec && rec.socials;
+    if (socials && typeof socials === 'object') Object.keys(socials).forEach((k) => { if (typeof socials[k] === 'string') bits.push(socials[k]); });
+    return /online|zoom|livestream|live stream|meet\.google|teams\.microsoft/i.test(bits.filter(Boolean).join(' '));
+  }
+
+  function XCard(props) {
+    const m = props.m;
+    const rec = props.rec || {};
+    const group = groupOf(m);
+    const words = props.groupWords || {};
+    const raw = rec.coverPhoto || m.coverPhoto || (m.type === 'contributor' ? m.profilePhoto : '') || '';
+    const cover = window.UI && window.UI.safeUrl ? (window.UI.safeUrl(raw) || '') : (/^https?:\/\//i.test(raw) ? raw : '');
+    const Icon = window.Icon;
+    const cat = window.DATA && window.DATA.getItemCategory ? window.DATA.getItemCategory(m) : null;
+    const near = window.MapV2Nearby;
+    const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
+    const when = whenLine(m, rec);
+    return h('button', {
+      type: 'button', 'data-mv2': 'xcard', 'data-explore-id': m.id,
+      'data-selected': props.selected ? '' : undefined,
+      onClick: () => props.onOpen && props.onOpen(m.id, m.type),
+    },
+      h('span', { 'data-mv2': 'xcard-img' },
+        cover ? h('img', { src: cover, alt: '' }) : (Icon ? h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 28 }) : null),
+        m.isLive ? h('span', { 'data-mv2': 'xcard-live' }, h('i', { 'aria-hidden': 'true' }), 'Live') : null),
+      h('span', { 'data-mv2': 'xcard-body' },
+        (cat && cat.name) || (group && words[group]) ? h('span', { 'data-mv2': 'xcard-chip' }, h('i', { 'data-cat': group || undefined, 'aria-hidden': 'true' }), h('span', { 'data-mv2': 'card-chip-label' }, (cat && cat.name) || words[group])) : null,
+        h('b', null, m.title || ''),
+        dist ? h('small', { 'data-mv2': 'row-meta' }, dist) : null,
+        when ? h('small', null, when) : null));
+  }
+
   /**
-   * The Explore panel. props: markers (what the map draws), sources ({ events, places, contributors }),
-   * apiRef (the map's), selectedId (the chosen listing), reveal ({ id, focus }: a PIN was tapped, so bring its card into
-   * view; a card tap sends none, and the row stays exactly where it is), hidden (the full listing is open),
-   * pill + onPill(id) + intent + onIntent(id) + ideas + onIdeas() (the category choice, which lives in this panel), min + onMin(bool) (the panel
-   * is lowered to its title strip, so the map's own buttons come back), onOpen(id, type) (a card was tapped),
-   * onSeeAll(), onHeight(px).
-   *
-   * While a listing is chosen the ranking is FROZEN: the map moves to the pin, and the cards must not reshuffle under
-   * the thumb. The panel ranks again the moment nothing is chosen.
+   * The home Explore sheet. Closed, its top edge sits on the crown's centre line.
+   * Open, it scrolls carousels and the crown is the sticky nav. A tile becomes tabs.
+   * props: markers, ideas, sources, apiRef, selectedId, reveal, hidden, onOpen, onSeeAll, onHeight, onTile, onOpenChange, onGo.
    */
   function Explore(props) {
     const api = props.apiRef;
+    const [open, setOpen] = useState(false);
+    const [tile, setTile] = useState('');
     const [view, setView] = useState(() => (api && api.current ? api.current.view() : { centre: null, user: null }));
-    const [mode, setMode] = useState('cards');      // 'cards' | 'cats' (the category list)
-    const [list, setList] = useState('groups');    // inside the list: 'groups' | 'intents' ("Where to…")
     const root = useRef(null);
-    const switchBtn = useRef(null);
-    const views = useRef({});
-    const readView = useRef(null);
-    const viewed = useRef(!!(view.centre || view.user));   // the map has told us where it is at least once
-    const chosen = useRef(props.selectedId);
-    chosen.current = props.selectedId;
-    const grab = useRef(null);
+    const tabsRef = useRef(null);
+    const scrollRef = useRef(null);
+    const drag = useRef(null);
     const str = S();
-    const Card = window.MapV2Card;
-    const Row = window.MapV2Row && window.MapV2Row.Row;
+    const P = str.panel || {};
     const Icon = window.Icon;
 
-    // Rank again when the map settles or the person's position arrives: one state update per settle, never per frame.
-    // A burst of moves (an eased pan ends a move on every frame) is one update, SETTLE_MS after the last.
     useEffect(() => {
       if (!api || !api.current || !api.current.onView) return undefined;
       let timer = null;
@@ -302,186 +406,172 @@
         const v = api.current ? api.current.view() : null;
         if (!v) return;
         lastView = v;
-        // The hold starts only once the panel knows where the map is: a pin tapped before the first reading must not leave
-        // every card without its distance until the choice is cleared.
-        if (chosen.current && viewed.current) return;
-        if (v.centre || v.user) viewed.current = true;
         setView((p) => {
           const same = (a, b) => (a === b) || (a && b && a.lat === b.lat && a.lng === b.lng);
           return same(p.centre, v.centre) && same(p.user, v.user) ? p : v;
         });
       };
-      readView.current = read;
       const later = () => { clearTimeout(timer); timer = setTimeout(read, SETTLE_MS); };
       read();
       const off = api.current.onView(later);
-      return () => { clearTimeout(timer); readView.current = null; off(); };
+      return () => { clearTimeout(timer); off(); };
     }, [api]);
-    useEffect(() => { if (!props.selectedId && readView.current) readView.current(); }, [props.selectedId]);
 
-    const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
-
-    const origin = view.user || view.centre;
-    const rows = useMemo(() => rank(origin, props.markers, props.selectedId, ROW_CAP),
-      [origin, props.markers, props.selectedId]);
-
-    // Tell the screen how tall the panel is, so the map's own controls and credit sit above it.
+    useEffect(() => { if (props.onTile) props.onTile(tile || null); }, [tile]);
+    useEffect(() => { if (props.onOpenChange) props.onOpenChange(open); }, [open]);
     useEffect(() => {
-      const el = root.current;
-      if (!el || !props.onHeight) return undefined;
-      // hidden under the sheet it measures 0: keep the last height, so the map's controls do not jump as the sheet opens
-      const tell = () => { if (!el.hidden) props.onHeight(el.offsetHeight); };
-      tell();
-      let ro = null;
-      if (typeof ResizeObserver === 'function') { ro = new ResizeObserver(tell); ro.observe(el); }
-      return () => { if (ro) ro.disconnect(); props.onHeight(0); };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (!open || props.hidden) return undefined;
+      const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };
+      document.addEventListener('keydown', onKey, true);
+      return () => document.removeEventListener('keydown', onKey, true);
+    }, [open, props.hidden]);
+    useEffect(() => {
+      if (!props.onHeight) return undefined;
+      props.onHeight(68);
+      return () => props.onHeight(0);
     }, []);
 
-    // The view that is not shown cannot be focused or read: `inert`, set by hand (a prop would be read differently by React 18, which the
-    // page loads, and 19, which the unit tests do)
     useEffect(() => {
-      const on = mode === 'cats';
-      const v = views.current;
-      if (v.cards) { if (on) v.cards.setAttribute('inert', ''); else v.cards.removeAttribute('inert'); }
-      if (v.cats) { if (on) v.cats.removeAttribute('inert'); else v.cats.setAttribute('inert', ''); }
-    }, [mode]);
+      const row = tabsRef.current;
+      if (!row || !tile) return undefined;
+      const el = row.querySelector('[data-tile="' + cssId(tile) + '"]');
+      if (!el || typeof row.scrollTo !== 'function') return undefined;
+      const left = Math.max(0, el.offsetLeft - row.clientWidth / 2 + el.offsetWidth / 2);
+      row.scrollTo({ left: left, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+      return undefined;
+    }, [tile]);
 
-    // Lowered: the category list has nowhere to show, so the panel comes back to its cards.
-    useEffect(() => { if (props.min) setMode('cards'); }, [props.min]);
-
-    // A new ranking starts again at the nearest card (a scroll, never a layout shift). Runs before the pin's own scroll below.
-    const rankKey = rows.map((r) => r.m.id).join('|');
-    useEffect(() => {
-      const list = root.current && root.current.querySelector("[data-mv2='list']");
-      if (list) list.scrollLeft = 0;
-    }, [rankKey]);
-
-    // A PIN was tapped: bring its card to the row's start (a glide, unless reduced motion), without moving focus
-    // unless the keyboard chose the pin. A card tap never comes here: the row stays exactly where it is.
-    useEffect(() => {
-      const el = root.current;
-      const r = props.reveal;
-      if (!el || !r || !props.selectedId || r.id !== props.selectedId) return;
-      const card = el.querySelector('[data-explore-id="' + cssId(props.selectedId) + '"]');
-      const list = el.querySelector("[data-mv2='list']");
-      if (!card || !list) return;
-      const li = card.closest('li') || card;
-      const gutter = parseFloat(window.getComputedStyle(list).paddingLeft) || 0;
-      const left = li.offsetLeft - list.offsetLeft - gutter;
-      if (typeof list.scrollTo === 'function') list.scrollTo({ left: left, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
-      else list.scrollLeft = left;
-      if (r.focus) {
-        const btn = card.querySelector('button, a');
-        if (btn) btn.focus({ preventScroll: true });
-      }
-    }, [props.reveal, rankKey]);
-
+    const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
+    const origin = view.user || view.centre;
+    const markers = Array.isArray(props.markers) ? props.markers : [];
+    const ideas = Array.isArray(props.ideas) ? props.ideas : [];
+    const pool = markers.concat(ideas.filter((m) => m && markers.every((x) => x.id !== m.id)));
     const distWords = view.user ? str : (str.centre || {});
-    const render = ({ m, meters }) => cardFor({
-      m: m, meters: meters, rec: byKey.get(m.type + ':' + m.id), idPrefix: 'mv2-x-' + m.id, words: distWords,
-      selected: props.selectedId === m.id, badge: str.selectedBadge, onOpen: props.onOpen,
-    });
+    const current = tileOf(tile);
 
-    // The handle: a tap lowers or raises the panel, and so does a short swipe down or up (never a drag that follows the
-    // finger: the panel has two heights). A swipe that ends on the handle must not also count as the tap.
-    const GRAB_PX = 24;
-    const onGrabDown = (e) => { grab.current = { y: e.clientY, swiped: false }; };
+    const ranked = (list, cap) => rank(origin, list, props.selectedId, cap || 12);
+    const tileItems = current ? ranked(pool.filter((m) => tileMatches(current.id, m)), 12) : [];
+    const now = Date.now();
+    const soon = (m) => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= now && t - now <= 6 * HOUR; };
+    const around = ranked(pool.filter((m) => (m.type === 'event' && (m.isLive || soon(m))) || m.type === 'place'), 12);
+    const weekend = weekendBounds(now);
+    const weekendItems = ranked(pool.filter((m) => m.type === 'event' && (() => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= weekend.start && t <= weekend.end; })()), 12);
+    const onlineItems = ranked(pool.filter((m) => looksOnline(m, byKey.get(m.type + ':' + m.id))), 12);
+    const freshItems = ranked(pool.filter((m) => { const t = Date.parse(m.createdAt || ''); return !isNaN(t) && now - t >= 0 && now - t <= NEW_WINDOW; }), 12)
+      .sort((a, b) => Date.parse(b.m.createdAt || '') - Date.parse(a.m.createdAt || ''));
+    const more = ranked(pool.filter((m) => m.type !== 'idea'), 16);
+
+    const pendingFocus = useRef('');
+    useEffect(() => {
+      const r = props.reveal;
+      if (!r || r.id !== props.selectedId || !r.focus) return undefined;
+      const m = pool.find((x) => x.id === r.id);
+      const next = m ? tileFor(m) : null;
+      setOpen(true);
+      if (next) setTile(next.id);
+      pendingFocus.current = r.id;
+      return undefined;
+    }, [props.reveal]);
+    useEffect(() => {
+      const id = pendingFocus.current;
+      if (!id || !open || !root.current) return undefined;
+      const host = root.current.parentNode;
+      const sel = '[data-explore-id="' + cssId(id) + '"]';
+      const card = host && (host.querySelector('[data-row="tile"] ' + sel) || host.querySelector('[data-row="more"] ' + sel) || host.querySelector(sel));
+      if (card && card.focus) { card.focus({ preventScroll: true }); pendingFocus.current = ''; }
+      return undefined;
+    }, [open, tile, props.reveal]);
+
+    const choose = (id) => setTile((cur) => (cur === id ? '' : id));
+    const onGrabDown = (e) => { drag.current = { y: e.clientY }; };
     const onGrabUp = (e) => {
-      const g = grab.current;
-      if (!g) return;
-      const dy = e.clientY - g.y;
-      if (Math.abs(dy) >= GRAB_PX) { g.swiped = true; props.onMin(dy > 0); }
+      const d = drag.current;
+      drag.current = null;
+      if (!d) return;
+      const dy = e.clientY - d.y;
+      if (dy <= -24) setOpen(true);
+      else if (dy >= 24) setOpen(false);
+      else setOpen((v) => !v);
     };
-    const onGrabClick = () => {
-      const g = grab.current;
-      grab.current = null;
-      if (g && g.swiped) return;
-      props.onMin(!props.min);
-    };
+    const cards = (id, list) => h('div', { 'data-mv2': 'xrow', 'data-row': id }, list.map((r) => h(XCard, {
+      key: id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
+      groupWords: str.groups, distWords: distWords,
+      selected: props.selectedId === r.m.id && (id === 'more' || id === 'tile'),
+      onOpen: props.onOpen,
+    })));
+    const section = (id, title, hint, list) => (list && list.length ? h('section', { key: id, 'data-mv2': 'xsec', 'aria-label': title },
+      h('div', { 'data-mv2': 'xsec-h' }, h('h3', null, title), hint ? h('small', null, hint) : null),
+      cards(id, list)) : null);
+    const kindPlural = (current && P.kind && P.kind[pool.find((m) => tileMatches(current.id, m)) ? (pool.find((m) => tileMatches(current.id, m)).type) : '']) || 'listings';
+    const kindWord = tileItems.length === 1 ? ({ events: 'event', places: 'place', contributors: 'contributor', ideas: 'idea', listings: 'listing' })[kindPlural] || kindPlural : kindPlural;
 
-    const toggleMode = () => {
-      if (props.min) { props.onMin(false); return; }
-      if (mode === 'cats') { setMode('cards'); return; }
-      // Open on the view that matches what is already filtering the cards.
-      setList(props.intent ? 'intents' : 'groups');
-      setMode('cats');
-    };
-    // The two tabs. Arrow keys move between them and do not wrap; Home and End jump to the ends.
-    const onListKey = (e) => {
-      const key = e.key;
-      if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return;
-      e.preventDefault();
-      const id = (key === 'ArrowRight' || key === 'End') ? 'intents' : 'groups';
-      setList(id);
-      const btn = e.currentTarget.querySelector("[data-list='" + id + "']");
-      if (btn && btn.focus) btn.focus();
-    };
-    const backToCards = () => {
-      setMode('cards');
-      if (switchBtn.current) switchBtn.current.focus({ preventScroll: true });
-    };
-    const onKeyDown = (e) => { if (e.key === 'Escape' && mode === 'cats') { e.stopPropagation(); backToCards(); } };
-
-    const words = str.groups || {};
-    const intentWord = props.intent && str.intents ? str.intents[props.intent] : '';
-    const filter = [];
-    if (intentWord && str.whereTo) filter.push(str.whereTo(intentWord));
-    else if (props.pill && props.pill !== 'all') filter.push(words[props.pill]);
-    if (props.ideas) filter.push(words.ideas);
-    const picked = rows.find((r) => r.m.id === props.selectedId);
-    const cats = mode === 'cats';
-
-    const emptyLine = intentWord && str.emptyIntent ? str.emptyIntent(intentWord) : str.empty;
-    const cards = rows.length && Row && Card
-      ? h(Row, {
-        // Keyed by SLOT, not by listing: a new ranking (the map moved, a pill changed) refills the same card boxes in
-        // place, so no card ever slides into a new position under the person's eyes (a layout shift).
-        items: rows, keyOf: (r, i) => 'slot' + i, idPrefix: 'mv2-explore', render: render,
-        strings: { label: view.user ? str.label : str.labelCentre },
-      })
-      : h('p', { 'data-mv2': 'explore-empty' }, emptyLine);
-
-    return h('section', {
-      ref: root, 'data-mv2': 'explore', 'data-mode': mode, 'data-min': props.min ? '' : undefined,
-      'aria-labelledby': 'mv2-explore-title', hidden: props.hidden || undefined, onKeyDown: onKeyDown,
+    return h('div', {
+      'data-mv2': 'explore-host', 'data-open': open ? '' : undefined, hidden: props.hidden || undefined,
     },
-      h('button', {
-        type: 'button', 'data-mv2': 'explore-grab', 'aria-expanded': props.min ? 'false' : 'true', 'aria-label': props.min ? str.raise : str.lower,
-        onPointerDown: onGrabDown, onPointerUp: onGrabUp, onPointerCancel: () => { grab.current = null; }, onClick: onGrabClick,
-      }, h('span', { 'data-mv2': 'explore-grab-bar', 'aria-hidden': 'true' })),
-      h('div', { 'data-mv2': 'explore-head' },
-        h('h2', { id: 'mv2-explore-title', 'data-mv2': 'explore-title' },
-          // named "Explore" (the heading and the region keep that name); what it does is its description
-          h('button', {
-            ref: switchBtn, type: 'button', 'data-mv2': 'explore-switch', 'aria-expanded': cats ? 'true' : 'false', 'aria-controls': 'mv2-explore-body',
-            'aria-describedby': 'mv2-explore-hint', onClick: toggleMode,
-          }, h('span', null, str.title), Icon ? h(Icon, { name: 'ChevronDown', size: 18 }) : null)),
-        h('span', { id: 'mv2-explore-hint', 'data-mv2': 'sr' }, cats ? str.backToListings : str.chooseCategory),
-        filter.length ? h('span', { 'data-mv2': 'explore-filter' }, filter.join(' · ')) : null,
-        h('button', { type: 'button', 'data-mv2': 'explore-all', 'aria-label': str.seeAllLabel, onClick: props.onSeeAll }, str.seeAll)),
-      // both views share one box, so the panel is as tall for the list as for the cards (nothing above the map moves)
-      h('div', { id: 'mv2-explore-body', 'data-mv2': 'explore-body' },
-        h('div', { ref: (el) => { views.current.cards = el; }, 'data-mv2': 'explore-view', 'data-view': 'cards', 'aria-hidden': cats ? 'true' : undefined }, cards),
-        h('div', { ref: (el) => { views.current.cats = el; }, 'data-mv2': 'explore-view', 'data-view': 'cats', 'data-list': list, inert: '', 'aria-hidden': cats ? undefined : 'true' },
-          h('div', { 'data-mv2': 'list-switch', role: 'tablist', 'aria-label': str.listLabel, onKeyDown: onListKey },
-            h('button', {
-              type: 'button', role: 'tab', id: 'mv2-tab-groups', 'data-mv2': 'intent-tab', 'data-list': 'groups',
-              'aria-selected': list === 'groups' ? 'true' : 'false', 'aria-controls': 'mv2-explore-list',
-              onClick: () => setList('groups'),
-            }, str.categoriesTab),
-            h('button', {
-              type: 'button', role: 'tab', id: 'mv2-tab-intents', 'data-mv2': 'intent-tab', 'data-list': 'intents',
-              'aria-selected': list === 'intents' ? 'true' : 'false', 'aria-controls': 'mv2-explore-list',
-              onClick: () => setList('intents'),
-            }, str.intentsTab)),
+      h('div', { 'data-mv2': 'explore-scrim', onClick: () => setOpen(false) }),
+      h('section', {
+        ref: root, 'data-mv2': 'explore', 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
+        'aria-label': 'Explore',
+      },
+        h('div', {
+          'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
+          'aria-label': open ? (P.close || 'Lower Explore') : (str.title || 'Explore'),
+          onPointerDown: onGrabDown, onPointerUp: onGrabUp,
+          onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => !v); } },
+        },
+          h('span', { 'data-mv2': 'explore-peek' },
+            h('span', null, h('b', null, str.title || 'Explore'), h('small', null, P.peek || 'Where to…')),
+            h('span', null, h('small', null, P.nearCount ? P.nearCount(pool.length) : ''))),
+          h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' })),
+        h('div', { 'data-mv2': 'explore-scroll', ref: scrollRef },
+          h('div', { 'data-mv2': 'explore-head' },
+            h('div', null,
+              h('span', { 'data-mv2': 'explore-kicker' }, view.user ? (P.kickerNear || 'Near you') : (P.kickerMap || 'Near the map')),
+              h('h2', null, P.where || 'Where to…')),
+            tile ? h('button', { type: 'button', 'data-mv2': 'explore-reset', onClick: () => setTile('') }, P.allTypes || 'All types') : null),
           h('div', {
-            role: 'tabpanel', id: 'mv2-explore-list',
-            'aria-labelledby': list === 'intents' ? 'mv2-tab-intents' : 'mv2-tab-groups',
-          }, list === 'intents'
-            ? h(Intents, { value: props.intent || null, onPick: (id) => { if (props.onIntent) props.onIntent(id); backToCards(); } })
-            : h(Categories, { value: props.pill, ideas: props.ideas, onPick: (id) => { props.onPill(id); backToCards(); }, onIdeas: props.onIdeas })))),
-      h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, picked ? str.selectedAnnounce(picked.m.title) : ''));
+            ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': tile ? '' : undefined,
+            role: tile ? 'tablist' : 'list', 'aria-label': P.where || 'Where to…',
+          }, TILES.map((t) => h('button', {
+            key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id,
+            role: tile ? 'tab' : undefined, 'aria-selected': tile ? (tile === t.id ? 'true' : 'false') : undefined,
+            onClick: () => choose(t.id),
+          }, Icon ? h(Icon, { name: t.icon, size: tile ? 16 : 24 }) : null, h('span', null, t.word)))),
+          current ? (tileItems.length
+            ? h('div', { 'data-mv2': 'xsec' },
+              h('div', { 'data-mv2': 'xsec-h' },
+                h('h3', null, current.word),
+                h('small', null, P.matches ? P.matches(tileItems.length, kindWord) : '')),
+              cards('tile', tileItems))
+            : h('p', { 'data-mv2': 'explore-empty' }, P.emptyTile ? P.emptyTile(current.word) : '')) : null,
+          section('around', P.around || 'Around you now…', P.aroundHint, around),
+          section('weekend', P.weekend || 'This weekend', P.weekendHint, weekendItems),
+          section('online', P.online || 'Online', P.onlineHint, onlineItems),
+          section('fresh', P.fresh || 'New on Connect', P.freshHint, freshItems),
+          section('more', P.more || 'More near you', P.moreHint, more),
+          h('button', {
+            type: 'button', 'data-mv2': 'explore-seeall', 'aria-label': P.seeAll || 'See all of Explore',
+            onClick: () => { if (props.onSeeAll) props.onSeeAll(); },
+          },
+            h('span', null, h('b', null, P.seeAll || 'See all of Explore'), h('small', null, P.seeAllHint || '')),
+            h('span', { 'aria-hidden': 'true' }, '→')))),
+      h('div', { 'data-mv2': 'explore-dock' },
+        h('button', {
+          type: 'button', 'data-mv2': 'explore-crown', 'aria-label': P.open || 'Open Explore',
+          tabIndex: open ? -1 : 0, onClick: () => setOpen(true),
+        }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)),
+        h('div', { 'data-mv2': 'explore-items', role: 'navigation', 'aria-label': P.dock || 'Connect', 'aria-hidden': open ? undefined : 'true' },
+          DOCK.map((item) => h('button', {
+            key: item.id, type: 'button', 'data-mv2': 'explore-nav', 'data-nav': item.id,
+            tabIndex: open ? 0 : -1,
+            'aria-current': open && item.id === 'explore' ? 'page' : undefined,
+            onClick: () => {
+              if (item.close) { setOpen(false); if (scrollRef.current) scrollRef.current.scrollTop = 0; return; }
+              if (item.page && props.onGo) props.onGo(item.page, item.params || {});
+            },
+          },
+            item.letter ? h('span', { 'data-mv2': 'explore-letter', 'aria-hidden': 'true' }, item.letter) : (Icon ? h(Icon, { name: item.icon, size: 20 }) : null),
+            h('small', null, (P.nav && P.nav[item.id]) || item.id))))));
   }
 
   // An id inside an attribute selector: listing ids are uuids or slugs, but never trust that.
@@ -494,7 +584,7 @@
   const useNarrow = () => useMedia(NARROW_MQ);
 
   window.MapV2Explore = {
-    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore,
+    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, PIN_HEX, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, pinHex, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore,
     lastView: () => lastView,
   };
 })();

@@ -140,7 +140,7 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     let last = "";
     await expect.poll(async () => { const now = await meta.innerText(); const still = now === last; last = now; return still; }, { intervals: [300] }).toBe(true);
     const onCard = last;
-    await cardOf(page, c.id).locator("[data-mv2='card2']").click();
+    await cardOf(page, c.id).click();
     await expect(head(page).locator("[data-mv2='distance']")).toHaveText(onCard);
   });
 
@@ -283,7 +283,7 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     const c = seed.contributors[0];
     await jump(page, c.physical_longitude, c.physical_latitude);
     await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).dispatchEvent("click");
-    await cardOf(page, c.id).locator("[data-mv2='card2']").focus();
+    await cardOf(page, c.id).focus();
     await page.keyboard.press("Enter");
     await expect(sheet(page)).toHaveAttribute("data-expanded", "");
     await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-mv2"))).toBe("name");

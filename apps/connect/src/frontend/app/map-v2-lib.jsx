@@ -35,7 +35,7 @@
   // Bump the ?v= whenever assets/map-v2.css changes: the service worker is
   // cache-first for same-origin static files. Root-absolute, plus the path prefix when the app is served under one
   // (/citizens/connect, C39): routes.jsx loads first and owns it.
-  const CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/map-v2.css?v=20261101c');
+  const CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/map-v2.css?v=20261116a');
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
@@ -153,12 +153,24 @@
   // A duration in ms for JS-driven motion: 0 when the person asked for less motion.
   const dur = (name) => (prefersReducedMotion() ? 0 : MOTION[name]);
 
-  // ── Map look: follows the phone ───────────────────────────────────
+  // ── Map look: follows the phone, unless Settings stored citizens-theme ──
+  // citizens-theme is the Settings override ('light' or 'dark'). Nothing in
+  // Settings writes it yet; when it does, this wins over the device. The
+  // retired cc_map_theme key is still cleared and still ignored.
+  const THEME_KEY = 'citizens-theme';
   function systemPrefersDark() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch { return false; }
   }
+  function themeOverride() {
+    try {
+      const s = store();
+      const v = s && s.getItem(THEME_KEY);
+      if (v === 'light' || v === 'dark') return v;
+    } catch { /* private mode */ }
+    return '';
+  }
   // 'light' or 'dark': what is actually drawn.
-  const resolvedTheme = () => (systemPrefersDark() ? 'dark' : 'light');
+  const resolvedTheme = () => themeOverride() || (systemPrefersDark() ? 'dark' : 'light');
   function applyTheme() {
     if (!doc || !doc.documentElement) return;
     doc.documentElement.setAttribute('data-theme', resolvedTheme());
@@ -184,6 +196,10 @@
       const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
       // The phone switched (by hand, or its own sunset schedule): follow it at once.
       if (mq && mq.addEventListener) mq.addEventListener('change', applyTheme);
+      if (window.addEventListener) {
+        window.addEventListener('storage', (e) => { if (!e || !e.key || e.key === THEME_KEY) applyTheme(); });
+        window.addEventListener('citizens-theme', applyTheme);
+      }
     } catch { /* optional */ }
     const done = () => {
       api.styleReady = true;

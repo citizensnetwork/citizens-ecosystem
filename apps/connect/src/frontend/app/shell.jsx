@@ -254,9 +254,13 @@
   }
 
   // ── Floating create FAB (contributors) ──
+  // Pack 08: the + button is hidden on the map so the map keeps the screen.
+  // The create flow itself stays (openCreate, this menu, every other screen). Restore by flipping the flag.
+  const SHOW_CREATE_ON_MAP = false;
   function CreateFab() {
     const { isContributor, listingRole, nav, openCreate } = window.useApp();
     const [open, setOpen] = useState(false);
+    if (!SHOW_CREATE_ON_MAP && nav.page === 'home') return null;
     if (!(isContributor || listingRole === 'editor') || ['messages', 'settings', 'intake-upgrade'].includes(nav.page)) return null;
     // There is no bottom bar: the button sits level with the folding nav, clear of the Explore row above it.
     return React.createElement('div', { className: 'fixed right-4 md:bottom-6 z-40 flex flex-col items-end gap-2 bottom-[calc(env(safe-area-inset-bottom)+12px)]' },
@@ -316,7 +320,10 @@
   }
 
   function Shell() {
-    const { createKind, createEditing, authed, guestMode, authResolved } = window.useApp();
+    const { createKind, createEditing, authed, guestMode, authResolved, nav } = window.useApp();
+    // On the map home the crown is the home button. The folding nav stays for every other screen,
+    // and for the clean map (view=map), which has no crown.
+    const onMapHome = nav && nav.page === 'home' && !(nav.params && nav.params.view === 'map');
     // Signed out: the landing — but while a probable session is still resolving,
     // the loading splash instead, so a returning member sees no "sign in" flash.
     if (!authed && !guestMode) return React.createElement(authResolved ? window.AuthScreen : window.LoadingSplash);
@@ -325,8 +332,8 @@
       React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },
         React.createElement(AssistBanner),
         React.createElement(CurrentPage)),
-      // Map v2 (#210): one folding round button instead of a bottom bar.
-      React.createElement(window.MapV2Nav),
+      // Map v2 (#210): one folding round button instead of a bottom bar. The map home uses the crown instead.
+      !onMapHome && React.createElement(window.MapV2Nav),
       React.createElement(CreateFab),
       createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),

@@ -76,33 +76,36 @@ test.describe("P1-03 motion tokens and reduced motion", () => {
 });
 
 test.describe("P1-04 the pin", () => {
-  test("a Contributor pin is a glyph pin below zoom 15 and a logo pin at and above it", async ({ page }) => {
+  test("an Event pin wears the disc: a glyph below zoom 15 and a logo at and above it", async ({ page }) => {
     const seed = smallSeed(FIXED_NOW) as Seed;
+    const photo = "data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='#7040b5'/></svg>");
+    (seed.events[0] as { image_url: string }).image_url = photo;
     await mockMapNetwork(page, seed);
     await openMap(page, "/?map=v2", 8);
-    const c0 = seed.contributors[0] as { physical_longitude: number; physical_latitude: number };
-    const pin = page.locator(".mv2-pin--contributor").first();
+    const ev = seed.events[0] as { longitude: number; latitude: number; id: string };
+    const pin = page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"] .mv2-pin`);
 
-    await jump(page, c0.physical_longitude, c0.physical_latitude, 12);
+    await jump(page, ev.longitude, ev.latitude, 12);
     await idle(page);
     await expect(pin.locator("[data-mv2='logo']")).not.toHaveAttribute("src", /./); // not even requested below the photo zoom
     expect(await pin.locator("[data-mv2='logo-wrap']").evaluate((e) => getComputedStyle(e).opacity)).toBe("0");
     await expect(pin.locator("[data-mv2='glyph']")).toBeVisible();
 
-    await jump(page, c0.physical_longitude, c0.physical_latitude, 15.5);
+    await jump(page, ev.longitude, ev.latitude, 15.5);
     await idle(page);
     await expect(pin).toHaveClass(/is-loaded/);
     await expect.poll(() => pin.locator("[data-mv2='logo-wrap']").evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
   });
 
-  test("the selected pin always shows its logo, even at a low zoom, and grows 1.6x", async ({ page }) => {
+  test("the selected Event pin always shows its logo, even at a low zoom, and grows 1.6x", async ({ page }) => {
     const seed = smallSeed(FIXED_NOW) as Seed;
+    (seed.events[0] as { image_url: string }).image_url = "data:image/svg+xml," + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='64' height='64' fill='#7040b5'/></svg>");
     await mockMapNetwork(page, seed);
     await openMap(page, "/?map=v2", 8);
-    const c0 = seed.contributors[0] as { physical_longitude: number; physical_latitude: number; id: string };
-    await jump(page, c0.physical_longitude, c0.physical_latitude, 12);
+    const ev = seed.events[0] as { longitude: number; latitude: number; id: string };
+    await jump(page, ev.longitude, ev.latitude, 12);
     await idle(page);
-    const wrap = page.locator(`.maplibregl-marker[data-cc-id="${c0.id}"]`);
+    const wrap = page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"]`);
     await wrap.focus();
     await page.keyboard.press("Enter");
     const pin = wrap.locator(".mv2-pin");
@@ -114,13 +117,13 @@ test.describe("P1-04 the pin", () => {
 
   test("a logo that fails to load leaves the category glyph, never a dead image", async ({ page }) => {
     const seed = smallSeed(FIXED_NOW) as Seed;
-    (seed.contributors[0] as { logo_url: string }).logo_url = "https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/missing-logo.png";
+    (seed.events[0] as { image_url: string }).image_url = "https://xyiajtrvhlxaeplsiajj.supabase.co/storage/v1/object/public/missing-logo.png";
     await page.route("**/missing-logo.png", (route) => route.fulfill({ status: 404, body: "" }));
     await mockMapNetwork(page, seed);
     await openMap(page, "/", 8);
-    const c0 = seed.contributors[0] as { physical_longitude: number; physical_latitude: number };
-    const pin = page.locator(".mv2-pin--contributor").first();
-    await jump(page, c0.physical_longitude, c0.physical_latitude, 15.5);
+    const ev = seed.events[0] as { longitude: number; latitude: number; id: string };
+    const pin = page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"] .mv2-pin`);
+    await jump(page, ev.longitude, ev.latitude, 15.5);
     await idle(page);
     await expect(pin).toHaveClass(/is-broken/);
     await expect(pin).not.toHaveClass(/is-loaded/);

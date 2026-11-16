@@ -459,10 +459,9 @@ test.describe("One profile entry point", () => {
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // #210: the bar folds into one round button (app/map-v2-nav.jsx). Open, it is Home, Explore, Map and Profile;
-    // never the old "You" tab, whose panel opened past the bottom edge of the screen and was unusable.
-    await page.getByRole("button", { name: "Open navigation" }).click();
-    const bottomNav = page.getByRole("navigation", { name: "Main" });
+    // Pack 08: the crown opens the sticky nav (Me, Map, Central, Do, Explore). There is no "You" tab.
+    await page.getByRole("button", { name: "Open Explore" }).click();
+    const bottomNav = page.getByRole("navigation", { name: "Connect" });
     await expect(bottomNav.getByRole("button", { name: "You" })).toHaveCount(0);
     await expect(bottomNav.getByRole("button", { name: "Explore" })).toBeVisible();
     await page.keyboard.press("Escape");
@@ -480,8 +479,8 @@ test.describe("One profile entry point", () => {
     await page.keyboard.press("Escape");
 
     // Same control, same corner, on the list screen (#210 part 3: the nav's Explore is the Discover page).
-    await page.getByRole("button", { name: "Open navigation" }).click();
-    await bottomNav.getByRole("button", { name: "Explore" }).click();
+    await page.getByRole("button", { name: "Open Explore" }).click();
+    await page.getByRole("navigation", { name: "Connect" }).getByRole("button", { name: "Explore" }).click();
     await expect(page.locator('[data-screen="explore"]')).toBeVisible();
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
   });
@@ -500,10 +499,10 @@ test.describe("One profile entry point", () => {
     // category, place category and Contributor type (mapV2Explore.test.tsx checks the mapping). They are no longer a pill row
     // over the map: they are a list inside the Explore panel, behind its title, starting with All.
     await expect(screen.getByRole("group", { name: "Show on the map" })).toHaveCount(0);
-    await screen.locator("[data-mv2='explore']").getByRole("button", { name: "Explore", exact: true }).click();
-    const list = screen.getByRole("list", { name: "Categories" });
-    await expect(list.getByRole("button", { name: "All", exact: true })).toBeVisible();
-    await expect(list.getByRole("button", { name: "Churches & worship" })).toBeVisible();
-    await expect(list.getByRole("button", { name: "Business" })).toBeAttached();
+    await page.getByRole("button", { name: "Open Explore" }).click();
+    const tiles = screen.locator("[data-mv2='explore-tiles']");
+    await expect(tiles.getByRole("button", { name: "Coffee", exact: true })).toBeVisible();
+    await expect(tiles.getByRole("button", { name: "Church", exact: true })).toBeVisible();
+    await expect(tiles.getByRole("button", { name: "Worship", exact: true })).toBeVisible();
   });
 });

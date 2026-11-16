@@ -51,7 +51,8 @@ test.describe("on a phone", () => {
   test("See all on the Explore row opens the Discover page at /explore; Back returns to the map", async ({ page }) => {
     await network(page);
     await openMap(page, "/", 8);
-    await page.locator("[data-mv2='explore']").getByRole("button", { name: "See all listings" }).tap();
+    await page.locator("[data-mv2='explore-crown']").tap();
+    await page.getByRole("button", { name: "See all of Explore" }).tap();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page$(page)).toBeVisible();
     await expect.poll(() => page.title()).toBe("Explore · Citizens Connect");
@@ -63,8 +64,8 @@ test.describe("on a phone", () => {
   test("the nav's Explore opens it too, marked as the current item; Back returns to the map", async ({ page }) => {
     await network(page);
     await openMap(page, "/", 8);
-    await toggle(page).tap();
-    await nav(page).getByRole("button", { name: "Explore" }).tap();
+    await page.locator("[data-mv2='explore-crown']").tap();
+    await page.getByRole("navigation", { name: "Connect" }).getByRole("button", { name: "Explore" }).tap();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page$(page)).toBeVisible();
     await toggle(page).tap();
@@ -204,7 +205,8 @@ test.describe("on a phone", () => {
   test("leaving the page and coming Back restores the pill and every scroll", async ({ page }) => {
     await network(page);
     await openMap(page, "/", 8);
-    await page.locator("[data-mv2='explore']").getByRole("button", { name: "See all listings" }).tap();
+    await page.locator("[data-mv2='explore-crown']").tap();
+    await page.getByRole("button", { name: "See all of Explore" }).tap();
     await expect.poll(() => page.locator("[data-mv2='discover-row']").count(), { timeout: 20_000 }).toBeGreaterThan(2);
     await page.getByRole("button", { name: "Events", exact: true }).tap();
     await listOf(page, "near").evaluate((e) => { e.scrollLeft = 280; });
@@ -220,11 +222,12 @@ test.describe("on a phone", () => {
     await expect(page.getByRole("button", { name: "Events", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect.poll(() => scrollTopOf(page)).toBe(top);
     await expect.poll(() => scrollLeftOf(listOf(page, "near"))).toBe(left);
-    // a fresh visit starts at the top, on All
+    // a fresh visit starts at the top, on All. Home is the folding nav; the map's crown opens Explore.
     await toggle(page).tap();
     await nav(page).getByRole("button", { name: "Home" }).tap();
-    await toggle(page).tap();
-    await nav(page).getByRole("button", { name: "Explore" }).tap();
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible();
+    await page.locator("[data-mv2='explore-crown']").tap();
+    await page.getByRole("navigation", { name: "Connect" }).getByRole("button", { name: "Explore" }).tap();
     await expect(page.getByRole("button", { name: "All", exact: true })).toHaveAttribute("aria-pressed", "true");
     expect(await scrollTopOf(page)).toBe(0);
   });
@@ -242,7 +245,8 @@ test.describe("on a laptop", () => {
   test("the sidebar keeps Kingdom Exploration at /discover; See all opens the Discover page", async ({ page }) => {
     await network(page);
     await openMap(page, "/", 8);
-    await page.locator("[data-mv2='explore']").getByRole("button", { name: "See all listings" }).click();
+    await page.locator("[data-mv2='explore-crown']").click();
+    await page.getByRole("button", { name: "See all of Explore" }).click();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page$(page)).toBeVisible();
     await page.locator("aside").getByRole("button", { name: "Kingdom Exploration" }).click();

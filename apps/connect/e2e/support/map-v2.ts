@@ -100,26 +100,22 @@ export async function mapSettled(page: Page) {
  */
 export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
   await mapSettled(page);
-  const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"][data-selected] [data-mv2='card2']`);
-  // a closed sheet leaves its card outlined; pressing the pin again would toggle that off, so press it only when needed
-  if (!(await card.count())) await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).dispatchEvent("click");
-  await card.waitFor({ state: "visible", timeout: 10_000 });
-  // the row glides the card to its start; press it once it has stopped
-  await page.waitForFunction(
-    (sel) => {
-      const el = document.querySelector(sel);
-      if (!el) return false;
-      const w = window as unknown as { __mv2x?: number };
-      const x = el.getBoundingClientRect().left;
-      const still = w.__mv2x === x;
-      w.__mv2x = x;
-      return still;
-    },
-    `[data-mv2='explore'] [data-explore-id="${id}"] [data-mv2='card2']`,
-    { polling: 100, timeout: 5_000 },
-  );
-  if (how === "tap") await card.tap();
-  else await card.click();
+  const explore = page.locator("[data-mv2='explore']");
+  if (await explore.count()) {
+    // Pack 08: the sheet starts closed. One tap on the card flies to the pin and opens the preview.
+    if ((await explore.getAttribute("data-open")) === null) {
+      await page.locator("[data-mv2='explore-crown']").click();
+      await expect(explore).toHaveAttribute("data-open", "", { timeout: 5_000 });
+    }
+    const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"]`).first();
+    await card.waitFor({ state: "visible", timeout: 10_000 });
+    if (how === "tap") await card.tap();
+    else await card.click();
+    return;
+  }
+  const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
+  if (how === "tap") await pin.tap({ force: true });
+  else await pin.click({ force: true });
 }
 
 /**

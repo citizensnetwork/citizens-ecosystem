@@ -308,13 +308,13 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     // The pin starts at the centre (50 %) and the map eases it up above the sheet: wait for it to arrive
     // (on a slow machine the ease is still running when the sheet appears), then check where it stopped.
     const pct = async () => {
-      const b = (await pinOf(page, c.id).locator("[data-mv2='disc']").boundingBox())!;
+      const b = (await pinOf(page, c.id).locator("[data-mv2='body']").boundingBox())!;
       return Math.round(((b.y + b.height / 2) / 844) * 100);
     };
     await expect.poll(pct, { timeout: 6000 }).toBeLessThan(35);
     await settled(page, (await innerH(page)) * 0.6);
     expect(await pct()).toBeGreaterThanOrEqual(20);
-    const b = (await pinOf(page, c.id).locator("[data-mv2='disc']").boundingBox())!;
+    const b = (await pinOf(page, c.id).locator("[data-mv2='body']").boundingBox())!;
     expect(b.y + b.height).toBeLessThan(await top(page)); // not hidden behind the sheet
   });
 });
@@ -665,7 +665,7 @@ test.describe("P1-06 side panel (wide screens)", () => {
     await expect(page.locator("[data-mv2='handle']")).toHaveCount(0);
     // the selected pin is pushed clear of the panel, into the visible part of the map
     await expect
-      .poll(async () => (await pinOf(page, c.id).locator("[data-mv2='disc']").boundingBox())!.x, { timeout: 4000 })
+      .poll(async () => (await pinOf(page, c.id).locator("[data-mv2='body']").boundingBox())!.x, { timeout: 4000 })
       .toBeGreaterThan(b.x + b.width);
   });
 });

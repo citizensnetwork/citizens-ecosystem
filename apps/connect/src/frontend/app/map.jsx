@@ -485,9 +485,10 @@
         const S = window.MapV2Strings, P = window.MapV2Pins;
         const catLabel = cat ? cat.name : ((m.type === 'contributor' && S.pin.kind[m.kind]) || S.pin.type[m.type] || '');
         const label = P.ariaLabelFor(m, catLabel, S.pin);
-        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, !!m.isLive, !!m.isBusy,
+        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, m.coverPhoto, !!m.isLive, !!m.isBusy,
           m.broadcast ? m.broadcast.message + '|' + m.broadcast.bubbleId : '', catLabel].join('');
-        const fill = m.type === 'idea' ? '#F2BD22' : (cat ? cat.hex : '#F2BD22');
+        // Pack 08: every pin takes its group colour. Ideas stay on the brand gold.
+        const fill = (window.MapV2Explore && window.MapV2Explore.pinHex) ? window.MapV2Explore.pinHex(m) : (m.type === 'idea' ? '#F2BD22' : (cat ? cat.hex : '#F2BD22'));
         const build = () => P.build(m, { lucideInner, icon: pinIcon(m, cat), hex: fill, strings: S.pin, onDismissBubble: onDismissBubbleRef.current });
         let mk = markerObjs.current.get(m.id);
         if (mk && mk._ccAnchor === anchor) {
@@ -524,8 +525,8 @@
         const passes = typeof filterCategory === 'function' ? filterCategory(m) : m.category === filterCategory;
         const dim = !!(filterCategory && !passes && m.type !== 'idea');
         const selected = selectedId === m.id;
-        // Event and Contributor badges hang from their point ('bottom'); every other pin is centred on it.
-        const anchor = (m.type === 'event' || m.type === 'contributor') ? 'bottom' : 'center';
+        // Events wear the tailed disc, so they hang from the point. Circles (contributors, places) sit on it.
+        const anchor = m.type === 'event' ? 'bottom' : 'center';
         upsertPinV2(m, cat, coords, anchor, dim, selected);
       });
       // drop markers whose item is gone

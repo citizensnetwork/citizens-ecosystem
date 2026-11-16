@@ -135,7 +135,9 @@
 
   // Place / Event / Idea keep the old silhouettes; the hairline is a wider dark stroke under the
   // white one, and the glyph colour is picked per fill. Geometry mirrors map.jsx pinSvg.
-  function shapeSvg({ shape, hex, glyph, selected }) {
+  function shapeSvg({ shape, hex, glyph, pinType }) {
+    // Rest size only. Selection grows the pin with a CSS transform, so the SVG is not rebuilt.
+    const selected = false;
     const svg = document.createElementNS(NS, 'svg');
     let w, h, body, gx, gy, gsize;
     if (shape === 'event') {
@@ -157,7 +159,7 @@
       gsize = Math.round(dd * 0.46); gx = c - gsize / 2; gy = c - gsize / 2;
       w = W; h = W;
     }
-    svg.setAttribute('data-cc-pin', shape);
+    svg.setAttribute('data-cc-pin', pinType || shape);
     svg.setAttribute('data-mv2', 'shape-svg');
     svg.setAttribute('width', String(w));
     svg.setAttribute('height', String(h));
@@ -176,53 +178,85 @@
    * deps: { lucideInner(name), icon (glyph name), hex (fill colour), strings (MapV2Strings.pin), onDismissBubble }
    * Returns the node; `.mv2-pin` carries data-state hooks the map toggles later.
    */
+  // Pack 08 pin mix. Events wear the contributor disc (tail, photo when selected).
+  // Contributors wear the place circle. Places wear the ink paper circle.
+  function discBody(root, m, hex, glyphInner, pinType) {
+    const bodyEl = document.createElement('span');
+    bodyEl.setAttribute('data-mv2', 'body');
+    const tail = document.createElement('span');
+    tail.setAttribute('data-mv2', 'tail');
+    const disc = document.createElement('span');
+    disc.setAttribute('data-mv2', 'disc');
+    disc.setAttribute('data-cc-pin', pinType);
+    disc.appendChild(glyphSvg(glyphInner, 'glyph'));
+    const photo = m.profilePhoto || m.coverPhoto || '';
+    if (photo) {
+      root.classList.add('has-logo');
+      disc.setAttribute('data-cc-logo', '1');
+      const wrap = document.createElement('span');
+      wrap.setAttribute('data-mv2', 'logo-wrap');
+      if (m.kind === 'individual') wrap.setAttribute('data-photo', '1');
+      const img = document.createElement('img');
+      img.setAttribute('data-mv2', 'logo');
+      img.alt = '';
+      img.decoding = 'async';
+      img.width = 96; img.height = 96;
+      img.setAttribute('data-src', photo);
+      img.onload = () => { root.classList.add('is-loaded'); };
+      img.onerror = () => { root.classList.add('is-broken'); };
+      wrap.appendChild(img);
+      disc.appendChild(wrap);
+      const badge = document.createElement('span');
+      badge.setAttribute('data-mv2', 'badge');
+      badge.appendChild(glyphSvg(glyphInner, 'badge-glyph'));
+      bodyEl.appendChild(badge);
+    }
+    bodyEl.insertBefore(tail, bodyEl.firstChild);
+    bodyEl.insertBefore(disc, tail.nextSibling);
+    return bodyEl;
+  }
+
+  function inkBody(hex, glyphInner) {
+    const bodyEl = document.createElement('span');
+    bodyEl.setAttribute('data-mv2', 'body');
+    const ink = document.createElement('span');
+    ink.setAttribute('data-mv2', 'ink');
+    ink.setAttribute('data-cc-pin', 'place');
+    ink.style.setProperty('--ink', hex);
+    const frame = document.createElement('span');
+    frame.setAttribute('data-mv2', 'ink-frame');
+    const face = document.createElement('span');
+    face.setAttribute('data-mv2', 'ink-face');
+    face.appendChild(glyphSvg(glyphInner, 'glyph'));
+    frame.appendChild(face);
+    ink.appendChild(frame);
+    bodyEl.appendChild(ink);
+    return bodyEl;
+  }
+
   function build(m, deps) {
     const hex = deps.hex;
     const root = document.createElement('div');
-    root.className = 'mv2-pin mv2-pin--' + m.type;
+    const disc = m.type === 'event';
+    const ink = m.type === 'place';
+    root.className = 'mv2-pin mv2-pin--' + m.type + (disc ? ' mv2-pin--disc' : '') + (ink ? ' mv2-pin--ink' : '');
     root.style.setProperty('--pin-cat', hex);
     root.style.setProperty('--pin-glyph', glyphColor(hex));
     const glyphInner = deps.lucideInner(deps.icon);
 
-    if (m.type === 'contributor') {
+    if (disc) {
+      root.appendChild(discBody(root, m, hex, glyphInner, 'event'));
+    } else if (ink) {
+      root.appendChild(inkBody(hex, glyphInner));
+    } else if (m.type === 'contributor') {
       const bodyEl = document.createElement('span');
       bodyEl.setAttribute('data-mv2', 'body');
-      const tail = document.createElement('span');
-      tail.setAttribute('data-mv2', 'tail');
-      const disc = document.createElement('span');
-      disc.setAttribute('data-mv2', 'disc');
-      disc.setAttribute('data-cc-pin', 'contributor');
-      disc.appendChild(glyphSvg(glyphInner, 'glyph'));
-      if (m.profilePhoto) {
-        root.classList.add('has-logo');
-        disc.setAttribute('data-cc-logo', '1');
-        const wrap = document.createElement('span');
-        wrap.setAttribute('data-mv2', 'logo-wrap');
-        if (m.kind === 'individual') wrap.setAttribute('data-photo', '1');
-        const img = document.createElement('img');
-        img.setAttribute('data-mv2', 'logo');
-        img.alt = '';
-        img.decoding = 'async';
-        img.width = 96; img.height = 96;
-        img.setAttribute('data-src', m.profilePhoto);
-        img.onload = () => { root.classList.add('is-loaded'); };
-        img.onerror = () => { root.classList.add('is-broken'); };
-        wrap.appendChild(img);
-        disc.appendChild(wrap);
-        const badge = document.createElement('span');
-        badge.setAttribute('data-mv2', 'badge');
-        badge.appendChild(glyphSvg(glyphInner, 'badge-glyph'));
-        bodyEl.appendChild(badge);
-      }
-      bodyEl.insertBefore(tail, bodyEl.firstChild);
-      bodyEl.insertBefore(disc, tail.nextSibling);
+      bodyEl.appendChild(shapeSvg({ shape: 'place', hex, glyph: glyphInner, pinType: 'contributor' }));
       root.appendChild(bodyEl);
     } else {
       const bodyEl = document.createElement('span');
       bodyEl.setAttribute('data-mv2', 'body');
-      const isIdea = m.type === 'idea';
-      // selected scale is a CSS transform on the body, so the SVG is always drawn at rest size
-      bodyEl.appendChild(shapeSvg({ shape: isIdea ? 'idea' : m.type === 'event' ? 'event' : 'place', hex, glyph: glyphInner, selected: false }));
+      bodyEl.appendChild(shapeSvg({ shape: 'idea', hex, glyph: glyphInner, pinType: 'idea' }));
       root.appendChild(bodyEl);
     }
 
