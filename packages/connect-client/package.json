@@ -26,10 +26,10 @@
     "@eslint/js": "10.0.1",
     "@typescript-eslint/eslint-plugin": "8.72.1",
     "@typescript-eslint/parser": "8.72.1",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "eslint": "10.13.0",
     "eslint-config-prettier": "10.1.8",
     "typescript": "5.5.4",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }
