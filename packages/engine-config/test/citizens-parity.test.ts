@@ -436,8 +436,18 @@ describe('vocabulary', () => {
   /**
    * Messages Connect does not show today. The offline page was written by the service worker,
    * which was retired on 2026-11-12; the message stays in the catalogue for a world that has one.
+   * The support-access notices are written only by a tenant's database (the engine line): the
+   * Citizens database has no support sessions.
    */
-  const NOT_SHOWN_TODAY: readonly MessageKey[] = ['screen.offline.body'];
+  const NOT_SHOWN_TODAY: readonly MessageKey[] = [
+    'screen.offline.body',
+    'notification.supportAccess.opened.title',
+    'notification.supportAccess.opened.body',
+    'notification.supportAccess.requested.title',
+    'notification.supportAccess.requested.body',
+    'notification.supportAccess.ended.title',
+    'notification.supportAccess.ended.body',
+  ];
 
   it('every message is tied to the place Connect writes it', () => {
     const untied = MESSAGE_KEYS.filter(

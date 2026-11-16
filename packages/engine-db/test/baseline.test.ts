@@ -233,6 +233,44 @@ describe('the security check catches what it must', () => {
     );
   });
 
+  it('support records that someone inside the world can write, or a visitor can read', async () => {
+    expect(await broken('grant insert on public.support_session_reads to service_role;')).toMatch(
+      /service_role can write support_session_reads/,
+    );
+    expect(await broken('grant update on public.support_sessions to authenticated;')).toMatch(
+      /authenticated can write support_sessions/,
+    );
+    expect(await broken('grant select on public.support_sessions to anon;')).toMatch(
+      /anon can read support_sessions/,
+    );
+    expect(
+      await broken('grant execute on function public.end_support_session(uuid) to anon;'),
+    ).toMatch(/anon can answer or end a support session/);
+  });
+
+  it('a private function someone inside the world can call, or a support guard switched off', async () => {
+    expect(
+      await broken(
+        'grant execute on function engine.open_support_session(uuid, text, text, timestamp with time zone) to authenticated;',
+      ),
+    ).toMatch(/authenticated can call the private function open_support_session/);
+    expect(await broken('grant execute on function engine.support_gate(uuid) to public;')).toMatch(
+      /private function open to every role: support_gate/,
+    );
+    expect(
+      await broken(
+        'alter table public.support_session_reads disable trigger support_session_reads_guard;',
+      ),
+    ).toMatch(
+      /support guard missing or switched off: support_session_reads\.support_session_reads_guard/,
+    );
+    expect(
+      await broken('drop trigger support_sessions_no_truncate on public.support_sessions;'),
+    ).toMatch(
+      /support guard missing or switched off: support_sessions\.support_sessions_no_truncate/,
+    );
+  });
+
   it('an owner-rights function without a fixed search path', async () => {
     expect(
       await broken(

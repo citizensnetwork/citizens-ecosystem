@@ -475,6 +475,49 @@ export const MESSAGES = {
     renderedBy: 'edge',
     default: 'A few {user:many} near you just RSVPed.',
   },
+  /*
+   * Support access (ADR-001, decision 3): notices to a world's own staff when the service
+   * provider opens, asks for, or ends read-only support access. Always on: not a feature.
+   */
+  'notification.supportAccess.opened.title': {
+    channel: 'notification',
+    renderedBy: 'database',
+    default: 'Support access opened',
+    singleLine: true,
+  },
+  'notification.supportAccess.opened.body': {
+    channel: 'notification',
+    renderedBy: 'database',
+    default:
+      'Your service provider opened read-only support access until {$until} UTC. Reason given: {$reason}',
+    params: ['until', 'reason'],
+  },
+  'notification.supportAccess.requested.title': {
+    channel: 'notification',
+    renderedBy: 'database',
+    default: 'Support access needs your answer',
+    singleLine: true,
+  },
+  'notification.supportAccess.requested.body': {
+    channel: 'notification',
+    renderedBy: 'database',
+    default:
+      'Your service provider asks for read-only support access until {$until} UTC. Nothing can be read until a staff member approves it. Reason given: {$reason}',
+    params: ['until', 'reason'],
+  },
+  'notification.supportAccess.ended.title': {
+    channel: 'notification',
+    renderedBy: 'database',
+    default: 'Support access ended',
+    singleLine: true,
+  },
+  'notification.supportAccess.ended.body': {
+    channel: 'notification',
+    renderedBy: 'database',
+    default:
+      'Read-only support access has ended. Reads made: {$reads}. Each one is listed in your support log.',
+    params: ['reads'],
+  },
   'notification.partnerApproved.title': {
     channel: 'notification',
     renderedBy: 'database',

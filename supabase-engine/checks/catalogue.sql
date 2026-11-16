@@ -76,6 +76,8 @@ declare
     'shares',
     'specialised_services',
     'suggestions',
+    'support_session_reads',
+    'support_sessions',
     'team_memberships',
     'team_owner_transfers',
     'user_blocks',
@@ -103,10 +105,12 @@ declare
     'claim_admin_created_contributor',
     'cleanup_stale_locations',
     'count_friends',
+    'decide_support_session',
     'decline_listing_claim',
     'delete_contributor_application',
     'deny_dashboard_access',
     'dismiss_map_bubble',
+    'end_support_session',
     'enforce_at_least_one_admin',
     'enforce_place_six_month_delete',
     'enforce_tag_cap_per_event',
@@ -237,7 +241,11 @@ declare
     'rsvps.trg_notify_friends_on_rsvp_attending',
     'saved_items.saved_items_cap_before_insert',
     'service_areas.service_areas_check_parent',
-    'specialised_services.trg_log_team_editor_services'
+    'specialised_services.trg_log_team_editor_services',
+    'support_session_reads.support_session_reads_guard',
+    'support_session_reads.support_session_reads_no_truncate',
+    'support_sessions.support_sessions_guard',
+    'support_sessions.support_sessions_no_truncate'
   ]::text[];
   v_anon constant text[] := array[
     'caller_may_read_private_event',
@@ -273,7 +281,8 @@ declare
     'map-prominence-recompute',
     'messaging-purge-60d',
     'moments-cleanup',
-    'search-term-stats-purge'
+    'search-term-stats-purge',
+    'support-session-expiry'
   ]::text[];
   v_buckets constant text[] := array[
     'event-images',
@@ -289,8 +298,25 @@ declare
   ]::text[];
   v_private_functions constant text[] := array[
     'call_edge_function',
+    'close_support_session',
+    'finish_support_session',
     'listed_categories',
+    'open_support_session',
     'schema_fingerprint',
+    'support_access_mode',
+    'support_find_account',
+    'support_gate',
+    'support_list_conversations',
+    'support_log',
+    'support_notify',
+    'support_read_account',
+    'support_read_guard',
+    'support_read_location',
+    'support_read_notifications',
+    'support_read_thread',
+    'support_session_guard',
+    'support_session_report',
+    'sweep_support_sessions',
     'write_entitlements'
   ]::text[];
   v_private_tables constant text[] := array[
@@ -307,7 +333,8 @@ declare
     '0007',
     '0008',
     '0009',
-    '0010'
+    '0010',
+    '0011'
   ]::text[];
   v_denied constant text[] := array[
     'ai_search_queries',

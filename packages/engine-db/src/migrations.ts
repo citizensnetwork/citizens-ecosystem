@@ -94,10 +94,17 @@ export function compareWithLock(
   return problems;
 }
 
-/** Does the file end by writing its own row into the ledger, with its own number and name? */
-export function recordsItself(migration: EngineMigration): boolean {
+/**
+ * Does the file end by writing its own row into the ledger, with its own number and name?
+ * `ledgerTable` is the ledger of the line the file belongs to (`linePaths(...).ledgerTable`).
+ */
+export function recordsItself(
+  migration: EngineMigration,
+  ledgerTable: string = 'engine.schema_migrations',
+): boolean {
+  if (!/^[a-z_]+\.[a-z_]+$/.test(ledgerTable)) throw new Error(`"${ledgerTable}" is not a table.`);
   const pattern = new RegExp(
-    `insert into engine\\.schema_migrations \\(version, name\\) values \\('${migration.version}', '${migration.name}'\\);\\s*$`,
+    `insert into ${ledgerTable.replace('.', '\\.')} \\(version, name\\) values \\('${migration.version}', '${migration.name}'\\);\\s*$`,
   );
   return pattern.test(migration.sql);
 }

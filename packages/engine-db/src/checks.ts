@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs';
 import { deniedColumns, deniedNames, type Allowlist } from './allowlist.ts';
 import type { EngineMigration } from './migrations.ts';
 import { BASELINE_LOCK_PATH, ENGINE_DIR } from './paths.ts';
+import { sqlLiteral } from './provision.ts';
 import { resolve } from 'node:path';
 
 export interface BaselineLock {
@@ -45,6 +46,8 @@ export interface EngineObjects {
   readonly publicExecutable: readonly string[];
   readonly privateSchemaFunctions: readonly string[];
   readonly privateSchemaTables: readonly string[];
+  /** Scheduled jobs the engine line adds beyond the cut. */
+  readonly jobs?: readonly string[];
 }
 
 export const ENGINE_OBJECTS_PATH = resolve(ENGINE_DIR, 'engine-objects.json');
@@ -81,6 +84,7 @@ export function expectedCatalogue(lock: BaselineLock, allowlist: Allowlist, engi
     jobs: sorted([
       ...allowlist.scheduledJobs.engine,
       ...Object.keys(allowlist.scheduledJobs.changed),
+      ...(engine.jobs ?? []),
     ]),
     buckets: sorted(allowlist.storageBuckets.engine),
     realtime: sorted(allowlist.realtime.engine),
@@ -89,11 +93,26 @@ export function expectedCatalogue(lock: BaselineLock, allowlist: Allowlist, engi
   };
 }
 
-const literal = (text: string) => `'${text.replaceAll("'", "''")}'`;
-const textArray = (values: readonly string[]) =>
+/** A list of texts as an SQL `text[]`, one entry per line. */
+export const sqlTextArray = (values: readonly string[]) =>
   values.length === 0
     ? 'array[]::text[]'
-    : `array[\n    ${values.map(literal).join(',\n    ')}\n  ]::text[]`;
+    : `array[\n    ${values.map(sqlLiteral).join(',\n    ')}\n  ]::text[]`;
+
+/**
+ * Two statements for a check's body: "not expected" and "missing" for one kind of object.
+ * `expectedVar` is a `text[]` variable of the block; `actualQuery` gives one column, `name`.
+ * The block must declare `v_problems text[]`.
+ */
+export const compareBlock = (label: string, expectedVar: string, actualQuery: string) => `
+  v_problems := v_problems || coalesce((
+    select array_agg(${sqlLiteral(`${label} not expected: `)} || a.name order by a.name)
+      from (${actualQuery}) a
+     where not (a.name = any (${expectedVar}))), array[]::text[]);
+  v_problems := v_problems || coalesce((
+    select array_agg(${sqlLiteral(`${label} missing: `)} || e.name order by e.name)
+      from unnest(${expectedVar}) e(name)
+     where not exists (select 1 from (${actualQuery}) a where a.name = e.name)), array[]::text[]);`;
 
 export function catalogueCheckSql(
   lock: BaselineLock,
@@ -105,17 +124,6 @@ export function catalogueCheckSql(
   const denied = deniedNames(allowlist);
   const columns = deniedColumns(allowlist);
   const versions = migrations.map((migration) => migration.version);
-
-  // "missing" and "not expected" for one kind of object, as two statements.
-  const compare = (label: string, expectedVar: string, actualQuery: string) => `
-  v_problems := v_problems || coalesce((
-    select array_agg(${literal(`${label} not expected: `)} || a.name order by a.name)
-      from (${actualQuery}) a
-     where not (a.name = any (${expectedVar}))), array[]::text[]);
-  v_problems := v_problems || coalesce((
-    select array_agg(${literal(`${label} missing: `)} || e.name order by e.name)
-      from unnest(${expectedVar}) e(name)
-     where not exists (select 1 from (${actualQuery}) a where a.name = e.name)), array[]::text[]);`;
 
   const publicFunctions = `select p.proname::text as name, p.oid, p.proacl
         from pg_catalog.pg_proc p
@@ -133,32 +141,32 @@ export function catalogueCheckSql(
 do $catalogue$
 declare
   v_problems text[] := array[]::text[];
-  v_tables constant text[] := ${textArray(expected.tables)};
-  v_views constant text[] := ${textArray(expected.views)};
-  v_functions constant text[] := ${textArray(expected.functions)};
-  v_triggers constant text[] := ${textArray(expected.triggers)};
-  v_anon constant text[] := ${textArray(expected.anonExecutable)};
-  v_public constant text[] := ${textArray(expected.publicExecutable)};
-  v_jobs constant text[] := ${textArray(expected.jobs)};
-  v_buckets constant text[] := ${textArray(expected.buckets)};
-  v_realtime constant text[] := ${textArray(expected.realtime)};
-  v_private_functions constant text[] := ${textArray(expected.privateFunctions)};
-  v_private_tables constant text[] := ${textArray(expected.privateTables)};
-  v_versions constant text[] := ${textArray(versions)};
-  v_denied constant text[] := ${textArray(denied)};
-  v_denied_columns constant text[] := ${textArray(columns)};
-  v_denied_schemas constant text[] := ${textArray(allowlist.schemas.citizensOnly)};
+  v_tables constant text[] := ${sqlTextArray(expected.tables)};
+  v_views constant text[] := ${sqlTextArray(expected.views)};
+  v_functions constant text[] := ${sqlTextArray(expected.functions)};
+  v_triggers constant text[] := ${sqlTextArray(expected.triggers)};
+  v_anon constant text[] := ${sqlTextArray(expected.anonExecutable)};
+  v_public constant text[] := ${sqlTextArray(expected.publicExecutable)};
+  v_jobs constant text[] := ${sqlTextArray(expected.jobs)};
+  v_buckets constant text[] := ${sqlTextArray(expected.buckets)};
+  v_realtime constant text[] := ${sqlTextArray(expected.realtime)};
+  v_private_functions constant text[] := ${sqlTextArray(expected.privateFunctions)};
+  v_private_tables constant text[] := ${sqlTextArray(expected.privateTables)};
+  v_versions constant text[] := ${sqlTextArray(versions)};
+  v_denied constant text[] := ${sqlTextArray(denied)};
+  v_denied_columns constant text[] := ${sqlTextArray(columns)};
+  v_denied_schemas constant text[] := ${sqlTextArray(allowlist.schemas.citizensOnly)};
   v_found text[];
 begin
-  -- 1. Exactly the listed objects, no more and no fewer.${compare(
+  -- 1. Exactly the listed objects, no more and no fewer.${compareBlock(
     'table',
     'v_tables',
     `select c.relname::text as name from pg_catalog.pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('r', 'p')`,
-  )}${compare(
+  )}${compareBlock(
     'view',
     'v_views',
     `select c.relname::text as name from pg_catalog.pg_class c where c.relnamespace = 'public'::regnamespace and c.relkind in ('v', 'm')`,
-  )}${compare('function', 'v_functions', `select f.name from (${publicFunctions}) f`)}${compare(
+  )}${compareBlock('function', 'v_functions', `select f.name from (${publicFunctions}) f`)}${compareBlock(
     'trigger',
     'v_triggers',
     `select (case when n.nspname = 'public' then '' else n.nspname::text || '.' end) || c.relname::text || '.' || t.tgname::text as name
@@ -167,29 +175,29 @@ begin
         join pg_catalog.pg_namespace n on n.oid = c.relnamespace
         join pg_catalog.pg_proc p on p.oid = t.tgfoid
        where not t.tgisinternal and (n.nspname = 'public' or p.pronamespace = 'public'::regnamespace)`,
-  )}${compare(
+  )}${compareBlock(
     'private function',
     'v_private_functions',
     `select p.proname::text as name from pg_catalog.pg_proc p where p.pronamespace = 'engine'::regnamespace`,
-  )}${compare(
+  )}${compareBlock(
     'private table',
     'v_private_tables',
     `select c.relname::text as name from pg_catalog.pg_class c where c.relnamespace = 'engine'::regnamespace and c.relkind = 'r'`,
-  )}${compare('migration', 'v_versions', `select m.version as name from engine.schema_migrations m`)}${compare(
+  )}${compareBlock('migration', 'v_versions', `select m.version as name from engine.schema_migrations m`)}${compareBlock(
     'storage bucket',
     'v_buckets',
     `select b.id::text as name from storage.buckets b`,
-  )}${compare(
+  )}${compareBlock(
     'realtime table',
     'v_realtime',
     `select p.tablename::text as name from pg_catalog.pg_publication_tables p where p.pubname = 'supabase_realtime' and p.schemaname = 'public'`,
   )}
 
-  -- 2. Who can call what: the signed-out role, and everyone.${compare(
+  -- 2. Who can call what: the signed-out role, and everyone.${compareBlock(
     'function the signed-out role can call',
     'v_anon',
     `select f.name from (${publicFunctions}) f where pg_catalog.has_function_privilege('anon', f.oid, 'execute')`,
-  )}${compare(
+  )}${compareBlock(
     'function open to every role',
     'v_public',
     `select f.name from (${publicFunctions}) f where exists (select 1 from pg_catalog.aclexplode(f.proacl) g where g.grantee = 0)`,

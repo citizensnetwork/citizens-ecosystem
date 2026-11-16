@@ -31,6 +31,7 @@ import {
   sha256,
   type EngineMigration,
 } from '../src/migrations.ts';
+import { isLineName, LINE_NAMES, linePaths } from '../src/paths.ts';
 import { describePlan, provisioningPlan, sqlLiteral } from '../src/provision.ts';
 import { buildPublishPayload } from '../src/wording.ts';
 
@@ -68,6 +69,22 @@ describe('the migration files and their lock', () => {
   it('hash the same whatever the line endings', () => {
     expect(sha256('a\r\nb\r\n')).toBe(sha256('a\nb\n'));
   });
+
+  it('belong to one line each: the two lines never share a directory, a lock or a ledger', () => {
+    const engineLine = linePaths('engine');
+    const controlLine = linePaths('control');
+    expect(engineLine.ledgerTable).toBe('engine.schema_migrations');
+    expect(controlLine.ledgerTable).toBe('control.schema_migrations');
+    for (const key of ['dir', 'migrations', 'probes', 'checks', 'lock', 'lockCommand'] as const) {
+      expect(engineLine[key], key).not.toBe(controlLine[key]);
+    }
+    expect(LINE_NAMES.every(isLineName)).toBe(true);
+    expect(isLineName('citizens')).toBe(false);
+    const first = migrations[0] as EngineMigration;
+    expect(recordsItself(first, engineLine.ledgerTable)).toBe(true);
+    expect(recordsItself(first, controlLine.ledgerTable)).toBe(false);
+    expect(() => recordsItself(first, 'engine.schema_migrations; drop')).toThrow(/is not a table/);
+  });
 });
 
 describe('the catalogue check', () => {
@@ -76,10 +93,15 @@ describe('the catalogue check', () => {
   const expected = expectedCatalogue(lock, allowlist, engine);
 
   it('expects the cut, the changed functions and what the engine line adds', () => {
-    expect(expected.tables).toHaveLength(72);
+    expect(expected.tables).toHaveLength(69 + engine.tables.length);
+    expect(expected.tables).toContain('support_sessions');
     expect(expected.functions).toHaveLength(95 + 15 + engine.functions.length);
     expect(expected.functions).toContain('publish_engine_configuration');
-    expect(expected.jobs).toHaveLength(8);
+    expect(expected.jobs).toHaveLength(8 + (engine.jobs ?? []).length);
+    expect(expected.jobs).toContain('support-session-expiry');
+    // A list of engine objects written before jobs could be added still works.
+    const { jobs: _jobs, ...withoutJobs } = engine;
+    expect(expectedCatalogue(lock, allowlist, withoutJobs).jobs).toHaveLength(8);
     expect(expected.anonExecutable).toContain('engine_feature_on');
     expect(expected.anonExecutable).not.toContain('publish_engine_configuration');
   });
@@ -204,6 +226,15 @@ describe('the provisioning plan', () => {
     siteUrl: 'https://world.example',
     entitlements: sampleEntitlements,
   };
+
+  it('names the jobs the engine line added after the cut', () => {
+    const jobs = (steps: ReturnType<typeof provisioningPlan>) =>
+      steps.find((step) => step.id === 'jobs')?.detail ?? '';
+    expect(jobs(provisioningPlan(input, allowlist))).not.toContain('support-session-expiry');
+    expect(jobs(provisioningPlan(input, allowlist, loadEngineObjects().jobs))).toContain(
+      'support-session-expiry',
+    );
+  });
 
   it('covers what SQL alone does not, and never copies an address', () => {
     const plan = provisioningPlan(input, allowlist);

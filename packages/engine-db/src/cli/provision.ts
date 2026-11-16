@@ -10,6 +10,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadAllowlist } from '../allowlist.ts';
+import { loadEngineObjects } from '../checks.ts';
 import { assertRunsLocally } from '../fanout.ts';
 import { describePlan, provisioningPlan } from '../provision.ts';
 
@@ -32,5 +33,6 @@ const plan = provisioningPlan(
     entitlements: JSON.parse(readFileSync(resolve(argument('entitlements')), 'utf8')),
   },
   loadAllowlist(),
+  loadEngineObjects().jobs ?? [],
 );
 console.log(describePlan(plan));

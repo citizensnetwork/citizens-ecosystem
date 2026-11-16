@@ -94,6 +94,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/supabase-engine/**",
+        "$TURBO_ROOT$/supabase-control/**",
         "$TURBO_ROOT$/supabase/migrations/**",
         "$TURBO_ROOT$/packages/engine-config/src/**"
       ]
@@ -103,6 +104,7 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/supabase-engine/**",
+        "$TURBO_ROOT$/supabase-control/**",
         "$TURBO_ROOT$/supabase/migrations/**",
         "$TURBO_ROOT$/packages/engine-config/src/**"
       ],

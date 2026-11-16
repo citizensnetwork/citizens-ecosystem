@@ -13,7 +13,14 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MESSAGE_KEYS, messageDefinition } from '@engine/config';
 import { MIGRATIONS_DIR } from '../src/paths.ts';
-import { engineWordingRows, STAND_IN_TERMS, wordingSeedSql } from '../src/wording.ts';
+import { listMigrations } from '../src/migrations.ts';
+import {
+  engineWordingRows,
+  STAND_IN_TERMS,
+  WORDING_ADDED_LATER,
+  wordingAddedLaterSql,
+  wordingSeedSql,
+} from '../src/wording.ts';
 
 const SEED_FILE = resolve(MIGRATIONS_DIR, '0010_wording_seed.sql');
 
@@ -25,6 +32,16 @@ describe('the engine wording seed', () => {
     expect(existsSync(SEED_FILE), 'run the wording command with ENGINE_DB_WRITE=1').toBe(true);
     expect(readFileSync(SEED_FILE, 'utf8').replaceAll('\r\n', '\n')).toBe(sql);
   });
+
+  it.each(Object.keys(WORDING_ADDED_LATER))(
+    'migration %s carries the rows that joined the catalogue with it',
+    (version) => {
+      const migration = listMigrations().find((candidate) => candidate.version === version);
+      expect(migration, `engine migration ${version} is missing`).toBeDefined();
+      expect(WORDING_ADDED_LATER[version]?.length).toBeGreaterThan(0);
+      expect(migration?.sql).toContain(wordingAddedLaterSql(version));
+    },
+  );
 
   it('has one row for every message a database or edge function writes out', () => {
     const expected = MESSAGE_KEYS.filter((key) =>
