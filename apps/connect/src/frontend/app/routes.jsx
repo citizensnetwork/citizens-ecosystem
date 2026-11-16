@@ -297,10 +297,10 @@
     return typeof o.webOrigin === 'string' && o.webOrigin !== '' ? o.webOrigin + appUrl(path) : null;
   }
 
-  const BASE_TITLE = 'Citizens Connect';
+  const BASE_TITLE = window.WORLD.t('meta.title');
   const TITLES = {
-    'kingdom-discovery': 'Kingdom Exploration', explore: 'Explore', lets: 'Let\'s…', community: 'Kingdom Projects', messages: 'Messages',
-    notifications: 'Notifications', settings: 'Settings', apply: 'Become a Contributor',
+    'kingdom-discovery': window.WORLD.t('screen.discover.title'), explore: 'Explore', lets: window.WORLD.t('screen.gatherings.title'), community: window.WORLD.t('screen.ideas.title'), messages: 'Messages',
+    notifications: 'Notifications', settings: 'Settings', apply: window.WORLD.t('screen.apply.title'),
     onboarding: 'Set up your profile', dashboard: 'Dashboard', admin: 'Admin',
     'intake-upgrade': 'Confirm your listing',
   };

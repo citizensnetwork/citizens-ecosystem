@@ -169,6 +169,9 @@ importers:
       '@citizens/frontend-build':
         specifier: workspace:*
         version: link:../../packages/frontend-build
+      '@engine/config':
+        specifier: workspace:*
+        version: link:../../packages/engine-config
       '@eslint/compat':
         specifier: ^2.1.1
         version: 2.1.1(eslint@10.12.0(jiti@2.7.0))

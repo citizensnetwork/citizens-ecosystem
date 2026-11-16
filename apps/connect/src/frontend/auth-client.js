@@ -43,7 +43,7 @@
     }
     if (err && (err.name === "AuthRetryableFetchError" || status === 0 ||
         /failed to fetch|networkerror|load failed|network request failed/.test(msg))) {
-      return "We couldn't reach Citizens — check your connection and try again.";
+      return "We couldn't reach " + window.WORLD.term("worldShort") + " — check your connection and try again.";
     }
     if (step === "verify" && (code === "otp_expired" || status === 403 || status === 400 ||
         /expired|invalid/.test(msg))) {
@@ -62,12 +62,12 @@
   // Display-only stand-in for a person with no name yet (email-code sign-ups
   // arrive with none): "jane.doe+news@x.com" → "Jane Doe". It never contains the
   // domain and is never written to the database, so other people keep seeing
-  // "Citizen" until the person sets a real name in Settings.
+  // the world's word for a user ("Citizen") until the person sets a real name in Settings.
   function displayNameFor(email) {
     var local = String(email || "").split("@")[0].split("+")[0];
     var words = local.replace(/[._-]+/g, " ").replace(/[^\p{L}\p{N} ]/gu, "").trim()
       .split(/\s+/).filter(Boolean).slice(0, 3);
-    if (!words.length || !/\p{L}/u.test(words.join(""))) return "Citizen";
+    if (!words.length || !/\p{L}/u.test(words.join(""))) return window.WORLD.term("user", "One");
     return words.map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join(" ").slice(0, 40);
   }
 

@@ -240,7 +240,7 @@
           h(Avatar, { src: user.profilePhoto, name: user.name, size: 84, rounded: 'xl', ring: '#F7F4EE' }),
           h('div', null,
             h('h1', { className: 'text-xl text-foreground font-display' }, user.name),
-            h('span', { className: 'text-xs font-semibold text-muted-foreground' }, 'Citizen')),
+            h('span', { className: 'text-xs font-semibold text-muted-foreground' }, window.WORLD.t('screen.role.user'))),
           user.bio && h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, user.bio),
           connectedEvents.length > 0 && h('div', null,
             h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Attending (' + connectedEvents.length + ')'),
@@ -278,7 +278,7 @@
       if (!still) setReading(null);
       return undefined;
     }, [reading, newsPosts, c]);
-    if (!c) return app.entityStatus('profile', id) === 'loading' ? h(Loading) : h(Empty, { icon: 'UserX', title: 'Contributor not found' });
+    if (!c) return app.entityStatus('profile', id) === 'loading' ? h(Loading) : h(Empty, { icon: 'UserX', title: window.WORLD.term('partner', 'One') + ' not found' });
     const isFollowing = followedOrgs.has(id);
     const cat = window.DATA.getItemCategory({ type: 'contributor', category: c.category });
     const cEvents = events.filter((e) => e.organizerId === c.id);

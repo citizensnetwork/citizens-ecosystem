@@ -137,7 +137,7 @@
     }
 
     const note = {
-      wrong: 'This link was sent to a different Citizens account. Sign out, then sign in with the address that received the email.',
+      wrong: 'This link was sent to a different ' + window.WORLD.term('worldShort') + ' account. Sign out, then sign in with the address that received the email.',
       expired: 'This link has expired. Your account was not changed.',
       declined: 'You already said this is not yours. Your account was not changed.',
       'done-decline': 'Nothing on your account was changed. The team has been told.',

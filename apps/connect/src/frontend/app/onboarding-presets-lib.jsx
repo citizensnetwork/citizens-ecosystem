@@ -14,6 +14,7 @@
 //  needsExtraReview, keepsOffMap, mapRowFor, COPY }.
 // ════════════════════════════════════════════════════════════════════
 (function () {
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const PRESETS = {
     congregation_ministry: { label: 'Congregation / Ministry', kind: 'ministry', extraReview: false },
     business_retail: { label: 'Business / Retail', kind: 'business', extraReview: false },
@@ -37,11 +38,11 @@
   };
 
   // The Type the wizard starts on, and falls back to when a category names no preset (design spec on #202, change 5).
-  const START_KIND = 'ministry';
+  const START_KIND = W.configuration.categories.defaultPartnerKind;
 
   const COPY = {
     mapToggleLabel: 'Show my address and pin on the map',
-    mapToggleDesc: 'Off by default. Your listing is still found in Kingdom Discovery without it.',
+    mapToggleDesc: 'Off by default. Your listing is still found in ' + W.term('discovery') + ' without it.',
     // Says only what is built. Restore "and what you add afterwards is up to you" when per-item public choice ships.
     careNote: 'Care and recovery services get an extra look from an admin before anything is public. Nothing of yours is public until they approve it.',
     reviewMapOn: 'Yes',

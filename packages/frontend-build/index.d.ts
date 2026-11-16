@@ -95,6 +95,16 @@ export interface BuildFrontendOptions {
    * digits and hyphens with no trailing slash, or the build throws.
    */
   basePath?: string;
+  /**
+   * More real-ESM entry files of the host app, at the top of the frontend source
+   * (e.g. ["engine-world.js"]). Each is bundled like the Capacitor bridge (imports
+   * resolve from the host's node_modules) into one content-hashed IIFE,
+   * `engine-world.<hash>.js`, and loaded where its own
+   * `<script src="engine-world.js"></script>` tag stands in index.html. The raw entry is
+   * never copied. The build throws when index.html has no such tag, or more than one.
+   * Default: [] (output unchanged).
+   */
+  browserBundles?: string[];
   /** Env source. Default: process.env. */
   env?: Record<string, string | undefined>;
   /** Default: console.log */
@@ -112,6 +122,8 @@ export interface BuildFrontendResult {
   authClientFile: string;
   /** Content-hashed Capacitor bridge filename (lives in dest/). */
   capacitorBridgeFile: string;
+  /** Each `browserBundles` entry → its content-hashed filename (lives in dest/). */
+  browserBundleFiles: Record<string, string>;
   /** The resolved config object written to dest/config.js. */
   config: Record<string, string>;
   /** Every CDN script URL whose pin + SRI hash was checked against node_modules. */
@@ -173,6 +185,8 @@ export declare function rewriteIndexHtml(
     bundleFile: string;
     authClientFile: string;
     capacitorBridgeFile: string;
+    /** `browserBundles` entry → hashed filename; each replaces its own tag (exactly one). */
+    browserBundleFiles?: Record<string, string>;
     basePath?: string;
   },
 ): string;

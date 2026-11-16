@@ -20,6 +20,9 @@
  *      Capacitor bridge loaded BEFORE auth-client so window.Cap* exists,
  *      development CDN builds swapped for their declared production twins)
  *   5. generate config.js from env vars (credentials never enter git)
+ *   6. optionally (`browserBundles`), bundle + hash more real-ESM entry files
+ *      of the host app (Connect's engine world), each loaded where its own
+ *      <script> tag stands in index.html
  *
  * Before any of that, the CDN <script> tags of the host's `sriPackages` are
  * checked against the lockfile-installed npm packages (exact version + SRI
@@ -46,6 +49,21 @@ const DEFAULT_SPECIAL_FILES = Object.freeze([
 const HASHED_SINGLE_RE = /^(auth-client|capacitor-bridge)\.[0-9a-f]{10}\.js$/;
 const HASHED_BUNDLE_RE = /^bundle\.[0-9a-f]{10}\.js$/;
 const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+/** A browser bundle's entry: a top-level lower-case `.js` file of the frontend source. */
+const BROWSER_BUNDLE_RE = /^[a-z][a-z0-9-]*\.js$/;
+const RESERVED_BUNDLE_NAMES = new Set(['auth-client.js', 'capacitor-bridge.js', 'config.js']);
+
+// Both helpers take a name BROWSER_BUNDLE_RE accepted, so the dot is its only special character.
+/** `<script src="name.js"></script>` (optionally `?v=…`) on a line of its own, for one entry. */
+function browserBundleTagRe(name) {
+  const escaped = name.replace(/\./g, '\\.');
+  return new RegExp(`^([ \\t]*)<script src="${escaped}(?:\\?v=[^"]*)?"></script>$`, 'gm');
+}
+/** The content-hashed output name of one entry: `engine-world.js` → `engine-world.<hash>.js`. */
+function hashedBundleRe(name) {
+  const stem = name.slice(0, -'.js'.length);
+  return new RegExp(`^${stem}\\.[0-9a-f]{10}\\.js$`);
+}
 
 /** Opening <script> tags, any case (attributes only — bodies are never inspected). */
 const SCRIPT_OPEN_TAG_RE = /<script\b([^>]*)>/gi;
@@ -306,10 +324,11 @@ function readLocalConfig(srcDir, envGlobalName) {
 }
 
 /** Remove stale content-hashed outputs from a previous build (filenames change per build). */
-function cleanHashedOutputs(dest) {
+function cleanHashedOutputs(dest, browserBundles = []) {
   if (!fs.existsSync(dest)) return;
+  const bundled = browserBundles.map(hashedBundleRe);
   for (const name of fs.readdirSync(dest)) {
-    if (HASHED_SINGLE_RE.test(name)) {
+    if (HASHED_SINGLE_RE.test(name) || bundled.some((re) => re.test(name))) {
       fs.unlinkSync(path.join(dest, name));
     }
   }
@@ -398,6 +417,27 @@ function buildCapacitorBridge({ esbuild, srcDir, dest }) {
   return filename;
 }
 
+/**
+ * A host app's other real-ESM entry (`browserBundles`), bundled exactly like the Capacitor
+ * bridge: its imports resolve from the host's node_modules, and the result is one IIFE that
+ * talks to the screens through `window.*`. Returns the written file's name.
+ */
+function buildBrowserBundle({ esbuild, srcDir, dest, name }) {
+  const result = esbuild.buildSync({
+    entryPoints: [path.join(srcDir, name)],
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2019',
+    minify: true,
+    write: false,
+  });
+  const code = result.outputFiles[0].text;
+  const filename = `${name.slice(0, -'.js'.length)}.${hashOf(code)}.js`;
+  fs.writeFileSync(path.join(dest, filename), code);
+  return filename;
+}
+
 /** auth-client.js is plain JS (no JSX) — just minify + content-hash it. */
 function buildAuthClient({ esbuild, srcDir, dest }) {
   const src = fs.readFileSync(path.join(srcDir, 'auth-client.js'), 'utf8');
@@ -429,9 +469,22 @@ function buildAuthClient({ esbuild, srcDir, dest }) {
  */
 function rewriteIndexHtml(
   html,
-  { bundleFile, authClientFile, capacitorBridgeFile, basePath = '' },
+  { bundleFile, authClientFile, capacitorBridgeFile, browserBundleFiles = {}, basePath = '' },
 ) {
   assertBasePath(basePath);
+  // Each browser bundle loads where its own tag stands, so the page decides the order.
+  for (const [name, file] of Object.entries(browserBundleFiles)) {
+    let found = 0;
+    html = html.replace(browserBundleTagRe(name), (_tag, indent) => {
+      found += 1;
+      return `${indent}<script src="${file}"></script>`;
+    });
+    if (found !== 1) {
+      throw new Error(
+        `[frontend-build] index.html must load ${name} with exactly one <script src="${name}"></script> tag of its own (found ${found})`,
+      );
+    }
+  }
   html = html.replace(/^\s*<script src="https:\/\/unpkg\.com\/@babel\/standalone[^\n]*\n/m, '');
   html = html.replace(/^\s*<script src="capacitor-bridge\.js(?:\?v=[^"]*)?"><\/script>\n?/gm, '');
   html = swapProductionTwins(html);
@@ -557,6 +610,19 @@ function assertOptions(options) {
     );
   }
   if (options.basePath !== undefined) assertBasePath(options.basePath);
+  const { browserBundles } = options;
+  if (
+    browserBundles !== undefined &&
+    (!Array.isArray(browserBundles) ||
+      new Set(browserBundles).size !== browserBundles.length ||
+      browserBundles.some(
+        (n) => typeof n !== 'string' || !BROWSER_BUNDLE_RE.test(n) || RESERVED_BUNDLE_NAMES.has(n),
+      ))
+  ) {
+    throw new TypeError(
+      '[frontend-build] options.browserBundles must list distinct top-level entry files such as "engine-world.js" (lower-case letters, digits and hyphens; not auth-client.js, capacitor-bridge.js or config.js)',
+    );
+  }
   for (const v of configVars) {
     if (v.validate !== undefined && !Object.hasOwn(VALIDATORS, v.validate)) {
       throw new TypeError(
@@ -573,7 +639,7 @@ function assertOptions(options) {
 
 /**
  * Run the full pipeline. Returns { dest, bundleFile, authClientFile,
- * capacitorBridgeFile, config } for logging/assertions.
+ * capacitorBridgeFile, browserBundleFiles, config } for logging/assertions.
  */
 function buildFrontend(options) {
   assertOptions(options);
@@ -592,6 +658,7 @@ function buildFrontend(options) {
     mobileMissingLabel = 'required',
     sriPackages = [],
     basePath = '',
+    browserBundles = [],
     env = process.env,
     log = console.log,
     warn = console.warn,
@@ -606,7 +673,8 @@ function buildFrontend(options) {
   }
 
   const dest = mobile ? mobileDir : publicDir;
-  const special = new Set([...DEFAULT_SPECIAL_FILES, ...extraSpecialFiles]);
+  // A browser bundle's raw entry is ESM with bare imports: only its bundled output ships.
+  const special = new Set([...DEFAULT_SPECIAL_FILES, ...extraSpecialFiles, ...browserBundles]);
   const srcLabel = path.relative(rootDir, srcDir).split(path.sep).join('/');
 
   // Fail fast, before anything is written: CDN pins/hashes vs the lockfile,
@@ -623,11 +691,15 @@ function buildFrontend(options) {
   const local = mobile ? readLocalConfig(srcDir, envGlobalName) : {};
   const config = resolveConfigValues({ mobile, configVars, env, local, basePath: webBasePath });
 
-  cleanHashedOutputs(dest);
+  cleanHashedOutputs(dest, browserBundles);
   copyDir(srcDir, dest, special);
   const bundleFile = buildAppBundle({ esbuild, srcDir, dest, appFileOrder, warn });
   const authClientFile = buildAuthClient({ esbuild, srcDir, dest });
   const capacitorBridgeFile = buildCapacitorBridge({ esbuild, srcDir, dest });
+  const browserBundleFiles = {};
+  for (const name of browserBundles) {
+    browserBundleFiles[name] = buildBrowserBundle({ esbuild, srcDir, dest, name });
+  }
 
   fs.writeFileSync(
     path.join(dest, 'index.html'),
@@ -635,6 +707,7 @@ function buildFrontend(options) {
       bundleFile,
       authClientFile,
       capacitorBridgeFile,
+      browserBundleFiles,
       basePath: webBasePath,
     }),
   );
@@ -648,6 +721,9 @@ function buildFrontend(options) {
   log(`[build-frontend] Compiled ${appFileOrder.length} screens → app/${bundleFile}`);
   log(`[build-frontend] Compiled auth-client.js → ${authClientFile}`);
   log(`[build-frontend] Bundled Capacitor plugins → ${capacitorBridgeFile}`);
+  for (const [name, file] of Object.entries(browserBundleFiles)) {
+    log(`[build-frontend] Bundled ${name} → ${file}`);
+  }
 
   if (mobile && mobileRequiredKeys.some((k) => !config[k])) {
     warn(
@@ -666,7 +742,15 @@ function buildFrontend(options) {
       `[build-frontend] Mobile-only config: ${mobileOnlyKeys.map((k) => `${k}=${config[k] || "'' (none)"}`).join(', ')}`,
     );
 
-  return { dest, bundleFile, authClientFile, capacitorBridgeFile, config, sriVerified };
+  return {
+    dest,
+    bundleFile,
+    authClientFile,
+    capacitorBridgeFile,
+    browserBundleFiles,
+    config,
+    sriVerified,
+  };
 }
 
 module.exports = {

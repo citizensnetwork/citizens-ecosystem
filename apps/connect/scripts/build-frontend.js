@@ -115,6 +115,10 @@ buildFrontend({
     'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
   ],
 
+  // Real-ESM entries bundled beside the screens: the world (words, categories, switches)
+  // from @engine/config (engine step E7). index.html loads it before auth-client.js.
+  browserBundles: ['engine-world.js'],
+
   // The config.js env-var mapping and the CDN pins live in ./frontend-config.js
   // (their own file so a test can run the real configuration into a temp directory).
   ...frontendConfig,

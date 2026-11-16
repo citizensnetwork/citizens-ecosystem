@@ -8,8 +8,10 @@ The map engine is one codebase. What makes it "Citizens Connect" or a tenant's o
 document: the **configuration**. This package says what that document may contain, checks it, and
 holds two of them: the Citizens configuration and one made-up sample tenant.
 
-Nothing here is wired into an app yet, and nothing is stored anywhere. Step E7 wires the frontend
-to it; step E5 decides where the document lives in a tenant's database.
+Connect's frontend reads it since step E7: `apps/connect/src/frontend/engine-world.js` builds the
+world once (`window.WORLD`), and the screens listed in `test/wired-screens.test.ts` take their words
+and partner kinds from it. The screens the facelift is still rebuilding follow one surface at a time.
+Step E5 decides where the document lives in a tenant's database.
 
 This repository is public. No real tenant's configuration is ever committed here.
 
@@ -186,8 +188,9 @@ visit and 45 degrees is about 27 (ADR-001, decision 6), so the engine owner can 
 - **`citizensConfiguration`** is Citizens Connect as it is today. `test/citizens-parity.test.ts`
   reads Connect's own files (the manifest, the stylesheets, the category lists, the screens, the
   email templates, the migrations that hold notification text) and fails when a value stops
-  matching. Until E7, Connect's files are what a person sees and the configuration is the record
-  of them.
+  matching. For a screen not yet wired, Connect's file is what a person sees and the configuration
+  is the record of it. For a wired screen (`WIRED` in that test), the test holds the text the
+  screen showed before, and checks the world still renders it.
 - **`sampleConfiguration`** is "Quillfern Commons", a made-up neighbourhood world. It is unlike
   Citizens on purpose: lower-case terms, a flat map, no slogan, a required service provider, and
   entitlements that allow less than the engine offers.
