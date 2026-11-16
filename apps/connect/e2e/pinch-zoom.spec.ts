@@ -16,7 +16,7 @@ const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[] };
 
 const scale = (page: Page) => page.evaluate(() => window.visualViewport?.scale ?? 1);
 const viewportTag = (page: Page) => page.evaluate(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content") ?? "");
-const SHEET = "[data-mv2='sheet']";
+const SHEET = ".cn-big";
 
 type MapApi = { getZoom(): number; jumpTo: (o: object, d: object) => void };
 const mapZoom = (page: Page) => page.evaluate(() => (window as unknown as { __ccMap: MapApi }).__ccMap.getZoom());
@@ -182,7 +182,7 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
     await page.waitForTimeout(400);
     const rule = () => page.evaluate(() => {
       const ta = (sel: string) => getComputedStyle(document.querySelector(sel) as Element).touchAction;
-      return { sheet: ta("[data-mv2='sheet']"), scroller: ta("[data-mv2='scroller']") };
+      return { sheet: ta(".cn-big"), scroller: ta("[data-mv2='scroller']") };
     });
     expect(await rule()).toEqual({ sheet: "none", scroller: "none" });          // half
     await goTo(page, "full");

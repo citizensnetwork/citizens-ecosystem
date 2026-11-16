@@ -50,9 +50,9 @@ describe("Map v2 visual consistency (tracker section 12.3)", () => {
     // The crown gold (the fill, and the dark look's ink) and its dark ink: the founder's 2026-10-31 decision. Nothing else.
     expect(components).not.toMatch(/#f2bd22|#836100|#c9a84c|#d4af37|#8b6914|#e8d48b/i);
     const gold = (css.match(/#f2bd22|#836100|#c9a84c|#d4af37|#8b6914|#e8d48b/gi) || []).map((x) => x.toLowerCase());
-    expect(new Set(gold)).toEqual(new Set(["#f2bd22", "#836100"]));
+    expect(new Set(gold)).toEqual(new Set(["#d4af37", "#836100"]));
     // the retired golds are gone from the token blocks too
-    expect(css).not.toMatch(/#c9a84c|#d4af37|#8b6914|#e8d48b|201, 168, 76/i);
+    expect(css).not.toMatch(/#c9a84c|#f2bd22|#8b6914|#e8d48b|201, 168, 76|242,\s*189,\s*34/i);
   });
 });
 

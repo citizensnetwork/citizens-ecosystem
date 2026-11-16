@@ -136,13 +136,13 @@ async function openMapSignedIn(page: Page, min = 5) {
   await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 20_000 });
   await page.waitForFunction((n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n, min, { timeout: 20_000 });
 }
-const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
+const sheet = (page: Page) => page.locator(".cn-big");
 async function pick(page: Page, id: string, lng: number, lat: number) {
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [lng, lat]);
   await openListing(page, id);
   await expect(sheet(page)).toBeVisible();
 }
-const act = (page: Page, re: RegExp) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: re });
+const act = (page: Page, re: RegExp) => page.locator(".cn-big .cn-actions button", { hasText: re });
 const saveBtn = (page: Page) => act(page, /^Saved?$/);
 const followBtn = (page: Page) => act(page, /^Follow(ing)?$/);
 

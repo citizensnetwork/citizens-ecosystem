@@ -17,7 +17,7 @@ import { touchSession, tapTouch } from "./support/touch";
 type C = { id: string; contributor_slug: string; full_name: string; physical_longitude: number; physical_latitude: number };
 type E = { id: string; title: string; created_by: string; latitude: number; longitude: number; co_host_ids?: string[] };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[]; events: E[] };
-const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
+const sheet = (page: Page) => page.locator(".cn-big");
 type MapHook = { jumpTo: (o: object, d: object) => void };
 
 async function openMapWith(page: Page, seed: ReturnType<typeof seed0>) {

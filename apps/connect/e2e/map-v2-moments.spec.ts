@@ -9,7 +9,7 @@ import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, fixtureImage
 
 type C = { id: string; contributor_slug: string; full_name: string; physical_longitude: number; physical_latitude: number };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[] };
-const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
+const sheet = (page: Page) => page.locator(".cn-big");
 type MapHook = { jumpTo: (o: object, d: object) => void };
 const H = 3_600_000;
 

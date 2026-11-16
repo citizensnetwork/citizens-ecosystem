@@ -296,9 +296,9 @@ describe("the page", () => {
 describe("wiring", () => {
   it("opens at /explore on Map v2's Discover page, and Kingdom Exploration keeps its own address", () => {
     const shell = read("src/frontend/app/shell.jsx");
-    expect(shell).toContain("case 'explore': return React.createElement(window.MapV2Discover.Discover);");
+    expect(shell).toContain("window.ConnectExplore.Page");
     expect(shell).toContain("case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);");
-    expect(read("src/frontend/app/home.jsx")).toContain("onSeeAll: () => app.go('explore')");
+    expect(read("src/frontend/app/connect-chrome.jsx")).toContain("app.go('explore')");
   });
 
   it("registers the module after the nav and before the home screen, in the page and in the build", () => {

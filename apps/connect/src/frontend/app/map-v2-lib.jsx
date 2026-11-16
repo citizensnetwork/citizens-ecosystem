@@ -32,10 +32,12 @@
   // Where the retired Map look control stored a choice; cleared on mount so a
   // tester's old "Light"/"Dark" can never pin the look against their phone.
   const LEGACY_THEME_KEY = 'cc_map_theme';
+  const THEME_KEY = 'citizens-theme';
   // Bump the ?v= whenever assets/map-v2.css changes: the service worker is
   // cache-first for same-origin static files. Root-absolute, plus the path prefix when the app is served under one
   // (/citizens/connect, C39): routes.jsx loads first and owns it.
   const CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/map-v2.css?v=20261101c');
+  const SHELL_CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/connect-shell.css?v=20261110a');
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
@@ -153,16 +155,46 @@
   // A duration in ms for JS-driven motion: 0 when the person asked for less motion.
   const dur = (name) => (prefersReducedMotion() ? 0 : MOTION[name]);
 
-  // ── Map look: follows the phone ───────────────────────────────────
+  // ── Map look: the device, unless citizens-theme says Light or Dark ──
   function systemPrefersDark() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch { return false; }
   }
-  // 'light' or 'dark': what is actually drawn.
-  const resolvedTheme = () => (systemPrefersDark() ? 'dark' : 'light');
+  function readPref() {
+    try {
+      const v = window.localStorage.getItem(THEME_KEY);
+      return v === 'Light' || v === 'Dark' ? v : 'System';
+    } catch (e) { return 'System'; }
+  }
+  let themePref = readPref();
+  let themeSys = systemPrefersDark();
+  const themeSubs = new Set();
+  const isDark = () => themePref === 'Dark' || (themePref === 'System' && themeSys);
+  const resolvedTheme = () => (isDark() ? 'dark' : 'light');
+  let fadeTimer = 0;
+  function fadeTheme() {
+    if (!doc || !doc.documentElement || prefersReducedMotion()) return;
+    try { window.clearTimeout(fadeTimer); } catch (e) { /* no timer yet */ }
+    doc.documentElement.setAttribute('data-fade', '');
+    fadeTimer = window.setTimeout(() => { if (doc.documentElement) doc.documentElement.removeAttribute('data-fade'); }, 360);
+  }
   function applyTheme() {
     if (!doc || !doc.documentElement) return;
     doc.documentElement.setAttribute('data-theme', resolvedTheme());
     try { window.dispatchEvent(new Event('cc-map-theme')); } catch { /* old webview */ }
+    themeSubs.forEach((f) => f());
+  }
+  // Settings (a later pack) is the only control. System removes the key.
+  function setThemePref(p) {
+    if (p !== 'Light' && p !== 'Dark' && p !== 'System') return;
+    if (p === themePref) return;
+    const was = isDark();
+    themePref = p;
+    if (was !== isDark()) fadeTheme();
+    try {
+      if (p === 'System') window.localStorage.removeItem(THEME_KEY);
+      else window.localStorage.setItem(THEME_KEY, p);
+    } catch (e) { /* storage blocked */ }
+    applyTheme();
   }
 
   // ── Stylesheet ───────────────────────────────────────────────────────────────────────────────────────
@@ -171,6 +203,8 @@
     trapFocus, lockBehind,
     // the globe is on only while the constant says so (read when this file loads)
     get onlineGlobe() { return ONLINE_GLOBE_ON; },
+    setThemePref,
+    get themePref() { return themePref; },
     // true once assets/map-v2.css has loaded (or failed: never block the map on it)
     styleReady: false,
     CSS_HREF,
@@ -182,8 +216,25 @@
     applyTheme();
     try {
       const mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)');
-      // The phone switched (by hand, or its own sunset schedule): follow it at once.
-      if (mq && mq.addEventListener) mq.addEventListener('change', applyTheme);
+      // The phone switched (by hand, or its own sunset schedule): follow it while the choice is System.
+      if (mq && mq.addEventListener) mq.addEventListener('change', (ev) => {
+        const next = !!(ev && ev.matches);
+        if (themeSys === next) return;
+        if (themePref === 'System') fadeTheme();
+        themeSys = next;
+        applyTheme();
+      });
+    } catch { /* optional */ }
+    try {
+      window.addEventListener('storage', (ev) => {
+        if (!ev || ev.key !== THEME_KEY) return;
+        const next = ev.newValue === 'Light' || ev.newValue === 'Dark' ? ev.newValue : 'System';
+        if (next === themePref) return;
+        const was = isDark();
+        themePref = next;
+        if (was !== isDark()) fadeTheme();
+        applyTheme();
+      });
     } catch { /* optional */ }
     const done = () => {
       api.styleReady = true;
@@ -195,6 +246,10 @@
     link.onload = done;
     link.onerror = done;
     doc.head.appendChild(link);
+    const shell = doc.createElement('link');
+    shell.rel = 'stylesheet';
+    shell.href = SHELL_CSS_HREF;
+    doc.head.appendChild(shell);
   }
   if (doc) {
     if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', mount);

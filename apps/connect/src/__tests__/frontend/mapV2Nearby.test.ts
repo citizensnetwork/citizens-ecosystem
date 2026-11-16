@@ -183,7 +183,7 @@ describe("the strings and the wiring", () => {
     expect(sheet).toContain("function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view })");
     expect(sheet).toContain("N.rank(item, nearby");
     const home = read("src/frontend/app/home.jsx");
-    expect(home).toContain("nearby: markers");
-    expect(home).toContain("onPick: (id, t) => openSheet(id, t, sheet.view)");
+    expect(home).toContain("ConnectPreviews.Conveyor");
+    expect(home).toContain("onFocus: (item) => { setSelected(item.id); setSelType(item.type); setBig(true); }");
   });
 });

@@ -233,7 +233,10 @@ test.describe("Verify-first attach (C10)", () => {
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // nothing waiting: said plainly
+    // nothing waiting: said plainly. The map shell no longer carries the account button; Header screens still do.
+    await page.getByRole("button", { name: "Do", exact: true }).click();
+    await page.getByRole("menuitem", { name: /Kingdom Projects/ }).click();
+    await expect(page.locator('[data-screen="community"]')).toBeVisible();
     await page.getByRole("button", { name: "Your account" }).first().click();
     await page.getByRole("button", { name: "Claim a Contributor listing" }).click();
     await expect(page.getByText("No pending listing found for your email.")).toBeVisible();

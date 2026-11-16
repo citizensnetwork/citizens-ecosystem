@@ -97,12 +97,10 @@ for (const [label, path] of [
       const s = await logoState(page);
       const map = await page.locator(".maplibregl-canvas").boundingBox();
       expect(s.uncovered).toBe(true);
-      expect(s.x - map!.x).toBeLessThan(40);
-      // Map v2 (#210): the Explore row sits at the foot of the map, so the logo sits just above the row instead
-      const row = path.includes("v2") ? await page.locator("[data-mv2='explore']").boundingBox() : null;
-      const floor = row ? row.y : map!.y + map!.height;
-      expect(s.bottom).toBeLessThanOrEqual(floor);
-      expect(floor - s.bottom).toBeLessThan(60);
+      // The desktop rail occupies the left edge, so the logo sits just to its right, still at the foot of the map.
+      expect(s.x - map!.x).toBeGreaterThan(70);
+      expect(s.x - map!.x).toBeLessThan(140);
+      expect(s.bottom).toBeGreaterThan(map!.y + map!.height - 80);
     });
   });
 }
@@ -116,5 +114,12 @@ test("the location picker (Become a Contributor) shows the logo and the © MapTi
   await expect(picker).toHaveCount(1, { timeout: 15_000 });
   await expectLogoLink(page);
   await expect(picker.locator(".maplibregl-ctrl-attrib")).toHaveCount(1);
+  // The wizard's sticky footer sits over the foot of a tall form. Bring the logo into the open area above it.
+  await page.locator(LOGO).first().evaluate((el) => {
+    const scroller = document.getElementById("main-scroll");
+    if (!scroller) return;
+    const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTop = Math.max(0, top - 140);
+  });
   expect((await logoState(page)).uncovered).toBe(true);
 });

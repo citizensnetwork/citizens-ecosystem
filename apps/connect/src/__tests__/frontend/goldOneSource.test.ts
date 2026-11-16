@@ -1,5 +1,5 @@
 /**
- * One gold (founder decision, 2026-10-31): the crown logo's own colour, #F2BD22, is Connect's only fill gold, and every
+ * One gold (founder decision, 2026-10-31): the crown logo's own colour, #D4AF37, is Connect's only fill gold, and every
  * place that writes a gold value (the Tailwind config and `:root` in index.html, Map v2's tokens, the map pins, the PWA
  * manifest) agrees on it. Gold text and small icons use the dark ink #836100; a gradient is light, the crown, then amber
  * (never a brown end stop); a label on a gold fill is near-black, never white. The contrast pairs themselves are in
@@ -15,7 +15,7 @@ const read = (rel: string) => readFileSync(join(APP, rel), "utf8");
 const index = read("src/frontend/index.html");
 const mapCss = read("src/frontend/assets/map-v2.css");
 
-const CROWN = "#f2bd22";
+const CROWN = "#d4af37";
 const INK = "#836100";
 const LIGHT = "#fcdd6c";
 const AMBER = "#e3a00a";
@@ -68,7 +68,7 @@ describe("one gold: the crown's colour", () => {
   });
 
   it("no retired gold is left in application code", () => {
-    const retired = /#(c9a84c|d4af37|e8d48b|8b6914|e9ce72|9c7a1d|c8a24f|f2e8cc)\b|rgba?\(\s*(201\s*,\s*168\s*,\s*76|212\s*,\s*175\s*,\s*55)\b/i;
+    const retired = /#(c9a84c|f2bd22|e8d48b|8b6914|e9ce72|9c7a1d|c8a24f|f2e8cc)\b|rgba?\(\s*(201\s*,\s*168\s*,\s*76|242\s*,\s*189\s*,\s*34)\b/i;
     const hits = ["src/frontend", "src/lib", "src/app", "public"].flatMap((d) => sources(d)).filter((f) => retired.test(read(f)));
     expect(hits).toEqual([]);
   });

@@ -10,7 +10,7 @@ import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, t
 type Seed = MapSeed & { contributors: { id: string; physical_longitude: number; physical_latitude: number }[] };
 type MapHook = { jumpTo: (o: object, d: object) => void };
 const seed0 = () => smallSeed(FIXED_NOW) as Seed;
-const SHEET = "[data-mv2='sheet']";
+const SHEET = ".cn-big";
 
 async function open(page: Page, seed: Seed) {
   await mockMapNetwork(page, seed);
@@ -27,7 +27,7 @@ test.describe("360 x 800", () => {
 
   test("the header, the actions and the close button fit; nothing scrolls sideways; every control is 44 px", async ({ page }) => {
     await open(page, seed0());
-    await expect(page.locator("[data-mv2='sheet'] [data-mv2='name']")).toBeVisible();
+    await expect(page.locator(".cn-big [data-mv2='name']")).toBeVisible();
     // the sheet slides in over 200 ms (a transform): measure hit areas once it has settled at half, not mid-slide,
     // where sub-pixel positions put the edge of a 43 px tab on the wrong side of a 21 px probe (seen on CI)
     await expect.poll(async () => (await page.locator(SHEET).boundingBox())!.y, { timeout: 3000 }).toBeCloseTo(800 * 0.6, -1);
@@ -38,7 +38,7 @@ test.describe("360 x 800", () => {
     expect(Math.round(sheet.width)).toBe(360);
     const small = await page.evaluate(() => {
       const bad: string[] = [];
-      document.querySelectorAll("[data-mv2='sheet'] button, [data-mv2='sheet'] a[href]").forEach((el) => {
+      document.querySelectorAll(".cn-big button, .cn-big a[href]").forEach((el) => {
         const r = el.getBoundingClientRect();
         if (!r.width) return;
         if (Math.min(r.width, r.height) >= 44) return;
@@ -51,7 +51,7 @@ test.describe("360 x 800", () => {
     expect(small).toEqual([]);
     // at half the actions are ONE row that scrolls sideways inside itself (founder, 2026-10-30): its box stays inside the sheet
     // and the page never scrolls sideways; at full they wrap, and every pill fits
-    const row = (await page.locator("[data-mv2='sheet'] [data-mv2='actions']").boundingBox())!;
+    const row = (await page.locator(".cn-big [data-mv2='actions']").boundingBox())!;
     expect(row.x).toBeGreaterThanOrEqual(0);
     expect(Math.round(row.x + row.width)).toBeLessThanOrEqual(360);
     await page.locator("[data-mv2='handle']").click();
