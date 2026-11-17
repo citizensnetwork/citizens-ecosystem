@@ -284,6 +284,79 @@ const repeatedExtglobRecursion = pattern => {
   return depth;
 };
 
+/**
+ * Citizens patch (GHSA-fc5q-39xc-vjpf / CVE-2026-112366), see PATCHED.md.
+ *
+ * Looks for an unbounded glob star in one branch of a `+(...)` or `*(...)`
+ * body: a `*` or `**` that is not escaped and does not open a nested
+ * `*(...)` extglob (the analysis above handles those), or a nested `!(...)`,
+ * which compiles to a lookahead plus an unbounded star. Stars inside quotes,
+ * brackets or nested extglobs count too, so the check errs towards finding one.
+ * Repeating such a branch nests one unbounded quantifier inside another
+ * (`+(*a)` compiles to `(?:[^/]*?a)+`), which backtracks exponentially on
+ * short strings that do not match.
+ *
+ * `collapsible` is true when the branch holds nothing but plain characters,
+ * `?` and single (non-globstar) stars. Such a branch B is closed under
+ * concatenation: in a match of B B, the first star absorbs everything up to the
+ * second copy's matching star, because that stretch contains no `/`. So
+ * `+(B)` matches exactly what `@(B)` matches, and `*(B)` what `?(B)` does.
+ */
+
+const scanBranchStars = branch => {
+  let escaped = false;
+  let star = false;
+  let plain = true;
+
+  for (let i = 0; i < branch.length; i++) {
+    const ch = branch[i];
+
+    if (escaped === true) {
+      escaped = false;
+      continue;
+    }
+
+    if (ch === '\\') {
+      escaped = true;
+      plain = false;
+      continue;
+    }
+
+    if (ch === '*') {
+      if (branch[i + 1] === '(') {
+        plain = false;
+        continue;
+      }
+
+      star = true;
+
+      if (branch[i + 1] === '*' || branch[i - 1] === '*') {
+        plain = false;
+      }
+      continue;
+    }
+
+    if (ch === '?') {
+      if (branch[i + 1] === '(') {
+        plain = false;
+      }
+      continue;
+    }
+
+    if (ch === '!' && branch[i + 1] === '(') {
+      star = true;
+      plain = false;
+      continue;
+    }
+
+    if (/[/"()[\]{}|!+@]/.test(ch)) {
+      plain = false;
+    }
+  }
+
+  return { star, collapsible: star === true && plain === true };
+};
+
 const analyzeRepeatedExtglob = (body, options) => {
   if (options.maxExtglobRecursion === false) {
     return { risky: false };
@@ -340,6 +413,17 @@ const analyzeRepeatedExtglob = (body, options) => {
   if (sawStarSequence) {
     return combinable
       ? { risky: true, safeOutput: buildCharClassStar([...new Set(safeChars)]) }
+      : { risky: true };
+  }
+
+  // Citizens patch (GHSA-fc5q-39xc-vjpf): a body with an unbounded star is
+  // collapsed when that is exact (one collapsible branch), and otherwise
+  // literalized like every other risky repeated extglob.
+  const scans = branches.map(scanBranchStars);
+
+  if (scans.some(scan => scan.star)) {
+    return branches.length === 1 && scans[0].collapsible
+      ? { risky: false, collapse: true }
       : { risky: true };
   }
 
@@ -565,7 +649,10 @@ const parse = (input, options) => {
       return;
     }
 
-    let output = token.close + (opts.capture ? ')' : '');
+    // Citizens patch (GHSA-fc5q-39xc-vjpf): `+(B)` closes as `@(B)`, `*(B)` as `?(B)`.
+    const collapse = analysis.collapse === true && (token.type === 'plus' || token.type === 'star');
+    const close = collapse ? (token.type === 'plus' ? ')' : ')?') : token.close;
+    let output = close + (opts.capture ? ')' : '');
     let rest;
 
     if (token.type === 'negate') {

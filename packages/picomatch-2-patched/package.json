@@ -18,5 +18,9 @@
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
     "test:coverage": "node --test \"test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "fast-glob": "^3.3.3",
+    "micromatch": "^4.0.8"
   }
 }

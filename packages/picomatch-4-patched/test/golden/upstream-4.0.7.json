@@ -1,0 +1,43 @@
+{
+  "upstream": {
+    "package": "picomatch@4.0.7",
+    "integrity": "sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA=="
+  },
+  "inputs": 369,
+  "literalizedPairs": {
+    "total": 10896,
+    "changed": 7240
+  },
+  "sections": {
+    "extglob-bodies-1-3": {
+      "patterns": 9420,
+      "literalized": 1352,
+      "variants": {
+        "default": "3d5129d30ab4d5bd33bc317719ced07d519c61c777de31daeefb84114222aea7",
+        "dot": "d60d676b05d1855a6a0403de084050d0ed49ea8392ee8e86aacd1e49ca91b714",
+        "windows": "3d5129d30ab4d5bd33bc317719ced07d519c61c777de31daeefb84114222aea7",
+        "bash": "98180414bf4e40297f959ec17896648a8b9fd78ccab5eb2bf9d6b31a52d29045"
+      }
+    },
+    "extglob-bodies-1-2-in-context": {
+      "patterns": 14820,
+      "literalized": 1368,
+      "variants": {
+        "default": "0ac3bc226d8d8eb6317ce5ae13b0ba75598c143ea7816693b6dd4ee47642239b",
+        "dot": "1d9fa974ae485dc979d434b8ae2828b1e62f50677de7965f22c44d71ceb115f7",
+        "windows": "0ac3bc226d8d8eb6317ce5ae13b0ba75598c143ea7816693b6dd4ee47642239b",
+        "bash": "9e3c34af6a11696c26be5006ea3aa9fff6989fe5054a21c5ad4aa7d61e0b9d69"
+      }
+    },
+    "realistic": {
+      "patterns": 33,
+      "literalized": 4,
+      "variants": {
+        "default": "3904937490d3a2908dde6f33e2e703591a88952b17ea69616b2f81cdaf15d35b",
+        "dot": "5cd555ffc12e2716df2ba2cb5f9c493620ae60257e235099ae8db9cdd1b136a9",
+        "windows": "3904937490d3a2908dde6f33e2e703591a88952b17ea69616b2f81cdaf15d35b",
+        "bash": "a91b637663425f8980b1289a1e6dbb485f399d77b431f44f07cdcdad320cc51f"
+      }
+    }
+  }
+}

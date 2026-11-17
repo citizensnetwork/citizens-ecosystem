@@ -20,5 +20,9 @@
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
     "test:coverage": "node --test \"test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "fdir": "^6.5.0",
+    "tinyglobby": "^0.2.17"
   }
 }
