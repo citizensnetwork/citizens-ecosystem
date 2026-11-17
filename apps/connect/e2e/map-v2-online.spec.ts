@@ -66,8 +66,17 @@ const SHEET = "[data-mv2='online-sheet']";
 const globe = (page: Page) => page.locator(GLOBE);
 const sheet = (page: Page) => page.locator(SHEET);
 
+// The middle of an element once it has stopped moving: the list slides up as it opens, and a touch aimed at where Close
+// WAS lands on the list's header by the time the finger lifts (a busy runner measures mid-slide).
 async function at(page: Page, selector: string): Promise<Pt> {
-  const b = await page.locator(selector).first().boundingBox();
+  const box = () => page.locator(selector).first().boundingBox();
+  let b = await box();
+  for (let i = 0; i < 30; i++) {
+    await page.waitForTimeout(50);
+    const next = await box();
+    if (b && next && Math.abs(next.x - b.x) < 0.5 && Math.abs(next.y - b.y) < 0.5) break;
+    b = next;
+  }
   if (!b) throw new Error("no box for " + selector);
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }

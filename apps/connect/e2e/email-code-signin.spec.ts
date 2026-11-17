@@ -8,6 +8,7 @@ import {
   type FakeProjectOpts,
   type FakeUser,
 } from "./support/fake-project";
+import { openMe } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Email-code sign-in (RESUME C5): "Continue with email" → a 6-digit code →
@@ -148,10 +149,12 @@ test.describe("Email-code sign-in", () => {
     await signIn(page).click();
 
     // In: a citizen lands on Discover, the landing screen is gone, and the
-    // sidebar shows a readable name — not a blank, and never the raw address.
+    // account menu shows a readable name — not a blank, and never the raw address.
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
     await expect(continueWithEmail(page)).toHaveCount(0);
-    await expect(page.locator("aside").getByText("New Citizen", { exact: true })).toBeVisible();
+    // (the map home has no sidebar since PR 365: the name is at the head of the account menu, the nav's Me)
+    await openMe(page);
+    await expect(page.getByText("New Citizen", { exact: true })).toBeVisible();
     await expect(page.getByText("new.citizen@example.com")).toHaveCount(0);
     expect(mocks.rpcCalls).not.toContain("mark_own_listing_claimed");
   });
@@ -254,7 +257,7 @@ test.describe("Email-code sign-in", () => {
     await page.getByRole("button", { name: "Browse as Guest" }).click();
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole("button", { name: "Your account" }).first().click();
+    await openMe(page);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
     await expect(continueWithEmail(page)).toBeVisible();

@@ -93,29 +93,60 @@ export async function mapSettled(page: Page) {
 }
 
 /**
- * Issue #210: a pin no longer opens the sheet. It scrolls the Explore row to its card and outlines it; the CARD opens
- * the sheet. This does both. The pin is pressed by a DOM click, because the row can cover a pin near the foot of the
- * screen (a spec that centres the map on a pin puts it right behind the row); the card is then pressed for real,
- * by a mouse or, with `how: "tap"`, by a touch tap, so the gesture that opens the sheet is a real one.
+ * Founder, 2026-11-17: a phone's Explore panel rests on the crown (a wide screen's on the Where to… strip), and only the
+ * OPEN panel lists every row and shows the sticky nav. The crown shows the strip; the handle opens the rest.
+ */
+export async function openExploreAll(page: Page, how: "click" | "tap" = "click") {
+  const explore = page.locator("[data-mv2='explore']");
+  if ((await explore.getAttribute("data-open")) !== null) return;
+  const press = (l: Locator) => (how === "tap" ? l.tap() : l.click());
+  if ((await explore.getAttribute("data-mode")) === "rest") await press(page.locator("[data-mv2='explore-crown']"));
+  await press(page.locator("[data-mv2='explore-grab']"));
+  await expect(explore).toHaveAttribute("data-open", "", { timeout: 5_000 });
+}
+
+/**
+ * Issue #210: a pin no longer opens the sheet; a CARD in the Explore panel does. Its first tap chooses it (its row takes
+ * the panel over and its pin glows, founder 2026-11-17); the second tap opens the preview. Both taps are real ones, by a
+ * mouse or, with `how: "tap"`, by touch. Without a panel (the clean map), the pin is pressed by a DOM click.
  */
 export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
   await mapSettled(page);
   const explore = page.locator("[data-mv2='explore']");
   if (await explore.count()) {
-    // Pack 08: the sheet starts closed. One tap on the card flies to the pin and opens the preview.
-    if ((await explore.getAttribute("data-open")) === null) {
-      await page.locator("[data-mv2='explore-crown']").click();
-      await expect(explore).toHaveAttribute("data-open", "", { timeout: 5_000 });
+    await openExploreAll(page, how);
+    const card = () => page.locator(`[data-mv2='explore'] [data-explore-id="${id}"]`).first();
+    await card().waitFor({ state: "visible", timeout: 10_000 });
+    // a card still chosen from an earlier opening says "Tap again to open": one tap does it
+    const chosen = (await card().getAttribute("data-selected")) !== null;
+    if (!chosen) {
+      if (how === "tap") await card().tap();
+      else await card().click();
+      await expect(card()).toHaveAttribute("data-selected", "", { timeout: 5_000 });
     }
-    const card = page.locator(`[data-mv2='explore'] [data-explore-id="${id}"]`).first();
-    await card.waitFor({ state: "visible", timeout: 10_000 });
-    if (how === "tap") await card.tap();
-    else await card.click();
+    if (how === "tap") await card().tap();
+    else await card().click();
     return;
   }
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
   if (how === "tap") await pin.tap({ force: true });
   else await pin.click({ force: true });
+}
+
+/**
+ * Founder, 2026-11-17: the map home has no account button; its actions are in the nav's Me. On a wide screen Me is in
+ * the nav beside the search bar; on a phone it is in the sticky nav of the open Explore panel. This opens that menu.
+ */
+export async function openMe(page: Page) {
+  // already open (Me toggles, so pressing it again would close it)
+  if (await page.getByRole("button", { name: "View Profile" }).isVisible()) return;
+  const rail = page.locator("[data-mv2='desktop-item'][data-nav='me']");
+  if (await rail.isVisible()) {
+    await rail.click();
+    return;
+  }
+  await openExploreAll(page);
+  await page.locator("[data-mv2='explore-dock'] [data-nav='me']").click();
 }
 
 /**

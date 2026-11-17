@@ -238,6 +238,13 @@
     return { top, bottom, left: FRAME_GAP, right: FRAME_GAP };
   }
 
+  // The share of the map's height a focused point sits above the middle (founder, 2026-11-17: "25% higher").
+  const FOCUS_LIFT = 0.25;
+  function liftOffset(el) {
+    const h = el ? (el.clientHeight || el.getBoundingClientRect().height || 0) : 0;
+    return [0, -Math.round(h * FOCUS_LIFT)];
+  }
+
   // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
   function frameData(mp, items, el) {
     const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
@@ -511,6 +518,8 @@
         mk._ccKeep = typeof filterCategory === 'function' && !!filterCategory(m);
         mk._ccMeta = { title: m.title, nextEventAt: m.nextEventAt, lastActivityAt: m.lastActivityAt };
         P.applyDim(mk.getElement(), dim);
+        // a filter from the Explore panel (a Where to… tile, a row, a group) makes its matching pins glow
+        P.applyMatch(mk.getElement(), mk._ccKeep);
         P.applySelected(mk.getElement(), selected);
         P.applyLit(mk.getElement(), litId === m.id, !!(litId && litId !== m.id));
       }
@@ -589,11 +598,25 @@
           if (!mp || userMovedRef.current || !items || !items.length) return;
           frameData(mp, items, containerRef.current);
         },
+        // Founder, 2026-11-17: whatever the map brings into focus (an area, a card's pin) sits FOCUS_LIFT of the map's height
+        // above the middle, so it stays clear of the Explore panel at the foot. `offset` moves the point, not the camera's
+        // padding, so nothing else on the map shifts.
+        focusLifted(minZoom) {
+          requestAnimationFrame(() => {
+            const mp = mapRef.current;
+            const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
+            if (!mp || !mk) return;
+            userMovedRef.current = true;
+            const to = { center: mk.getLngLat(), offset: liftOffset(containerRef.current), duration: window.MapV2.dur('slow'), essential: true };
+            if (Number.isFinite(minZoom) && mp.getZoom() < minZoom) to.zoom = minZoom;
+            mp.easeTo(to, { originalEvent: {} });
+          });
+        },
         survey(lat, lng, zoom) {
           const mp = mapRef.current;
           if (!mp || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
           userMovedRef.current = true;
-          mp.easeTo({ center: [lng, lat], zoom: zoom, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+          mp.easeTo({ center: [lng, lat], zoom: zoom, offset: liftOffset(containerRef.current), duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
         },
         restore() {
           const mp = mapRef.current;

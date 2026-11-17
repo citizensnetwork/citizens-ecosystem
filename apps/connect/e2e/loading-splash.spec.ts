@@ -90,9 +90,9 @@ test.describe("Loading splash", () => {
 
     release();
     await expect(splash).toHaveCount(0, { timeout: 15_000 });
-    // In the app now (its sidebar brand mark is the same crown), and the landing
+    // In the app now (the map home's nav beside the search bar is headed by the same crown), and the landing
     // was never in the DOM at any point.
-    await expect(page.locator("aside img[src*='citizens-crown']")).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("[data-mv2='desktop-crown'] img[src*='citizens-crown']")).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(LANDING)).toHaveCount(0);
     expect((await seen(page)).landing).toBe(false);
     expect((await seen(page)).splash).toBe(true);

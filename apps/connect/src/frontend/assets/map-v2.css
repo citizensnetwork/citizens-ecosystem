@@ -170,8 +170,13 @@
   --explore-body-min: 160px;                /* the least the panel holds, so the category list always has room */
   --ctrl-btn: 36px;                         /* the map's own zoom and locate buttons */
   --crown: 52px;                            /* the home button: a glass circle on a 1px gold ring */
-  --xp-strip: 168px;                        /* Where to… as a short strip, so the map stays in view */
-  --xp-strip-on: 292px;                     /* the same strip once it holds one carousel */
+  --xp-strip: 124px;                        /* the handle and the Where to… tiles, so the map stays in view */
+  --xp-focus: 284px;                        /* one row in focus: tabs, a line, the cards; never another height */
+  --xp-card-w: 148px;                       /* the panel's cards (founder, 2026-11-17: smaller) */
+  --xp-card-img: 64px;
+  --z-xp-layer: 1;                          /* inside the Explore host: the panel, a row's arrows */
+  --z-xp-crown: 2;                          /* the crown and the sticky nav, above the panel */
+  --z-xp-rail: 3;                           /* the desktop nav, above both */
   --pin-lit-scale: 1.25;                    /* the pin a card has chosen */
   --grp-worship: #7040b5;
   --grp-serve: #087d69;
@@ -3369,18 +3374,48 @@ a[data-mv2='card2'],
   }
 }
 
-/* ── Pack 08. The home Explore sheet and the crown that becomes the nav.
-   The old row's rules above are renamed explore-legacy so they no longer
-   paint this panel. Tiles and tabs are frosted grey. Gold is the crown ring. */
+/* ── Pack 08. The home Explore panel, the crown, and the nav (app/map-v2-explore.jsx, app/home.jsx).
+   Founder, 2026-11-17: four looks of one panel (data-mode): rest (the crown alone, a phone's default), strip (the
+   handle and the Where to… tiles), focus (one row's tabs and cards at ONE fixed height) and open (every row). The panel
+   is always its full height and slides by transform (never by height), so moving it costs the phone no layout; the
+   crown and the sticky nav swap outright with a short fade, no morph. Tiles and tabs are frosted grey; gold is the
+   crown's ring and the Explore more mark. */
 [data-mv2='home'][data-crown] {
-  --explore-h: var(--xp-strip);
+  --explore-h: 0px;
   --nav-clear: 0px;
 }
+/* The map screen never scrolls. `hidden` alone still lets a focus or a scrollIntoView (a keyboard Tab onto a tile while
+   the panel is still sliding in) scroll the whole screen up under the person; `clip` cannot be scrolled at all. The
+   doubled attribute outranks Tailwind's .overflow-hidden, which stays as the fallback where clip is unknown. */
+[data-mv2='home'][data-screen] {
+  overflow: clip;
+}
+/* What the panel covers, for the map's corner, credit and controls (they sit just above it). Read from the panel's look,
+   so it never waits on a measurement. At rest they clear the crown. */
+[data-mv2='home'][data-crown]:has([data-mv2='explore-host'][data-mode='rest']) {
+  --explore-h: calc(var(--crown) + var(--space-4));
+}
+[data-mv2='home'][data-crown]:has([data-mv2='explore-host'][data-mode='strip']) {
+  --explore-h: var(--xp-strip);
+}
+[data-mv2='home'][data-crown]:has([data-mv2='explore-host'][data-mode='focus']) {
+  --explore-h: var(--xp-focus);
+}
 [data-mv2='explore-host'] {
+  --xp-vis: 0px;
   position: absolute;
   inset: 0;
   z-index: calc(var(--z-controls) + 2);
   pointer-events: none;
+}
+[data-mv2='explore-host'][data-mode='strip'] {
+  --xp-vis: var(--xp-strip);
+}
+[data-mv2='explore-host'][data-mode='focus'] {
+  --xp-vis: var(--xp-focus);
+}
+[data-mv2='explore-host'][data-mode='open'] {
+  --xp-vis: 100%;
 }
 [data-mv2='explore-host'][hidden] {
   display: none;
@@ -3401,10 +3436,11 @@ a[data-mv2='card2'],
   left: 0;
   right: 0;
   bottom: env(safe-area-inset-bottom, 0px);
-  z-index: 1;
+  z-index: var(--z-xp-layer);
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  height: calc(100% - var(--xp-dock-h) - env(safe-area-inset-bottom, 0px));
   margin: 0;
   padding: 0;
   border: 0;
@@ -3417,70 +3453,31 @@ a[data-mv2='card2'],
   color: var(--text-1);
   font-family: var(--font-body);
   pointer-events: auto;
-  height: var(--xp-strip);
   overflow: hidden;
-  transform: none;
-  transition: height var(--dur-morph) var(--ease-enter), transform var(--dur-morph) var(--ease-enter);
+  transform: translateY(calc(100% - var(--xp-vis)));
+  transition: transform var(--dur-slow) var(--ease-enter), visibility 0s;
 }
-[data-mv2='explore'][data-tabbed]:not([data-open]) {
-  height: var(--xp-strip-on);
-}
-[data-mv2='explore'][data-open] {
-  height: calc(100% - var(--xp-dock-h));
-  transform: none;
+/* At rest the panel is off screen: out of reach of a tap (and, through `inert`, of the keyboard) once it has slid away. */
+[data-mv2='explore'][data-mode='rest'] {
+  visibility: hidden;
+  transition: transform var(--dur-slow) var(--ease-enter), visibility 0s linear var(--dur-slow);
 }
 [data-mv2='home']:not([data-narrow]) [data-mv2='explore'] {
   left: 50%;
   right: auto;
   width: min(var(--xp-max), calc(100% - var(--space-8)));
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(calc(100% - var(--xp-vis)));
 }
-[data-mv2='home']:not([data-narrow]) [data-mv2='explore'][data-open] {
-  transform: translateX(-50%);
-}
+/* the handle: the strip has no title any more (founder, 2026-11-17), only this bar to pull up or drop down */
 [data-mv2='explore-grab'] {
   position: relative;
   flex: 0 0 auto;
-  display: flex;
-  align-items: center;
   height: var(--space-5);
-  padding: 0 var(--space-5);
   border: 0;
   background: none;
   color: inherit;
   cursor: grab;
   touch-action: none;
-  transition: height var(--dur-morph) var(--ease-enter);
-}
-[data-mv2='explore'][data-open] [data-mv2='explore-grab'] {
-  height: var(--space-6);
-}
-[data-mv2='explore-peek'] {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  gap: var(--space-3);
-  transition: opacity var(--dur-base) var(--ease-enter);
-}
-[data-mv2='explore'][data-open] [data-mv2='explore-peek'] {
-  opacity: 0;
-  pointer-events: none;
-}
-[data-mv2='explore-peek'] > span:first-child {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-[data-mv2='explore-peek'] b {
-  font-size: var(--fs-2);
-  font-weight: var(--fw-semibold);
-}
-[data-mv2='explore-peek'] small,
-[data-mv2='xsec-h'] small,
-[data-mv2='explore-seeall'] small {
-  font-size: var(--fs-1);
-  color: var(--xp-muted);
 }
 [data-mv2='explore-handle'] {
   position: absolute;
@@ -3499,50 +3496,42 @@ a[data-mv2='card2'],
 [data-mv2='explore-scroll'] {
   flex: 1 1 auto;
   min-height: 0;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+[data-mv2='explore'][data-open] [data-mv2='explore-scroll'] {
   overflow-x: hidden;
   overflow-y: auto;
-  padding-bottom: var(--space-3);
-  opacity: 1;
-  scrollbar-width: none;
-  transition: opacity var(--dur-base) var(--ease-enter);
-}
-[data-mv2='explore'][data-open] [data-mv2='explore-scroll'] {
   padding-bottom: calc(var(--xp-dock-h) + var(--space-8));
 }
-[data-mv2='explore'][data-open] [data-mv2='explore-scroll'] {
-  opacity: 1;
-}
-[data-mv2='explore-head'] {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-1) var(--space-5) var(--space-2);
-}
-[data-mv2='explore-head'] h2 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-3);
-  line-height: var(--lh-3);
-  font-weight: var(--fw-semibold);
-}
-[data-mv2='explore-kicker'] {
-  display: block;
+[data-mv2='xsec-h'] small,
+[data-mv2='xfocus-bar'] small {
   font-size: var(--fs-1);
-  font-weight: var(--fw-semibold);
   color: var(--xp-muted);
 }
+[data-mv2='xsec-h'] small {
+  min-width: 0;
+  text-align: right;
+}
+/* "All types" and "Close": plain words to tap (founder, 2026-11-17), with a full-size target around them */
 [data-mv2='explore-reset'] {
+  position: relative;
   flex: none;
-  min-height: var(--hit);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--xp-tile-line);
-  border-radius: var(--radius-full);
-  background: var(--xp-tile);
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text-1);
   font-size: var(--fs-1);
+  line-height: var(--lh-1);
   font-weight: var(--fw-semibold);
+  text-decoration: underline;
+  text-underline-offset: var(--space-1);
   cursor: pointer;
+}
+[data-mv2='explore-reset']::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--hit) - var(--lh-1)) / -2) calc(var(--space-3) * -1);
 }
 [data-mv2='explore-tiles'] {
   display: flex;
@@ -3567,26 +3556,29 @@ a[data-mv2='card2'],
   color: var(--text-1);
   font-size: var(--fs-1);
   font-weight: var(--fw-semibold);
+  white-space: nowrap;
   cursor: pointer;
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
 }
 [data-mv2='explore-tiles'][data-tabs] {
   align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
 }
 [data-mv2='explore-tiles'][data-tabs] [data-mv2='explore-tile'] {
   flex-direction: row;
   width: auto;
   min-width: var(--hit);
   height: var(--hit);
-  padding: 0 var(--space-3) 0 var(--space-2);
+  padding: 0 var(--space-3);
   border-radius: var(--radius-full);
-  box-shadow: none;
+}
+[data-mv2='explore-tiles'][data-tabs] [data-mv2='explore-tile']:has(svg) {
+  padding-left: var(--space-2);
 }
 [data-mv2='explore-tile'][aria-selected='true'] {
   background: var(--xp-tile-on);
   color: var(--xp-tile-ink);
-  border-color: var(--xp-tile-line);
+  border-color: var(--text-1);
 }
 [data-mv2='explore-tile'] svg {
   width: var(--space-6);
@@ -3598,9 +3590,24 @@ a[data-mv2='card2'],
 }
 [data-mv2='explore-empty'] {
   margin: 0;
-  padding: 0 var(--space-5) var(--space-4);
+  padding: var(--space-2) var(--space-5) var(--space-4);
   font-size: var(--fs-2);
   color: var(--xp-muted);
+}
+/* the focus: tabs, one line, the cards. Its height is the panel's (--xp-focus), whatever the row holds. */
+[data-mv2='xfocus-bar'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--space-5);
+  padding: 0 var(--space-5);
+}
+[data-mv2='xfocus-bar'] small {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 [data-mv2='xsec-h'] {
   display: flex;
@@ -3610,27 +3617,39 @@ a[data-mv2='card2'],
   padding: var(--space-3) var(--space-5) var(--space-2);
 }
 [data-mv2='xsec-h'] h3 {
+  flex: none;
   margin: 0;
   font-size: var(--fs-3);
   line-height: var(--lh-3);
   font-weight: var(--fw-semibold);
 }
+/* a row's title takes the row over (its focus): it reads as the title it is, with a chevron-free plain button */
+[data-mv2='xsec-go'] {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 [data-mv2='xrow'] {
   display: flex;
   gap: var(--space-3);
   overflow-x: auto;
-  padding: var(--space-1) var(--space-5) var(--space-4);
+  padding: var(--space-1) var(--space-5) var(--space-3);
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
+/* The panel's cards (founder, 2026-11-17: smaller, so a row shows more of them and the map more of itself). */
 [data-mv2='xcard'] {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  width: calc(var(--space-8) * 4 + var(--space-2));
+  width: var(--xp-card-w);
   padding: 0;
   border: 1px solid var(--xp-tile-line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--surface-1);
   color: var(--text-1);
   text-align: left;
@@ -3645,10 +3664,11 @@ a[data-mv2='card2'],
 }
 [data-mv2='xcard-img'] {
   position: relative;
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: calc(var(--space-8) * 2 + var(--space-6));
+  height: var(--xp-card-img);
   background: var(--surface-2);
   color: var(--text-2);
 }
@@ -3658,18 +3678,25 @@ a[data-mv2='card2'],
   object-fit: cover;
   display: block;
 }
-[data-mv2='xcard-live'] {
+[data-mv2='xcard-live'],
+[data-mv2='xcard-badge'] {
   position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
+  top: var(--space-1);
+  left: var(--space-1);
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
+  padding: 0 var(--space-2);
   border-radius: var(--radius-full);
   background: var(--glass-bg);
+  color: var(--text-1);
   font-size: var(--fs-1);
+  line-height: var(--lh-1);
   font-weight: var(--fw-semibold);
+}
+[data-mv2='xcard-badge'] {
+  top: auto;
+  bottom: var(--space-1);
 }
 [data-mv2='xcard-live'] i {
   width: var(--space-2);
@@ -3680,26 +3707,39 @@ a[data-mv2='card2'],
 [data-mv2='xcard-body'] {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3);
+  gap: 0;
+  padding: var(--space-2);
+  min-width: 0;
 }
 [data-mv2='xcard-body'] b {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: calc(var(--lh-2) * 2);
+  overflow: hidden;
   font-size: var(--fs-2);
   font-weight: var(--fw-semibold);
   line-height: var(--lh-2);
 }
-[data-mv2='xcard-body'] small {
+[data-mv2='xcard-body'] small,
+[data-mv2='xcard-chip'] {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: var(--fs-1);
+  line-height: var(--lh-1);
   color: var(--xp-muted);
 }
 [data-mv2='xcard-chip'] {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: var(--space-1);
-  align-self: flex-start;
   max-width: 100%;
-  font-size: var(--fs-1);
   color: var(--text-2);
+}
+[data-mv2='xcard-chip'] > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 [data-mv2='xcard-chip'] i {
   flex: none;
@@ -3708,148 +3748,123 @@ a[data-mv2='card2'],
   border-radius: var(--radius-full);
   background: var(--cat-c, var(--text-2));
 }
-[data-mv2='explore-seeall'] {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin: var(--space-2) var(--space-5) 0;
-  padding: var(--space-4);
-  border: 1px solid var(--divider);
-  border-radius: var(--radius-lg);
-  background: var(--xp-tile);
-  color: var(--text-1);
-  text-align: left;
-  cursor: pointer;
-}
-[data-mv2='explore-seeall'] b {
-  display: block;
-  font-size: var(--fs-2);
-  font-weight: var(--fw-semibold);
-}
-[data-mv2='explore-host']:not([data-open]) [data-mv2='explore-dock'] {
-  bottom: calc(var(--xp-strip) + var(--space-2));
-}
-[data-mv2='explore-host'][data-tabbed]:not([data-open]) [data-mv2='explore-dock'] {
-  bottom: calc(var(--xp-strip-on) + var(--space-2));
-}
-[data-mv2='explore-dock'] {
+/* The crown: a glass circle on a gold ring, riding just above the panel (or the foot of the screen at rest). */
+[data-mv2='explore-crown'] {
   position: absolute;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--crown) / 2);
-  z-index: 2;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
+  z-index: var(--z-xp-crown);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: var(--crown);
   height: var(--crown);
-  transform: translateX(-50%);
+  padding: 0;
   border: 1px solid var(--accent);
   border-radius: var(--radius-full);
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--elev-1);
-  overflow: hidden;
   pointer-events: auto;
-  transition: width var(--dur-morph) var(--ease-enter), height var(--dur-morph) var(--ease-enter), bottom var(--dur-morph) var(--ease-enter), border-color var(--dur-base) var(--ease-enter);
-}
-[data-mv2='explore-host'][data-open] [data-mv2='explore-dock'] {
-  width: min(var(--sheet-panel-w), calc(100% - var(--space-7)));
-  height: var(--xp-dock-h);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
-  border-color: var(--divider);
-}
-[data-mv2='explore-crown'] {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  background: none;
   cursor: pointer;
-  transition: opacity var(--dur-base) var(--ease-enter), transform var(--dur-base) var(--ease-enter);
+  transform: translate(-50%, calc(var(--xp-vis) * -1));
+  transition: transform var(--dur-slow) var(--ease-enter);
+  animation: mv2-fade-in var(--dur-fast) linear;
 }
 [data-mv2='explore-crown'] img {
   width: var(--space-7);
   height: auto;
 }
-[data-mv2='explore-host'][data-open] [data-mv2='explore-crown'] {
-  opacity: 0;
-  transform: scale(0.5);
-  pointer-events: none;
-}
-[data-mv2='explore-items'] {
+/* The sticky nav the crown gives way to while Explore is open: a plain swap, no morph (founder, 2026-11-17). */
+[data-mv2='explore-dock'] {
   position: absolute;
-  inset: 0;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
+  z-index: var(--z-xp-crown);
   display: flex;
   align-items: center;
   justify-content: space-around;
+  width: min(calc(var(--hit) * 6), calc(100% - var(--space-7)));
+  height: var(--xp-dock-h);
   padding: 0 var(--space-2);
-  pointer-events: none;
-}
-[data-mv2='explore-host'][data-open] [data-mv2='explore-items'] {
+  box-sizing: border-box;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-1);
   pointer-events: auto;
+  transform: translateX(-50%);
+  animation: mv2-fade-in var(--dur-fast) linear;
+}
+[data-mv2='me-wrap'] {
+  position: relative;
+  display: flex;
+}
+/* the account menu opens over the panel's own cards: a solid surface keeps its words readable (the glass is for the map) */
+[data-mv2='me-wrap'] > div {
+  background: var(--surface-0);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 [data-mv2='explore-nav'] {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-1);
+  gap: 0;
   min-width: var(--hit);
   min-height: var(--hit);
-  padding: var(--space-1);
+  padding: var(--space-1) var(--space-2);
   border: 0;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-1);
-  opacity: 0;
   cursor: pointer;
-}
-[data-mv2='explore-host'][data-open] [data-mv2='explore-nav'] {
-  opacity: 1;
 }
 [data-mv2='explore-nav'][aria-current='page'] {
   background: var(--xp-tile-on);
   color: var(--xp-tile-ink);
 }
-[data-mv2='explore-nav'] svg {
+[data-mv2='explore-nav'] svg,
+[data-mv2='desktop-item'] svg {
   width: var(--space-5);
   height: var(--space-5);
 }
 [data-mv2='explore-nav'] small,
-[data-mv2='explore-letter'] {
+[data-mv2='desktop-item'] small {
   font-size: var(--fs-1);
+  line-height: var(--lh-1);
   font-weight: var(--fw-semibold);
 }
-[data-mv2='explore-letter'] {
-  font-size: var(--fs-3);
-  line-height: var(--lh-3);
+[data-mv2='explore-nav'][data-emphasis] svg,
+[data-mv2='desktop-item'][data-emphasis] svg {
+  width: calc(var(--space-5) * 1.15);
+  height: calc(var(--space-5) * 1.15);
+}
+[data-mv2='explore-nav'][data-emphasis][aria-current='page'],
+[data-mv2='desktop-item'][data-emphasis][aria-current='page'] {
+  background: var(--surface-2);
+  color: var(--text-1);
 }
 [data-mv2='explore-grab']:focus-visible,
 [data-mv2='explore-tile']:focus-visible,
 [data-mv2='explore-reset']:focus-visible,
+[data-mv2='xsec-go']:focus-visible,
 [data-mv2='xcard']:focus-visible,
-[data-mv2='explore-seeall']:focus-visible,
 [data-mv2='explore-crown']:focus-visible,
 [data-mv2='explore-nav']:focus-visible,
 [data-mv2='desktop-crown']:focus-visible,
 [data-mv2='desktop-item']:focus-visible,
 [data-mv2='xarrow']:focus-visible,
 [data-mv2='explore-more']:focus-visible,
-[data-mv2='filter-row']:focus-visible {
+[data-mv2='filter-row']:focus-visible,
+[data-mv2='filter-chip-x']:focus-visible,
+[data-mv2='home-find']:focus-visible {
   outline: var(--focus-w) solid var(--focus-ring);
   outline-offset: var(--focus-offset);
-}
-[data-mv2='explore-nav'][data-emphasis] svg,
-[data-mv2='desktop-item'][data-emphasis] svg {
-  width: calc(var(--space-5) * 1.35);
-  height: calc(var(--space-5) * 1.35);
-}
-[data-mv2='explore-nav'][data-emphasis][aria-current='page'],
-[data-mv2='desktop-item'][data-emphasis][aria-current='page'] {
-  background: var(--surface-2);
-  color: var(--text-1);
 }
 [data-mv2='explore-more'] {
   display: flex;
@@ -3893,7 +3908,7 @@ a[data-mv2='card2'],
     [data-mv2='xarrow'] {
       position: absolute;
       top: 50%;
-      z-index: 1;
+      z-index: var(--z-xp-layer);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -3910,28 +3925,38 @@ a[data-mv2='card2'],
     [data-mv2='xarrow'][data-dir='next'] { right: var(--space-2); }
   }
 }
+/* The desktop nav (founder, 2026-11-17): beside the search bar at the top left, its capsule exactly the crown's width. */
 [data-mv2='desktop-nav'] {
   display: none;
 }
 @media (min-width: 64rem) {
   [data-mv2='explore-host']:not([data-open]) [data-mv2='desktop-nav'] {
     position: absolute;
-    left: var(--space-4);
-    top: 50%;
-    z-index: 3;
+    left: var(--space-3);
+    top: max(var(--space-3), env(safe-area-inset-top, 0px));
+    z-index: var(--z-xp-rail);
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     gap: var(--space-2);
-    transform: translateY(-50%);
+    width: var(--crown);
     pointer-events: auto;
   }
-  [data-mv2='explore-host']:not([data-open]) [data-mv2='explore-dock'] {
+  [data-mv2='explore-crown'] {
     display: none;
+  }
+  /* the search bar starts after the crown, its middle level with the crown's */
+  [data-mv2='home'] [data-mv2='home-top'] {
+    padding-top: calc(max(var(--space-3), env(safe-area-inset-top, 0px)) + (var(--crown) - var(--hit)) / 2);
+  }
+  [data-mv2='home'] [data-mv2='home-bar'] {
+    padding-left: calc(var(--space-3) + var(--crown) + var(--space-3));
   }
 }
 [data-mv2='desktop-crown'],
 [data-mv2='desktop-items'] {
+  box-sizing: border-box;
+  width: var(--crown);
   border: 1px solid var(--divider);
   background: var(--surface-0);
   color: var(--text-1);
@@ -3941,80 +3966,126 @@ a[data-mv2='card2'],
   display: flex;
   align-items: center;
   justify-content: center;
-  width: var(--crown);
   height: var(--crown);
   padding: 0;
   border-radius: var(--radius-full);
   cursor: pointer;
 }
 [data-mv2='desktop-crown'] img {
-  width: var(--space-7);
+  width: calc(var(--crown) / 2);
   height: auto;
 }
 [data-mv2='desktop-items'] {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: var(--space-1);
-  min-width: var(--hit);
-  padding: var(--space-2);
-  border-radius: var(--radius-lg);
+  padding: var(--space-2) 0;
+  border-radius: var(--radius-full);
 }
 [data-mv2='desktop-item'] {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-1);
-  min-width: var(--hit);
+  gap: 0;
+  width: calc(var(--crown) - var(--space-2));
   min-height: var(--hit);
-  padding: var(--space-1);
+  padding: var(--space-1) 0;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-1);
   cursor: pointer;
 }
-[data-mv2='desktop-item'] svg {
-  width: var(--space-5);
-  height: var(--space-5);
-}
-[data-mv2='desktop-item'] small,
-[data-mv2='desktop-letter'] {
+[data-mv2='desktop-item'] small {
   font-size: var(--fs-1);
-  font-weight: var(--fw-semibold);
 }
 [data-mv2='desktop-item'][aria-current='page'] {
   background: var(--surface-2);
 }
-[data-mv2='do-drawer'] {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  min-width: calc(var(--space-7) * 4);
-  margin-left: calc(var(--crown) + var(--space-2));
-  padding: var(--space-2);
-  border: 1px solid var(--divider);
-  border-radius: var(--radius-lg);
-  background: var(--surface-0);
-  box-shadow: var(--elev-1);
+/* The top bar's round Search button, where the account button was (founder, 2026-11-17). */
+[data-mv2='home-bar'] {
+  justify-content: flex-end;
 }
-[data-mv2='do-drawer'] button {
+[data-mv2='home-find'] {
+  flex: none;
+  align-self: flex-start;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0;
-  min-height: var(--hit);
-  padding: var(--space-2);
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--hit) + var(--space-1));
+  height: calc(var(--hit) + var(--space-1));
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-1);
   color: var(--text-1);
-  text-align: left;
   cursor: pointer;
 }
-[data-mv2='do-drawer'] small {
-  color: var(--text-2);
+/* The filter chip (founder, 2026-11-17): small, in the filter's own colour, with its own clear button. */
+[data-mv2='filter-chip'] {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 60%;
+  min-height: var(--space-7);
+  padding: 0 0 0 var(--space-3);
+  border: 1px solid var(--chip, var(--accent));
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--chip, var(--accent)) 14%, var(--surface-0));
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
   font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='home-bar']:not([data-search]) [data-mv2='filter-chip'] {
+  margin-right: auto;
+}
+[data-mv2='filter-chip-label'] {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+[data-mv2='filter-chip'] [data-mv2='filter-dot'] {
+  background: var(--chip);
+  box-shadow: 0 0 var(--space-2) var(--chip);
+}
+[data-mv2='filter-chip-x'] {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-7);
+  height: var(--space-7);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-1);
+  cursor: pointer;
+}
+[data-mv2='filter-chip-x']::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--hit) - var(--space-7)) / -2);
+}
+/* a pin inside a panel filter glows in its own colour (applyMatch, app/map-v2-pins.jsx) */
+.mv2-pin[data-match] {
+  filter: drop-shadow(0 0 var(--space-2) var(--pin-cat));
+}
+/* open, the bar wraps its category list below: the magnifier stays level with the words */
+[data-mv2='home-search'][data-open] > svg {
+  align-self: flex-start;
+  height: var(--hit);
 }
 [data-mv2='home-search'][data-open] [data-mv2='home-filters'] {
   flex: 1 0 100%;

@@ -309,26 +309,27 @@
     for (let i = 0; i < TILES.length; i++) if (tileMatches(TILES[i].id, m)) return TILES[i];
     return null;
   }
+  // The map home's nav. Do and Central are hidden until they are built out (founder, 2026-11-17); with them gone the
+  // sticky nav keeps Map in the middle (Explore, Map, Me). Me opens the account menu (the top-right person button is a
+  // Search button now), so everything that button held is one tap from the nav.
   const DOCK = [
-    { id: 'do', icon: 'LayoutGrid', page: 'lets', params: {} },
-    { id: 'central', letter: 'C', page: 'kingdom-discovery', params: {} },
+    { id: 'explore', icon: 'Compass', page: 'explore' },
     { id: 'map', icon: 'Map', close: true, emphasis: true },
-    { id: 'explore', icon: 'Compass', page: 'explore', params: {} },
-    { id: 'me', icon: 'User', page: 'profile', params: {} },
+    { id: 'me', icon: 'User', me: true },
   ];
   const RAIL = [
     { id: 'map', icon: 'Map', act: 'map', emphasis: true },
     { id: 'explore', icon: 'Compass', act: 'open' },
-    { id: 'central', letter: 'C', act: 'go', page: 'kingdom-discovery' },
-    { id: 'do', icon: 'LayoutGrid', act: 'do' },
-    { id: 'me', icon: 'User', act: 'go', page: 'profile' },
+    { id: 'me', icon: 'User', me: true },
   ];
-  const DO_ROWS = [
-    { page: 'lets', title: 'Let\u2019s\u2026', line: 'Gather with people near you' },
-    { page: 'community', title: 'Kingdom Projects', line: 'A shared need, a shared response' },
-    { page: 'apply', title: 'List an organisation', line: 'Be easier to discover' },
-  ];
+  // The account menu's extra rows on the map home: Let's\u2026 is a Do page, so it is hidden with Do.
+  const ME_EXTRAS = ['messages', 'notifications'];
+
+  // The panel's rows. Each one can take the panel over as a "focus" (founder, 2026-11-17): the panel settles at ONE
+  // height with that row's cards, and stays there while the person taps through cards and tabs.
+  const SECTIONS = ['around', 'weekend', 'online', 'fresh', 'more'];
   const FINE_MQ = '(min-width: 1024px) and (pointer: fine)';
+  const DESK_MQ = '(min-width: 64rem)';    // the desktop nav beside the search bar takes over from the crown
   const HOUR = 60 * 60 * 1000;
   const DAY = 24 * HOUR;
   const NEW_WINDOW = 30 * DAY;
@@ -372,20 +373,24 @@
     const near = window.MapV2Nearby;
     const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
     const when = whenLine(m, rec);
+    const meta = [dist, when].filter(Boolean).join(' · ');
+    const by = m.ownerName ? ((window.MapV2Strings && window.MapV2Strings.sheet && window.MapV2Strings.sheet.by) || 'by') + ' ' + m.ownerName : '';
     return h('button', {
       type: 'button', 'data-mv2': 'xcard', 'data-explore-id': m.id,
       'data-selected': props.selected ? '' : undefined,
+      'aria-current': props.selected ? 'true' : undefined,
       onClick: () => props.onOpen && props.onOpen(m.id, m.type),
     },
       h('span', { 'data-mv2': 'xcard-img' },
-        cover ? h('img', { src: cover, alt: '' }) : (Icon ? h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 28 }) : null),
-        m.isLive ? h('span', { 'data-mv2': 'xcard-live' }, h('i', { 'aria-hidden': 'true' }), 'Live') : null),
+        cover ? h('img', { src: cover, alt: '' }) : (Icon ? h(Icon, { name: (cat && cat.icon), size: 22 }) : null),
+        m.isLive ? h('span', { 'data-mv2': 'xcard-live' }, h('i', { 'aria-hidden': 'true' }), 'Live') : null,
+        // what the next tap does, in words, over the picture (so choosing a card never changes its size)
+        props.selected && props.badge ? h('span', { 'data-mv2': 'xcard-badge' }, props.badge) : null),
       h('span', { 'data-mv2': 'xcard-body' },
         (cat && cat.name) || (group && words[group]) ? h('span', { 'data-mv2': 'xcard-chip' }, h('i', { 'data-cat': group || undefined, 'aria-hidden': 'true' }), h('span', { 'data-mv2': 'card-chip-label' }, (cat && cat.name) || words[group])) : null,
         h('b', null, m.title || ''),
-        dist ? h('small', { 'data-mv2': 'row-meta' }, dist) : null,
-        m.ownerName ? h('small', { 'data-mv2': 'xcard-by' }, ((window.MapV2Strings && window.MapV2Strings.sheet && window.MapV2Strings.sheet.by) || 'by') + ' ' + m.ownerName) : null,
-        when ? h('small', null, when) : null));
+        meta ? h('small', { 'data-mv2': 'row-meta' }, meta) : null,
+        by ? h('small', { 'data-mv2': 'xcard-by' }, by) : null));
   }
 
   function XRow(props) {
@@ -408,26 +413,36 @@
       if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
     };
     const Icon = window.Icon;
+    const P = S().panel || {};
     return h('div', { 'data-mv2': 'xrow-wrap' },
-      props.fine && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': 'Scroll left', onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
+      props.fine && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
       h('div', { 'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure }, props.children),
-      props.fine && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': 'Scroll right', onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
+      props.fine && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
   }
 
   /**
-   * The home Explore sheet. A short Where to… strip leaves the map in view.
-   * Dragging it up opens the rest of the rows. The crown becomes the sticky nav.
-   * Open, it scrolls carousels and the crown is the sticky nav. A tile becomes tabs.
-   * props: markers, ideas, sources, apiRef, selectedId, reveal, hidden, onOpen, onSeeAll, onHeight, onTile, onOpenChange, onGo.
+   * The home Explore panel (founder, 2026-11-17). Four looks, one element:
+   *   rest   the crown alone at the foot (a phone's default: the map gets the whole screen)
+   *   strip  the handle and the Where to… tiles (the crown's tap; a wide screen's default)
+   *   focus  ONE row taken over: a Where to… tile, or Near and Now… / This weekend / Online / New on Connect / More near
+   *          you. Tabs, a line, and that row's cards, at one fixed height that never changes while the person taps
+   *          through tabs and cards. The map shows the row's pins, glowing.
+   *   open   every row, scrolled (dragged up from any of the others); the crown is the sticky nav.
+   * The panel moves by transform only (never its height), and the crown and the nav swap without a morph, so a phone
+   * does no layout work while it moves. The focus itself (`props.focus`, { kind: 'tile' | 'sec', id }) belongs to the
+   * map screen, which filters the pins with it and owns the filter chip that clears it.
+   * props: markers, ideas, sources, apiRef, selectedId, reveal, hidden, focus, filtered, onFocus(next), onReset(),
+   *        onSectionIds(ids), onOpen(id, type), onSeeAll, onHeight(px), onOpenChange(open), onGo(page, params).
    */
   function Explore(props) {
     const api = props.apiRef;
-    const [open, setOpen] = useState(false);
-    const [tile, setTile] = useState('');
-    const [rail, setRail] = useState(true);
-    const [drawer, setDrawer] = useState(false);
+    const desk = useMedia(DESK_MQ);
     const fine = useMedia(FINE_MQ);
+    const [stage, setStage] = useState(() => (matches(DESK_MQ) ? 'strip' : 'rest'));
+    const [rail, setRail] = useState(true);
+    const [me, setMe] = useState('');          // '' | 'rail' | 'dock': where the account menu is open
     const [view, setView] = useState(() => (api && api.current ? api.current.view() : { centre: null, user: null }));
+    const host = useRef(null);
     const root = useRef(null);
     const tabsRef = useRef(null);
     const scrollRef = useRef(null);
@@ -435,6 +450,14 @@
     const str = S();
     const P = str.panel || {};
     const Icon = window.Icon;
+    const focus = props.focus || null;
+    const tile = focus && focus.kind === 'tile' ? focus.id : '';
+    const sec = focus && focus.kind === 'sec' ? focus.id : '';
+    // A wide screen has no crown-only rest (its crown heads the nav beside the search bar).
+    const base = stage === 'rest' && desk ? 'strip' : stage;
+    const mode = base === 'open' ? 'open' : (focus ? 'focus' : base);
+    const open = mode === 'open';
+    const setFocus = (next) => { if (props.onFocus) props.onFocus(next); };
 
     useEffect(() => {
       if (!api || !api.current || !api.current.onView) return undefined;
@@ -454,32 +477,54 @@
       return () => { clearTimeout(timer); off(); };
     }, [api]);
 
-    useEffect(() => { if (props.onTile) props.onTile(tile || null); }, [tile]);
     useEffect(() => { if (props.onOpenChange) props.onOpenChange(open); }, [open]);
     useEffect(() => {
       if (!open || props.hidden) return undefined;
-      const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false); } };
+      const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setStage('strip'); } };
       document.addEventListener('keydown', onKey, true);
       return () => document.removeEventListener('keydown', onKey, true);
     }, [open, props.hidden]);
+    // Leaving the full panel puts its rows back at the top, so the strip and the focus always show their own head.
+    useEffect(() => { if (!open && scrollRef.current) scrollRef.current.scrollTop = 0; }, [open]);
+    // How much of the map the panel covers, for the map's corner and controls: read from the CSS (one source of truth).
     useEffect(() => {
       if (!props.onHeight) return undefined;
-      props.onHeight(open ? 0 : (tile ? 292 : 168));
-      return () => props.onHeight(0);
-    }, [open, tile]);
+      const el = host.current;
+      const px = el && !open && window.getComputedStyle ? parseFloat(window.getComputedStyle(el).getPropertyValue('--xp-vis')) : 0;
+      // before the stylesheet has arrived the token reads empty: the strip and the focus still take room
+      props.onHeight(Number.isFinite(px) ? px : (mode === 'strip' || mode === 'focus' ? 1 : 0));
+      return undefined;
+    }, [mode, desk]);
+    useEffect(() => () => { if (props.onHeight) props.onHeight(0); }, []);
+    // Off screen, the panel's buttons leave the tab order and the screen reader (React 18 has no `inert` prop).
+    useEffect(() => {
+      const el = root.current;
+      if (!el) return;
+      if (mode === 'rest') el.setAttribute('inert', '');
+      else el.removeAttribute('inert');
+    }, [mode]);
+    useEffect(() => { if (open || props.hidden) setMe(''); }, [open, props.hidden]);
 
+    // the chosen tab in view, in the middle of its row
+    const tabKey = tile || sec;
     useEffect(() => {
       const row = tabsRef.current;
-      if (!row || !tile) return undefined;
-      const el = row.querySelector('[data-tile="' + cssId(tile) + '"]');
+      if (!row || !tabKey) return undefined;
+      const el = row.querySelector('[data-tab="' + cssId(tabKey) + '"]');
       if (!el || typeof row.scrollTo !== 'function') return undefined;
       const left = Math.max(0, el.offsetLeft - row.clientWidth / 2 + el.offsetWidth / 2);
       row.scrollTo({ left: left, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
       return undefined;
-    }, [tile]);
+    }, [tabKey, mode]);
 
     const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
-    const origin = view.user || view.centre;
+    // The rows rank from where the map looks, but a focus holds its first origin until it ends: the map moves for the
+    // focus itself (to the town, to a chosen card), and re-ranking then would reorder the cards under the person's finger.
+    const live = view.user || view.centre;
+    const held = useRef(null);
+    if (!focus) held.current = null;
+    else if (!held.current && live) held.current = live;
+    const origin = (focus && held.current) || live;
     const markers = (Array.isArray(props.markers) ? props.markers : []).filter((m) => m && m.type !== 'contributor');
     const ideas = Array.isArray(props.ideas) ? props.ideas : [];
     const pool = markers.concat(ideas.filter((m) => m && markers.every((x) => x.id !== m.id)));
@@ -490,13 +535,21 @@
     const tileItems = current ? ranked(pool.filter((m) => tileMatches(current.id, m)), 12) : [];
     const now = Date.now();
     const soon = (m) => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= now && t - now <= 6 * HOUR; };
-    const around = ranked(pool.filter((m) => (m.type === 'event' && (m.isLive || soon(m))) || m.type === 'place'), 12);
     const weekend = weekendBounds(now);
-    const weekendItems = ranked(pool.filter((m) => m.type === 'event' && (() => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= weekend.start && t <= weekend.end; })()), 12);
-    const onlineItems = ranked(pool.filter((m) => looksOnline(m, byKey.get(m.type + ':' + m.id))), 12);
-    const freshItems = ranked(pool.filter((m) => { const t = Date.parse(m.createdAt || ''); return !isNaN(t) && now - t >= 0 && now - t <= NEW_WINDOW; }), 12)
-      .sort((a, b) => Date.parse(b.m.createdAt || '') - Date.parse(a.m.createdAt || ''));
-    const more = ranked(pool.filter((m) => m.type !== 'idea'), 16);
+    const rows = {
+      around: ranked(pool.filter((m) => (m.type === 'event' && (m.isLive || soon(m))) || m.type === 'place'), 12),
+      weekend: ranked(pool.filter((m) => m.type === 'event' && (() => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= weekend.start && t <= weekend.end; })()), 12),
+      online: ranked(pool.filter((m) => looksOnline(m, byKey.get(m.type + ':' + m.id))), 12),
+      fresh: ranked(pool.filter((m) => { const t = Date.parse(m.createdAt || ''); return !isNaN(t) && now - t >= 0 && now - t <= NEW_WINDOW; }), 12)
+        .sort((a, b) => Date.parse(b.m.createdAt || '') - Date.parse(a.m.createdAt || '')),
+      more: ranked(pool.filter((m) => m.type !== 'idea'), 16),
+    };
+    const rowTitle = (id) => P[id] || id;
+    const rowHint = (id) => P[id + 'Hint'] || '';
+
+    // A row in focus tells the map which pins it holds (the map keeps them on screen and makes them glow).
+    const secIds = sec && rows[sec] ? rows[sec].map((r) => r.m.id).join('|') : '';
+    useEffect(() => { if (props.onSectionIds) props.onSectionIds(secIds ? secIds.split('|') : []); }, [secIds]);
 
     const pendingFocus = useRef('');
     useEffect(() => {
@@ -504,137 +557,186 @@
       if (!r || r.id !== props.selectedId || !r.focus) return undefined;
       const m = pool.find((x) => x.id === r.id);
       const next = m ? tileFor(m) : null;
-      setOpen(true);
-      if (next) setTile(next.id);
+      if (next) setFocus({ kind: 'tile', id: next.id });
+      setStage((s) => (s === 'rest' ? 'strip' : s));
       pendingFocus.current = r.id;
       return undefined;
     }, [props.reveal]);
     useEffect(() => {
       const id = pendingFocus.current;
-      if (!id || !open || !root.current) return undefined;
-      const host = root.current.parentNode;
-      const sel = '[data-explore-id="' + cssId(id) + '"]';
-      const card = host && (host.querySelector('[data-row="tile"] ' + sel) || host.querySelector('[data-row="more"] ' + sel) || host.querySelector(sel));
+      if (!id || mode === 'rest' || !root.current) return undefined;
+      const card = root.current.querySelector('[data-explore-id="' + cssId(id) + '"]');
       if (card && card.focus) { card.focus({ preventScroll: true }); pendingFocus.current = ''; }
       return undefined;
-    }, [open, tile, props.reveal]);
+    }, [mode, tile, props.reveal]);
 
-    const choose = (id) => setTile((cur) => (cur === id ? '' : id));
-    const onGrabDown = (e) => { drag.current = { y: e.clientY }; };
+    // A tile or a row taken over: the panel settles at its focus height (from the full panel too).
+    const chooseTile = (id) => { setFocus(tile === id ? null : { kind: 'tile', id: id }); setStage('strip'); };
+    const chooseRow = (id) => { setFocus(sec === id ? null : { kind: 'sec', id: id }); setStage('strip'); };
+    const raise = () => setStage('open');
+    const lower = () => {
+      if (open) { setStage('strip'); return; }
+      if (focus) { setFocus(null); return; }
+      if (!desk) setStage('rest');
+    };
+    // A drag on the handle raises or lowers the panel; a tap (or a screen reader's activation, which sends a click and
+    // no pointer events) toggles it. A drag swallows the click that follows it, so it never toggles twice.
+    const dragged = useRef(false);
+    const onGrabDown = (e) => { drag.current = { y: e.clientY }; dragged.current = false; };
     const onGrabUp = (e) => {
       const d = drag.current;
       drag.current = null;
       if (!d) return;
       const dy = e.clientY - d.y;
-      if (dy <= -24) setOpen(true);
-      else if (dy >= 24) setOpen(false);
-      else setOpen((v) => !v);
+      if (Math.abs(dy) < 24) return;
+      dragged.current = true;
+      if (dy < 0) raise();
+      else lower();
+    };
+    const onGrabClick = () => {
+      if (dragged.current) { dragged.current = false; return; }
+      if (open) lower();
+      else raise();
+    };
+    // The crown: with any filter on, it clears them all and goes home (the map screen snaps to the person's place);
+    // otherwise it shows or hides the Where to… strip.
+    const filtered = !!focus || !!props.filtered;
+    const onCrown = () => {
+      setMe('');
+      if (filtered) { if (props.onReset) props.onReset(); setStage('rest'); return; }
+      setStage((s) => (s === 'rest' ? 'strip' : 'rest'));
+    };
+    const crownLabel = filtered ? (P.reset) : (base === 'rest' ? (P.open) : (P.close));
+
+    // A card in the full panel takes its row over first; the map screen then chooses it (a second tap opens it).
+    const openCard = (row) => (id, type) => {
+      if (open) {
+        if (row === 'tile') setStage('strip');
+        else if (SECTIONS.indexOf(row) !== -1) chooseRow(row);
+      }
+      if (props.onOpen) props.onOpen(id, type);
     };
     const cards = (id, list) => h(XRow, { id: id, fine: fine, list: list }, list.map((r) => h(XCard, {
       key: id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
       groupWords: str.groups, distWords: distWords,
-      selected: props.selectedId === r.m.id && (id === 'more' || id === 'tile'),
-      onOpen: props.onOpen,
+      selected: props.selectedId === r.m.id, badge: str.selectedBadge,
+      onOpen: openCard(id),
     })));
-    const section = (id, title, hint, list) => (list && list.length ? h('section', { key: id, 'data-mv2': 'xsec', 'aria-label': title },
-      h('div', { 'data-mv2': 'xsec-h' }, h('h3', null, title), hint ? h('small', null, hint) : null),
-      cards(id, list)) : null);
-    const kindPlural = (current && P.kind && P.kind[pool.find((m) => tileMatches(current.id, m)) ? (pool.find((m) => tileMatches(current.id, m)).type) : '']) || 'listings';
+    const kindOf = current ? pool.find((m) => tileMatches(current.id, m)) : null;
+    const kindPlural = (kindOf && P.kind && P.kind[kindOf.type]) || 'listings';
     const kindWord = tileItems.length === 1 ? ({ events: 'event', places: 'place', contributors: 'contributor', ideas: 'idea', listings: 'listing' })[kindPlural] || kindPlural : kindPlural;
 
-    const railGo = (item) => {
-      if (item.act === 'map') { setOpen(false); setDrawer(false); return; }
-      if (item.act === 'open') { setOpen(true); setDrawer(false); return; }
-      if (item.act === 'do') { setDrawer((d) => !d); return; }
-      setDrawer(false);
-      if (item.page && props.onGo) props.onGo(item.page, {});
+    const tab = (id, word, icon, on, onClick, extra) => h('button', Object.assign({
+      key: id, type: 'button', 'data-mv2': 'explore-tile', 'data-tab': id,
+      role: 'tab', 'aria-selected': on ? 'true' : 'false', onClick: onClick,
+    }, extra), icon && Icon ? h(Icon, { name: icon, size: 16 }) : null, h('span', null, word));
+    const tilesBig = () => h('div', {
+      ref: tabsRef, 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where,
+    }, TILES.map((t) => h('button', {
+      key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
+      onClick: () => chooseTile(t.id),
+    }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word))));
+    const tileTabs = () => h('div', { ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.where },
+      TILES.map((t) => tab(t.id, t.word, t.icon, tile === t.id, () => chooseTile(t.id), { 'data-tile': t.id })));
+    const rowTabs = () => h('div', { ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.rows },
+      SECTIONS.filter((id) => rows[id].length || id === sec).map((id) => tab(id, rowTitle(id), null, sec === id, () => chooseRow(id), { 'data-sec': id })));
+    // The focus: tabs, one line (what is shown, and the plain-words way back), and the row's cards.
+    const focusView = () => {
+      const list = tile ? tileItems : (rows[sec] || []);
+      const line = tile ? (P.matches ? P.matches(list.length, kindWord) : '') : rowHint(sec);
+      return h('div', { 'data-mv2': 'xfocus', 'data-focus': tile ? 'tile' : 'sec' },
+        tile ? tileTabs() : rowTabs(),
+        h('div', { 'data-mv2': 'xfocus-bar' },
+          h('small', null, line),
+          h('button', { type: 'button', 'data-mv2': 'explore-reset', onClick: () => setFocus(null) }, tile ? (P.allTypes) : (P.closeRow))),
+        list.length ? cards(tile ? 'tile' : sec, list)
+          : h('p', { 'data-mv2': 'explore-empty' }, tile ? (P.emptyTile ? P.emptyTile(current ? current.word : '') : '') : (P.emptyRow || '')));
     };
+    const section = (id) => (rows[id].length ? h('section', { key: id, 'data-mv2': 'xsec', 'data-sec': id, 'aria-label': rowTitle(id) },
+      h('div', { 'data-mv2': 'xsec-h' },
+        h('h3', null, h('button', { type: 'button', 'data-mv2': 'xsec-go', onClick: () => chooseRow(id) }, rowTitle(id))),
+        rowHint(id) ? h('small', null, rowHint(id)) : null),
+      cards(id, rows[id])) : null);
+    const openView = () => [
+      h('div', { key: 'tiles' }, tile ? tileTabs() : tilesBig()),
+      current ? h('div', { key: 'tile', 'data-mv2': 'xsec' },
+        h('div', { 'data-mv2': 'xsec-h' },
+          h('h3', null, current.word),
+          h('small', null, P.matches ? P.matches(tileItems.length, kindWord) : '')),
+        tileItems.length ? cards('tile', tileItems) : h('p', { 'data-mv2': 'explore-empty' }, P.emptyTile ? P.emptyTile(current.word) : '')) : null,
+    ].concat(SECTIONS.map(section), [h('button', {
+      key: 'more-link', type: 'button', 'data-mv2': 'explore-more', 'aria-label': P.seeAll,
+      onClick: () => { if (props.onSeeAll) props.onSeeAll(); },
+    },
+      h('span', { 'data-mv2': 'explore-more-ring' }, Icon ? h(Icon, { name: 'Compass', size: 22 }) : null),
+      h('small', null, P.seeAll))]);
+
+    // Me: the account menu, beside the desktop nav or above the sticky nav.
+    const meItem = (where, item, attrs, lead) => h('div', { key: item.id, 'data-mv2': 'me-wrap' },
+      h('button', Object.assign({
+        type: 'button', 'data-nav': item.id, 'aria-expanded': me === where ? 'true' : 'false', 'aria-haspopup': 'true',
+        onClick: () => setMe((v) => (v === where ? '' : where)),
+      }, attrs), lead, h('small', null, (P.nav && P.nav[item.id]) || item.id)),
+      me === where && window.ProfilePanel ? h(window.ProfilePanel, { anchor: where, extras: ME_EXTRAS, onClose: () => setMe('') }) : null);
+    const navIcon = (item) => (Icon ? h(Icon, { name: item.icon, size: 20 }) : null);
+    const railGo = (item) => {
+      setMe('');
+      if (item.act === 'map') { setStage('strip'); return; }
+      if (item.act === 'open') raise();
+    };
+
     return h('div', {
-      'data-mv2': 'explore-host', 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined, hidden: props.hidden || undefined,
+      ref: host, 'data-mv2': 'explore-host', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
+      hidden: props.hidden || undefined,
     },
       !open && h('div', { 'data-mv2': 'desktop-nav' },
         h('button', {
           type: 'button', 'data-mv2': 'desktop-crown', 'aria-expanded': rail ? 'true' : 'false',
-          'aria-label': rail ? 'Hide navigation' : 'Show navigation',
-          onClick: () => { setRail((v) => !v); setDrawer(false); },
-        }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)),
-        rail && h('nav', { 'data-mv2': 'desktop-items', 'aria-label': P.dock || 'Connect' }, RAIL.map((item) => h('button', {
-          key: item.id, type: 'button', 'data-mv2': 'desktop-item', 'data-nav': item.id,
-          'data-emphasis': item.emphasis ? '' : undefined,
-          'aria-current': item.act === 'map' ? 'page' : undefined,
-          onClick: () => railGo(item),
-        },
-          item.letter ? h('span', { 'data-mv2': 'desktop-letter', 'aria-hidden': 'true' }, item.letter) : (Icon ? h(Icon, { name: item.icon, size: 20 }) : null),
-          h('small', null, (P.nav && P.nav[item.id]) || item.id)))),
-        drawer && h('div', { 'data-mv2': 'do-drawer', role: 'menu', 'aria-label': 'Do' }, DO_ROWS.map((row) => h('button', {
-          key: row.page, type: 'button', role: 'menuitem',
-          onClick: () => { setDrawer(false); if (props.onGo) props.onGo(row.page, {}); },
-        }, h('b', null, row.title), h('small', null, row.line))))),
-      h('div', { 'data-mv2': 'explore-scrim', onClick: () => setOpen(false) }),
+          'aria-label': rail ? P.hideNav : P.showNav,
+          onClick: () => { setRail((v) => !v); setMe(''); },
+        }, window.CrownMark ? h(window.CrownMark, { size: 26 }) : (Icon ? h(Icon, { name: 'Crown', size: 22 }) : null)),
+        rail && h('nav', { 'data-mv2': 'desktop-items', 'aria-label': P.dock }, RAIL.map((item) => (item.me
+          ? meItem('rail', item, { 'data-mv2': 'desktop-item' }, navIcon(item))
+          : h('button', {
+            key: item.id, type: 'button', 'data-mv2': 'desktop-item', 'data-nav': item.id,
+            'data-emphasis': item.emphasis ? '' : undefined,
+            'aria-current': item.act === 'map' ? 'page' : undefined,
+            onClick: () => railGo(item),
+          }, navIcon(item), h('small', null, (P.nav && P.nav[item.id]) || item.id)))))),
+      h('div', { 'data-mv2': 'explore-scrim', onClick: () => setStage('strip') }),
       h('section', {
-        ref: root, 'data-mv2': 'explore', 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
-        'aria-label': 'Explore',
+        ref: root, 'data-mv2': 'explore', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
+        'aria-label': str.title,
       },
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
-          'aria-label': open ? (P.close || 'Lower Explore') : (str.title || 'Explore'),
-          onPointerDown: onGrabDown, onPointerUp: onGrabUp,
-          onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen((v) => !v); } },
+          'aria-label': open ? (P.lower) : (P.raise),
+          onPointerDown: onGrabDown, onPointerUp: onGrabUp, onClick: onGrabClick,
+          onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (open) lower(); else raise(); } },
         },
-          h('span', { 'data-mv2': 'explore-peek' },
-            h('span', null, h('b', null, str.title || 'Explore'), h('small', null, P.peek || 'Where to…')),
-            h('span', null, h('small', null, P.nearCount ? P.nearCount(pool.length) : ''))),
           h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' })),
         h('div', { 'data-mv2': 'explore-scroll', ref: scrollRef },
-          h('div', { 'data-mv2': 'explore-head' },
-            h('div', null,
-              h('span', { 'data-mv2': 'explore-kicker' }, view.user ? (P.kickerNear || 'Near you') : (P.kickerMap || 'Near the map')),
-              h('h2', null, P.where || 'Where to…')),
-            tile ? h('button', { type: 'button', 'data-mv2': 'explore-reset', onClick: () => setTile('') }, P.allTypes || 'All types') : null),
-          h('div', {
-            ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': tile ? '' : undefined,
-            role: tile ? 'tablist' : 'list', 'aria-label': P.where || 'Where to…',
-          }, TILES.map((t) => h('button', {
-            key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id,
-            role: tile ? 'tab' : undefined, 'aria-selected': tile ? (tile === t.id ? 'true' : 'false') : undefined,
-            onClick: () => choose(t.id),
-          }, Icon ? h(Icon, { name: t.icon, size: tile ? 16 : 24 }) : null, h('span', null, t.word)))),
-          current ? (tileItems.length
-            ? h('div', { 'data-mv2': 'xsec' },
-              h('div', { 'data-mv2': 'xsec-h' },
-                h('h3', null, current.word),
-                h('small', null, P.matches ? P.matches(tileItems.length, kindWord) : '')),
-              cards('tile', tileItems))
-            : h('p', { 'data-mv2': 'explore-empty' }, P.emptyTile ? P.emptyTile(current.word) : '')) : null,
-          section('around', P.around || 'Near and Now…', P.aroundHint, around),
-          section('weekend', P.weekend || 'This weekend', P.weekendHint, weekendItems),
-          section('online', P.online || 'Online', P.onlineHint, onlineItems),
-          section('fresh', P.fresh || 'New on Connect', P.freshHint, freshItems),
-          section('more', P.more || 'More near you', P.moreHint, more),
-          h('button', {
-            type: 'button', 'data-mv2': 'explore-more', 'aria-label': P.seeAll || 'Explore more',
-            onClick: () => { if (props.onSeeAll) props.onSeeAll(); },
-          },
-            h('span', { 'data-mv2': 'explore-more-ring' }, Icon ? h(Icon, { name: 'Compass', size: 22 }) : null),
-            h('small', null, P.seeAll || 'Explore more')))),
-      h('div', { 'data-mv2': 'explore-dock' },
-        h('button', {
-          type: 'button', 'data-mv2': 'explore-crown', 'aria-label': P.open || 'Open Explore',
-          tabIndex: open ? -1 : 0, onClick: () => setOpen(true),
-        }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)),
-        h('div', { 'data-mv2': 'explore-items', role: 'navigation', 'aria-label': P.dock || 'Connect', 'aria-hidden': open ? undefined : 'true' },
-          DOCK.map((item) => h('button', {
+          mode === 'focus' ? focusView() : mode === 'open' ? openView() : tilesBig())),
+      // The crown and the sticky nav swap outright (founder, 2026-11-17: the morph was slow on a phone).
+      !open ? h('button', {
+        type: 'button', 'data-mv2': 'explore-crown', 'aria-label': crownLabel,
+        'data-filtered': filtered ? '' : undefined, onClick: onCrown,
+      }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)) : null,
+      open ? h('nav', { 'data-mv2': 'explore-dock', 'aria-label': P.dock },
+        DOCK.map((item) => {
+          const lead = navIcon(item);
+          if (item.me) return meItem('dock', item, { 'data-mv2': 'explore-nav' }, lead);
+          return h('button', {
             key: item.id, type: 'button', 'data-mv2': 'explore-nav', 'data-nav': item.id,
             'data-emphasis': item.emphasis ? '' : undefined,
-            tabIndex: open ? 0 : -1,
-            'aria-current': open && item.id === 'explore' ? 'page' : undefined,
+            'aria-current': item.id === 'explore' ? 'page' : undefined,
             onClick: () => {
-              if (item.close) { setOpen(false); if (scrollRef.current) scrollRef.current.scrollTop = 0; return; }
-              if (item.page && props.onGo) props.onGo(item.page, item.params || {});
+              setMe('');
+              if (item.close) { setStage(desk ? 'strip' : 'rest'); return; }
+              if (item.page && props.onGo) props.onGo(item.page, {});
             },
-          },
-            item.letter ? h('span', { 'data-mv2': 'explore-letter', 'aria-hidden': 'true' }, item.letter) : (Icon ? h(Icon, { name: item.icon, size: 20 }) : null),
-            h('small', null, (P.nav && P.nav[item.id]) || item.id))))));
+          }, lead, h('small', null, (P.nav && P.nav[item.id]) || item.id));
+        })) : null);
   }
 
   // An id inside an attribute selector: listing ids are uuids or slugs, but never trust that.
@@ -647,7 +749,7 @@
   const useNarrow = () => useMedia(NARROW_MQ);
 
   window.MapV2Explore = {
-    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore,
+    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore, SECTIONS,
     lastView: () => lastView,
   };
 })();

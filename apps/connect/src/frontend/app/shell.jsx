@@ -25,8 +25,16 @@
   }
 
   // ── Profile / role-switch panel ──
-  // anchor 'top' (under the account button), 'nav' (above Map v2's folding nav, #210) or the sidebar's default.
+  // anchor 'top' (under the account button), 'nav' (above Map v2's folding nav, #210), 'rail' (beside the map home's
+  // desktop nav), 'dock' (above the map home's sticky nav), or the sidebar's default.
   // extras: Map v2's nav has no Projects, Messages or Alerts of its own, so its account menu lists them, with counts.
+  // `true` lists all three; an array lists only those pages (the map home's Me: Let's… is hidden with Do for now).
+  const PANEL_POS = {
+    top: 'right-0 top-full mt-2',
+    nav: 'left-0 right-0 mx-auto bottom-0',
+    rail: 'left-full top-0 ml-3',
+    dock: 'right-0 bottom-full mb-3',
+  };
   function ProfilePanel({ onClose, anchor, extras }) {
     const app = window.useApp();
     useBackGuard(true, onClose);
@@ -34,12 +42,19 @@
     const ref = useRef(null);
     const [claiming, setClaiming] = useState(false);
     useEffect(() => {
-      const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+      // A press outside closes the panel, but not one on the button that opened it (the panel's own parent box):
+      // that button toggles, and closing here first would let its click open the panel straight back up.
+      const h = (e) => {
+        const box = ref.current;
+        if (!box || box.contains(e.target)) return;
+        if (box.parentNode && box.parentNode.contains(e.target)) return;
+        onClose();
+      };
       const t = setTimeout(() => document.addEventListener('mousedown', h), 0);
       return () => { clearTimeout(t); document.removeEventListener('mousedown', h); };
     }, [onClose]);
 
-    const pos = anchor === 'top' ? 'right-0 top-full mt-2' : anchor === 'nav' ? 'left-0 right-0 mx-auto bottom-0' : 'left-full bottom-0 ml-2';
+    const pos = PANEL_POS[anchor] || 'left-full bottom-0 ml-2';
     const go2 = (p) => { go(p); onClose(); };
 
     // An admin, or the Google Form, may have made a listing for this person's email (see
@@ -62,10 +77,12 @@
     const links = [{ p: 'profile', label: 'View Profile', icon: 'User' }];
     if (extras) {
       const menu = (window.MapV2Strings && window.MapV2Strings.nav && window.MapV2Strings.nav.menu) || {};
-      links.push(
+      const wanted = Array.isArray(extras) ? extras : ['lets', 'messages', 'notifications'];
+      [
         { p: 'lets', label: menu.lets, icon: 'Users' },
         { p: 'messages', label: menu.messages, icon: 'MessageCircle', count: unreadMsgs },
-        { p: 'notifications', label: menu.alerts, icon: 'Bell', count: unreadNotifs });
+        { p: 'notifications', label: menu.alerts, icon: 'Bell', count: unreadNotifs },
+      ].forEach((l) => { if (wanted.indexOf(l.p) !== -1) links.push(l); });
     }
     // citizenscentral.co.za/dashboard is a real, bookmarkable destination
     // (next.config.ts rewrite + store.jsx deep link) once you ARE a

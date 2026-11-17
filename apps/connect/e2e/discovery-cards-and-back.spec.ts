@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { openListing } from "./support/map-v2";
+import { openListing, openMe } from "./support/map-v2";
 
 declare global {
   interface Window {
@@ -243,8 +243,8 @@ test.describe("Device Back button", () => {
 
     // An open overlay is dismissed BEFORE the screen changes. (The category
     // sheet this used to open no longer exists — it duplicated the pill row —
-    // so the account panel, the app's one profile entry point, stands in.)
-    await page.getByRole("button", { name: "Your account" }).click();
+    // so the account panel, the app's one profile entry point, stands in: on the map home it is the nav's Me.)
+    await openMe(page);
     await expect(page.getByRole("button", { name: /View Profile/ })).toBeVisible();
     await page.goBack();
     await expect(page.getByRole("button", { name: /View Profile/ })).toBeHidden();
@@ -451,16 +451,15 @@ test.describe("One profile entry point", () => {
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // Pack 08: the crown opens the sticky nav (Me, Map, Central, Do, Explore). There is no "You" tab.
-    await page.getByRole("button", { name: "Open Explore" }).click();
-    const bottomNav = page.getByRole("navigation", { name: "Connect" });
+    // Founder, 2026-11-17: no account button on the map home; the open panel's sticky nav (Explore, Map, Me) holds it in Me.
+    // There is no "You" tab.
+    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(0);
+    await openMe(page);
+    const bottomNav = page.locator("[data-mv2='explore-dock']");
     await expect(bottomNav.getByRole("button", { name: "You" })).toHaveCount(0);
     await expect(bottomNav.getByRole("button", { name: "Explore" })).toBeVisible();
-    await page.keyboard.press("Escape");
 
-    // Exactly one account control, and its panel opens inside the viewport.
-    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
-    await page.getByRole("button", { name: "Your account" }).click();
+    // Exactly one account menu, and it opens inside the viewport.
     const panel = page.getByRole("button", { name: /View Profile/ });
     await expect(panel).toBeVisible();
     const box = await panel.boundingBox();
@@ -470,14 +469,15 @@ test.describe("One profile entry point", () => {
     expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height);
     await page.keyboard.press("Escape");
 
-    // Same control, same corner, on the list screen (#210 part 3: the nav's Explore is the Discover page).
-    await page.getByRole("button", { name: "Open Explore" }).click();
-    await page.getByRole("navigation", { name: "Connect" }).getByRole("button", { name: "Explore" }).click();
+    // The list screen keeps its account button in the top corner (#210 part 3: the nav's Explore is the Discover page).
+    // (Escape closed the menu and lowered the panel: raise it again for its nav)
+    if (!(await bottomNav.isVisible())) await page.locator("[data-mv2='explore-grab']").click();
+    await bottomNav.getByRole("button", { name: "Explore" }).click();
     await expect(page.locator('[data-screen="explore"]')).toBeVisible();
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
   });
 
-  test("the map's top bar is search + account only, and the categories are inside the Explore panel", async ({ page }) => {
+  test("the map's top bar is search only, and the categories are inside the Explore panel", async ({ page }) => {
     await mockNetwork(page);
     await page.goto("/");
     const screen = page.locator('[data-screen="discover"]');
@@ -491,7 +491,11 @@ test.describe("One profile entry point", () => {
     // category, place category and Contributor type (mapV2Explore.test.tsx checks the mapping). They are no longer a pill row
     // over the map: they are a list inside the Explore panel, behind its title, starting with All.
     await expect(screen.getByRole("group", { name: "Show on the map" })).toHaveCount(0);
-    await page.getByRole("button", { name: "Open Explore" }).click();
+    await expect(screen.getByRole("button", { name: "Your account" })).toHaveCount(0);
+    await expect(screen.getByRole("button", { name: "Search", exact: true })).toBeVisible();
+    // a phone rests on the crown, which shows the Where to… tiles; a wide screen shows them from the start
+    const crown = screen.locator("[data-mv2='explore-crown']");
+    if (await crown.isVisible()) await crown.click();
     const tiles = screen.locator("[data-mv2='explore-tiles']");
     await expect(tiles.getByRole("button", { name: "Coffee", exact: true })).toBeVisible();
     await expect(tiles.getByRole("button", { name: "Church", exact: true })).toBeVisible();

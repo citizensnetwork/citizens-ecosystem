@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { openListing } from "./support/map-v2";
+import { openListing, openExploreAll } from "./support/map-v2";
 import {
   FAKE_PROJECT,
   FAKE_PROJECT_CORS,
@@ -464,10 +464,14 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole("button", { name: "Kingdom Exploration" }).first().click();
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
-    expect(path(page)).toBe("/discover");
-    expect(await pushes(page)).toEqual([{ active: true, guard: false, url: "/discover" }]);
+    // the map home's menu is the open Explore panel's nav (founder, 2026-11-17: Central is hidden for now; opening the
+    // panel itself pushes nothing), and its Explore opens the Explore page
+    await openExploreAll(page);
+    expect(await pushes(page)).toEqual([]);
+    await page.locator("[data-mv2='explore-dock']").getByRole("button", { name: "Explore" }).click();
+    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
+    expect(path(page)).toBe("/explore");
+    expect(await pushes(page)).toEqual([{ active: true, guard: false, url: "/explore" }]);
 
     await page.goBack();
     await expect.poll(() => screen(page)).toBe("discover");

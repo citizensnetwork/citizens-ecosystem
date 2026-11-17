@@ -214,59 +214,134 @@ describe("Pills", () => {
   });
 });
 
-describe("Explore panel", () => {
+describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => {
   const view = { centre: ORIGIN, user: null as null | { lat: number; lng: number } };
   const apiRef = { current: { view: () => view, onView: () => () => {} } };
   const markers = [mk("one", 1, { title: "First church" }), mk("two", 3, { title: "Second café", category: "hospitality-cafes", type: "place", ownerName: "Anchor Community Church" }), mk("three", 6, { title: "Third", type: "event", category: "kids" })];
   const sources = { contributors: [{ id: "one", coverPhoto: "https://img.test/one.jpg" }], places: [], events: [] };
-  const open = () => {
-    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn(), onTile: vi.fn(), onOpenChange: vi.fn() }));
-    fireEvent.click(screen.getByRole("button", { name: "Open Explore" }));
-  };
-
-  it("starts closed on the crown and opens onto Where to… tiles", () => {
-    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("data-open")).toBe(false);
-    fireEvent.click(screen.getByRole("button", { name: "Open Explore" }));
-    expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("data-open")).toBe(true);
-    expect(screen.getByRole("heading", { name: "Where to…" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Coffee" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Church" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Kids" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Contributors" })).toBeNull();
+  const P = () => (S.explore as unknown as { panel: Record<string, string> }).panel;
+  const mode = () => document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode");
+  // The map screen owns the focus; this stands in for it.
+  function Harness(props: Record<string, unknown>) {
+    const [focus, setFocus] = React.useState<unknown>(null);
+    const onReset = () => { setFocus(null); if (typeof props.onReset === "function") (props.onReset as () => void)(); };
+    return React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn(), ...props, focus, onFocus: setFocus, onReset });
+  }
+  beforeEach(() => {
+    (window as unknown as Record<string, unknown>).ProfilePanel = function ProfilePanel({ anchor, extras }: { anchor: string; extras: string[] }) {
+      return React.createElement("div", { "data-testid": "me-menu", "data-anchor": anchor, "data-extras": String(extras) });
+    };
   });
 
-  it("turns a tile into grey tabs and a carousel of real matches, and All types brings the tiles back", () => {
-    open();
+  it("rests on the crown alone, and the crown shows and hides the Where to… tiles (no title text, only the handle)", () => {
+    render(React.createElement(Harness));
+    expect(mode()).toBe("rest");
+    expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("inert")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    expect(mode()).toBe("strip");
+    expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("inert")).toBe(false);
+    expect(screen.getByRole("button", { name: "Coffee" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Kids" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Contributors" })).toBeNull();
+    // the strip says nothing but its tiles: no "Explore", "Where to…", "Near you" or count line
+    expect(screen.queryByRole("heading")).toBeNull();
+    expect(document.querySelector("[data-mv2='explore-peek']")).toBeNull();
+    expect(document.querySelector("[data-mv2='explore-handle']")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: P().close }));
+    expect(mode()).toBe("rest");
+  });
+
+  it("a tile takes the panel to its focus: grey tabs and its cards, and All types (plain words) goes back", () => {
+    render(React.createElement(Harness));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
     fireEvent.click(screen.getByRole("button", { name: "Coffee" }));
-    const tab = screen.getByRole("tab", { name: "Coffee" });
-    expect(tab.getAttribute("aria-selected")).toBe("true");
+    expect(mode()).toBe("focus");
+    expect(screen.getByRole("tab", { name: "Coffee" }).getAttribute("aria-selected")).toBe("true");
     expect(document.querySelector("[data-row='tile'] [data-explore-id='two']")).toBeTruthy();
     expect(document.querySelector("[data-row='tile'] [data-explore-id='two'] [data-mv2='xcard-by']")!.textContent).toBe("by Anchor Community Church");
     expect(document.querySelector("[data-row='tile'] [data-explore-id='one']")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "All types" }));
+    // another tab keeps the focus (and so the panel's height): only the row changes
+    fireEvent.click(screen.getByRole("tab", { name: "Kids" }));
+    expect(mode()).toBe("focus");
+    expect(document.querySelector("[data-row='tile'] [data-explore-id='three']")).toBeTruthy();
+    const reset = screen.getByRole("button", { name: P().allTypes });
+    expect(reset.getAttribute("data-mv2")).toBe("explore-reset");
+    fireEvent.click(reset);
+    expect(mode()).toBe("strip");
     expect(screen.queryByRole("tab")).toBeNull();
-    expect(screen.getByRole("button", { name: "Coffee" })).toBeTruthy();
   });
 
-  it("Explore more calls onSeeAll, and a card tap reports that listing", () => {
+  it("the handle opens every row; Explore more calls onSeeAll; a card there takes its row over and reports the listing", () => {
     const onSeeAll = vi.fn();
     const onOpen = vi.fn();
-    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "two", onOpen, onSeeAll }));
-    fireEvent.click(screen.getByRole("button", { name: "Open Explore" }));
-    fireEvent.click(screen.getByRole("button", { name: "Explore more" }));
+    render(React.createElement(Harness, { selectedId: "two", onOpen, onSeeAll }));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    fireEvent.click(screen.getByRole("button", { name: P().raise }));
+    expect(mode()).toBe("open");
+    fireEvent.click(screen.getByRole("button", { name: P().seeAll }));
     expect(onSeeAll).toHaveBeenCalled();
     const sel = document.querySelector("[data-row='more'] [data-explore-id='two']")!;
     expect(sel.hasAttribute("data-selected")).toBe(true);
+    expect(sel.querySelector("[data-mv2='xcard-badge']")!.textContent).toBe(S.explore.selectedBadge);
     fireEvent.click(sel);
     expect(onOpen).toHaveBeenCalledWith("two", "place");
+    expect(mode()).toBe("focus");
+    expect(screen.getByRole("tablist", { name: P().rows })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: P().more }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: P().closeRow }));
+    expect(mode()).toBe("strip");
+  });
+
+  it("tells the map which pins a row in focus holds", () => {
+    const onSectionIds = vi.fn();
+    render(React.createElement(Harness, { onSectionIds }));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    fireEvent.click(screen.getByRole("button", { name: P().raise }));
+    fireEvent.click(screen.getByRole("button", { name: P().more }));
+    expect(mode()).toBe("focus");
+    expect(onSectionIds).toHaveBeenLastCalledWith(["two", "three"]);
+  });
+
+  it("with a filter on, the crown clears everything and comes back to rest", () => {
+    const onReset = vi.fn();
+    render(React.createElement(Harness, { onReset }));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    fireEvent.click(screen.getByRole("button", { name: "Coffee" }));
+    fireEvent.click(screen.getByRole("button", { name: P().reset }));
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect(mode()).toBe("rest");
+    // a search filter from the map screen counts too
+    render(React.createElement(Harness, { onReset, filtered: true }));
+    expect(screen.getAllByRole("button", { name: P().reset }).length).toBe(1);
   });
 
   it("a keyboard pin opens the panel onto that card", () => {
-    const { rerender } = render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, reveal: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "three", reveal: { id: "three", focus: true, n: 1 }, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("data-open")).toBe(true);
+    const { rerender } = render(React.createElement(Harness, { reveal: null }));
+    rerender(React.createElement(Harness, { selectedId: "three", reveal: { id: "three", focus: true, n: 1 } }));
+    expect(mode()).toBe("focus");
     expect(document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id")).toBe("three");
+  });
+
+  it("hides Do and Central, keeps Map in the middle, and Me opens the account menu with Messages and Alerts", () => {
+    const onGo = vi.fn();
+    render(React.createElement(Harness, { onGo }));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    fireEvent.click(screen.getByRole("button", { name: P().raise }));
+    const dock = screen.getByRole("navigation", { name: P().dock });
+    expect([...dock.querySelectorAll("[data-nav]")].map((b) => b.getAttribute("data-nav"))).toEqual(["explore", "map", "me"]);
+    expect(document.querySelector("[data-nav='do']")).toBeNull();
+    expect(document.querySelector("[data-nav='central']")).toBeNull();
+    // the crown has given way to the nav outright
+    expect(document.querySelector("[data-mv2='explore-crown']")).toBeNull();
+    const me = dock.querySelector("[data-nav='me']")!;
+    fireEvent.click(me);
+    expect(me.getAttribute("aria-expanded")).toBe("true");
+    const menu = screen.getByTestId("me-menu");
+    expect(menu.getAttribute("data-anchor")).toBe("dock");
+    expect(menu.getAttribute("data-extras")).toBe("messages,notifications");
+    fireEvent.click(dock.querySelector("[data-nav='map']")!);
+    expect(mode()).toBe("rest");
+    expect(document.querySelector("[data-mv2='explore-crown']")).toBeTruthy();
   });
 
   it("puts every live category on exactly one tile", () => {
@@ -426,14 +501,14 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261116c"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261117a"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261116c");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261117a");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");

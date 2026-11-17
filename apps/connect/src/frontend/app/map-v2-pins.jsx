@@ -311,6 +311,13 @@
     if (pin && !!dim !== pin.hasAttribute('data-dim')) { if (dim) pin.setAttribute('data-dim', ''); else pin.removeAttribute('data-dim'); }
   }
 
+  // A pin INSIDE a filter from the Explore panel glows softly in its own colour (founder, 2026-11-17: "I like the glow,
+  // keep it for all the panel's filters"). Same inner root as applyDim.
+  function applyMatch(wrap, on) {
+    const pin = wrap.querySelector('.mv2-pin');
+    if (pin && !!on !== pin.hasAttribute('data-match')) { if (on) pin.setAttribute('data-match', ''); else pin.removeAttribute('data-match'); }
+  }
+
   function applyLit(wrap, lit, quiet) {
     const pin = wrap.querySelector('.mv2-pin');
     if (!pin) return;
@@ -370,6 +377,6 @@
 
   window.MapV2Pins = {
     photoShown, glyphColor, ariaLabelFor, comparePriority, overlapGroups, hiddenLabels,
-    build, makeOperable, ensureLogo, applyDim, applySelected, applyLit, layoutOnIdle, OVERLAP_PX,
+    build, makeOperable, ensureLogo, applyDim, applyMatch, applySelected, applyLit, layoutOnIdle, OVERLAP_PX,
   };
 })();
