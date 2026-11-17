@@ -43,6 +43,12 @@ describe('the override is wired in', () => {
   it('tinyglobby gives the expected answers through the patched copy', async () => {
     const { globSync } = require('tinyglobby');
     const found = globSync(['test/*.test.js', '!test/golden*'], { cwd: packageRoot }).sort();
-    assert.deepEqual(found, ['test/integration.test.js', 'test/redos.test.js']);
+    const expected = fs
+      .readdirSync(path.join(packageRoot, 'test'))
+      .filter(name => name.endsWith('.test.js') && !name.startsWith('golden'))
+      .map(name => `test/${name}`)
+      .sort();
+    assert.ok(expected.includes('test/integration.test.js'));
+    assert.deepEqual(found, expected);
   });
 });

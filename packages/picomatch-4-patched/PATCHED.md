@@ -28,7 +28,7 @@ identical in both.
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Base            | the npm tarball of **picomatch@4.0.7**, integrity `sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==` (the value `pnpm-lock.yaml` had)                                                |
 | Licence         | MIT, Copyright (c) 2017-present Jon Schlinkert. [`LICENSE`](./LICENSE) is the upstream file, unchanged                                               |
-| Unchanged files | everything except `package.json` (private, renamed, versioned, `node --test` scripts, devDependencies for the integration test) and `lib/parse.js` |
+| Unchanged files | everything except `package.json` (private, renamed, versioned, `node --test` scripts, devDependencies for the integration test), `lib/parse.js` and `lib/utils.js` |
 | Version         | `4.0.7-citizens.1`                                                                                                                              |
 
 Git history keeps the vendored import (`chore(deps): vendor picomatch@2.3.2 and picomatch@4.0.7
@@ -54,6 +54,16 @@ a `+(...)` or `*(...)` body safe:
   - **Literalized** otherwise (`+(*a|*b)`, `+(*/a)`, `+(*[ab])`, `+(**)`, `+(!(b)!(b))`): the extglob
     becomes literal text, exactly what upstream already does for every other risky repeated extglob.
 - `extglobClose` emits the collapse (`)` instead of `)+`, `)?` instead of `)*`). Nothing else changes.
+
+### Second change: `utils.removeBackslashes`
+
+CodeQL (js/polynomial-redos) flagged upstream's `removeBackslashes`, which `scan()` calls with
+`unescape: true`: its regex `/(?:\[.*?[^\\]\]|\\(?=.))/g` tries the bracket branch at every `[`
+and scans to the end of the line, so a long run of `[` without a `]` took quadratic time. It is
+now one linear pass that returns exactly what the regex replace returned (the constant itself
+stays exported, unchanged). `test/remove-backslashes.test.js` compares the two on every string of
+up to 7 characters over `[`, `]`, `\`, `a` and three line terminators (960,800 strings) and checks
+that 200,000 `[` take well under a second.
 
 ### Behaviour
 
@@ -102,7 +112,7 @@ lockfile has no `picomatch@` entry, and (in the 4.x copy) that no `link:` holds 
 ## Verifying
 
 ```bash
-pnpm --filter picomatch-4-patched test   # golden (identical behaviour), ReDoS cases, integration
+pnpm --filter picomatch-4-patched test   # golden (identical behaviour), ReDoS cases, removeBackslashes, integration
 pnpm why picomatch -r                       # every path ends in picomatch-2-patched / picomatch-4-patched
 ```
 
@@ -116,7 +126,7 @@ cd packages/picomatch-4-patched
 npm pack picomatch@4.0.7 --pack-destination /tmp          # integrity must equal the value above
 mkdir -p .upstream-4.0.7 && tar -xzf /tmp/picomatch-4.0.7.tgz -C .upstream-4.0.7   # gitignored
 diff -ru .upstream-4.0.7/package . -x node_modules -x test -x .upstream-4.0.7 -x PATCHED.md \
-  -x package.json -x .gitignore                                 # only lib/parse.js differs
+  -x package.json -x .gitignore                     # only lib/parse.js and lib/utils.js differ
 node test/golden/run.js --diff .upstream-4.0.7/package     # "no differences" over the whole corpus
 node test/golden/run.js --generate .upstream-4.0.7/package # regenerates upstream-4.0.7.json
 ```
