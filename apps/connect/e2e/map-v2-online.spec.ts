@@ -219,7 +219,10 @@ test.describe("the globe on a phone (real touch)", () => {
     const api = await openAtPretoria(page, { [PTA]: TWO });
     await expect(globe(page)).toHaveCount(1);
     for (const r of api.requests) expect(r).not.toMatch(/lat|lng|-25\.|28\.2/);
-    expect(api.requests.filter((r) => r.startsWith("/api/v1/service-areas"))).toEqual(["/api/v1/service-areas"]); // one cacheable index read
+    // one cacheable index read; when the map is close enough for a city, its sub-areas are asked for by the parent's id only
+    const areaReads = api.requests.filter((r) => r.startsWith("/api/v1/service-areas"));
+    expect(areaReads.filter((r) => r === "/api/v1/service-areas")).toHaveLength(1);
+    for (const r of areaReads) expect(r).toMatch(/^\/api\/v1\/service-areas(\?parent=[0-9a-f-]{36})?$/);
   });
 
   test("a failed list shows an error with a retry that asks again", async ({ page }) => {

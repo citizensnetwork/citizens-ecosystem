@@ -199,7 +199,7 @@
   //  Save, Share ...) is the one action row above, in the same pills. No white box, no second Follow button. The organiser
   //  and the co-hosts are links to their own profiles; the socials, the counts and, for an upcoming event, the Convince
   //  note follow. `data-card` and `data-entity-card` keep the hooks the card had.
-  function ListingBody({ item, type, org, go, onClose }) {
+  function ListingBody({ item, type, org, go, onClose, onPick }) {
     const { realUser, myProfileMeta, user, toast, contributors } = window.useApp();
     const Str = S();
     const Icon = window.Icon;
@@ -217,10 +217,14 @@
     const orgName = (org && org.name) || item.organizerName || '';
     // to the organiser's own page: navigate first, then close, so the sheet's history entry is replaced (see BACK, above)
     const toProfile = (pid) => () => { go('profile', { id: pid }); onClose(); };
+    // The owner line opens the owner's own sheet in this one (founder, 2026-11-17: a Contributor has no pin and no Explore
+    // card, so this line is how the map reaches them), the way a Nearby row does: no new history entry, and the full
+    // profile is one tap further, on that sheet. Without a sheet to switch (onPick), it goes to the profile page.
+    const toOwner = (pid) => (onPick ? () => onPick(pid, 'contributor') : toProfile(pid));
     const organiser = orgName
       ? h('li', { key: 'org', 'data-mv2': 'fact' },
         org
-          ? h('button', { type: 'button', 'data-mv2': 'fact-link', onClick: toProfile(org.id) },
+          ? h('button', { type: 'button', 'data-mv2': 'fact-link', 'data-owner': org.id, onClick: toOwner(org.id) },
             h('span', null, Str.by + ' ', h('b', null, orgName)), h(Icon, { name: 'BadgeCheck', size: 16 }), h(Icon, { name: 'ChevronRight', size: 18 }))
           : h('span', { 'data-mv2': 'fact-line' }, h('span', null, Str.by + ' ', h('b', null, orgName))))
       : null;
@@ -277,6 +281,7 @@
     const lastPadding = useRef(null);
     const snapRef = useRef(snap);
     snapRef.current = snap;
+    const pressedAt = useRef(0);    // when a finger or a mouse last pressed the sheet (see onFocus below)
 
     // ONE history entry for the whole life of the sheet, registered by this mount.
     useBackGuard(true, onClose);
@@ -670,7 +675,7 @@
     // ── body ────────────────────────────────────────────────────────
     let body;
     if (!isContributor) {
-      body = h(ListingBody, { item, type, org, go, onClose });
+      body = h(ListingBody, { item, type, org, go, onClose, onPick });
     } else {
       const bio = item.bio ? h('p', { 'data-mv2': 'bio' }, item.bio) : null;
       let panel = null;
@@ -843,6 +848,19 @@
       'data-expanded': expanded ? '' : undefined,
       role: 'dialog', 'aria-label': Str.dialogLabel(name), 'aria-modal': 'false',
       onPointerDown,
+      // The keyboard reaches what the half sheet hides below the screen's edge (the map screen cannot scroll to it:
+      // overflow clip): focus there raises the sheet to full, so what has focus is always in view. A finger or a mouse
+      // press focuses too, and must never move the sheet: focus that follows a press within the moment is left alone.
+      onPointerDownCapture: () => { pressedAt.current = Date.now(); },
+      onFocus: (e) => {
+        if (wide || snapRef.current === 'full' || !e.target || !e.target.getBoundingClientRect) return;
+        // the sheet's own title takes focus as the sheet slides in (tabindex -1: the keyboard never lands there)
+        if (e.target.getAttribute && e.target.getAttribute('tabindex') === '-1') return;
+        if (Date.now() - pressedAt.current < 600) return;
+        // a control (a button, a link, a tab), never a container the size of the sheet (the scroller takes focus too)
+        const r = e.target.getBoundingClientRect();
+        if (r.height < window.innerHeight / 3 && r.bottom > window.innerHeight) setSnap('full');
+      },
     },
       grab,
       h('div', { ref: scroller, 'data-mv2': 'scroller' },

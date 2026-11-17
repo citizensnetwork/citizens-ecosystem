@@ -173,7 +173,10 @@
     // #210: where the map is looking as the sheet opens, so its distance says what the card said (the map moves under the sheet)
     const openSheet = (id, t, from) => {
       const view = from || (mapApi.current && mapApi.current.view ? mapApi.current.view() : null);
-      setSelected(id); setSelType(t); setSheet({ id, type: t, view }); if (t === 'event') trackImpression(id);
+      // A Contributor (reached by a place's or an event's owner line) has no pin and no card: the listing that led there
+      // stays the chosen one, so closing the sheet comes back to that card, still outlined.
+      if (t !== 'contributor') { setSelected(id); setSelType(t); }
+      setSheet({ id, type: t, view }); if (t === 'event') trackImpression(id);
     };
     const closeSheet = () => setSheet(null);
     // The first tap on a card CHOOSES it: it keeps its place in the panel (outlined, "Tap again to open"), and the map
@@ -182,10 +185,10 @@
     chosen.current = { id: selected, type: selType };
     // A card's first tap chooses it: its pin glows and the map brings it 25% above the middle, while the panel stays exactly
     // as it is. The second tap on the chosen card opens its preview (founder, 2026-11-17).
-    const tapCard = (id, t) => {
+    const tapCard = (id, t, from) => {
       if (t === 'idea') { setSheet(null); setSelected(id); setSelType(t); return; }
       // chosen already (by its own tap, or by its pin): the card says "Tap again to open", so this tap opens it
-      if (selected === id) { openSheet(id, t); return; }
+      if (selected === id) { openSheet(id, t, from); return; }
       chosen.current = { id, type: t };
       setSelected(id); setSelType(t); setLitId(id);
       if (mapApi.current && mapApi.current.focusLifted) mapApi.current.focusLifted(CARD_ZOOM);

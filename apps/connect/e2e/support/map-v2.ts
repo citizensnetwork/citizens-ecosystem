@@ -10,6 +10,41 @@ export const FIXED_NOW = Date.UTC(2026, 9, 10, 8, 0, 0); // 2026-10-10 10:00 in 
 
 export type MapSeed = { contributors: unknown[]; places: unknown[]; events: unknown[] };
 
+// The seed each page is served, so the helpers below can find what a Contributor owns (a Contributor has no pin and no
+// Explore card since PR 365: the map reaches them through the owner line of a place or an event they run).
+const seeds = new WeakMap<Page, MapSeed>();
+/** For a spec that serves its own directories: tell the helpers which seed the page shows. */
+export function rememberSeed(page: Page, seed: MapSeed) {
+  seeds.set(page, seed);
+}
+type Row = { id: string; created_by?: string | null; latitude?: number; longitude?: number; date?: string };
+/** The place (else the upcoming event) a Contributor in this page's seed owns, or null when `id` is not a Contributor. */
+export function ownedBy(page: Page, id: string): { id: string; lng: number; lat: number } | null {
+  const seed = seeds.get(page);
+  if (!seed || !(seed.contributors as Row[]).some((c) => c.id === id)) return null;
+  const own = (seed.places as Row[]).find((r) => r.created_by === id)
+    ?? (seed.events as Row[]).find((r) => r.created_by === id && Date.parse(r.date ?? "") >= FIXED_NOW);
+  if (!own || typeof own.latitude !== "number" || typeof own.longitude !== "number") {
+    throw new Error(`Contributor ${id} owns no place or upcoming event with a position in this seed: nothing on the map opens their sheet`);
+  }
+  return { id: own.id, lng: own.longitude, lat: own.latitude };
+}
+/** Bring a listing's point into the middle of the map (no animation), keeping a zoom at which its pin is drawn. */
+async function centreOn(page: Page, to: { lng: number; lat: number }) {
+  await page.evaluate(([lng, lat]) => {
+    const m = (window as unknown as { __ccMap: { getZoom(): number; jumpTo(o: object, d: object): void } }).__ccMap;
+    m.jumpTo({ center: [lng, lat], zoom: Math.max(m.getZoom(), 14) }, { originalEvent: {} });
+  }, [to.lng, to.lat]);
+}
+/** On an open place or event sheet, the owner line opens the owner's own sheet in its place. */
+async function throughOwner(page: Page, ownerId: string, how: "click" | "tap") {
+  const line = page.locator(`[data-mv2='sheet'] [data-owner="${ownerId}"]`);
+  await line.waitFor({ state: "visible", timeout: 10_000 });
+  if (how === "tap") await line.tap();
+  else await line.click();
+  await expect(line).toHaveCount(0, { timeout: 5_000 });
+}
+
 /**
  * Hermetic network for the map screen: config.js, MapTiler and /api/** answered locally, the
  * three public directories served from `seed`, a guest session so the landing is skipped, and
@@ -20,6 +55,7 @@ export async function mockMapNetwork(
   seed: MapSeed = smallSeed(FIXED_NOW),
   extra?: (page: Page) => Promise<void>,
 ) {
+  seeds.set(page, seed);
   await page.clock.setFixedTime(FIXED_NOW);
   await page.route("**/config.js", (route: Route) =>
     route.fulfill({
@@ -111,6 +147,20 @@ export async function openExploreAll(page: Page, how: "click" | "tap" = "click")
  * mouse or, with `how: "tap"`, by touch. Without a panel (the clean map), the pin is pressed by a DOM click.
  */
 export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
+  // the Explore panel hides behind an open listing: close it first (Escape closes the sheet at once and gives its entry back)
+  const open = page.locator("[data-mv2='sheet']");
+  if (await page.locator("[data-mv2='explore']").count() && await open.count()) {
+    await page.keyboard.press("Escape");
+    await expect(open).toHaveCount(0, { timeout: 5_000 });
+  }
+  // a Contributor: open the place (or event) they own, then its owner line
+  const own = ownedBy(page, id);
+  if (own) {
+    await centreOn(page, own);
+    await openListing(page, own.id, how);
+    await throughOwner(page, id, how);
+    return;
+  }
   await mapSettled(page);
   const explore = page.locator("[data-mv2='explore']");
   if (await explore.count()) {
@@ -161,6 +211,14 @@ export async function toCleanMap(page: Page) {
 }
 export async function openPinSheet(page: Page, id: string, how: "click" | "tap" = "click") {
   if (await page.locator("[data-mv2='explore']").count()) await toCleanMap(page);
+  // a Contributor has no pin: open the place (or event) they own, then its owner line
+  const own = ownedBy(page, id);
+  if (own) {
+    await centreOn(page, own);
+    await openPinSheet(page, own.id, how);
+    await throughOwner(page, id, how);
+    return;
+  }
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
   if (how === "tap") await pin.tap({ force: true });
   else await pin.click({ force: true });

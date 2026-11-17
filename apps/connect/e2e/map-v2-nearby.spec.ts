@@ -25,10 +25,14 @@ const metres = (a: Thing, b: Thing) => {
   const h = Math.sin(r(b.lat - a.lat) / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(r(b.lng - a.lng) / 2) ** 2;
   return 2 * 6371008.8 * Math.asin(Math.sqrt(h));
 };
-/** What the list should show for `from`: nearest first, within 10 km, at most 8, without what is already on the sheet. */
+/**
+ * What the list should show for `from`: nearest first, within 10 km, at most 8, without what is already on the sheet.
+ * Only what the map draws is listed, and since PR 365 a Contributor is not drawn (no pin): places and events only.
+ */
 function expected(s: Seed, from: Thing): { name: string; m: number }[] {
   const own = from.type === "contributor" ? new Set(s.events.filter((e) => e.created_by === from.id).map((e) => e.id)) : new Set<string>();
   return things(s)
+    .filter((t) => t.type !== "contributor")
     .filter((t) => !(t.id === from.id && t.type === from.type) && !own.has(t.id) && !(from.type === "event" && t.id === from.organiser))
     .map((t) => ({ name: t.name, m: metres(from, t) }))
     .filter((t) => t.m <= 10_000)
@@ -126,15 +130,17 @@ test.describe("P2-01 the Nearby list (phone)", () => {
     for (let i = 0; i < n; i++) expect((await rows.nth(i).boundingBox())!.height).toBeGreaterThanOrEqual(44);
   });
 
-  test("tapping a row opens that listing in the same sheet, whatever its kind: back at half, one sheet, no new history entry, Back closes it", async ({ page }) => {
+  test("tapping a row opens that listing in the same sheet, whatever its kind: back at half, one sheet, no new history entry, Back closes it (and so does the owner line)", async ({ page }) => {
     const seed = seedOf();
     const me = things(seed)[0];
     await openSheetOn(page, seed, me);
     const all = things(seed);
     const len0 = await page.evaluate(() => history.length);
-    // Contributor -> Place -> Event -> Contributor: every hop changes the kind of listing, so the type travels with the id
+    // Contributor -> Place -> Event by Nearby rows (every hop changes the kind of listing, so the type travels with the id),
+    // then Event -> its organiser by the owner line: a Contributor is not a Nearby row any more, and that line is how the
+    // map reaches them (founder, 2026-11-17)
     let from = me;
-    for (const kind of ["place", "event", "contributor"] as const) {
+    for (const kind of ["place", "event"] as const) {
       await toFull(page);
       await scrollEnd(page);
       const want = expected(seed, from);
@@ -154,6 +160,11 @@ test.describe("P2-01 the Nearby list (phone)", () => {
       await expect.poll(async () => { const bx = await pin.boundingBox(); return bx ? bx.y + bx.height : 9999; }, { timeout: 4000 }).toBeLessThan(sheetTop);
       from = picked;
     }
+    const organiser = all.find((t) => t.id === from.organiser)!;
+    await page.locator(`${SHEET} [data-owner="${organiser.id}"]`).tap();
+    await expect(page.locator("[data-mv2='name']")).toHaveText(organiser.name);
+    await expect(sheet(page)).toHaveCount(1);
+    expect(await page.evaluate(() => history.length)).toBe(len0);
     // Back closes the whole sheet at once (D6): one entry, however many listings were opened
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);

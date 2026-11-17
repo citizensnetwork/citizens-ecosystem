@@ -525,6 +525,8 @@
     if (!focus) held.current = null;
     else if (!held.current && live) held.current = live;
     const origin = (focus && held.current) || live;
+    // where the cards measured from, handed to the sheet a card opens, so its distance says what the card said
+    const measuredFrom = view.user ? view : { centre: origin, user: null };
     const markers = (Array.isArray(props.markers) ? props.markers : []).filter((m) => m && m.type !== 'contributor');
     const ideas = Array.isArray(props.ideas) ? props.ideas : [];
     const pool = markers.concat(ideas.filter((m) => m && markers.every((x) => x.id !== m.id)));
@@ -612,9 +614,10 @@
     const openCard = (row) => (id, type) => {
       if (open) {
         if (row === 'tile') setStage('strip');
-        else if (SECTIONS.indexOf(row) !== -1) chooseRow(row);
+        // (a card never turns its row's focus off, even when that row is the focus already: only its tab toggles)
+        else if (SECTIONS.indexOf(row) !== -1) { setFocus({ kind: 'sec', id: row }); setStage('strip'); }
       }
-      if (props.onOpen) props.onOpen(id, type);
+      if (props.onOpen) props.onOpen(id, type, measuredFrom);
     };
     const cards = (id, list) => h(XRow, { id: id, fine: fine, list: list }, list.map((r) => h(XCard, {
       key: id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),

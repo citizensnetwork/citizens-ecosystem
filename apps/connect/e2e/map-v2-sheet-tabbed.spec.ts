@@ -200,7 +200,9 @@ test.describe("tabbed block on a phone", () => {
   });
 
   test("with nothing nearby the hairline still sits above the QR action", async ({ page }) => {
-    const seed = makeSeed({ contributors: 1, places: 0, events: 0, now: FIXED_NOW, spread: 0.02, seed: 7 }) as Seed;
+    // one place, the Contributor's own, 20+ km away: it is how the map reaches them (its owner line), and too far for Nearby
+    const seed = makeSeed({ contributors: 1, places: 1, events: 0, now: FIXED_NOW, spread: 0.02, seed: 7 }) as Seed;
+    seed.places[0].latitude = Number(seed.contributors[0].physical_latitude) + 0.2;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 3 });
     await openMap(page, "/?map=v2", 1);

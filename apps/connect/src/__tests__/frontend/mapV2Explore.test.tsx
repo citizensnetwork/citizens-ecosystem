@@ -284,7 +284,8 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(sel.hasAttribute("data-selected")).toBe(true);
     expect(sel.querySelector("[data-mv2='xcard-badge']")!.textContent).toBe(S.explore.selectedBadge);
     fireEvent.click(sel);
-    expect(onOpen).toHaveBeenCalledWith("two", "place");
+    // the third argument is where the cards measured from, so the sheet's distance says what the card said
+    expect(onOpen).toHaveBeenCalledWith("two", "place", { centre: ORIGIN, user: null });
     expect(mode()).toBe("focus");
     expect(screen.getByRole("tablist", { name: P().rows })).toBeTruthy();
     expect(screen.getByRole("tab", { name: P().more }).getAttribute("aria-selected")).toBe("true");

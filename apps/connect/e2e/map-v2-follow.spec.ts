@@ -111,8 +111,12 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     });
     expect(mapped).toEqual(["", "", "", "", "", "100+", "25,000+"]);
 
-    // the Place page and a Contributor's page (opened from its sheet)
-    await page.getByRole("button", { name: "View Full Profile" }).first().click();
+    // the Place page and a Contributor's page (opened from its sheet). At half the button is below the screen's edge:
+    // the keyboard reaching it raises the sheet to full, so what has focus is in view
+    const viewFull = page.getByRole("button", { name: "View Full Profile" }).first();
+    await viewFull.focus();
+    await expect(sheet(page)).toHaveAttribute("data-snap", "full");
+    await viewFull.click();
     await expect(page.getByText(seed.places[0].name).first()).toBeVisible();
     await expect(page.locator("body")).not.toContainText("0 followers");
     expect(t.id).toBeTruthy();
