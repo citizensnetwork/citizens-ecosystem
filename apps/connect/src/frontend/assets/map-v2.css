@@ -187,6 +187,7 @@
   --xp-max: 720px;                          /* the desktop Explore sheet */
   --xp-tile-size: 84px;                     /* a Where to… tile */
   --xp-dock-h: 64px;                        /* the sticky nav the crown becomes */
+  --pp-peek: 244px;                         /* the pin carousel lowered: its bar and one row of cards (Pack 09) */
   --xp-sheet: rgba(249, 248, 243, 0.95);
   --xp-tile: rgba(236, 238, 240, 0.72);     /* frosted grey glass: tiles and tabs, including the selected one */
   --xp-tile-line: rgba(39, 42, 37, 0.1);
@@ -4090,29 +4091,55 @@ a[data-mv2='card2'],
 [data-mv2='home-search'][data-open] [data-mv2='home-filters'] {
   flex: 1 0 100%;
 }
+/* The category chips (founder, 2026-11-18): ONE row of small chips under the words, swiped (or scrolled) sideways. Each
+   chip is 32px to the eye; its ::after reaches the 44px tap target, and the row's own padding keeps that inside the row
+   (a scroller clips what leaves it). */
 [data-mv2='home-filters'] {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-top: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--divider);
-  border-radius: var(--radius-lg);
-  background: var(--surface-0);
+  flex-direction: row;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  margin-top: var(--space-1);
+  padding: calc((var(--hit) - var(--space-7)) / 2) var(--space-1);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--space-1);
+  scrollbar-width: none;
+  touch-action: pan-x;
   color: var(--text-1);
 }
+[data-mv2='home-filters']::-webkit-scrollbar {
+  display: none;
+}
 [data-mv2='filter-row'] {
-  display: flex;
+  position: relative;
+  flex: none;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
-  min-height: var(--hit);
+  gap: var(--space-2);
+  height: var(--space-7);
   padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
   color: var(--text-1);
-  text-align: left;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  scroll-snap-align: start;
   cursor: pointer;
+}
+[data-mv2='filter-row']::after {
+  content: '';
+  position: absolute;
+  inset: calc((var(--hit) - var(--space-7)) / -2) calc(var(--space-1) * -1);
+}
+[data-mv2='filter-row'][aria-checked='true'] {
+  border-color: var(--chip, var(--text-1));
+  background: color-mix(in srgb, var(--chip, var(--text-1)) 16%, var(--surface-0));
 }
 [data-mv2='filter-dot'] {
   flex: none;
@@ -4126,4 +4153,208 @@ a[data-mv2='card2'],
 [data-mv2='filter-row'][aria-checked='true'] [data-mv2='filter-dot'] {
   background: var(--chip, var(--text-1));
   box-shadow: 0 0 var(--space-2) var(--chip, var(--text-1));
+}
+
+/* ── Pack 09. The map home's levels (founder, 2026-11-18; app/home.jsx, app/map-v2-explore.jsx PinCarousel) ──────
+   Level 2, a pin tapped: the pin carousel rests at the foot (--pp-peek), its cards the Explore row's own, the chosen one
+   in the middle; the crown rides on its top edge. Level 3, the chosen card tapped again: the same box rises (transform
+   only, like the Explore panel) with a sticky bar (Back, Close) and the card's details below the cards. */
+[data-mv2='home'] {
+  /* raised: it stops below the top bar's buttons, so a slice of map and the Search button stay in view */
+  --pp-full: calc(100% - var(--hit) - var(--space-7) - env(safe-area-inset-top, 0px));
+}
+[data-mv2='pinpeek'] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: calc(var(--z-controls) + 1);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: var(--pp-full);
+  margin: 0;
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid var(--divider);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--xp-sheet);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-2);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
+  transform: translateY(calc(100% - var(--pp-peek)));
+  transition: transform var(--dur-slow) var(--ease-enter);
+  animation: mv2-pp-in var(--dur-base) var(--ease-enter) both;
+}
+@keyframes mv2-pp-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+[data-mv2='pinpeek'][hidden] {
+  display: none;
+}
+[data-mv2='pinpeek'][data-raised] {
+  background: var(--surface-1);
+  overflow-y: auto;
+  touch-action: pan-y;
+  transform: translateY(0);
+}
+[data-mv2='home']:not([data-narrow]) [data-mv2='pinpeek'] {
+  left: 50%;
+  right: auto;
+  width: min(var(--xp-max), calc(100% - var(--space-8)));
+  transform: translateX(-50%) translateY(calc(100% - var(--pp-peek)));
+  animation: none;
+}
+[data-mv2='home']:not([data-narrow]) [data-mv2='pinpeek'][data-raised] {
+  transform: translateX(-50%);
+}
+[data-mv2='pinpeek-bar'] {
+  position: sticky;
+  top: 0;
+  z-index: calc(var(--z-xp-layer) + 1);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--hit);
+  padding: var(--space-1) var(--space-1) 0 var(--space-4);
+  touch-action: none;
+}
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-bar'] {
+  padding-left: var(--space-1);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--divider);
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle-bar'] {
+  position: absolute;
+  left: 50%;
+  top: var(--space-1);
+  transform: translateX(-50%);
+}
+[data-mv2='pinpeek-count'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='pinpeek-back'],
+[data-mv2='pinpeek-close'] {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: var(--hit);
+  min-height: var(--hit);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='pinpeek-back']:focus-visible,
+[data-mv2='pinpeek-close']:focus-visible,
+[data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+/* The cards: the chosen one in the middle, its neighbours either side (snap to the middle; the row's padding lets the
+   first and the last reach it). A vertical swipe on them is the panel's (raise / back), a sideways one the row's. */
+[data-mv2='xrow-wrap'][data-peek] {
+  flex: none;
+}
+[data-mv2='xrow'][data-row='peek'] {
+  position: relative;
+  padding-inline: calc(50% - var(--xp-card-w) / 2);
+  scroll-padding-inline: calc(50% - var(--xp-card-w) / 2);
+  touch-action: pan-x;
+}
+[data-mv2='pinpeek'][data-raised] [data-mv2='xrow'][data-row='peek'] {
+  touch-action: pan-x pan-y;
+}
+[data-mv2='xrow'][data-row='peek'] [data-mv2='xcard'] {
+  scroll-snap-align: center;
+}
+[data-mv2='xrow'][data-row='peek'] [data-mv2='xcard'][data-selected] {
+  outline-color: var(--accent);
+}
+/* the arrows on every screen here (founder: "swipeable or with left/right arrows"), over the neighbours, never the chosen card */
+[data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow'] {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-xp-layer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+[data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow'][data-dir='prev'] {
+  left: var(--space-2);
+}
+[data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow'][data-dir='next'] {
+  right: var(--space-2);
+}
+[data-mv2='pinpeek-details'] {
+  flex: none;
+  padding: 0 var(--space-4);
+  border-top: 1px solid var(--divider);
+}
+/* the listing sheet, inline: no box, no motion, no scroller of its own (the raised carousel scrolls) */
+[data-mv2='sheet'][data-inline] {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  height: auto;
+  max-width: none;
+  margin-inline: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  animation: none;
+  touch-action: pan-y;
+}
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] {
+  overflow: visible;
+  padding-inline: 0;
+}
+/* the crown on the carousel's top edge (lowered); raised, the bar's Close does its job */
+[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden]):not([data-raised])) [data-mv2='explore-crown'] {
+  transform: translate(-50%, calc((var(--pp-peek) - env(safe-area-inset-bottom, 0px) - var(--space-4) - var(--crown) / 2) * -1));
+}
+[data-mv2='home']:has([data-mv2='pinpeek'][data-raised]:not([hidden])) [data-mv2='explore-crown'] {
+  visibility: hidden;
+}
+/* the map's corner, credit and controls clear the lowered carousel */
+[data-mv2='home'][data-crown]:has([data-mv2='pinpeek']:not([hidden])) {
+  --explore-h: var(--pp-peek);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-mv2='pinpeek'] {
+    transition: none;
+    animation: none;
+  }
 }

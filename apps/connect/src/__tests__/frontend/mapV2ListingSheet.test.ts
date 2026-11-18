@@ -22,7 +22,7 @@ describe("the expanded listing sheet (#210)", () => {
   });
 
   it("opens at full only when a card opened it; the clean map's pin keeps the half sheet", () => {
-    expect(sheet).toContain("const opensAt = expanded ? 'full' : 'half';");
+    expect(sheet).toContain("const opensAt = expanded || inline ? 'full' : 'half';");
     expect(sheet).toContain("useState(opensAt)");
     expect(home).toContain("expanded: !clean, view: sheet.view");
   });

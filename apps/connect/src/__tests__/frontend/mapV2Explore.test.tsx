@@ -522,3 +522,201 @@ describe("the stylesheet and the wiring", () => {
     expect(shell).not.toContain("BottomNav");
   });
 });
+
+describe("the map home's levels (founder, 2026-11-18): the pin carousel and the crown", () => {
+  type PeekApi = {
+    peekOrder: (target: Marker | null, markers: Marker[], visible: string[] | null, cap?: number) => Marker[];
+    nearestIndex: (centres: number[], mid: number) => number;
+    PinCarousel: React.ComponentType<Record<string, unknown>>;
+  };
+  const Y = () => X as unknown as PeekApi;
+  const PK = () => (S.explore as unknown as { peek: Record<string, unknown> & { count: (i: number, n: number) => string; details: (n: string) => string } }).peek;
+  const P = () => (S.explore as unknown as { panel: Record<string, string> }).panel;
+  const pins = [
+    mk("a", 0, { type: "place", title: "Alpha", category: "hospitality-cafes" }),
+    mk("b", 2, { type: "event", title: "Bravo", category: "kids" }),
+    mk("c", 1, { type: "place", title: "Charlie", category: "retail-shopping" }),
+    mk("d", 5, { type: "place", title: "Delta", category: "kids" }),
+    mk("i", 0.5, { type: "idea", title: "An idea" }),
+  ];
+
+  it("orders the carousel from the tapped pin: it first, then the pins in view, nearest to it first, ideas never", () => {
+    const b = pins.find((m) => m.id === "b")!;
+    expect(Y().peekOrder(b, pins, null).map((m) => m.id)).toEqual(["b", "c", "a", "d"]);
+    // only the pins in view (the tapped one is always first, in view or not)
+    expect(Y().peekOrder(b, pins, ["a", "d"]).map((m) => m.id)).toEqual(["b", "a", "d"]);
+    // capped, the cap counting the tapped pin
+    expect(Y().peekOrder(b, pins, null, 2).map((m) => m.id)).toEqual(["b", "c"]);
+    expect(Y().peekOrder(null, pins, null)).toEqual([]);
+  });
+
+  it("knows which card a swipe settled on: the one whose middle is nearest the row's middle", () => {
+    expect(Y().nearestIndex([74, 234, 394], 240)).toBe(1);
+    expect(Y().nearestIndex([74, 234, 394], 0)).toBe(0);
+    expect(Y().nearestIndex([74, 234, 394], 9999)).toBe(2);
+    expect(Y().nearestIndex([], 10)).toBe(-1);
+  });
+
+  function carousel(props: Record<string, unknown> = {}) {
+    const calls = { onIndex: vi.fn(), onRaise: vi.fn(), onBack: vi.fn(), onClose: vi.fn() };
+    const items = [pins[0], pins[2], pins[1]];
+    const r = render(React.createElement(Y().PinCarousel, {
+      items, index: 0, raised: false, origin: ORIGIN, distWords: S.explore, sources: { places: [], events: [], contributors: [] },
+      details: (m: Marker) => React.createElement("p", { "data-testid": "details" }, "About " + m.title),
+      ...calls, ...props,
+    }));
+    return { calls, items, ...r };
+  }
+  const cardsIn = () => [...document.querySelectorAll<HTMLElement>("[data-mv2='pinpeek'] [data-mv2='xcard']")];
+
+  it("draws the Explore row's own cards, the chosen one outlined with what its next tap does, and its count", () => {
+    carousel();
+    const cards = cardsIn();
+    expect(cards.map((c) => c.getAttribute("data-explore-id"))).toEqual(["a", "c", "b"]);
+    expect(cards[0].hasAttribute("data-selected")).toBe(true);
+    expect(cards[0].getAttribute("aria-current")).toBe("true");
+    expect(cards[0].textContent).toContain(PK().detailsBadge as string);
+    expect(cards[1].hasAttribute("data-selected")).toBe(false);
+    expect(screen.getByRole("status").textContent).toContain(PK().count(1, 3));
+    expect(screen.getByRole("status").textContent).toContain("Alpha");
+    // no arrow points past the first card; the next one does
+    expect(screen.queryByRole("button", { name: PK().prev as string })).toBeNull();
+    expect(screen.getByRole("button", { name: PK().next as string })).toBeTruthy();
+    // lowered: no details, no Back
+    expect(screen.queryByTestId("details")).toBeNull();
+    expect(screen.queryByRole("button", { name: PK().back as string })).toBeNull();
+  });
+
+  it("an arrow or a neighbour's tap chooses that card; the chosen card's tap raises the panel", () => {
+    const { calls } = carousel({ index: 1 });
+    fireEvent.click(screen.getByRole("button", { name: PK().next as string }));
+    expect(calls.onIndex).toHaveBeenLastCalledWith(2);
+    fireEvent.click(screen.getByRole("button", { name: PK().prev as string }));
+    expect(calls.onIndex).toHaveBeenLastCalledWith(0);
+    fireEvent.click(cardsIn()[2]);
+    expect(calls.onIndex).toHaveBeenLastCalledWith(2);
+    expect(calls.onRaise).not.toHaveBeenCalled();
+    fireEvent.click(cardsIn()[1]);
+    expect(calls.onRaise).toHaveBeenCalledTimes(1);
+    // Close goes home from any level
+    fireEvent.click(screen.getByRole("button", { name: PK().close as string }));
+    expect(calls.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("raised: the chosen card's details sit below the cards, with Back and Close in the bar; Escape steps back", () => {
+    const { calls } = carousel({ index: 1, raised: true });
+    expect(document.querySelector("[data-mv2='pinpeek']")!.hasAttribute("data-raised")).toBe(true);
+    expect(screen.getByTestId("details").textContent).toBe("About Charlie");
+    expect(screen.getByRole("region", { name: PK().details("Charlie") })).toBeTruthy();
+    // the details come after the cards
+    const row = document.querySelector("[data-row='peek']")!;
+    expect(row.compareDocumentPosition(screen.getByTestId("details")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // the chosen card no longer says "tap again": it already did
+    expect(cardsIn()[1].textContent).not.toContain(PK().detailsBadge as string);
+    fireEvent.click(cardsIn()[1]);
+    expect(calls.onRaise).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: PK().back as string }));
+    expect(calls.onBack).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(calls.onBack).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves Escape to a full sheet open over it (hidden), and gives focus back when it closes with focus inside", () => {
+    const returnFocus = vi.fn();
+    const { calls, rerender, unmount } = carousel({ hidden: true, returnFocus });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(calls.onBack).not.toHaveBeenCalled();
+    rerender(React.createElement(Y().PinCarousel, {
+      items: [pins[0]], index: 0, ...calls, returnFocus, sources: {}, focusCard: 1,
+    }));
+    // a pin chosen from the keyboard: focus goes into the cards
+    expect(document.activeElement && document.activeElement.getAttribute("data-explore-id")).toBe("a");
+    unmount();
+    expect(returnFocus).toHaveBeenCalledTimes(1);
+    expect(returnFocus).toHaveBeenCalledWith("a");
+  });
+
+  it("a pull up on the lowered panel raises it; a pull down steps back (and swallows the tap that ends it)", () => {
+    const { calls } = carousel();
+    const panel = document.querySelector("[data-mv2='pinpeek']")!;
+    const card = cardsIn()[0];
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 1, pointerType: "touch" });
+    expect(calls.onRaise).toHaveBeenCalledTimes(1);
+    fireEvent.click(card);
+    expect(calls.onRaise).toHaveBeenCalledTimes(1);
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 2, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 2, pointerType: "touch" });
+    expect(calls.onBack).toHaveBeenCalledTimes(1);
+    // a short or sideways move is a swipe of the row, never a pull
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 3, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 220, clientY: 340, pointerId: 3, pointerType: "touch" });
+    expect(calls.onBack).toHaveBeenCalledTimes(1);
+  });
+
+  describe("the Explore panel under the carousel", () => {
+    const view = { centre: ORIGIN, user: null };
+    const apiRef = { current: { view: () => view, onView: () => () => {} } };
+    const base = { markers: pins.filter((m) => m.type !== "idea"), sources: { contributors: [], places: [], events: [] }, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() };
+    const mode = () => document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode");
+
+    it("rests while the carousel is up, and its crown then goes straight back to the map's rest", () => {
+      const onLevelReset = vi.fn();
+      const onMode = vi.fn();
+      const { rerender } = render(React.createElement(X.Explore, { ...base, onMode }));
+      fireEvent.click(screen.getByRole("button", { name: P().open }));
+      expect(mode()).toBe("strip");
+      rerender(React.createElement(X.Explore, { ...base, onMode, peek: true, level: 1, onLevelReset }));
+      expect(mode()).toBe("rest");
+      expect(onMode).toHaveBeenLastCalledWith("rest");
+      const crown = document.querySelector<HTMLButtonElement>("[data-mv2='explore-crown']")!;
+      expect(crown.getAttribute("aria-label")).toBe(P().home);
+      fireEvent.click(crown);
+      expect(onLevelReset).toHaveBeenCalledTimes(1);
+      // the panel's own look comes back as it was once the carousel is gone
+      rerender(React.createElement(X.Explore, { ...base, onMode, peek: false, level: 0, onLevelReset }));
+      expect(mode()).toBe("rest");
+    });
+
+    it("a tap on empty map (restSignal) folds the Where to… strip back to the crown alone", () => {
+      const { rerender } = render(React.createElement(X.Explore, { ...base, restSignal: 0 }));
+      fireEvent.click(screen.getByRole("button", { name: P().open }));
+      expect(mode()).toBe("strip");
+      rerender(React.createElement(X.Explore, { ...base, restSignal: 1 }));
+      expect(mode()).toBe("rest");
+    });
+
+    it("the desktop crown resets the levels too, and only folds the nav at the map's rest", () => {
+      const onLevelReset = vi.fn();
+      const { rerender } = render(React.createElement(X.Explore, { ...base, level: 1, onLevelReset }));
+      const crown = () => document.querySelector<HTMLButtonElement>("[data-mv2='desktop-crown']")!;
+      expect(crown().getAttribute("aria-label")).toBe(P().home);
+      fireEvent.click(crown());
+      expect(onLevelReset).toHaveBeenCalledTimes(1);
+      expect(crown().getAttribute("aria-expanded")).toBe("true");
+      rerender(React.createElement(X.Explore, { ...base, level: 0, onLevelReset }));
+      fireEvent.click(crown());
+      expect(onLevelReset).toHaveBeenCalledTimes(1);
+      expect(crown().getAttribute("aria-expanded")).toBe("false");
+    });
+  });
+
+  it("wires the levels into the map screen: one history entry per level, the chips row, and the inline details", () => {
+    const home = read("src/frontend/app/home.jsx");
+    expect(home).toContain("useBackGuard(searchOpen,");
+    expect(home).toContain("useBackGuard(!!peek, closePeek)");
+    expect(home).toContain("useBackGuard(!!(peek && peek.raised), lowerPeek)");
+    expect(home).toContain("React.createElement(X.PinCarousel");
+    expect(home).toContain("inline: true");
+    expect(home).toContain("'aria-label': XS.chipsLabel");
+    const css = read("src/frontend/assets/map-v2.css");
+    // the chips: one row that scrolls sideways (no column), and the carousel moves by transform only
+    const chips = css.slice(css.search(/^\[data-mv2='home-filters'\] \{/m));
+    expect(chips.slice(0, chips.indexOf("}"))).toMatch(/flex-direction: row;[\s\S]*overflow-x: auto;/);
+    expect(css).toMatch(/\[data-mv2='pinpeek'\] \{[^}]*transform: translateY\(calc\(100% - var\(--pp-peek\)\)\);/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\[data-mv2='pinpeek'\] \{\s*transition: none;\s*animation: none;/);
+    const store = read("src/frontend/app/store.jsx");
+    // closing several levels at once takes all their entries off in ONE step
+    expect(store).toContain("window.history.go(-k)");
+  });
+});

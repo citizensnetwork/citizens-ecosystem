@@ -624,6 +624,57 @@
           userMovedRef.current = false;
           if (mp && items && items.length) frameData(mp, items, containerRef.current);
         },
+        // The map home's levels (founder, 2026-11-18): each level keeps the camera it was entered with, so Back puts the
+        // map exactly where the person left it. A plain copy (no MapLibre objects), safe to keep in React state. The tilt is
+        // fixed (D17, set once above), so it is neither read nor written here.
+        camera() {
+          const mp = mapRef.current;
+          if (!mp) return null;
+          const c = mp.getCenter();
+          return { lng: c.lng, lat: c.lat, zoom: mp.getZoom(), bearing: mp.getBearing() };
+        },
+        setCamera(cam) {
+          const mp = mapRef.current;
+          if (!mp || !cam || !Number.isFinite(cam.lng) || !Number.isFinite(cam.lat) || !Number.isFinite(cam.zoom)) return;
+          userMovedRef.current = true;
+          const to = { center: [cam.lng, cam.lat], zoom: cam.zoom, bearing: Number(cam.bearing) || 0 };
+          const dur = window.MapV2 && window.MapV2.dur ? window.MapV2.dur('base') : 0;
+          if (dur > 0) mp.easeTo(Object.assign(to, { duration: dur, essential: true }), { originalEvent: {} });
+          else mp.jumpTo(to, { originalEvent: {} });
+        },
+        // The pins the person can see right now: inside the map's bounds and not hidden by the zoom gates.
+        visibleIds() {
+          const mp = mapRef.current;
+          if (!mp) return [];
+          const b = mp.getBounds();
+          const out = [];
+          markerObjs.current.forEach((mk, id) => {
+            const w = mk.getElement();
+            if (!w || w.style.display === 'none') return;
+            if (b.contains(mk.getLngLat())) out.push(id);
+          });
+          return out;
+        },
+        // The selected pin, clear of the bar at the top and of `bottom` px at the foot (the pin carousel): left alone
+        // when it already is, otherwise eased to the middle of what is left (a carousel swipe to a pin off screen).
+        revealSelected(bottom) {
+          requestAnimationFrame(() => {
+            const mp = mapRef.current;
+            const el = containerRef.current;
+            const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
+            if (!mp || !el || !mk) return;
+            const foot = Math.max(0, Number(bottom) || 0);
+            const pad = framePadding(el);
+            const top = typeof pad === 'object' ? pad.top : 0;
+            const low = el.clientHeight - foot;
+            const p = mp.project(mk.getLngLat());
+            const edge = 24;
+            if (p.x > edge && p.x < el.clientWidth - edge && p.y > top + edge && p.y < low - edge) return;
+            userMovedRef.current = true;
+            const offset = [0, Math.round((top + low) / 2 - el.clientHeight / 2)];
+            mp.easeTo({ center: mk.getLngLat(), offset, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+          });
+        },
       };
       return () => { apiRef.current = null; };
     }, [apiRef]);

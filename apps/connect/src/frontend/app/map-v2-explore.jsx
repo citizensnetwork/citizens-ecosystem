@@ -25,7 +25,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
-  const { useState, useEffect, useRef, useMemo } = React;
+  const { useState, useEffect, useLayoutEffect, useRef, useMemo } = React;
 
   const ROW_CAP = 20;                // cards in the row: the nearest twenty (plus the selected one, wherever it is)
   const SETTLE_MS = 150;             // rank again only once the map has been still this long (a programmatic pan ends a move every frame)
@@ -454,8 +454,10 @@
     const tile = focus && focus.kind === 'tile' ? focus.id : '';
     const sec = focus && focus.kind === 'sec' ? focus.id : '';
     // A wide screen has no crown-only rest (its crown heads the nav beside the search bar).
-    const base = stage === 'rest' && desk ? 'strip' : stage;
-    const mode = base === 'open' ? 'open' : (focus ? 'focus' : base);
+    // While the pin carousel is up (`peek`, founder 2026-11-18) the panel rests: the carousel has the foot of the map, and the
+    // crown rides on its top edge. The panel's own look comes back exactly as it was when the carousel closes.
+    const base = props.peek ? 'rest' : (stage === 'rest' && desk ? 'strip' : stage);
+    const mode = props.peek ? 'rest' : (base === 'open' ? 'open' : (focus ? 'focus' : base));
     const open = mode === 'open';
     const setFocus = (next) => { if (props.onFocus) props.onFocus(next); };
 
@@ -478,6 +480,7 @@
     }, [api]);
 
     useEffect(() => { if (props.onOpenChange) props.onOpenChange(open); }, [open]);
+    useEffect(() => { if (props.onMode) props.onMode(mode); }, [mode]);
     useEffect(() => {
       if (!open || props.hidden) return undefined;
       const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setStage('strip'); } };
@@ -504,6 +507,10 @@
       else el.removeAttribute('inert');
     }, [mode]);
     useEffect(() => { if (open || props.hidden) setMe(''); }, [open, props.hidden]);
+    // A tap on empty map (founder, 2026-11-18): back to the crown alone. A focus stays (it is a filter, and its chip says so);
+    // the Where to… strip and the menu fold away. A wide screen's rest is its strip.
+    const restSignal = props.restSignal || 0;
+    useEffect(() => { if (restSignal) { setStage('rest'); setMe(''); } }, [restSignal]);
 
     // the chosen tab in view, in the middle of its row
     const tabKey = tile || sec;
@@ -603,12 +610,15 @@
     // The crown: with any filter on, it clears them all and goes home (the map screen snaps to the person's place);
     // otherwise it shows or hides the Where to… strip.
     const filtered = !!focus || !!props.filtered;
+    // Above the map's rest (search open, or the pin carousel: `level`, founder 2026-11-18) it goes straight back to the crown
+    // alone, closing every level at once.
     const onCrown = () => {
       setMe('');
       if (filtered) { if (props.onReset) props.onReset(); setStage('rest'); return; }
+      if (props.level) { if (props.onLevelReset) props.onLevelReset(); setStage('rest'); return; }
       setStage((s) => (s === 'rest' ? 'strip' : 'rest'));
     };
-    const crownLabel = filtered ? (P.reset) : (base === 'rest' ? (P.open) : (P.close));
+    const crownLabel = filtered ? (P.reset) : props.level ? P.home : (base === 'rest' ? (P.open) : (P.close));
 
     // A card in the full panel takes its row over first; the map screen then chooses it (a second tap opens it).
     const openCard = (row) => (id, type) => {
@@ -695,8 +705,13 @@
       !open && h('div', { 'data-mv2': 'desktop-nav' },
         h('button', {
           type: 'button', 'data-mv2': 'desktop-crown', 'aria-expanded': rail ? 'true' : 'false',
-          'aria-label': rail ? P.hideNav : P.showNav,
-          onClick: () => { setRail((v) => !v); setMe(''); },
+          'aria-label': props.level ? P.home : (rail ? P.hideNav : P.showNav),
+          onClick: () => {
+            setMe('');
+            // the desktop crown is the crown too: above the map's rest it goes back to it, and only then folds the nav
+            if (props.level && props.onLevelReset) { props.onLevelReset(); return; }
+            setRail((v) => !v);
+          },
         }, window.CrownMark ? h(window.CrownMark, { size: 26 }) : (Icon ? h(Icon, { name: 'Crown', size: 22 }) : null)),
         rail && h('nav', { 'data-mv2': 'desktop-items', 'aria-label': P.dock }, RAIL.map((item) => (item.me
           ? meItem('rail', item, { 'data-mv2': 'desktop-item' }, navIcon(item))
@@ -742,6 +757,177 @@
         })) : null);
   }
 
+  // ── The pin carousel (founder, 2026-11-18) ───────────────────────────
+  // A pin tapped on the map home opens a row of cards at the foot of the map: that pin's card first, then the other pins
+  // in view, nearest to it first (so a swipe walks to the next pin along). The same cards as the Explore row (XCard).
+  // Swiping, the arrows or a tap on a neighbour choose a card, and its pin lights on the map. A second tap on the chosen
+  // card raises the panel, with that card's details (the listing sheet, inline) below the cards. The levels and their
+  // history entries belong to the map screen (home.jsx); this component only draws them and reports what was asked.
+
+  /**
+   * The carousel's order: `target` first, then the other listings in `visible` (ids; null = every one), nearest to the
+   * target first (rank()'s order), at most `cap` cards in all. Ideas are not listings and never appear. Returns markers.
+   */
+  function peekOrder(target, markers, visible, cap) {
+    if (!target) return [];
+    const max = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : ROW_CAP;
+    const vis = Array.isArray(visible) ? new Set(visible) : null;
+    const pool = (Array.isArray(markers) ? markers : [])
+      .filter((m) => m && m.id !== target.id && m.type !== 'idea' && (!vis || vis.has(m.id)));
+    return [target].concat(rank(target, pool, null, Math.max(0, max - 1)).slice(0, Math.max(0, max - 1)).map((r) => r.m));
+  }
+
+  /** Which card's middle is closest to `mid` (the row's middle, in the row's scroll coordinates)? -1 for no cards. */
+  function nearestIndex(centres, mid) {
+    let best = -1;
+    let gap = Infinity;
+    (centres || []).forEach((c, i) => { const d = Math.abs(c - mid); if (d < gap) { gap = d; best = i; } });
+    return best;
+  }
+
+  const SWIPE_SETTLE_MS = 140;   // a swipe has ended once the row has been still this long (snap and momentum included)
+  const PULL_PX = 36;            // a vertical pull this long on the panel raises it or steps back
+  /**
+   * props: items (markers, in order), index, raised, origin + distWords (the cards' distance), sources (indexSources()),
+   *        hidden, focusCard (a counter: move focus to the chosen card, for a pin chosen from the keyboard), onIndex(i),
+   *        onRaise(), onBack(), onClose(), details(m) (the node under the cards when raised), returnFocus(id) (it closed
+   *        with focus inside: `id` is the card that was chosen last).
+   */
+  function PinCarousel(props) {
+    const items = Array.isArray(props.items) ? props.items : [];
+    const n = items.length;
+    const index = Math.max(0, Math.min(n - 1, props.index || 0));
+    const raised = !!props.raised;
+    const root = useRef(null);
+    const row = useRef(null);
+    const indexRef = useRef(index);
+    indexRef.current = index;
+    const touched = useRef(false);     // the person's own finger, wheel or trackpad moved the row
+    const settle = useRef(null);
+    const fromSwipe = useRef(false);
+    const mounted = useRef(false);
+    const pull = useRef(null);
+    const swallow = useRef(false);
+    const back = useRef(props.onBack);
+    back.current = props.onBack;
+    const giveBack = useRef(props.returnFocus);
+    giveBack.current = props.returnFocus;
+    const lastId = useRef('');
+    const str = S();
+    const P = str.peek || {};
+    const Icon = window.Icon;
+    const near = window.MapV2Nearby;
+    const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
+    const current = items[index] || null;
+    lastId.current = current ? current.id : '';
+
+    // the chosen card in the middle of the row, unless the person's own swipe chose it (the row is already there)
+    const centreCard = (i, smooth) => {
+      const el = row.current;
+      const card = el && el.children[i];
+      if (!card || typeof el.scrollTo !== 'function') return;
+      const left = Math.max(0, card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2);
+      el.scrollTo({ left: left, behavior: smooth && !matches(REDUCED_MQ) ? 'smooth' : 'auto' });
+    };
+    const order = items.map((m) => m.id).join('|');
+    useEffect(() => {
+      if (fromSwipe.current) { fromSwipe.current = false; return; }
+      centreCard(index, mounted.current);
+      mounted.current = true;
+    }, [index, order]);
+    useEffect(() => {
+      if (!props.focusCard || !row.current) return;
+      const card = row.current.children[indexRef.current];
+      if (card && card.focus) card.focus({ preventScroll: true });
+    }, [props.focusCard]);
+    useEffect(() => () => clearTimeout(settle.current), []);
+    // A layout effect: its clean-up runs while the carousel is still in the page, so focus can still be found inside it
+    // (by the time a plain effect's clean-up runs, the removed cards have already dropped focus to the page).
+    useLayoutEffect(() => {
+      const el = root.current;
+      return () => { if (el && el.contains(document.activeElement) && giveBack.current) giveBack.current(lastId.current); };
+    }, []);
+    // Escape steps back one level, like Back (not while a full sheet is open over the carousel: that one takes it)
+    useEffect(() => {
+      if (props.hidden) return undefined;
+      const onKey = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); if (back.current) back.current(); } };
+      document.addEventListener('keydown', onKey);
+      return () => document.removeEventListener('keydown', onKey);
+    }, [props.hidden]);
+
+    const onRowScroll = () => {
+      if (!touched.current) return;
+      clearTimeout(settle.current);
+      settle.current = setTimeout(() => {
+        touched.current = false;
+        const el = row.current;
+        if (!el) return;
+        const centres = Array.prototype.map.call(el.children, (c) => c.offsetLeft + c.offsetWidth / 2);
+        const i = nearestIndex(centres, el.scrollLeft + el.clientWidth / 2);
+        if (i !== -1 && i !== indexRef.current) { fromSwipe.current = true; props.onIndex(i); }
+      }, SWIPE_SETTLE_MS);
+    };
+    const touch = () => { touched.current = true; };
+
+    // A vertical pull on the panel (its bar, or the cards while lowered): up raises it, down steps back one level.
+    const onPullDown = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (raised && !(e.target.closest && e.target.closest("[data-mv2='pinpeek-bar']"))) return;
+      pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+    };
+    const onPullUp = (e) => {
+      const p = pull.current;
+      pull.current = null;
+      if (!p || p.id !== e.pointerId) return;
+      const dx = e.clientX - p.x;
+      const dy = e.clientY - p.y;
+      if (Math.abs(dy) < PULL_PX || Math.abs(dy) < 1.5 * Math.abs(dx)) return;
+      swallow.current = true;
+      setTimeout(() => { swallow.current = false; }, 0);
+      if (dy < 0) { if (!raised) props.onRaise(); } else props.onBack();
+    };
+
+    const tap = (id) => {
+      if (swallow.current) return;
+      const i = items.findIndex((m) => m.id === id);
+      if (i === -1) return;
+      if (i !== index) { props.onIndex(i); return; }
+      if (!raised) props.onRaise();
+    };
+    const step = (d) => { const i = index + d; if (i >= 0 && i < n) props.onIndex(i); };
+    const meters = (m) => (props.origin && near ? near.metersBetween(props.origin, m) : NaN);
+    const iconBtn = (attrs, icon, word) => h('button', Object.assign({ type: 'button' }, attrs),
+      Icon ? h(Icon, { name: icon, size: 18 }) : null, word ? h('span', null, word) : null);
+
+    return h('section', {
+      ref: root, 'data-mv2': 'pinpeek', 'data-raised': raised ? '' : undefined, hidden: props.hidden || undefined,
+      'aria-label': P.label, onPointerDown: onPullDown, onPointerUp: onPullUp,
+      onPointerCancel: () => { pull.current = null; },
+    },
+      h('div', { 'data-mv2': 'pinpeek-bar' },
+        raised ? iconBtn({ 'data-mv2': 'pinpeek-back', onClick: props.onBack }, 'ChevronLeft', P.back) : null,
+        h('span', { 'data-mv2': 'pinpeek-count', role: 'status', 'aria-live': 'polite' },
+          n > 1 && P.count ? P.count(index + 1, n) : '',
+          current ? h('span', { 'data-mv2': 'sr' }, ' ' + (current.title || '')) : null),
+        raised ? h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }) : null,
+        iconBtn({ 'data-mv2': 'pinpeek-close', 'aria-label': P.close, onClick: props.onClose }, 'X')),
+      h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
+        n > 1 && index > 0 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
+        h('div', {
+          ref: row, 'data-mv2': 'xrow', 'data-row': 'peek', onScroll: onRowScroll,
+          onPointerDownCapture: touch, onTouchStart: touch, onWheel: touch,
+        }, items.map((m, i) => h(XCard, {
+          key: 'peek:' + m.id, m: m, meters: meters(m), rec: byKey.get(m.type + ':' + m.id),
+          groupWords: str.groups, distWords: props.distWords || {},
+          selected: i === index, badge: raised ? '' : P.detailsBadge,
+          onOpen: tap,
+        }))),
+        n > 1 && index < n - 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
+      raised && current && props.details ? h('div', {
+        'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
+      }, props.details(current)) : null);
+  }
+
   // An id inside an attribute selector: listing ids are uuids or slugs, but never trust that.
   function cssId(id) {
     const s = String(id);
@@ -753,6 +939,7 @@
 
   window.MapV2Explore = {
     ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore, SECTIONS,
+    peekOrder, nearestIndex, PinCarousel,
     lastView: () => lastView,
   };
 })();
