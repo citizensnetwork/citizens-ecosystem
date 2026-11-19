@@ -639,8 +639,25 @@
           userMovedRef.current = true;
           const to = { center: [cam.lng, cam.lat], zoom: cam.zoom, bearing: Number(cam.bearing) || 0 };
           const dur = window.MapV2 && window.MapV2.dur ? window.MapV2.dur('base') : 0;
-          if (dur > 0) mp.easeTo(Object.assign(to, { duration: dur, essential: true }), { originalEvent: {} });
-          else mp.jumpTo(to, { originalEvent: {} });
+          if (!(dur > 0)) { mp.jumpTo(to, { originalEvent: {} }); return; }
+          // Back must land exactly where the level was entered. If the ease is cut short (CI saw it end 80-90% of the way
+          // on a slow machine) and neither the person (a press or a wheel on the map) nor a newer camera move took over,
+          // the rest of the way is a jump.
+          const box = mp.getCanvasContainer();
+          let touched = false;
+          const touch = () => { touched = true; };
+          box.addEventListener('pointerdown', touch, true);
+          box.addEventListener('wheel', touch, { capture: true, passive: true });
+          mp.easeTo(Object.assign({}, to, { duration: dur, essential: true }), { originalEvent: {} });
+          // after easeTo: stopping an earlier animation fires its own moveend first, and this must not take that one
+          mp.once('moveend', () => setTimeout(() => {
+            box.removeEventListener('pointerdown', touch, true);
+            box.removeEventListener('wheel', touch, { capture: true });
+            if (touched || mapRef.current !== mp || mp.isMoving()) return;
+            const c = mp.getCenter();
+            const off = Math.abs(c.lng - cam.lng) > 1e-9 || Math.abs(c.lat - cam.lat) > 1e-9 || Math.abs(mp.getZoom() - cam.zoom) > 1e-6;
+            if (off) mp.jumpTo(to, { originalEvent: {} });
+          }, 0));
         },
         // The pins the person can see right now: inside the map's bounds and not hidden by the zoom gates.
         visibleIds() {
