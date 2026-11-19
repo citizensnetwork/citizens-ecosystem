@@ -72,8 +72,10 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     expect(labels).toContain("Follow");
     expect(labels.indexOf("Follow")).toBeLessThan(labels.indexOf("Share"));
     const vh = page.viewportSize()!.height;
-    const b = (await followBtn(page).boundingBox())!;
-    expect(b.y + b.height).toBeLessThanOrEqual(vh); // on screen at half, without scrolling
+    // on screen at half, without scrolling: measured once the sheet has slid in (the CPU is throttled, so the slide can
+    // still be under way when the sheet first counts as visible)
+    await expect.poll(async () => { const b = (await followBtn(page).boundingBox())!; return b.y + b.height; }, { timeout: 5_000 })
+      .toBeLessThanOrEqual(vh);
   });
 
   test("a Contributor profile does not print a low follower count", async ({ page }) => {

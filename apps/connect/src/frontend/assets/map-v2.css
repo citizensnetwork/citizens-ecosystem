@@ -4341,8 +4341,9 @@ a[data-mv2='card2'],
   overflow: visible;
   padding-inline: 0;
 }
-/* the crown on the carousel's top edge (lowered); raised, the bar's Close does its job */
-[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden]):not([data-raised])) [data-mv2='explore-crown'] {
+/* the crown on the carousel's top edge (lowered); raised, the bar's Close does its job and the crown waits there hidden,
+   so lowering the carousel never sends it gliding up from the foot */
+[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden])) [data-mv2='explore-crown'] {
   transform: translate(-50%, calc((var(--pp-peek) - env(safe-area-inset-bottom, 0px) - var(--space-4) - var(--crown) / 2) * -1));
 }
 [data-mv2='home']:has([data-mv2='pinpeek'][data-raised]:not([hidden])) [data-mv2='explore-crown'] {
