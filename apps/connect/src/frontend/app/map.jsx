@@ -561,6 +561,11 @@
     useEffect(() => {
       if (!apiRef) return undefined;
       apiRef.current = {
+        keepCamera() {
+          // Choosing a filter takes ownership of this view, just like moving the map.
+          userMovedRef.current = true;
+          if (mapRef.current) mapRef.current.stop();
+        },
         focusSelected(padding, minZoom) {
           requestAnimationFrame(() => {
             const mp = mapRef.current;

@@ -352,6 +352,7 @@
         scrollRight: 'Scroll right',
         hideNav: 'Hide navigation',
         showNav: 'Show navigation',
+        openPanel: 'Open explore panel',
         // the crown (founder, 2026-11-17): it shows and hides Where to…, and with a filter on it clears everything
         open: 'Show Where to…',
         close: 'Hide Where to…',

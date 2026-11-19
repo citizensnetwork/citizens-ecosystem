@@ -4359,3 +4359,16 @@ a[data-mv2='card2'],
     animation: none;
   }
 }
+
+/* Adjustable map panels and the category heading. */
+[data-mv2='where-heading'] {
+  margin: 0 var(--space-4) var(--space-2);
+  font: var(--fw-semibold) var(--fs-2)/var(--lh-2) var(--font-body);
+}
+[data-mv2='pinpeek'][data-adjusted] {
+  transform: translateY(var(--pp-offset));
+  transition: none;
+}
+[data-mv2='home']:not([data-narrow]) [data-mv2='pinpeek'][data-adjusted] {
+  transform: translateX(-50%) translateY(var(--pp-offset));
+}
