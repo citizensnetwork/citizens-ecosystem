@@ -1,0 +1,283 @@
+/*
+ * Central (the feed of everything Citizens offers). Every value below is copied from the Central block of
+ * docs/central/reference/central-reference.template.html, which quotes the approved design check; the guide lists
+ * them in section 7. Do not restyle anything here. Selectors are scoped under .cen so nothing leaks into the rest of
+ * the front door, and the few resets below only undo the front door's own element styles so the values equal the
+ * reference's.
+ *
+ * Dark theme: the reference switches on html[data-theme=dark]. The front door has no theme switch, so Central
+ * follows the device's setting (an open question in the guide, section 12).
+ */
+
+.cen-wrap {
+  container-type: inline-size;
+  font:
+    16px/1.6 ui-sans-serif,
+    system-ui,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tokens (guide section 7.1) */
+.cen {
+  --gold: #f2bd22;
+  --bg: #f7f6f1;
+  --tx: #272a25;
+  --tx2: #272a25a6;
+  --hr: #272a2514;
+  --card: linear-gradient(125deg, #f7f6f1e8, #f7f6f1a6 70%, #f7f6f170);
+  --edge: #ffffffb8;
+  --sh: 0 12px 35px #272a2509;
+  --raised: #fffdf8;
+  min-height: 100%;
+  color: var(--tx);
+  background: radial-gradient(
+      ellipse at 100% 0%,
+      color-mix(in srgb, var(--gold) 7%, transparent),
+      transparent 50%
+    ),
+    var(--bg);
+  transition:
+    background 0.28s,
+    color 0.28s;
+}
+@media (prefers-color-scheme: dark) {
+  .cen {
+    --bg: #1b1c18;
+    --tx: #f7f6f1;
+    --tx2: #f7f6f1b3;
+    --hr: #f7f6f11f;
+    --card: linear-gradient(125deg, #23251ff2, #2a2c26d8);
+    --edge: #ffffff1a;
+    --sh: 0 12px 35px #00000059;
+    --raised: #23251f;
+  }
+}
+
+/* Resets: the reference's own element rules (h1,h3,p margin 0; svg,img block), and the front door's p max-width. */
+.cen h2,
+.cen h3,
+.cen p {
+  margin: 0;
+  max-width: none;
+}
+.cen svg,
+.cen img {
+  display: block;
+}
+.cen .kicker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}
+
+/* Around the feed (guide section 7.3) */
+.cen .in {
+  padding: 0 clamp(12px, 4cqw, 40px) 60px;
+}
+.cen .cen-hero {
+  padding: clamp(30px, 6cqw, 70px) 4px clamp(18px, 3cqw, 34px);
+  max-width: 860px;
+}
+.cen .cen-title {
+  font-family: inherit;
+  font-size: clamp(36px, 6.3cqw, 63px);
+  font-weight: 500;
+  letter-spacing: -0.055em;
+  line-height: 1.04;
+  margin: 14px 0 14px;
+}
+.cen .cen-hero p {
+  font-size: 16px;
+  line-height: 1.75;
+  max-width: 60ch;
+  color: var(--tx2);
+  margin: 0;
+}
+.cen .lead2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cen .enc {
+  border-radius: 28px;
+  padding: 22px 24px;
+  background: var(--card);
+  border: 1px solid var(--edge);
+  box-shadow: var(--sh);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+.cen .enc p {
+  font-size: clamp(18px, 2.3cqw, 23px);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.3;
+  margin: 10px 0 10px;
+}
+.cen .enc small,
+.cen .fc small {
+  font-size: 12px;
+  color: var(--tx2);
+}
+@container (min-width:760px) {
+  .cen .lead2 {
+    grid-template-columns: 1.7fr 1fr;
+  }
+}
+
+/* ENGINE: staggered columns. The layout engine gives every card its column, top and height (guide section 6.5). */
+.cen .feed {
+  position: relative;
+}
+.cen .fc {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+}
+/* Cards waiting to be measured: drawn at their width, out of sight, and not adding to the page's scroll area. */
+.cen .fc-measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Card anatomy (guide section 7.4). The reference's card is a button; here it is a link, so no underline. */
+.cen .fc {
+  width: 100%;
+  text-align: left;
+  text-decoration: none;
+  padding: 0;
+  border-radius: 24px;
+  overflow: hidden;
+  background: var(--card);
+  border: 1px solid var(--edge);
+  box-shadow: var(--sh);
+  color: var(--tx);
+  animation: usher 0.35s ease-out;
+}
+/* ENGINE: the image fills the card's spare height; its least proportion follows the span (guide section 7.5). */
+.cen .fc img {
+  width: 100%;
+  object-fit: cover;
+  flex: 1 0 auto;
+  aspect-ratio: 1/1;
+}
+.cen .fc.wide img {
+  aspect-ratio: 2/1;
+}
+.cen .fc .tx {
+  padding: 13px 15px 16px;
+  display: grid;
+  gap: 6px;
+}
+.cen .fc .pl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--tx2);
+}
+.cen .fc .pl b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--tx);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--hr);
+  text-underline-offset: 3px;
+}
+.cen .fc .pl i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--a);
+}
+.cen .fc h3 {
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0;
+}
+.cen .fc .ico {
+  width: 22px;
+  color: var(--tx);
+}
+.cen .fc ol {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.cen .fc ol li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding-top: 6px;
+  border-top: 1px solid var(--hr);
+}
+.cen .fc ol .ico {
+  width: 16px;
+}
+.cen .fc.rest {
+  background: linear-gradient(170deg, #e9e3d3, #d9d6c8);
+  color: #272a25;
+  border-color: #ffffffb8;
+  min-height: 230px;
+  display: grid;
+  align-content: end;
+}
+@media (prefers-color-scheme: dark) {
+  .cen .fc.rest {
+    background: linear-gradient(170deg, #2a2a22, #1f211b);
+    color: #f7f6f1;
+    border-color: #ffffff1a;
+  }
+}
+.cen .fc.rest h3 {
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+}
+.cen .fc.rest small {
+  color: inherit;
+  opacity: 0.65;
+}
+
+/* States (guide section 7.6) */
+.cen .more {
+  padding: 22px 0 8px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--tx2);
+}
+@keyframes usher {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cen *,
+  .cen {
+    animation: none !important;
+    transition: none !important;
+  }
+}

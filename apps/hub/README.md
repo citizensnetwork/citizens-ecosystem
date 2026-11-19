@@ -80,8 +80,9 @@ hub's 404. Every link the hub writes is lowercase (a test checks each one agains
 
 ## Security headers: the hub's own pages only
 
-The hub's pages are static HTML plus one external stylesheet and **no script at all**, so the policy allows nothing
-inline:
+The hub's pages are static HTML plus one external stylesheet. The one exception is the landing page, which runs the
+Central feed from external script files only (the hub builds with webpack, because Turbopack writes an inline loader
+script that this policy blocks). The policy allows nothing inline:
 
 ```
 default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self';
