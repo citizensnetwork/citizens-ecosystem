@@ -288,6 +288,21 @@
       // a card (or a pin) chosen: the card says what the next tap does, in words laid over its picture
       selectedBadge: 'Tap again to open',
       selectedAnnounce: (name) => name + ' is chosen. Press it again to open it.',
+      // the search bar's category chips (founder, 2026-11-18: one small row that swipes sideways)
+      chipsLabel: 'Filter the map by category',
+      // the pin carousel (founder, 2026-11-18): a pin's card and its neighbours at the foot of the map
+      peek: {
+        label: 'On the map here',
+        detailsBadge: 'Tap again for details',
+        count: (i, n) => i + ' of ' + n,
+        prev: 'Previous on the map',
+        next: 'Next on the map',
+        back: 'Back',
+        close: 'Close and go back to the map',
+        raise: 'Show details',
+        lower: 'Back to the cards',
+        details: (name) => 'Details of ' + name,
+      },
       // the panel's own controls (founder, 2026-10-30): the title switches to the category list, the handle lowers the panel
       chooseCategory: 'Choose a category',
       backToListings: 'Back to the listings',
@@ -341,6 +356,7 @@
         open: 'Show Where to…',
         close: 'Hide Where to…',
         reset: 'Clear filters and go back to the map',
+        home: 'Close and go back to the map',
         // the handle
         raise: 'Show every row',
         lower: 'Lower the panel',

@@ -25,8 +25,8 @@ describe("open to collaborate", () => {
     expect(sheet).toContain("isContributor && item.openToCollaborate");
     expect(sheet).toContain("'data-mv2': 'collab-chip'");
     expect(sheet).toContain("Str.collaborate");
-    expect(sheet).toContain("if (collabChip && !expanded) actions.unshift(collabChip)");
-    expect(sheet).toContain("expanded && collabChip");
+    expect(sheet).toContain("if (collabChip && !expanded && !inline) actions.unshift(collabChip)");
+    expect(sheet).toContain("(expanded || inline) && collabChip");
     expect(sheet).not.toMatch(/collab-chip'[^)]*<button/);
 
     const profile = read("src/frontend/app/profiles.jsx");

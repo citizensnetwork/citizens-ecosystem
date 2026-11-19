@@ -720,6 +720,8 @@
     const selfPops = useRef(0); // history.back() calls we made ourselves; popstate ignores them
     const navRef = useRef(nav);
     const backGuards = useRef([]);
+    const released = useRef(new Set());   // guard entries closed this task, popped together (registerBackGuard)
+    const flushQueued = useRef(false);
     const contributorsRef = useRef(contributors);
     contributorsRef.current = contributors;
     const canHistory = () => !!(window.history && window.history.pushState);
@@ -785,12 +787,26 @@
         // it first (history.back() is asynchronous, a pushState is not), and only while it
         // is still the top entry and nobody owns it. If the person moved on, writeHistory
         // already replaced it; if Back popped it, histIdx has moved below it.
+        // Overlays closed together (the map home's levels, all reset by the crown) release
+        // their entries in one go: ONE history.go(-k) takes every released entry off the top,
+        // so no leftover guard entries stay behind for Back or Forward to walk through.
+        if (entry.idx === -1) return;
+        released.current.add(entry.idx);
+        if (flushQueued.current) return;
+        flushQueued.current = true;
         Promise.resolve().then(() => {
+          flushQueued.current = false;
+          const gone = released.current;
+          released.current = new Set();
           const cur = canHistory() ? window.history.state : null;
-          if (entry.idx !== -1 && entry.idx === histIdx.current && cur && cur.guard && !ownsTopEntry()) {
-            selfPops.current += 1;
-            window.history.back();
-          }
+          if (!cur || !cur.guard || ownsTopEntry()) return;
+          const owned = (i) => backGuards.current.some((g) => g.idx === i);
+          let k = 0;
+          while (histIdx.current - k > 0 && gone.has(histIdx.current - k) && !owned(histIdx.current - k)) k += 1;
+          if (!k) return;
+          selfPops.current += 1;
+          if (k === 1) window.history.back();
+          else window.history.go(-k);
         });
       };
     }, []);

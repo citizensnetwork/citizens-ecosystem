@@ -158,11 +158,14 @@ test.describe("P1-04 the pin", () => {
     const outline = await first.evaluate((e) => getComputedStyle(e).outlineStyle + " " + getComputedStyle(e).outlineWidth);
     expect(outline).toBe("solid 2px");
     await page.keyboard.press("Enter");
-    // #210: Enter selects the pin and outlines its card in the Explore row, where the keyboard follows; Enter there opens the sheet
-    await expect(page.locator("[data-mv2='explore'] [data-selected]").first()).toBeVisible();
-    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest("[data-explore-id][data-selected]"))).toBe(true);
+    // founder, 2026-11-18: Enter opens the pin carousel at that pin's card, where the keyboard follows; Enter there raises
+    // the carousel with the card's details (the listing sheet, inline), and Escape steps back one level
+    await expect(page.locator("[data-mv2='pinpeek'] [data-selected]").first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => !!document.activeElement?.closest("[data-mv2='pinpeek'] [data-explore-id][data-selected]"))).toBe(true);
     await page.keyboard.press("Enter");
-    await expect(page.locator("[data-mv2='sheet']")).toBeVisible();
+    await expect(page.locator("[data-mv2='pinpeek'][data-raised] [data-mv2='sheet'][data-inline]")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-mv2='pinpeek']")).not.toHaveAttribute("data-raised", "");
   });
 
   test("the tap target of every pin is at least 44 x 44 CSS px", async ({ page }) => {
