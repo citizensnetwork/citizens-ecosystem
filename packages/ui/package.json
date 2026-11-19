@@ -27,9 +27,9 @@
     "@citizens/config": "workspace:*",
     "@types/react": "^19.3.0",
     "@eslint/js": "10.0.1",
-    "@typescript-eslint/eslint-plugin": "8.72.1",
-    "@typescript-eslint/parser": "8.72.1",
-    "eslint": "10.13.0",
+    "@typescript-eslint/eslint-plugin": "8.72.2",
+    "@typescript-eslint/parser": "8.72.2",
+    "eslint": "10.14.0",
     "eslint-config-prettier": "10.1.8",
     "react": "19.3.1",
     "typescript": "5.5.4"
