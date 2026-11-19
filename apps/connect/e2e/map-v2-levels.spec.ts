@@ -32,9 +32,21 @@ async function open(page: Page) {
   }, [lng, lat]);
   await idle(page);
 }
+/**
+ * The map has settled: not moving, and its camera unchanged for 300 ms. A carousel choice eases the map one frame later
+ * (requestAnimationFrame), so "not moving" alone can be read in the frame before an ease begins (CI saw that).
+ */
 async function idle(page: Page) {
-  await page.waitForFunction(() => !(window as unknown as { __ccMap: MapLike }).__ccMap.isMoving());
-  await page.waitForTimeout(120);
+  await page.waitForFunction(() => {
+    const w = window as unknown as { __ccMap: MapLike; __idle?: { sig: string; at: number } };
+    const m = w.__ccMap;
+    if (m.isMoving()) { w.__idle = undefined; return false; }
+    const c = m.getCenter();
+    const sig = `${c.lng.toFixed(9)},${c.lat.toFixed(9)},${m.getZoom().toFixed(6)}`;
+    const now = performance.now();
+    if (!w.__idle || w.__idle.sig !== sig) { w.__idle = { sig, at: now }; return false; }
+    return now - w.__idle.at > 300;
+  }, undefined, { polling: 50, timeout: 15_000 });
 }
 const cam = (page: Page) => page.evaluate(() => {
   const m = (window as unknown as { __ccMap: MapLike }).__ccMap;
@@ -298,10 +310,12 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       // lowered, the crown rides the carousel's top edge (a phone) or heads the nav beside the search bar (desktop)
       const crown = size.name === "phone" ? page.locator("[data-mv2='explore-crown']") : page.locator("[data-mv2='desktop-crown']");
       if (size.name === "phone") {
-        await still(page);
-        const c = (await crown.boundingBox())!;
-        const top = (await peek(page).boundingBox())!.y;
-        expect(Math.abs(c.y + c.height / 2 - top)).toBeLessThan(6);
+        // both slide by transform: measure once neither moves
+        await expect.poll(async () => {
+          const top = await still(page);
+          const c = (await crown.boundingBox())!;
+          return Math.abs(c.y + c.height / 2 - top);
+        }, { timeout: 5_000 }).toBeLessThan(6);
       }
       await crown.click();
       await reset();
