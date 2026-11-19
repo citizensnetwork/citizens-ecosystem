@@ -412,12 +412,10 @@ describe('workspace graph', () => {
     assert.deepEqual(live.packageApps['packages/connect-client'], ['wear']);
     assert.deepEqual(live.packageApps['packages/config'], ['wear', 'hub']);
     assert.deepEqual(live.packageApps['packages/ui'], []);
-    assert.deepEqual(live.packageApps['packages/braces-patched'], [
-      'connect',
-      'vision',
-      'wear',
-      'hub',
-    ]);
+    // Root pnpm.overrides links (patched braces and picomatch forks) reach every app.
+    for (const fork of ['braces-patched', 'picomatch-2-patched', 'picomatch-4-patched']) {
+      assert.deepEqual(live.packageApps[`packages/${fork}`], ['connect', 'vision', 'wear', 'hub']);
+    }
     // The front door builds from the registry, so a registry change must redeploy it (and the apps that read it).
     assert.deepEqual(live.packageApps['packages/ecosystem'], ['connect', 'vision', 'wear', 'hub']);
     assert.deepEqual(live.affectedByApp, graph.affectedByApp);
@@ -427,6 +425,8 @@ describe('workspace graph', () => {
     expectActions(['packages/utils/src/index.ts'], threeApps, live);
     expectActions(['packages/frontend-build/index.js'], threeApps, live);
     expectActions(['packages/braces-patched/lib/parse.js'], all, live);
+    expectActions(['packages/picomatch-2-patched/lib/parse.js'], all, live);
+    expectActions(['packages/picomatch-4-patched/lib/parse.js'], all, live);
     expectActions(['packages/ecosystem/index.js'], all, live);
     expectActions(['apps/hub/next.config.js'], { ...none, hub: 'build' }, live);
   });
