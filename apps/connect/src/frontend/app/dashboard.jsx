@@ -384,7 +384,6 @@
                 app.role === 'contributor' && h('option', { value: '' }, 'My listing'),
                 (app.teamListings || []).map((t) => h('option', { key: t.id, value: t.id }, ((t.contributor && t.contributor.name) || 'Listing') + (t.role === 'viewer' ? ' (view)' : '')))))),
           h('div', { className: 'flex items-center gap-2' },
-            h('span', { className: 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-accent text-gold-dark flex items-center gap-1' }, h(Icon, { name: 'Crown', size: 11 }), activeContributor.involvementLevel),
             h('button', { onClick: () => go('settings'), className: 'w-9 h-9 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:text-foreground' }, h(Icon, { name: 'Settings', size: 16 }))))),
 
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8' },

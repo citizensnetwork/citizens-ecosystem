@@ -1074,3 +1074,74 @@ describe('mobileOnly and validate (native public links)', () => {
     expect(isBasePath('')).toBe(false);
   });
 });
+
+describe('browserBundles (other real-ESM entries of the host app)', () => {
+  /** A bundle entry that imports a helper module, so a plain copy could never run it. */
+  function writeBundleEntry(): void {
+    const src = path.join(rootDir, 'src', 'frontend');
+    fs.writeFileSync(path.join(src, 'world-helper.mjs'), 'export const word = "hello";\n');
+    fs.writeFileSync(
+      path.join(src, 'engine-world.js'),
+      'import { word } from "./world-helper.mjs";\nwindow.FIXTURE_WORLD = word;\n',
+    );
+    const html = INDEX_HTML.replace(
+      '<script src="config.js"></script>',
+      '<script src="config.js"></script>\n  <script src="engine-world.js"></script>',
+    );
+    fs.writeFileSync(path.join(src, 'index.html'), html);
+  }
+
+  it('bundles the entry into one hashed IIFE loaded where its tag stood', () => {
+    writeBundleEntry();
+    const result = buildFrontend(
+      makeOptions(rootDir, {
+        browserBundles: ['engine-world.js'],
+        extraSpecialFiles: ['config.example.js', 'world-helper.mjs'],
+      }),
+    );
+    const file = result.browserBundleFiles['engine-world.js'] ?? '';
+    expect(file).toMatch(/^engine-world\.[0-9a-f]{10}\.js$/);
+    const code = fs.readFileSync(path.join(result.dest, file), 'utf8');
+    expect(code).not.toContain('import');
+    const win: Record<string, unknown> = {};
+    new Function('window', code)(win);
+    expect(win.FIXTURE_WORLD).toBe('hello');
+    // The raw ESM entry never ships: a browser could not run its import.
+    expect(fs.existsSync(path.join(result.dest, 'engine-world.js'))).toBe(false);
+    const html = fs.readFileSync(path.join(result.dest, 'index.html'), 'utf8');
+    expect(html).not.toContain('src="engine-world.js"');
+    expect(html.indexOf('config.js')).toBeLessThan(html.indexOf(file));
+    expect(html.indexOf(file)).toBeLessThan(html.indexOf(result.authClientFile));
+  });
+
+  it('removes the hashed copy of an earlier build, and an app without the option gets none', () => {
+    writeBundleEntry();
+    const options = makeOptions(rootDir, {
+      browserBundles: ['engine-world.js'],
+      extraSpecialFiles: ['config.example.js', 'world-helper.mjs'],
+    });
+    const first = buildFrontend(options);
+    const stale = path.join(first.dest, 'engine-world.aaaaaaaaaa.js');
+    fs.writeFileSync(stale, '// old build');
+    buildFrontend(options);
+    expect(fs.existsSync(stale)).toBe(false);
+    expect(buildFrontend(makeOptions(rootDir)).browserBundleFiles).toEqual({});
+  });
+
+  it('fails the build when index.html has no tag of its own for the entry', () => {
+    const src = path.join(rootDir, 'src', 'frontend');
+    fs.writeFileSync(path.join(src, 'engine-world.js'), 'window.FIXTURE_WORLD = 1;\n');
+    expect(() =>
+      buildFrontend(makeOptions(rootDir, { browserBundles: ['engine-world.js'] })),
+    ).toThrow(/exactly one <script src="engine-world\.js"><\/script> tag/);
+  });
+
+  it.each([['auth-client.js'], ['Engine.js'], ['app/engine.js'], ['engine.mjs']])(
+    'refuses %s as an entry name',
+    (name) => {
+      expect(() => buildFrontend(makeOptions(rootDir, { browserBundles: [name] }))).toThrow(
+        /options\.browserBundles/,
+      );
+    },
+  );
+});

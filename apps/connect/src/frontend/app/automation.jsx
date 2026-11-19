@@ -20,6 +20,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { useState, useEffect, useCallback, useRef } = React;
   const { cx, Button, Field, Input, Textarea, Toggle, Empty } = window.UI;
@@ -431,7 +432,7 @@
       h('div', null,
         h('p', { className: 'text-sm font-bold text-foreground leading-tight' }, 'Automatic updates'),
         h('p', { className: 'text-xs text-muted-foreground mt-0.5 leading-relaxed' },
-          'Keeping a listing current takes time. With your permission, Citizens can read your public website, YouTube channel and calendar and suggest events, news and profile updates here. Nothing changes without your yes, unless you choose to have new events published for you.')));
+          'Keeping a listing current takes time. With your permission, ' + W.term('worldShort') + ' can read your public website, YouTube channel and calendar and suggest events, news and profile updates here. Nothing changes without your yes, unless you choose to have new events published for you.')));
     if (auto.status === 'loading') return shell([h(F, { key: 'head' }, title), h('p', { key: 'l', className: 'text-xs text-muted-foreground' }, 'Loading your settings…')]);
     if (auto.status === 'unavailable') {
       return shell([h(F, { key: 'head' }, title), h('p', { key: 'u', className: 'text-xs text-muted-foreground' }, 'Automatic updates are not available for your account right now. Please check back soon.')]);
@@ -601,7 +602,7 @@
       return h(Empty, { icon: 'Sparkles', title: 'View only', sub: 'You can look at this listing. Suggesting and publishing updates stays with an editor or the owner.' });
     }
     if (!auto || auto.status === 'idle') {
-      return h(Empty, { icon: 'Sparkles', title: 'Suggestions appear here', sub: 'Sign in with your Contributor account to see updates suggested from your public website, YouTube channel and calendar.' });
+      return h(Empty, { icon: 'Sparkles', title: 'Suggestions appear here', sub: 'Sign in with your ' + W.term('partner') + ' account to see updates suggested from your public website, YouTube channel and calendar.' });
     }
     if (auto.status === 'loading') return h('p', { className: 'text-xs text-muted-foreground py-8 text-center' }, 'Loading…');
     if (auto.status === 'unavailable') {

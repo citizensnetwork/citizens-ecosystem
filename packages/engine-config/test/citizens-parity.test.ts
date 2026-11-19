@@ -65,28 +65,15 @@ interface ConnectCategories {
   EVENT_CATEGORY_KEYWORDS: Record<string, string[]>;
 }
 
-interface ConnectInvolvement {
-  INVOLVEMENT_COLORS: Record<string, string>;
-  INVOLVEMENT_DESCRIPTIONS: Record<string, string>;
-  computeInvolvementLevel(signals: {
-    followers: number;
-    events: number;
-    places: number;
-    teamSize: number;
-  }): string;
-}
-
 async function load<T>(path: string): Promise<T> {
   const url = pathToFileURL(resolve(ROOT, path)).href;
   return (await import(/* @vite-ignore */ url)) as T;
 }
 
 let connect: ConnectCategories;
-let involvement: ConnectInvolvement;
 
 beforeAll(async () => {
   connect = await load<ConnectCategories>(`${CONNECT}/src/lib/categories.ts`);
-  involvement = await load<ConnectInvolvement>(`${CONNECT}/src/lib/contributors/involvement.ts`);
 });
 
 describe('the home-screen app', () => {
@@ -195,12 +182,30 @@ describe('place categories and partner types', () => {
   });
 
   it('partner kinds are Connect’s four, with the same default', () => {
-    const apply = raw(`${APP}/apply.jsx`);
-    for (const kind of config.categories.partnerKinds) {
-      expect(apply).toContain(`{ value: '${kind.id}', label: '${kind.label}' }`);
+    // The four kinds migration 173 stores, and the kind the screens used when none was picked.
+    expect(config.categories.partnerKinds.map((kind) => [kind.id, kind.label])).toEqual([
+      ['ministry', 'Ministry'],
+      ['organization', 'Organisation'],
+      ['business', 'Business'],
+      ['individual', 'Individual'],
+    ]);
+    expect(config.categories.defaultPartnerKind).toBe('ministry');
+  });
+
+  it('the screens read the partner kinds from the world (step E7)', () => {
+    for (const file of ['apply.jsx', 'admin.jsx', 'store.jsx']) {
+      const source = raw(`${APP}/${file}`);
+      expect(source, file).toContain('W.configuration.categories.partnerKinds.map(');
+      expect(source, file).not.toContain("{ value: 'ministry', label:");
     }
-    expect(config.categories.partnerKinds).toHaveLength(4);
-    expect(apply).toContain(`? value : '${config.categories.defaultPartnerKind}';`);
+    for (const file of ['apply.jsx', 'admin.jsx', 'store.jsx', 'pending-application.jsx']) {
+      const source = raw(`${APP}/${file}`);
+      expect(source, file).toContain('W.configuration.categories.defaultPartnerKind');
+      expect(source, file).not.toContain("'ministry'");
+    }
+    expect(raw(`${APP}/onboarding-presets-lib.jsx`)).toContain(
+      'const START_KIND = W.configuration.categories.defaultPartnerKind;',
+    );
   });
 });
 
@@ -319,37 +324,18 @@ describe('vocabulary', () => {
    */
   const SOURCES: Partial<Record<MessageKey, { file: string; wrap?: (text: string) => string }>> = {
     'screen.map.navLabel': { file: shell, wrap: (text) => `{ page: 'home', label: '${text}'` },
-    'screen.discover.title': { file: routes, wrap: (text) => `'kingdom-discovery': '${text}'` },
-    'screen.gatherings.title': { file: routes, wrap: (text) => `lets: '${text}'` },
-    'screen.ideas.title': { file: routes, wrap: (text) => `community: '${text}'` },
     'screen.ideas.subtitle': { file: pages },
     'screen.ideas.confirmed': { file: pages },
     'screen.ideas.mapType': { file: strings, wrap: (text) => `idea: '${text}'` },
-    'screen.apply.title': { file: routes, wrap: (text) => `apply: '${text}'` },
-    'screen.apply.intro': { file: `${APP}/apply.jsx` },
-    'screen.apply.aboutTitle': { file: `${APP}/apply.jsx`, wrap: (text) => `title: '${text}'` },
-    'screen.apply.nameLabel': { file: `${APP}/apply.jsx`, wrap: (text) => `nameLabel: '${text}'` },
     'screen.apply.pendingTitle': { file: pages },
     'screen.apply.invite': { file: pages, wrap: (text) => `: '${text}')` },
     'screen.communityEvents.rule': { file: pages },
     'screen.portal.title': { file: shell, wrap: (text) => `label: '${text}'` },
     'screen.claim.action': { file: shell },
-    'screen.role.partner': { file: shell, wrap: (text) => `label: level || '${text}'` },
-    'screen.role.user': { file: `${APP}/profiles.jsx`, wrap: (text) => `}, '${text}')` },
-    'screen.fallback.userName': { file: store, wrap: (text) => `|| '${text}'` },
-    'screen.fallback.partnerName': { file: store, wrap: (text) => `: '${text}'` },
-    'screen.fallback.ownPartnerName': { file: store, wrap: (text) => `|| '${text}'` },
+    'screen.role.partner': { file: shell, wrap: (text) => `{ label: '${text}', color:` },
     'screen.loading': { file: `${APP}/auth.jsx`, wrap: (text) => `'aria-label': '${text}'` },
     'screen.wordmark.primary': { file: shell, wrap: (text) => `font-display' }, '${text}')` },
     'screen.wordmark.secondary': { file: shell, wrap: (text) => `uppercase mt-0.5' }, '${text}')` },
-    'screen.admin.tab.partners': {
-      file: `${APP}/admin.jsx`,
-      wrap: (text) => `value: 'contributors', label: '${text}'`,
-    },
-    'screen.admin.tab.users': {
-      file: `${APP}/admin.jsx`,
-      wrap: (text) => `value: 'citizens', label: '${text}'`,
-    },
     'screen.map.type.partner': { file: strings, wrap: (text) => `contributor: '${text}'` },
     'screen.listing.whereDirectory': { file: `${APP}/data.jsx`, wrap: (text) => `: '${text}')` },
     'screen.listing.whereMapAndDirectory': {
@@ -357,7 +343,6 @@ describe('vocabulary', () => {
       wrap: (text) => `? '${text}'`,
     },
     'screen.settings.weeklyDigest': { file: pages },
-    'screen.cohost.invite': { file: `${APP}/cohosts.jsx` },
     'email.senderName': {
       file: `${CONNECT}/src/lib/email/send.ts`,
       wrap: (text) => `EMAIL_FROM = "${text} <`,
@@ -430,6 +415,51 @@ describe('vocabulary', () => {
     },
   };
 
+  /**
+   * Messages a Connect screen reads from the world since step E7. `text` is what the screen
+   * showed before it was wired: the Citizens world must still render exactly that, the screen
+   * must ask for the key, and its old copy must be gone.
+   */
+  const WIRED: Partial<Record<MessageKey, { files: readonly string[]; text: string }>> = {
+    'meta.title': { files: [routes], text: 'Citizens Connect' },
+    'screen.discover.title': { files: [routes], text: 'Kingdom Exploration' },
+    'screen.gatherings.title': { files: [routes], text: "Let's…" },
+    'screen.ideas.title': { files: [routes], text: 'Kingdom Projects' },
+    'screen.apply.title': {
+      files: [routes, `${APP}/apply.jsx`, store],
+      text: 'Become a Contributor',
+    },
+    'screen.apply.intro': {
+      files: [`${APP}/apply.jsx`],
+      text: 'Contributors create events & places, broadcast updates, message citizens, and lead Kingdom initiatives across the map.',
+    },
+    'screen.apply.aboutTitle': { files: [`${APP}/apply.jsx`], text: 'About your ministry' },
+    'screen.apply.nameLabel': {
+      files: [`${APP}/apply.jsx`, `${APP}/admin.jsx`, `${APP}/pending-application.jsx`],
+      text: 'Organisation / ministry name',
+    },
+    'screen.apply.namePlaceholder': {
+      files: [`${APP}/apply.jsx`, `${APP}/admin.jsx`],
+      text: 'e.g. New Wine Fellowship',
+    },
+    'screen.apply.fallbackName': { files: [`${APP}/apply.jsx`], text: 'Your ministry' },
+    'screen.apply.teamSubtitle': {
+      files: [`${APP}/apply.jsx`],
+      text: 'Add the people and channels behind your ministry.',
+    },
+    'screen.role.user': { files: [`${APP}/profiles.jsx`, `${APP}/messages.jsx`], text: 'Citizen' },
+    'screen.fallback.userName': { files: [store], text: 'A Citizen' },
+    'screen.fallback.partnerName': { files: [store], text: 'Unnamed Ministry' },
+    'screen.fallback.ownPartnerName': { files: [store], text: 'My Ministry' },
+    'screen.portal.title': {
+      files: [`${APP}/listing-claim.jsx`, `${APP}/admin.jsx`],
+      text: 'Contributor Portal',
+    },
+    'screen.admin.tab.partners': { files: [`${APP}/admin.jsx`], text: 'Contributors' },
+    'screen.admin.tab.users': { files: [`${APP}/admin.jsx`], text: 'Citizens' },
+    'screen.cohost.invite': { files: [`${APP}/cohosts.jsx`], text: 'Invite another Contributor.' },
+  };
+
   /** Messages with nothing to compare: the text is empty in Connect today. */
   const EMPTY_TODAY: readonly MessageKey[] = ['meta.description'];
 
@@ -451,10 +481,14 @@ describe('vocabulary', () => {
 
   it('every message is tied to the place Connect writes it', () => {
     const untied = MESSAGE_KEYS.filter(
-      (key) => !SOURCES[key] && !EMPTY_TODAY.includes(key) && !NOT_SHOWN_TODAY.includes(key),
+      (key) =>
+        !SOURCES[key] &&
+        !WIRED[key] &&
+        !EMPTY_TODAY.includes(key) &&
+        !NOT_SHOWN_TODAY.includes(key),
     );
     expect(untied).toEqual([]);
-    for (const key of NOT_SHOWN_TODAY) expect(SOURCES[key], key).toBeUndefined();
+    for (const key of NOT_SHOWN_TODAY) expect(SOURCES[key] ?? WIRED[key], key).toBeUndefined();
     for (const key of EMPTY_TODAY) expect(world.t(key), key).toBe('');
   });
 
@@ -476,8 +510,19 @@ describe('vocabulary', () => {
     });
   });
 
+  it.each(Object.entries(WIRED))('%s is read from the world and reads as before', (key, wired) => {
+    expect(world.t(key as MessageKey)).toBe(wired.text);
+    for (const file of wired.files) {
+      const contents = js(file);
+      expect(contents, `${file} asks for ${key}`).toContain(`t('${key}')`);
+      expect(contents, `${file} still holds its own copy of ${key}`).not.toContain(
+        quoted(wired.text),
+      );
+    }
+  });
+
   it('the page title is also the app’s base title', () => {
-    expect(js(routes)).toContain(`BASE_TITLE = '${world.t('meta.title')}'`);
+    expect(js(routes)).toContain(`BASE_TITLE = window.WORLD.t('meta.title')`);
   });
 
   it('the rotating slogan has Connect’s nine phrases, in order', () => {
@@ -497,8 +542,11 @@ describe('vocabulary', () => {
     expect(world.term('user', 'many')).toBe('Citizens');
     expect(world.term('partner', 'a')).toBe('a Contributor');
     expect(world.term('ideaProject', 'many')).toBe('Kingdom Projects');
+    expect(world.term('discovery')).toBe('Kingdom Discovery');
+    expect(world.term('user', 'One')).toBe('Citizen');
+    expect(world.term('partner', 'One')).toBe('Contributor');
     expect(js(`${APP}/onboarding-presets-lib.jsx`)).toContain(
-      `found in ${world.term('discovery')} without it`,
+      `found in ' + W.term('discovery') + ' without it`,
     );
   });
 });
@@ -605,17 +653,12 @@ describe('layout, map and the rest', () => {
     expect(tiers).toHaveLength(5);
   });
 
-  it('the partner levels are the ones Connect computes, with the same colours and thresholds', () => {
-    const levels = config.partnerLevels ?? [];
-    expect(levels.map((level) => level.label)).toEqual(Object.keys(involvement.INVOLVEMENT_COLORS));
-    const at = (followers: number) =>
-      involvement.computeInvolvementLevel({ followers, events: 0, places: 0, teamSize: 0 });
-    levels.forEach((level, index) => {
-      expect(level.color, level.id).toBe(involvement.INVOLVEMENT_COLORS[level.label]);
-      expect(level.description, level.id).toBe(involvement.INVOLVEMENT_DESCRIPTIONS[level.label]);
-      expect(at(level.minScore), level.id).toBe(level.label);
-      if (index > 0) expect(at(level.minScore - 1), level.id).toBe(levels[index - 1]?.label);
-    });
+  it('Connect has no partner level ladder (founder, 2026-11-16)', () => {
+    expect(config.partnerLevels).toBeUndefined();
+    expect(existsSync(resolve(ROOT, `${CONNECT}/src/lib/contributors/involvement.ts`))).toBe(false);
+    for (const file of ['store.jsx', 'profiles.jsx', 'shell.jsx', 'dashboard.jsx', 'data.jsx']) {
+      expect(raw(`${APP}/${file}`), file).not.toMatch(/involvementLevel|Shepherd|TIERS = \[/);
+    }
   });
 
   it('the three environment switches are recorded at Connect’s default (off)', () => {

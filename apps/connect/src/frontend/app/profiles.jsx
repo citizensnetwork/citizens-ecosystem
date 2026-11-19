@@ -240,7 +240,7 @@
           h(Avatar, { src: user.profilePhoto, name: user.name, size: 84, rounded: 'xl', ring: '#F7F4EE' }),
           h('div', null,
             h('h1', { className: 'text-xl text-foreground font-display' }, user.name),
-            h('span', { className: 'text-xs font-semibold text-muted-foreground' }, 'Citizen')),
+            h('span', { className: 'text-xs font-semibold text-muted-foreground' }, window.WORLD.t('screen.role.user'))),
           user.bio && h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, user.bio),
           connectedEvents.length > 0 && h('div', null,
             h('p', { className: 'text-sm font-bold text-foreground mb-2' }, 'Attending (' + connectedEvents.length + ')'),
@@ -278,7 +278,7 @@
       if (!still) setReading(null);
       return undefined;
     }, [reading, newsPosts, c]);
-    if (!c) return app.entityStatus('profile', id) === 'loading' ? h(Loading) : h(Empty, { icon: 'UserX', title: 'Contributor not found' });
+    if (!c) return app.entityStatus('profile', id) === 'loading' ? h(Loading) : h(Empty, { icon: 'UserX', title: window.WORLD.term('partner', 'One') + ' not found' });
     const isFollowing = followedOrgs.has(id);
     const cat = window.DATA.getItemCategory({ type: 'contributor', category: c.category });
     const cEvents = events.filter((e) => e.organizerId === c.id);
@@ -292,7 +292,6 @@
     const cPlaces = places.filter((p) => p.organizerId === c.id);
     const cNews = (newsPosts || []).filter((n) => n.contributorId === c.id).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const collabs = (c.collaborators || []).map((cid) => contributors.find((x) => x.id === cid)).filter(Boolean);
-    const TIER_PCT = { Shepherd: 33, Beacon: 66, Pillar: 100 }[c.involvementLevel] || 33;
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'profile' },
       h(Scroll, null,
         h('div', { className: 'relative h-44 sm:h-52' },
@@ -317,13 +316,6 @@
             h(Button, { variant: 'outline', icon: 'Share2', onClick: () => app.shareLink({ page: 'profile', params: { id } }) })),
           h('div', { className: 'space-y-4' },
             h('p', { className: 'text-sm text-muted-foreground leading-relaxed' }, c.bio),
-            // involvement tier
-            h('div', { className: 'bg-card rounded-2xl border border-border p-4' },
-              h('div', { className: 'flex items-center justify-between mb-2' },
-                h('div', { className: 'flex items-center gap-2' }, h(Icon, { name: 'Crown', size: 15, className: 'text-gold' }), h('p', { className: 'text-sm font-bold text-foreground' }, 'Involvement: ' + c.involvementLevel)),
-                h('span', { className: 'text-xs text-muted-foreground' }, c.dominantNiche)),
-              h('div', { className: 'h-2 rounded-full bg-muted overflow-hidden mb-1.5' }, h('div', { className: 'h-full gold-gradient rounded-full', style: { width: TIER_PCT + '%' } })),
-              h('div', { className: 'flex justify-between text-[10px] font-semibold text-muted-foreground' }, ['Shepherd', 'Beacon', 'Pillar'].map((t) => h('span', { key: t, className: t === c.involvementLevel ? 'text-gold-dark' : '' }, t)))),
             h('div', { className: 'bg-card rounded-2xl border border-border p-4 divide-y divide-border/60' },
               c.website && h(InfoRow, { icon: 'Globe', label: 'Website', value: c.website }),
               c.contactEmail && h(InfoRow, { icon: 'Mail', label: 'Email', value: c.contactEmail }),

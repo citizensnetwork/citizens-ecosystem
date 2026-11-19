@@ -36,3 +36,11 @@
 # longer contains an npm `braces` for OSV to match. Once npm ships a fixed
 # `braces`: bump, then delete that override and the package (PATCHED.md, "Removing
 # the fork"). This file stays empty either way.
+#
+# `picomatch` (2026-11-17): GHSA-fc5q-39xc-vjpf / CVE-2026-112366 (ReDoS through
+# repeated extglobs such as `+(*a)`) affects every `picomatch` <= 4.0.7, npm's
+# latest, so again nothing to bump to. Same remedy, two major lines: root
+# `pnpm.overrides` points `picomatch@<3` at `packages/picomatch-2-patched` (for
+# micromatch@4) and `picomatch@>=3` at `packages/picomatch-4-patched` (tinyglobby,
+# fdir, vite, vitest), each the npm tarball plus one guard (see their PATCHED.md).
+# The extra `fdir>picomatch` override only keeps fdir's peer range as published.

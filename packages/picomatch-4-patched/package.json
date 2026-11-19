@@ -1,0 +1,28 @@
+{
+  "name": "picomatch-4-patched",
+  "version": "4.0.7-citizens.1",
+  "private": true,
+  "description": "Citizens' patched copy of picomatch@4.0.7 (GHSA-fc5q-39xc-vjpf: no nested unbounded repetition in repeated extglobs). Not published; wired in via pnpm.overrides. See PATCHED.md.",
+  "homepage": "https://github.com/micromatch/picomatch",
+  "author": "Jon Schlinkert (https://github.com/jonschlinkert)",
+  "repository": "micromatch/picomatch",
+  "license": "MIT",
+  "files": [
+    "index.js",
+    "posix.js",
+    "lib"
+  ],
+  "sideEffects": false,
+  "main": "index.js",
+  "engines": {
+    "node": ">=12"
+  },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.js\"",
+    "test:coverage": "node --test \"test/**/*.test.js\""
+  },
+  "devDependencies": {
+    "fdir": "^6.5.0",
+    "tinyglobby": "^0.2.17"
+  }
+}

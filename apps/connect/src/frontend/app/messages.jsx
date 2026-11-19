@@ -46,7 +46,7 @@
         h(Avatar, { src: conv.participantPhoto, name: conv.participantName, size: 38, rounded: 'xl' }),
         h('div', { className: 'flex-1 min-w-0' },
           h('div', { className: 'flex items-center gap-1.5' }, h('p', { className: 'text-sm font-bold text-foreground truncate' }, conv.participantName), conv.isOrg && h(Icon, { name: 'BadgeCheck', size: 13, className: 'text-gold' })),
-          h('p', { className: 'text-[11px] text-muted-foreground' }, isPending ? 'Message request' : (conv.isOrg ? 'Contributor' : 'Citizen'))),
+          h('p', { className: 'text-[11px] text-muted-foreground' }, isPending ? 'Message request' : (conv.isOrg ? window.WORLD.t('screen.role.partner') : window.WORLD.t('screen.role.user')))),
         // ── More menu ────────────────────────────────────────────────
         h('div', { ref: menuRef, className: 'relative' },
           h('button', { onClick: () => setMenuOpen((o) => !o), className: 'w-8 h-8 rounded-lg hover:bg-accent/60 flex items-center justify-center text-muted-foreground' }, h(Icon, { name: 'MoreVertical', size: 16 })),

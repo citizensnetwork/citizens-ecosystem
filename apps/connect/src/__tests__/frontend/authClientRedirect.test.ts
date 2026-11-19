@@ -7,6 +7,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { citizensWorld } from "./support/loadFrontend";
 
 type Call = { options: { redirectTo?: string; emailRedirectTo?: string } };
 type Auth = {
@@ -29,6 +30,7 @@ function load(env: Record<string, unknown>, extra: Record<string, unknown> = {})
     __CC_ENV: { SUPABASE_URL: "https://project.test", SUPABASE_ANON_KEY: "anon-key-for-tests", ...env },
     supabase: { createClient: () => client },
     location: { origin: "https://app.example" },
+    WORLD: citizensWorld,
     ...extra,
   };
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});

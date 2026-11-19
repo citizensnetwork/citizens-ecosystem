@@ -57,7 +57,10 @@
       "baseline-browser-mapping@2.10.41": ">=2.11.0",
       "minimatch@<11.0.1": "^11.0.1",
       "glob@>=9.0.0 <14.0.2": "^14.0.2",
-      "braces": "link:./packages/braces-patched"
+      "braces": "link:./packages/braces-patched",
+      "picomatch@<3": "link:./packages/picomatch-2-patched",
+      "picomatch@>=3": "link:./packages/picomatch-4-patched",
+      "fdir>picomatch": "^3 || ^4"
     },
     "packageExtensions": {
       "next": {

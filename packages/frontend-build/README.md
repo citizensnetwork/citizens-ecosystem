@@ -22,6 +22,10 @@ What one `buildFrontend()` call does for an app:
    development CDN builds swapped for their `data-prod-src` production twins —
    the build fails if any `*.development.js` script would ship).
 5. Generate `config.js` from env vars — credentials never enter git.
+6. Optional `browserBundles` (Connect: `["engine-world.js"]`): more real-ESM
+   entries, each bundled and hashed like the bridge and loaded where its own
+   `<script src="engine-world.js"></script>` tag stands. The raw entry never ships,
+   and the build fails if `index.html` has no such tag.
 
 ## Usage (a host app's `scripts/build-frontend.js`)
 

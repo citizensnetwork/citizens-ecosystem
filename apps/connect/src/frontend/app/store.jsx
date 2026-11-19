@@ -2,6 +2,7 @@
 //  Citizens Connect — app store (state + actions + tiny router)
 // ════════════════════════════════════════════════════════════════════
 (function () {
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const { createContext, useContext, useState, useCallback, useRef, useEffect, useMemo } = React;
   const AppCtx = createContext(null);
 
@@ -283,7 +284,7 @@
 
   // API contributor row (public /api/v1/contributors → a profiles row) → app
   // contributor shape. The public directory is sparse, so anything it doesn't
-  // expose (follower counts, involvement tier, niche) gets honest, crash-safe
+  // expose (follower counts, niche) gets honest, crash-safe
   // defaults — never fabricated numbers (VISION: honour the small honestly).
   function adaptContributor(r) {
     const socials = window.DATA.socialsFromRow(r, window.DATA.SOCIAL_COLUMNS.contributor);
@@ -291,7 +292,7 @@
       id: r.id,
       name: r.full_name || (r.contributor_slug
         ? r.contributor_slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
-        : 'Unnamed Ministry'),
+        : W.t('screen.fallback.partnerName')),
       role: 'contributor',
       kind: r.contributor_kind || 'organization',
       slug: r.contributor_slug || null,
@@ -322,7 +323,6 @@
       noFixedLocation: !!r.no_fixed_location,
       openToCollaborate: r.open_to_collaborate === true,
       followerCount: 0,
-      involvementLevel: 'Shepherd',
       dominantNiche: '',
       socials,
       gallery: r.gallery_urls || [],
@@ -335,8 +335,8 @@
   // The four kinds the database accepts (migration 173). Same list as
   // ApplyParts.contributorKind. An applicant who never touches Type, or a
   // value the select cannot produce, is ministry.
-  const CONTRIBUTOR_KIND_VALUES = ['ministry', 'organization', 'business', 'individual'];
-  const contributorKindValue = (value) => (CONTRIBUTOR_KIND_VALUES.indexOf(value) >= 0 ? value : 'ministry');
+  const CONTRIBUTOR_KIND_VALUES = W.configuration.categories.partnerKinds.map((k) => k.id);
+  const contributorKindValue = (value) => (CONTRIBUTOR_KIND_VALUES.indexOf(value) >= 0 ? value : W.configuration.categories.defaultPartnerKind);
 
   // socials {platformKey: value} → the /api/contributor/* payload fields, keyed
   // by the profiles column names in window.DATA.SOCIAL_COLUMNS.contributor.
@@ -465,7 +465,7 @@
       id: r.id,
       isOrg: !!other.is_contributor,
       participantId: other.id || null,
-      participantName: other.full_name || 'Citizen',
+      participantName: other.full_name || W.term('user', 'One'),
       participantPhoto: other.avatar_url || '',
       lastMessage: r.last_message ? r.last_message.body : 'Start the conversation…',
       lastTime: timeAgo(r.last_message ? r.last_message.created_at : r.updated_at),
@@ -507,7 +507,7 @@
       tier: r.tier || 'community',
       tierLabel: r.tier_label || '',
       votedByMe: !!r.voted_by_me,
-      authorName: r.author_name || 'A Citizen',
+      authorName: r.author_name || W.t('screen.fallback.userName'),
       authorPhoto: r.author_avatar || '',
       projectLeadId: r.project_lead_id || null,
       associatedEventId: r.associated_event_id || null,
@@ -525,7 +525,7 @@
       id: r.id,
       eventId: r.entity_type === 'event' ? r.entity_id : null,
       placeId: r.entity_type === 'place' ? r.entity_id : null,
-      name: (prof && prof.full_name) || 'A Citizen',
+      name: (prof && prof.full_name) || W.t('screen.fallback.userName'),
       photo: (prof && prof.avatar_url) || '',
       role: 'Volunteer',
       message: r.message || '',
@@ -916,7 +916,7 @@
         if (facts.hasTeamPortal) { /* editor or viewer of a live listing: keep the dashboard */ }
         else if (facts.role === 'admin') resetNav('admin');
         else if (facts.role === 'citizen' && facts.contributorStatus === 'pending') { /* their pending Dashboard */ }
-        else { resetNav('apply'); toast('Become a Contributor to unlock your portal.', 'gold'); }
+        else { resetNav('apply'); toast(W.t('screen.apply.title') + ' to unlock your portal.', 'gold'); }
       } else if (need === 'admin' && facts.role !== 'admin') {
         resetNav('home');
         toast('That page is for admins.', 'red');
@@ -963,7 +963,7 @@
       || (myContributor && myContributor.id === activeContributorId ? myContributor : null)
       || contributors.find((c) => c.id === activeContributorId)
       || contributors[0]
-      || { id: 'c1', name: 'My Ministry', profilePhoto: '', coverPhoto: '', bio: '', involvementLevel: 'Shepherd', followerCount: 0, dominantNiche: '', website: '', location: '', socials: {}, gallery: [] };
+      || { id: 'c1', name: W.t('screen.fallback.ownPartnerName'), profilePhoto: '', coverPhoto: '', bio: '', followerCount: 0, dominantNiche: '', website: '', location: '', socials: {}, gallery: [] };
 
     const baseUser =
       role === 'admin' ? ADMIN_BASE
@@ -971,7 +971,7 @@
         ? {
             id: activeContributor.id, name: activeContributor.name, role: 'contributor',
             profilePhoto: activeContributor.profilePhoto, coverPhoto: activeContributor.coverPhoto,
-            bio: activeContributor.bio, involvementLevel: activeContributor.involvementLevel,
+            bio: activeContributor.bio,
             followerCount: activeContributor.followerCount, orgId: activeContributor.id,
           }
         : CITIZEN_BASE;
@@ -1068,7 +1068,7 @@
             // for the applicant (see /api/contributor/apply) — showing it
             // beats "please try again" when the fix is one field away.
             toast(body.error === 'already_approved'
-              ? 'You are already a Contributor. Refresh to see your Dashboard.'
+              ? 'You are already ' + W.term('partner', 'a') + '. Refresh to see your Dashboard.'
               : (res.status === 400 && typeof body.error === 'string' && body.error)
                 || 'Could not submit — please try again.', 'red');
             finish(false);
@@ -1116,13 +1116,13 @@
               ? { lat: mine.lat, lng: mine.lng }
               : await geocodeAddress(mine.location);
           const org = {
-            id: uid('c'), name: mine.name || 'My Ministry', role: 'contributor', kind: mine.kind || 'organization', slug: null,
+            id: uid('c'), name: mine.name || W.t('screen.fallback.ownPartnerName'), role: 'contributor', kind: mine.kind || 'organization', slug: null,
             bio: mine.bio || '', profilePhoto: mine.photo || '', coverPhoto: mine.coverPhoto || '',
             category: mine.category, website: mine.website || '', contactEmail: mine.contactEmail || '',
             location: mine.noFixedLocation ? '' : (mine.location || ''), members: [], followerCount: 0,
             noFixedLocation: !!mine.noFixedLocation,
             dominantNiche: (DATA.getItemCategory({ type: 'contributor', category: mine.category }) || { name: 'Community' }).name,
-            involvementLevel: 'Shepherd', collaborators: [], socials: mine.socials || {}, isMine: true, verified: true,
+            collaborators: [], socials: mine.socials || {}, isMine: true, verified: true,
             lat: geo ? geo.lat : null, lng: geo ? geo.lng : null,
           };
           setContributors((prev) => [...prev.filter((c) => c.id !== org.id), org]);
@@ -1504,14 +1504,14 @@
       const finish = (ok) => { if (done) done(ok); };
       const localOrg = {
         id: realUser ? realUser.id : uid('c'),
-        name: form.name || (myApplication && myApplication.name) || 'My Ministry',
+        name: form.name || (myApplication && myApplication.name) || W.t('screen.fallback.ownPartnerName'),
         role: 'contributor', kind: 'organization', slug: null,
         bio: form.bio, profilePhoto: form.profilePhoto || '', coverPhoto: form.coverPhoto || '',
         category: form.category, website: form.website, contactEmail: form.contactEmail || '',
         location: form.noFixedLocation ? '' : (form.location || ''), members: form.members || [], followerCount: 0,
         noFixedLocation: !!form.noFixedLocation,
         dominantNiche: (DATA.getItemCategory({ type: 'contributor', category: form.category }) || { name: 'Community' }).name,
-        involvementLevel: 'Shepherd', collaborators: [], socials: form.socials || {}, isMine: true, verified: true,
+        collaborators: [], socials: form.socials || {}, isMine: true, verified: true,
       };
       if (!realUser) {
         // Demo mode still geocodes (same helper, same MapTiler key) so a
@@ -1542,7 +1542,7 @@
           const setupRes = await authedFetch('/api/contributor/setup', {
             method: 'POST',
             body: JSON.stringify({
-              display_name: form.name || 'My Ministry',
+              display_name: form.name || W.t('screen.fallback.ownPartnerName'),
               contact_email: form.contactEmail || null,
               website_url: asUrl(form.website),
               bio: form.bio || null,
@@ -3102,7 +3102,7 @@
         } catch (e) { /* reported below */ }
         if (!active) return;
         if (!listing) {
-          toast('That Contributor listing could not be found.', 'red');
+          toast('That ' + W.term('partner') + ' listing could not be found.', 'red');
           commitNav(HOME_NAV, true, true);
           return;
         }
