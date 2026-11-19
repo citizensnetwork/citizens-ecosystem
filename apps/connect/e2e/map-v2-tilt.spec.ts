@@ -34,7 +34,7 @@ async function open(page: Page, path = "/?map=v2") {
   const seed = seed0();
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { gallery: 3 });
-  await openMap(page, path, 8);
+  await openMap(page, path, 5);
   return seed;
 }
 
@@ -181,9 +181,9 @@ test.describe("R8 fixed tilt: the map still works under it (phone)", () => {
 
   test("tapping a pin opens the sheet and the pin stays clear of it (the map re-centres under the pitch)", async ({ page }) => {
     const seed = await open(page);
-    const c = seed.contributors[0];
-    await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-    await openPinSheet(page, c.id, "tap");
+    const p = seed.places[0] as { id: string; longitude: number; latitude: number };
+    await jump(page, p.longitude, p.latitude, 15.5);
+    await openPinSheet(page, p.id, "tap");
     const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet).toBeVisible();
     await page.waitForTimeout(900); // the 320 ms ease
@@ -191,7 +191,7 @@ test.describe("R8 fixed tilt: the map still works under it (phone)", () => {
       const p = document.querySelector(`.maplibregl-marker[data-cc-id="${id}"]`)!.getBoundingClientRect();
       const s = document.querySelector("[data-mv2='sheet']")!.getBoundingClientRect();
       return { pinBottom: p.bottom, sheetTop: s.top };
-    }, c.id);
+    }, p.id);
     expect(pinBottom, "pin above the sheet's top edge").toBeLessThan(sheetTop);
     expect((await cam(page)).pitch).toBeCloseTo(PITCH, 1);
   });

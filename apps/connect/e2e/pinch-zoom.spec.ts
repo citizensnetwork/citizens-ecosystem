@@ -99,7 +99,7 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
     await recordPointerEvents(page);
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 3 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     return seed;
   }
 
@@ -118,12 +118,12 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
   for (const snap of ["peek", "half"] as const) {
     test(`a pinch on the sheet at ${snap} leaves the page scale at 1 and the sheet on its snap state`, async ({ page }) => {
       const seed = await openOnMap(page);
-      const c = seed.contributors[0];
+      const p = seed.places[0] as { id: string; longitude: number; latitude: number };
       await page.evaluate(
         ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
-        [c.physical_longitude, c.physical_latitude],
+        [p.longitude, p.latitude],
       );
-      await openPinSheet(page, c.id, "tap");
+      await openPinSheet(page, p.id, "tap");
       const sheet = page.locator(SHEET);
       await expect(sheet).toBeVisible();
       await expect.poll(() => sheet.getAttribute("data-snap")).toBe("half");
@@ -149,12 +149,12 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
 
   test("at FULL a pinch on the card's content zooms the page, so small text can be enlarged, and the sheet stays at full", async ({ page }) => {
     const seed = await openOnMap(page);
-    const c = seed.contributors[0];
+    const p = seed.places[0] as { id: string; longitude: number; latitude: number };
     await page.evaluate(
       ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
-      [c.physical_longitude, c.physical_latitude],
+      [p.longitude, p.latitude],
     );
-    await openPinSheet(page, c.id, "tap");
+    await openPinSheet(page, p.id, "tap");
     const sheet = page.locator(SHEET);
     await expect(sheet).toBeVisible();
     await page.waitForTimeout(400);
@@ -172,12 +172,12 @@ test.describe("R9 the map and the sheet still handle their own two-finger gestur
 
   test("the rule itself: no zoom allowed on the sheet or its content at peek and half, zoom allowed at full", async ({ page }) => {
     const seed = await openOnMap(page);
-    const c = seed.contributors[0];
+    const p = seed.places[0] as { id: string; longitude: number; latitude: number };
     await page.evaluate(
       ([lo, la]) => (window as unknown as { __ccMap: MapApi }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }),
-      [c.physical_longitude, c.physical_latitude],
+      [p.longitude, p.latitude],
     );
-    await openPinSheet(page, c.id, "tap");
+    await openPinSheet(page, p.id, "tap");
     await expect(page.locator(SHEET)).toBeVisible();
     await page.waitForTimeout(400);
     const rule = () => page.evaluate(() => {

@@ -38,22 +38,19 @@
   //    z≈8–9   one province, e.g. Gauteng ("provincial")
   //    z≈10–11 one metro, e.g. Pretoria
   //    z≈13+   suburb / street
-  //  Founder's rule: places drop out at provincial scale, events with them at
-  //  wider scale still, and — so the national view reads clean and professional
-  //  rather than as a scatter of pins — Contributors too below zoom 6
-  //  (2026-10-02; they used to be permanent anchors that never gated).
+  //  Founder's rule: places drop out at provincial scale, events at a wider
+  //  scale still. Contributors are not a pin (a profile status). A contributor
+  //  shows up here only as a place or an event listing.
   //  This is the ONE place the thresholds live; each type hides when z < gate.
-  const ZOOM_GATES = { place: 9.5, event: 7.5, contributor: 6 };
+  const ZOOM_GATES = { place: 9.5, event: 7.5 };
   //  What the current zoom is showing — reported upward so the map screen can
   //  say WHY pins vanished instead of leaving it a mystery.
-  //    'all'          everything with coordinates
-  //    'places'       places gated out (provincial)
-  //    'contributors' events gated out too — only Contributors remain
-  //    'none'         Contributors gated out as well (national) — nothing drawn
+  //    'all'          places and events
+  //    'places'       places gated out (provincial) — events remain
+  //    'none'         events gated out too — nothing is pinned
   function zoomBandFor(z) {
     if (z >= ZOOM_GATES.place) return 'all';
     if (z >= ZOOM_GATES.event) return 'places';
-    if (z >= ZOOM_GATES.contributor) return 'contributors';
     return 'none';
   }
   // A pin is hidden only when its own type is gated out (Impact Ideas are an
@@ -241,6 +238,13 @@
     return { top, bottom, left: FRAME_GAP, right: FRAME_GAP };
   }
 
+  // The share of the map's height a focused point sits above the middle (founder, 2026-11-17: "25% higher").
+  const FOCUS_LIFT = 0.25;
+  function liftOffset(el) {
+    const h = el ? (el.clientHeight || el.getBoundingClientRect().height || 0) : 0;
+    return [0, -Math.round(h * FOCUS_LIFT)];
+  }
+
   // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
   function frameData(mp, items, el) {
     const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
@@ -270,7 +274,7 @@
     }
   }
 
-  function StylizedMap({ markers, filterCategory, selectedId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
+  function StylizedMap({ markers, filterCategory, selectedId, litId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     // mapRef is a ref, so setting it alone doesn't re-run the pin-rendering
@@ -310,7 +314,7 @@
       markerObjs.current.forEach((mk) => {
         const w = mk.getElement();
         if (!w) return;
-        const hidden = markerHidden(mk._ccType, z, selectedRef.current === mk._ccId);
+        const hidden = !mk._ccKeep && markerHidden(mk._ccType, z, selectedRef.current === mk._ccId);
         w.style.display = hidden ? 'none' : '';
       });
       const band = zoomBandFor(z);
@@ -485,8 +489,9 @@
         const S = window.MapV2Strings, P = window.MapV2Pins;
         const catLabel = cat ? cat.name : ((m.type === 'contributor' && S.pin.kind[m.kind]) || S.pin.type[m.type] || '');
         const label = P.ariaLabelFor(m, catLabel, S.pin);
-        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, !!m.isLive, !!m.isBusy,
+        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, m.coverPhoto, !!m.isLive, !!m.isBusy,
           m.broadcast ? m.broadcast.message + '|' + m.broadcast.bubbleId : '', catLabel].join('');
+        // Category colour, as on main. Ideas stay on the brand gold.
         const fill = m.type === 'idea' ? '#F2BD22' : (cat ? cat.hex : '#F2BD22');
         const build = () => P.build(m, { lucideInner, icon: pinIcon(m, cat), hex: fill, strings: S.pin, onDismissBubble: onDismissBubbleRef.current });
         let mk = markerObjs.current.get(m.id);
@@ -510,9 +515,13 @@
         }
         mk._ccType = m.type;
         mk._ccId = m.id;
+        mk._ccKeep = typeof filterCategory === 'function' && !!filterCategory(m);
         mk._ccMeta = { title: m.title, nextEventAt: m.nextEventAt, lastActivityAt: m.lastActivityAt };
         P.applyDim(mk.getElement(), dim);
+        // a filter from the Explore panel (a Where to… tile, a row, a group) makes its matching pins glow
+        P.applyMatch(mk.getElement(), mk._ccKeep);
         P.applySelected(mk.getElement(), selected);
+        P.applyLit(mk.getElement(), litId === m.id, !!(litId && litId !== m.id));
       }
 
       // ── individual pins — show them all ──
@@ -523,9 +532,10 @@
         // Map v2's pills (#210) pass a test per marker (a group, or "Events"); the old map passes one category id.
         const passes = typeof filterCategory === 'function' ? filterCategory(m) : m.category === filterCategory;
         const dim = !!(filterCategory && !passes && m.type !== 'idea');
+        if (m.type === 'contributor') return;
         const selected = selectedId === m.id;
-        // Event and Contributor badges hang from their point ('bottom'); every other pin is centred on it.
-        const anchor = (m.type === 'event' || m.type === 'contributor') ? 'bottom' : 'center';
+        // Events wear the tailed disc, so they hang from the point. Place circles sit on it.
+        const anchor = m.type === 'event' ? 'bottom' : 'center';
         upsertPinV2(m, cat, coords, anchor, dim, selected);
       });
       // drop markers whose item is gone
@@ -540,7 +550,7 @@
       // they were actually added at.
       applyZoomGates();
       layoutV2();
-    }, [markers, filterCategory, selectedId, applyZoomGates, layoutV2, mapReady]);
+    }, [markers, filterCategory, selectedId, litId, applyZoomGates, layoutV2, mapReady]);
 
     // Map v2: the sheet tells the map how much of it the sheet covers; the map eases the selected pin into the
     // middle of what is left visible (tracker E5: about 27 % from the top with the sheet at 46 %). An imperative
@@ -587,6 +597,83 @@
           const items = framedItemsRef.current;
           if (!mp || userMovedRef.current || !items || !items.length) return;
           frameData(mp, items, containerRef.current);
+        },
+        // Founder, 2026-11-17: whatever the map brings into focus (an area, a card's pin) sits FOCUS_LIFT of the map's height
+        // above the middle, so it stays clear of the Explore panel at the foot. `offset` moves the point, not the camera's
+        // padding, so nothing else on the map shifts.
+        focusLifted(minZoom) {
+          requestAnimationFrame(() => {
+            const mp = mapRef.current;
+            const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
+            if (!mp || !mk) return;
+            userMovedRef.current = true;
+            const to = { center: mk.getLngLat(), offset: liftOffset(containerRef.current), duration: window.MapV2.dur('slow'), essential: true };
+            if (Number.isFinite(minZoom) && mp.getZoom() < minZoom) to.zoom = minZoom;
+            mp.easeTo(to, { originalEvent: {} });
+          });
+        },
+        survey(lat, lng, zoom) {
+          const mp = mapRef.current;
+          if (!mp || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+          userMovedRef.current = true;
+          mp.easeTo({ center: [lng, lat], zoom: zoom, offset: liftOffset(containerRef.current), duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+        },
+        restore() {
+          const mp = mapRef.current;
+          const items = framedItemsRef.current;
+          userMovedRef.current = false;
+          if (mp && items && items.length) frameData(mp, items, containerRef.current);
+        },
+        // The map home's levels (founder, 2026-11-18): each level keeps the camera it was entered with, so Back puts the
+        // map exactly where the person left it. A plain copy (no MapLibre objects), safe to keep in React state. The tilt is
+        // fixed (D17, set once above), so it is neither read nor written here.
+        camera() {
+          const mp = mapRef.current;
+          if (!mp) return null;
+          const c = mp.getCenter();
+          return { lng: c.lng, lat: c.lat, zoom: mp.getZoom(), bearing: mp.getBearing() };
+        },
+        setCamera(cam) {
+          const mp = mapRef.current;
+          if (!mp || !cam || !Number.isFinite(cam.lng) || !Number.isFinite(cam.lat) || !Number.isFinite(cam.zoom)) return;
+          userMovedRef.current = true;
+          const to = { center: [cam.lng, cam.lat], zoom: cam.zoom, bearing: Number(cam.bearing) || 0 };
+          const dur = window.MapV2 && window.MapV2.dur ? window.MapV2.dur('base') : 0;
+          if (dur > 0) mp.easeTo(Object.assign(to, { duration: dur, essential: true }), { originalEvent: {} });
+          else mp.jumpTo(to, { originalEvent: {} });
+        },
+        // The pins the person can see right now: inside the map's bounds and not hidden by the zoom gates.
+        visibleIds() {
+          const mp = mapRef.current;
+          if (!mp) return [];
+          const b = mp.getBounds();
+          const out = [];
+          markerObjs.current.forEach((mk, id) => {
+            const w = mk.getElement();
+            if (!w || w.style.display === 'none') return;
+            if (b.contains(mk.getLngLat())) out.push(id);
+          });
+          return out;
+        },
+        // The selected pin, clear of the bar at the top and of `bottom` px at the foot (the pin carousel): left alone
+        // when it already is, otherwise eased to the middle of what is left (a carousel swipe to a pin off screen).
+        revealSelected(bottom) {
+          requestAnimationFrame(() => {
+            const mp = mapRef.current;
+            const el = containerRef.current;
+            const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
+            if (!mp || !el || !mk) return;
+            const foot = Math.max(0, Number(bottom) || 0);
+            const pad = framePadding(el);
+            const top = typeof pad === 'object' ? pad.top : 0;
+            const low = el.clientHeight - foot;
+            const p = mp.project(mk.getLngLat());
+            const edge = 24;
+            if (p.x > edge && p.x < el.clientWidth - edge && p.y > top + edge && p.y < low - edge) return;
+            userMovedRef.current = true;
+            const offset = [0, Math.round((top + low) / 2 - el.clientHeight / 2)];
+            mp.easeTo({ center: mk.getLngLat(), offset, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+          });
         },
       };
       return () => { apiRef.current = null; };

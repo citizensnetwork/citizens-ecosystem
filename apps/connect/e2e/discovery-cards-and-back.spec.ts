@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { openListing } from "./support/map-v2";
+import { openListing, openMe } from "./support/map-v2";
 
 declare global {
   interface Window {
@@ -243,8 +243,8 @@ test.describe("Device Back button", () => {
 
     // An open overlay is dismissed BEFORE the screen changes. (The category
     // sheet this used to open no longer exists — it duplicated the pill row —
-    // so the account panel, the app's one profile entry point, stands in.)
-    await page.getByRole("button", { name: "Your account" }).click();
+    // so the account panel, the app's one profile entry point, stands in: on the map home it is the nav's Me.)
+    await openMe(page);
     await expect(page.getByRole("button", { name: /View Profile/ })).toBeVisible();
     await page.goBack();
     await expect(page.getByRole("button", { name: /View Profile/ })).toBeHidden();
@@ -296,26 +296,27 @@ test.describe("One card, both surfaces", () => {
 });
 
 test.describe("Every pin opens the same small card", () => {
-  test("tapping a Contributor pin opens the sheet on the map — not the full profile — and View Full Profile opens it", async ({ page }) => {
+  test("tapping a Place pin opens the sheet on the map — not the full page — and names its owner", async ({ page }) => {
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    // A place and an event. The contributor is not a pin.
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(2, { timeout: 15_000 });
+    await expect(page.locator('[data-cc-pin="contributor"]')).toHaveCount(0);
 
-    await openListing(page, (await page.locator('.maplibregl-marker:has([data-cc-pin="contributor"])').first().getAttribute("data-cc-id"))!);
+    await openListing(page, (await page.locator('.maplibregl-marker:has([data-cc-pin="place"])').first().getAttribute("data-cc-id"))!);
     const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet).toBeVisible({ timeout: 10_000 });
-    // Still on the map: the full-screen profile page was the old behaviour.
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
-    await expect(page.locator('[data-screen="profile"]')).toHaveCount(0);
+    await expect(page.locator('[data-screen="place"]')).toHaveCount(0);
 
-    // The name, and the way in to the full page.
-    await expect(page.locator("[data-map-sheet-header]")).toContainText("Anchor Community Church");
+    await expect(page.locator("[data-map-sheet-header]")).toContainText("Brooklyn Anchor Campus");
+    await expect(sheet).toContainText("by Anchor Community Church");
     await expect(page.locator("[data-mv2='view-full']")).toBeVisible();
 
     await page.locator("[data-mv2='view-full']").click();
-    await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole("heading", { name: "Anchor Community Church" })).toBeVisible();
+    await expect(page.locator('[data-screen="place"]')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("heading", { name: "Brooklyn Anchor Campus" })).toBeVisible();
   });
 });
 
@@ -325,8 +326,8 @@ test.describe("Finished events", () => {
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // Place + contributor + the ONE upcoming event; the finished one is absent.
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    // Place + the ONE upcoming event. The contributor is not pinned, and the finished event is absent.
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(2, { timeout: 15_000 });
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1);
 
     await page.evaluate(() => window.__cc.go("kingdom-discovery"));
@@ -347,8 +348,8 @@ test.describe("Finished events", () => {
     await mockNetwork(page, { events: [PAST_EVENT] });
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
-    // Map: only the place and the contributor.
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(2, { timeout: 15_000 });
+    // Map: only the place. The contributor is not a pin, and the finished event is absent.
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(1, { timeout: 15_000 });
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(0);
 
     await page.evaluate(() => window.__cc.go("kingdom-discovery"));
@@ -362,11 +363,11 @@ test.describe("Finished events", () => {
 });
 
 test.describe("Map density gates and pin labels", () => {
-  test("pins peel away as you zoom out — places, then events, then contributors — and the hint says what is hidden", async ({ page }) => {
+  test("pins peel away as you zoom out — places, then events — and the hint says what is hidden", async ({ page }) => {
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(2, { timeout: 15_000 });
     await expect.poll(() => page.evaluate(() => !!window.__ccMap)).toBe(true);
 
     const pin = (shape: string) =>
@@ -380,62 +381,53 @@ test.describe("Map density gates and pin labels", () => {
       );
     const hint = page.locator("[data-zoom-hint]");
 
-    // City zoom: everything is on the map, nothing to explain.
+    // City zoom: places and events are on the map. Contributors are not pins.
     await zoomTo(11);
     await expect(pin("place")).toBeVisible();
     await expect(pin("event")).toBeVisible();
-    await expect(pin("contributor")).toBeVisible();
+    await expect(pin("contributor")).toHaveCount(0);
     await expect(hint).toHaveCount(0);
 
-    // Provincial (below 9.5): places go; events and contributors stay.
+    // Provincial (below 9.5): places go; events stay.
     await zoomTo(8.5);
     await expect(pin("place")).toBeHidden();
     await expect(pin("event")).toBeVisible();
-    await expect(pin("contributor")).toBeVisible();
     await expect(hint).toHaveAttribute("data-zoom-hint", "places");
 
-    // Wider (below 7.5): events go too; only contributors remain.
+    // Wider (below 7.5): events go too. Nothing is left to pin.
     await zoomTo(6.5);
     await expect(pin("event")).toBeHidden();
-    await expect(pin("contributor")).toBeVisible();
-    await expect(hint).toHaveAttribute("data-zoom-hint", "contributors");
-
-    // National (below 6): contributors go as well — a clean map, and the hint
-    // says why it is empty. Founder decision D1, 2026-10-02.
-    await zoomTo(5.5);
-    await expect(pin("contributor")).toBeHidden();
     await expect(page.locator(".maplibregl-marker:visible")).toHaveCount(0);
     await expect(hint).toHaveAttribute("data-zoom-hint", "none");
-    await expect(hint).toContainText("contributors, events and places");
+    await expect(hint).toContainText("events and places");
 
-    // …and exactly at the gate they are back.
-    await zoomTo(6);
-    await expect(pin("contributor")).toBeVisible();
+    await zoomTo(7.5);
+    await expect(pin("event")).toBeVisible();
   });
 
   test("data spread across the whole country never opens on an empty map", async ({ page }) => {
-    // Pretoria contributor + event, but a place in Cape Town: framing ALL the
-    // data lands far below the Contributor gate (zoom 6), where every pin is
-    // hidden. The first screen must stop at the gate and centre on what shows.
+    // Pretoria event, but a place in Cape Town: framing ALL the data lands
+    // below the event gate (zoom 7.5), where every pin would be hidden. The
+    // first screen must stop at that gate and centre on the event.
     const capeTownPlace = { ...PLACE, id: "e2e-place-ct", name: "Table Bay Chapel", latitude: -33.92, longitude: 18.42 };
     await mockNetwork(page, { places: [capeTownPlace] });
     // A phone: at zoom 6 its screen spans ~800 km, so a view centred on the
     // middle of the data (Northern Cape) would crop the Gauteng pin off the edge.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(2, { timeout: 15_000 });
     await expect.poll(() => page.evaluate(() => !!window.__ccMap)).toBe(true);
 
-    const contributor = page.locator('.maplibregl-marker:has([data-cc-pin="contributor"])');
-    await expect(contributor).toBeVisible();
-    await expect(contributor).toBeInViewport({ ratio: 1 });
-    await expect(page.locator("[data-zoom-hint]")).toHaveAttribute("data-zoom-hint", "contributors");
+    const event = page.locator('.maplibregl-marker:has([data-cc-pin="event"])');
+    await expect(event).toBeVisible();
+    await expect(event).toBeInViewport({ ratio: 1 });
+    await expect(page.locator("[data-zoom-hint]")).toHaveAttribute("data-zoom-hint", "places");
   });
 
   test("a pin's name appears from neighbourhood zoom (15), not before", async ({ page }) => {
     await mockNetwork(page);
     await page.goto("/");
-    await expect(page.locator(".maplibregl-marker")).toHaveCount(3, { timeout: 15_000 });
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(2, { timeout: 15_000 });
     await expect.poll(() => page.evaluate(() => !!window.__ccMap)).toBe(true);
 
     const zoomTo = (z: number) =>
@@ -459,17 +451,15 @@ test.describe("One profile entry point", () => {
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // #210: the bar folds into one round button (app/map-v2-nav.jsx). Open, it is Home, Explore, Map and Profile;
-    // never the old "You" tab, whose panel opened past the bottom edge of the screen and was unusable.
-    await page.getByRole("button", { name: "Open navigation" }).click();
-    const bottomNav = page.getByRole("navigation", { name: "Main" });
+    // Founder, 2026-11-17: no account button on the map home; the open panel's sticky nav (Explore, Map, Me) holds it in Me.
+    // There is no "You" tab.
+    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(0);
+    await openMe(page);
+    const bottomNav = page.locator("[data-mv2='explore-dock']");
     await expect(bottomNav.getByRole("button", { name: "You" })).toHaveCount(0);
     await expect(bottomNav.getByRole("button", { name: "Explore" })).toBeVisible();
-    await page.keyboard.press("Escape");
 
-    // Exactly one account control, and its panel opens inside the viewport.
-    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
-    await page.getByRole("button", { name: "Your account" }).click();
+    // Exactly one account menu, and it opens inside the viewport.
     const panel = page.getByRole("button", { name: /View Profile/ });
     await expect(panel).toBeVisible();
     const box = await panel.boundingBox();
@@ -479,14 +469,15 @@ test.describe("One profile entry point", () => {
     expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height);
     await page.keyboard.press("Escape");
 
-    // Same control, same corner, on the list screen (#210 part 3: the nav's Explore is the Discover page).
-    await page.getByRole("button", { name: "Open navigation" }).click();
+    // The list screen keeps its account button in the top corner (#210 part 3: the nav's Explore is the Discover page).
+    // (Escape closed the menu and lowered the panel: raise it again for its nav)
+    if (!(await bottomNav.isVisible())) await page.locator("[data-mv2='explore-grab']").click();
     await bottomNav.getByRole("button", { name: "Explore" }).click();
     await expect(page.locator('[data-screen="explore"]')).toBeVisible();
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
   });
 
-  test("the map's top bar is search + account only, and the categories are inside the Explore panel", async ({ page }) => {
+  test("the map's top bar is search only, and the categories are inside the Explore panel", async ({ page }) => {
     await mockNetwork(page);
     await page.goto("/");
     const screen = page.locator('[data-screen="discover"]');
@@ -500,10 +491,14 @@ test.describe("One profile entry point", () => {
     // category, place category and Contributor type (mapV2Explore.test.tsx checks the mapping). They are no longer a pill row
     // over the map: they are a list inside the Explore panel, behind its title, starting with All.
     await expect(screen.getByRole("group", { name: "Show on the map" })).toHaveCount(0);
-    await screen.locator("[data-mv2='explore']").getByRole("button", { name: "Explore", exact: true }).click();
-    const list = screen.getByRole("list", { name: "Categories" });
-    await expect(list.getByRole("button", { name: "All", exact: true })).toBeVisible();
-    await expect(list.getByRole("button", { name: "Churches & worship" })).toBeVisible();
-    await expect(list.getByRole("button", { name: "Business" })).toBeAttached();
+    await expect(screen.getByRole("button", { name: "Your account" })).toHaveCount(0);
+    await expect(screen.getByRole("button", { name: "Search", exact: true })).toBeVisible();
+    // a phone rests on the crown, which shows the Where to… tiles; a wide screen shows them from the start
+    const crown = screen.locator("[data-mv2='explore-crown']");
+    if (await crown.isVisible()) await crown.click();
+    const tiles = screen.locator("[data-mv2='explore-tiles']");
+    await expect(tiles.getByRole("button", { name: "Coffee", exact: true })).toBeVisible();
+    await expect(tiles.getByRole("button", { name: "Church", exact: true })).toBeVisible();
+    await expect(tiles.getByRole("button", { name: "Worship", exact: true })).toBeVisible();
   });
 });

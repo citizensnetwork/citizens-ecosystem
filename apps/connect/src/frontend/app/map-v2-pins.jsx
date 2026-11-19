@@ -135,7 +135,9 @@
 
   // Place / Event / Idea keep the old silhouettes; the hairline is a wider dark stroke under the
   // white one, and the glyph colour is picked per fill. Geometry mirrors map.jsx pinSvg.
-  function shapeSvg({ shape, hex, glyph, selected }) {
+  function shapeSvg({ shape, hex, glyph, pinType }) {
+    // Rest size only. Selection grows the pin with a CSS transform, so the SVG is not rebuilt.
+    const selected = false;
     const svg = document.createElementNS(NS, 'svg');
     let w, h, body, gx, gy, gsize;
     if (shape === 'event') {
@@ -157,7 +159,7 @@
       gsize = Math.round(dd * 0.46); gx = c - gsize / 2; gy = c - gsize / 2;
       w = W; h = W;
     }
-    svg.setAttribute('data-cc-pin', shape);
+    svg.setAttribute('data-cc-pin', pinType || shape);
     svg.setAttribute('data-mv2', 'shape-svg');
     svg.setAttribute('width', String(w));
     svg.setAttribute('height', String(h));
@@ -176,53 +178,65 @@
    * deps: { lucideInner(name), icon (glyph name), hex (fill colour), strings (MapV2Strings.pin), onDismissBubble }
    * Returns the node; `.mv2-pin` carries data-state hooks the map toggles later.
    */
+  // Events wear the live disc and tail. Places wear the live filled circle.
+  // Contributors are not a pin: a profile status, shown through its places and events.
+  function discBody(root, m, hex, glyphInner, pinType) {
+    const bodyEl = document.createElement('span');
+    bodyEl.setAttribute('data-mv2', 'body');
+    const tail = document.createElement('span');
+    tail.setAttribute('data-mv2', 'tail');
+    const disc = document.createElement('span');
+    disc.setAttribute('data-mv2', 'disc');
+    disc.setAttribute('data-cc-pin', pinType);
+    disc.appendChild(glyphSvg(glyphInner, 'glyph'));
+    const photo = m.profilePhoto || m.coverPhoto || '';
+    if (photo) {
+      root.classList.add('has-logo');
+      disc.setAttribute('data-cc-logo', '1');
+      const wrap = document.createElement('span');
+      wrap.setAttribute('data-mv2', 'logo-wrap');
+      if (m.kind === 'individual') wrap.setAttribute('data-photo', '1');
+      const img = document.createElement('img');
+      img.setAttribute('data-mv2', 'logo');
+      img.alt = '';
+      img.decoding = 'async';
+      img.width = 96; img.height = 96;
+      img.setAttribute('data-src', photo);
+      img.onload = () => { root.classList.add('is-loaded'); };
+      img.onerror = () => { root.classList.add('is-broken'); };
+      wrap.appendChild(img);
+      disc.appendChild(wrap);
+      const badge = document.createElement('span');
+      badge.setAttribute('data-mv2', 'badge');
+      badge.appendChild(glyphSvg(glyphInner, 'badge-glyph'));
+      bodyEl.appendChild(badge);
+    }
+    bodyEl.insertBefore(tail, bodyEl.firstChild);
+    bodyEl.insertBefore(disc, tail.nextSibling);
+    return bodyEl;
+  }
+
   function build(m, deps) {
     const hex = deps.hex;
     const root = document.createElement('div');
-    root.className = 'mv2-pin mv2-pin--' + m.type;
+    const disc = m.type === 'event';
+    root.className = 'mv2-pin mv2-pin--' + m.type + (disc ? ' mv2-pin--disc' : '');
     root.style.setProperty('--pin-cat', hex);
     root.style.setProperty('--pin-glyph', glyphColor(hex));
     const glyphInner = deps.lucideInner(deps.icon);
 
-    if (m.type === 'contributor') {
+    if (m.type === 'contributor') return root;
+    if (disc) {
+      root.appendChild(discBody(root, m, hex, glyphInner, 'event'));
+    } else if (m.type === 'place') {
       const bodyEl = document.createElement('span');
       bodyEl.setAttribute('data-mv2', 'body');
-      const tail = document.createElement('span');
-      tail.setAttribute('data-mv2', 'tail');
-      const disc = document.createElement('span');
-      disc.setAttribute('data-mv2', 'disc');
-      disc.setAttribute('data-cc-pin', 'contributor');
-      disc.appendChild(glyphSvg(glyphInner, 'glyph'));
-      if (m.profilePhoto) {
-        root.classList.add('has-logo');
-        disc.setAttribute('data-cc-logo', '1');
-        const wrap = document.createElement('span');
-        wrap.setAttribute('data-mv2', 'logo-wrap');
-        if (m.kind === 'individual') wrap.setAttribute('data-photo', '1');
-        const img = document.createElement('img');
-        img.setAttribute('data-mv2', 'logo');
-        img.alt = '';
-        img.decoding = 'async';
-        img.width = 96; img.height = 96;
-        img.setAttribute('data-src', m.profilePhoto);
-        img.onload = () => { root.classList.add('is-loaded'); };
-        img.onerror = () => { root.classList.add('is-broken'); };
-        wrap.appendChild(img);
-        disc.appendChild(wrap);
-        const badge = document.createElement('span');
-        badge.setAttribute('data-mv2', 'badge');
-        badge.appendChild(glyphSvg(glyphInner, 'badge-glyph'));
-        bodyEl.appendChild(badge);
-      }
-      bodyEl.insertBefore(tail, bodyEl.firstChild);
-      bodyEl.insertBefore(disc, tail.nextSibling);
+      bodyEl.appendChild(shapeSvg({ shape: 'place', hex, glyph: glyphInner, pinType: 'place' }));
       root.appendChild(bodyEl);
     } else {
       const bodyEl = document.createElement('span');
       bodyEl.setAttribute('data-mv2', 'body');
-      const isIdea = m.type === 'idea';
-      // selected scale is a CSS transform on the body, so the SVG is always drawn at rest size
-      bodyEl.appendChild(shapeSvg({ shape: isIdea ? 'idea' : m.type === 'event' ? 'event' : 'place', hex, glyph: glyphInner, selected: false }));
+      bodyEl.appendChild(shapeSvg({ shape: 'idea', hex, glyph: glyphInner, pinType: 'idea' }));
       root.appendChild(bodyEl);
     }
 
@@ -297,6 +311,21 @@
     if (pin && !!dim !== pin.hasAttribute('data-dim')) { if (dim) pin.setAttribute('data-dim', ''); else pin.removeAttribute('data-dim'); }
   }
 
+  // A pin INSIDE a filter from the Explore panel glows softly in its own colour (founder, 2026-11-17: "I like the glow,
+  // keep it for all the panel's filters"). Same inner root as applyDim.
+  function applyMatch(wrap, on) {
+    const pin = wrap.querySelector('.mv2-pin');
+    if (pin && !!on !== pin.hasAttribute('data-match')) { if (on) pin.setAttribute('data-match', ''); else pin.removeAttribute('data-match'); }
+  }
+
+  function applyLit(wrap, lit, quiet) {
+    const pin = wrap.querySelector('.mv2-pin');
+    if (!pin) return;
+    pin.classList.toggle('is-lit', !!lit);
+    if (quiet) pin.setAttribute('data-quiet', '');
+    else pin.removeAttribute('data-quiet');
+  }
+
   function applySelected(wrap, selected) {
     const pin = wrap.querySelector('.mv2-pin');
     if (pin) pin.classList.toggle('is-selected', !!selected);
@@ -348,6 +377,6 @@
 
   window.MapV2Pins = {
     photoShown, glyphColor, ariaLabelFor, comparePriority, overlapGroups, hiddenLabels,
-    build, makeOperable, ensureLogo, applyDim, applySelected, layoutOnIdle, OVERLAP_PX,
+    build, makeOperable, ensureLogo, applyDim, applyMatch, applySelected, applyLit, layoutOnIdle, OVERLAP_PX,
   };
 })();

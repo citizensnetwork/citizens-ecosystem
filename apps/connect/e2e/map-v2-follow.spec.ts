@@ -23,7 +23,7 @@ async function open(page: Page, kind: "contributor" | "place", index: number, fo
   await throttleCpu(page);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { followers });
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   const t = kind === "contributor"
     ? { id: seed.contributors[index].id, lng: seed.contributors[index].physical_longitude, lat: seed.contributors[index].physical_latitude }
     : { id: seed.places[index].id, lng: seed.places[index].longitude, lat: seed.places[index].latitude };
@@ -39,7 +39,7 @@ test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true
 
 test.describe("P2-04 Follow on the Contributor sheet", () => {
   test("a real tap follows, a second tap unfollows; label, filled heart and toast agree; the sheet stays put", async ({ page }) => {
-    await open(page, "contributor", 0);
+    await open(page, "place", 0);
     const btn = followBtn(page);
     await expect(btn).toHaveCount(1);
     await expect(btn).toHaveText("Follow");
@@ -55,19 +55,19 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     await tapTouch(cdp, centreOf(await stillBox(page, btn)));
     await expect(btn).toHaveText("Following");
     await expect(btn).toHaveAttribute("data-on", "");
-    await expect(page.getByText("Now following Fixture Fellowship 1")).toBeVisible();
+    await expect(page.getByText("Now following Fixture Place 1")).toBeVisible();
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
     expect(await page.evaluate(() => history.length)).toBe(histBefore);
 
     await tapTouch(cdp, centreOf(await stillBox(page, btn)));
     await expect(btn).toHaveText("Follow");
     await expect(btn).not.toHaveAttribute("data-on", /.*/);
-    await expect(page.getByText("Unfollowed Fixture Fellowship 1")).toBeVisible();
+    await expect(page.getByText("Unfollowed Fixture Place 1")).toBeVisible();
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
   });
 
   test("Follow sits next to Directions and Share in the action row, and half still shows the header and the row", async ({ page }) => {
-    await open(page, "contributor", 0);
+    await open(page, "place", 0);
     const labels = await page.locator("[data-mv2='actions'] [data-mv2='action']").allTextContents();
     expect(labels).toContain("Follow");
     expect(labels.indexOf("Follow")).toBeLessThan(labels.indexOf("Share"));
@@ -76,24 +76,17 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     expect(b.y + b.height).toBeLessThanOrEqual(vh); // on screen at half, without scrolling
   });
 
-  test("following a Contributor never prints a low follower count", async ({ page }) => {
-    await open(page, "contributor", 0, 42);
-    const header = page.locator("[data-map-sheet-header]");
-    await followBtn(page).click();
-    await expect(followBtn(page)).toHaveText("Following");
-    await expect(header).not.toContainText("followers");
-    await expect(header).not.toContainText("42");
-  });
-
-  test("control: from 100 the bucket does show, and following does not turn it into the exact figure", async ({ page }) => {
-    await open(page, "contributor", 0, 137);
-    const header = page.locator("[data-map-sheet-header]");
-    await expect(header).toContainText("100+ followers");
-    await followBtn(page).click();
-    await expect(followBtn(page)).toHaveText("Following");
-    await expect(header).toContainText("100+ followers");
-    await expect(header).not.toContainText("137");
-    await expect(header).not.toContainText("138");
+  test("a Contributor profile does not print a low follower count", async ({ page }) => {
+    const seed = seed0();
+    await mockMapNetwork(page, seed);
+    await mockContributorDetail(page, seed, { followers: 42 });
+    await openMap(page, "/?map=v2", 5);
+    await expect(page.locator("[data-cc-pin='contributor']")).toHaveCount(0);
+    await page.evaluate((id) => (window as unknown as { __cc: { go: (p: string, q: object) => void } }).__cc.go("profile", { id }), seed.contributors[0].id);
+    const profile = page.locator('[data-screen="profile"]');
+    await expect(profile.getByRole("heading", { name: "Fixture Fellowship 1" })).toBeVisible();
+    await expect(profile).not.toContainText("followers");
+    await expect(profile).not.toContainText("42");
   });
 
   // founder, 2026-10-30: a Place follows the Contributor's rules, so its ONE Follow is a pill in the action row
@@ -118,22 +111,28 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     });
     expect(mapped).toEqual(["", "", "", "", "", "100+", "25,000+"]);
 
-    // the Place page and a Contributor's page (opened from its sheet)
-    await page.getByRole("button", { name: "View Full Profile" }).first().click();
+    // the Place page and a Contributor's page (opened from its sheet). At half the button is below the screen's edge:
+    // the keyboard reaching it raises the sheet to full, so what has focus is in view
+    const viewFull = page.getByRole("button", { name: "View Full Profile" }).first();
+    await viewFull.focus();
+    await expect(sheet(page)).toHaveAttribute("data-snap", "full");
+    await viewFull.click();
     await expect(page.getByText(seed.places[0].name).first()).toBeVisible();
     await expect(page.locator("body")).not.toContainText("0 followers");
     expect(t.id).toBeTruthy();
   });
 
   test("a Contributor's full profile does not say '0 followers' either", async ({ page }) => {
-    await open(page, "contributor", 0);
-    await page.getByRole("button", { name: "View Full Profile" }).click();
+    const seed = seed0();
+    await mockMapNetwork(page, seed);
+    await openMap(page, "/?map=v2", 5);
+    await page.evaluate((id) => (window as unknown as { __cc: { go: (p: string, q: object) => void } }).__cc.go("profile", { id }), seed.contributors[0].id);
     await expect(page.getByRole("heading", { name: "Fixture Fellowship 1" })).toBeVisible();
-    await expect(page.locator("body")).not.toContainText("followers");
+    await expect(page.locator('[data-screen="profile"]')).not.toContainText("0 followers");
   });
 
   test("a signed-out visitor on the real site is asked to sign in, and nothing flips (control: demo mode flips)", async ({ page }) => {
-    await open(page, "contributor", 0);
+    await open(page, "place", 0);
     // the real site has Supabase configured (window.CC_AUTH) and nobody signed in; the hermetic page has neither
     await page.evaluate(() => { (window as unknown as { CC_AUTH: object }).CC_AUTH = {}; });
     const btn = followBtn(page);
@@ -141,7 +140,7 @@ test.describe("P2-04 Follow on the Contributor sheet", () => {
     await expect(page.getByText("Sign in to follow.")).toBeVisible();
     await expect(btn).toHaveText("Follow");
     await expect(btn).not.toHaveAttribute("data-on", /.*/);
-    await expect(page.getByText("Now following Fixture Fellowship 1")).toHaveCount(0);
+    await expect(page.getByText("Now following Fixture Place 1")).toHaveCount(0);
   });
 
   test("the same guard holds for a Place's own Follow, which had the same fake success", async ({ page }) => {

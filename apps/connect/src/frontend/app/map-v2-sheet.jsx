@@ -199,7 +199,7 @@
   //  Save, Share ...) is the one action row above, in the same pills. No white box, no second Follow button. The organiser
   //  and the co-hosts are links to their own profiles; the socials, the counts and, for an upcoming event, the Convince
   //  note follow. `data-card` and `data-entity-card` keep the hooks the card had.
-  function ListingBody({ item, type, org, go, onClose }) {
+  function ListingBody({ item, type, org, go, onClose, onPick }) {
     const { realUser, myProfileMeta, user, toast, contributors } = window.useApp();
     const Str = S();
     const Icon = window.Icon;
@@ -217,10 +217,14 @@
     const orgName = (org && org.name) || item.organizerName || '';
     // to the organiser's own page: navigate first, then close, so the sheet's history entry is replaced (see BACK, above)
     const toProfile = (pid) => () => { go('profile', { id: pid }); onClose(); };
+    // The owner line opens the owner's own sheet in this one (founder, 2026-11-17: a Contributor has no pin and no Explore
+    // card, so this line is how the map reaches them), the way a Nearby row does: no new history entry, and the full
+    // profile is one tap further, on that sheet. Without a sheet to switch (onPick), it goes to the profile page.
+    const toOwner = (pid) => (onPick ? () => onPick(pid, 'contributor') : toProfile(pid));
     const organiser = orgName
       ? h('li', { key: 'org', 'data-mv2': 'fact' },
         org
-          ? h('button', { type: 'button', 'data-mv2': 'fact-link', onClick: toProfile(org.id) },
+          ? h('button', { type: 'button', 'data-mv2': 'fact-link', 'data-owner': org.id, onClick: toOwner(org.id) },
             h('span', null, Str.by + ' ', h('b', null, orgName)), h(Icon, { name: 'BadgeCheck', size: 16 }), h(Icon, { name: 'ChevronRight', size: 18 }))
           : h('span', { 'data-mv2': 'fact-line' }, h('span', null, Str.by + ' ', h('b', null, orgName))))
       : null;
@@ -251,18 +255,21 @@
   }
 
   // ── the sheet ────────────────────────────────────────────────────
-  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view }) {
+  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view, inline }) {
     const app = window.useApp();
     const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, savedContributors, savedPlaces, toggleSave, realUser } = app;
     // Place and Event actions (#210, founder 2026-10-30): the same pills as a Contributor's, so the sheet speaks one way
     const { followedPlaces, togglePlaceFollow, connected, toggleConnect, considering, toggleConsider, startConversationWith } = app;
     const Str = S();
-    const wide = useWide();
+    // INLINE (founder, 2026-11-18): the details under the map home's pin carousel (map-v2-explore.jsx PinCarousel). The
+    // same header facts, actions and body, laid out in the carousel's own raised panel: no box of its own, no drag, no
+    // grab bar or cover (the card above already shows them), and no history entry or Escape key (the carousel's level owns both).
+    const wide = useWide() && !inline;
     const root = useRef(null);
     const scroller = useRef(null);
     const tabbed = useRef(null);
     const title = useRef(null);
-    const opensAt = expanded ? 'full' : 'half';
+    const opensAt = expanded || inline ? 'full' : 'half';
     const [snap, setSnap] = useState(opensAt);
     const [tab, setTab] = useState(null);
     const [enter, setEnter] = useState(null);       // 'next' | 'prev': the side a newly chosen tab's panel slides in from
@@ -277,9 +284,10 @@
     const lastPadding = useRef(null);
     const snapRef = useRef(snap);
     snapRef.current = snap;
+    const pressedAt = useRef(0);    // when a finger or a mouse last pressed the sheet (see onFocus below)
 
     // ONE history entry for the whole life of the sheet, registered by this mount.
-    useBackGuard(true, onClose);
+    useBackGuard(!inline, onClose);
 
     const isContributor = type === 'contributor';
     const item = type === 'event' ? events.find((e) => e.id === id)
@@ -355,11 +363,11 @@
     const distance = useMemo(() => {
       const N = window.MapV2Nearby;
       const from = view && (view.user || view.centre);
-      if (!expanded || !N || !from || !item || typeof item.lat !== 'number' || typeof item.lng !== 'number') return '';
+      if (!(expanded || inline) || !N || !from || !item || typeof item.lat !== 'number' || typeof item.lng !== 'number') return '';
       const meters = N.metersBetween(from, item);
       const words = window.MapV2Strings.explore;
       return Number.isFinite(meters) ? N.distanceText(meters, view.user ? words : words.centre) : '';
-    }, [expanded, view, item]);
+    }, [expanded, inline, view, item]);
 
     // A different pin: start again where this sheet opened, on the first tab, scrolled to the top (not on the first
     // mount: nothing to reset, and every state update here is another render on the way to the header).
@@ -406,15 +414,16 @@
 
     // Escape closes at once (an open photo viewer or news reader takes the key first: it listens in the capture phase).
     useEffect(() => {
+      if (inline) return undefined;
       const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
       document.addEventListener('keydown', onKey);
       return () => document.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    }, [onClose, inline]);
 
     // Tell the map how much of it the sheet covers, so the selected pin clears it (tracker E5). Not the expanded sheet
     // (#210): it covers the whole map, and the person's map and Explore panel must be exactly as they left them on close.
     useEffect(() => {
-      if (!onOccupy || expanded) return undefined;
+      if (!onOccupy || expanded || inline) return undefined;
       let pad;
       if (wide) pad = { top: 0, right: 0, bottom: 0, left: cssLen('calc(var(--sheet-panel-w) + 2 * var(--space-3))') };
       else if (snap === 'peek') pad = { top: 0, right: 0, left: 0, bottom: cssLen('var(--sheet-peek-h)') };
@@ -473,7 +482,7 @@
       else setSnap(target);
     };
     const onPointerDown = (e) => {
-      if (wide || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (wide || inline || (e.pointerType === 'mouse' && e.button !== 0)) return;
       const t = e.target;
       const inScroller = scroller.current && scroller.current.contains(t);
       // Inside the content at full the content owns the swipe, except for a finger on content that is at its top:
@@ -649,7 +658,7 @@
           h(window.Icon, { name: 'Handshake', size: 14, 'aria-hidden': true }),
           Str.collaborate)
       : null;
-    if (collabChip && !expanded) actions.unshift(collabChip);
+    if (collabChip && !expanded && !inline) actions.unshift(collabChip);
     // P2-06: the QR code is a tool for printing, not a first-glance action: it sits at the bottom of the content, so the
     // action row stays at the height it had and half still shows the header, the actions and the first tab
     // (only for a slug the router itself would resolve: nothing odd from the data ever reaches a printed code)
@@ -670,7 +679,7 @@
     // ── body ────────────────────────────────────────────────────────
     let body;
     if (!isContributor) {
-      body = h(ListingBody, { item, type, org, go, onClose });
+      body = h(ListingBody, { item, type, org, go, onClose, onPick });
     } else {
       const bio = item.bio ? h('p', { 'data-mv2': 'bio' }, item.bio) : null;
       let panel = null;
@@ -802,8 +811,8 @@
       followers && h('span', { key: 'fol', 'data-mv2': 'followers' }, ' · ' + Str.followers(followers)),
     ];
     // #210 expanded: a fixed bar (the grab bar to the eye, X to a thumb), then the header at the top of the content
-    const group = expanded && window.MapV2Explore ? window.MapV2Explore.groupOf(item) : '';
-    const grab = expanded
+    const group = (expanded || inline) && window.MapV2Explore ? window.MapV2Explore.groupOf(item) : '';
+    const grab = inline ? null : expanded
       ? h('div', { 'data-mv2': 'grab' },
         h('div', { 'data-mv2': 'xbar' }, !wide && h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }), closeBtn))
       : h('div', { 'data-mv2': 'grab' },
@@ -820,26 +829,42 @@
     // the chip is the Explore card's own (map-v2-card.jsx): the group's dot and outline, the category's words.
     // Then the facts: how far, open or starting, followers.
     const facts = [];
-    if (expanded) {
+    if (expanded || inline) {
       if (distance) facts.push(h('span', { key: 'd', 'data-mv2': 'distance' }, distance));
       if (state) facts.push(h('span', { key: 's', 'data-mv2': 'state', 'data-status': state.status }, state.text));
       if (followers) facts.push(h('span', { key: 'f', 'data-mv2': 'followers' }, Str.followers(followers)));
     }
-    const xhead = expanded && h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
-      h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
+    const xhead = (expanded || inline) && h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
+      inline ? null : h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
       h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
       h('p', { 'data-mv2': 'xmeta' },
         h('span', { 'data-mv2': 'card-chip' },
           h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
           h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
-        expanded && collabChip,
+        type === 'place' && ((org && org.name) || item.organizerName)
+          ? h('span', { 'data-mv2': 'xcard-by' }, Str.by + ' ' + ((org && org.name) || item.organizerName))
+          : null,
+        (expanded || inline) && collabChip,
         facts.length > 0 && h('span', { 'data-mv2': 'sub' },
           facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), []))));
-    return h('section', {
+    return h(inline ? 'div' : 'section', {
       ref: root, 'data-mv2': 'sheet', 'data-snap': wide ? 'panel' : snap, 'data-wide': wide ? '1' : undefined,
-      'data-expanded': expanded ? '' : undefined,
-      role: 'dialog', 'aria-label': Str.dialogLabel(name), 'aria-modal': 'false',
+      'data-expanded': expanded ? '' : undefined, 'data-inline': inline ? '' : undefined,
+      role: inline ? undefined : 'dialog', 'aria-label': inline ? undefined : Str.dialogLabel(name), 'aria-modal': inline ? undefined : 'false',
       onPointerDown,
+      // The keyboard reaches what the half sheet hides below the screen's edge (the map screen cannot scroll to it:
+      // overflow clip): focus there raises the sheet to full, so what has focus is always in view. A finger or a mouse
+      // press focuses too, and must never move the sheet: focus that follows a press within the moment is left alone.
+      onPointerDownCapture: () => { pressedAt.current = Date.now(); },
+      onFocus: (e) => {
+        if (wide || inline || snapRef.current === 'full' || !e.target || !e.target.getBoundingClientRect) return;
+        // the sheet's own title takes focus as the sheet slides in (tabindex -1: the keyboard never lands there)
+        if (e.target.getAttribute && e.target.getAttribute('tabindex') === '-1') return;
+        if (Date.now() - pressedAt.current < 600) return;
+        // a control (a button, a link, a tab), never a container the size of the sheet (the scroller takes focus too)
+        const r = e.target.getBoundingClientRect();
+        if (r.height < window.innerHeight / 3 && r.bottom > window.innerHeight) setSnap('full');
+      },
     },
       grab,
       h('div', { ref: scroller, 'data-mv2': 'scroller' },
@@ -850,7 +875,7 @@
         qrAction,
         reportAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),
-      h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
+      !inline && h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
       // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost;
       // the phone app has no web origin of its own, so its build supplies the public site's address, see CC_ROUTES.publicUrl)
       qr && qrOk && ReactDOM.createPortal(h(window.MapV2QR.Dialog, {

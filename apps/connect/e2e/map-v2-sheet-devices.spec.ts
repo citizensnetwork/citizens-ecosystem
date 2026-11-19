@@ -7,7 +7,7 @@ import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, t
 //  Tracker P1-06 Accept: "works at 360x800 and with emulated iOS safe areas".
 // ════════════════════════════════════════════════════════════════════
 
-type Seed = MapSeed & { contributors: { id: string; physical_longitude: number; physical_latitude: number }[] };
+type Seed = MapSeed & { places: { id: string; longitude: number; latitude: number }[] };
 type MapHook = { jumpTo: (o: object, d: object) => void };
 const seed0 = () => smallSeed(FIXED_NOW) as Seed;
 const SHEET = "[data-mv2='sheet']";
@@ -15,10 +15,10 @@ const SHEET = "[data-mv2='sheet']";
 async function open(page: Page, seed: Seed) {
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { gallery: 6 });
-  await openMap(page, "/?map=v2", 8);
-  const c = seed.contributors[0];
-  await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
-  await openPinSheet(page, c.id);
+  await openMap(page, "/?map=v2", 5);
+  const p = seed.places[1]; // no opening hours, so the subtitle stays one line above the home indicator
+  await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [p.longitude, p.latitude]);
+  await openPinSheet(page, p.id);
   await expect(page.locator(SHEET)).toBeVisible();
 }
 

@@ -14,7 +14,7 @@ import { render, screen, fireEvent, cleanup, act } from "@testing-library/react"
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-type Marker = { id: string; type: string; title: string; category?: string; lat?: number; lng?: number; kind?: string };
+type Marker = { id: string; type: string; title: string; category?: string; lat?: number; lng?: number; kind?: string; ownerName?: string };
 type Ranked = { m: Marker; meters: number };
 type ExploreApi = {
   ROW_CAP: number;
@@ -214,220 +214,148 @@ describe("Pills", () => {
   });
 });
 
-describe("Explore", () => {
+describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => {
   const view = { centre: ORIGIN, user: null as null | { lat: number; lng: number } };
   const apiRef = { current: { view: () => view, onView: () => () => {} } };
-  const markers = [mk("one", 1, { title: "First church" }), mk("two", 3, { title: "Second café", category: "hospitality-cafes", type: "place" }), mk("three", 6, { title: "Third", type: "event", category: "kids" })];
+  const markers = [mk("one", 1, { title: "First church" }), mk("two", 3, { title: "Second café", category: "hospitality-cafes", type: "place", ownerName: "Anchor Community Church" }), mk("three", 6, { title: "Third", type: "event", category: "kids" })];
   const sources = { contributors: [{ id: "one", coverPhoto: "https://img.test/one.jpg" }], places: [], events: [] };
+  const P = () => (S.explore as unknown as { panel: Record<string, string> }).panel;
+  const mode = () => document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode");
+  // The map screen owns the focus; this stands in for it.
+  function Harness(props: Record<string, unknown>) {
+    const [focus, setFocus] = React.useState<unknown>(null);
+    const onReset = () => { setFocus(null); if (typeof props.onReset === "function") (props.onReset as () => void)(); };
+    return React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn(), ...props, focus, onFocus: setFocus, onReset });
+  }
+  beforeEach(() => {
+    (window as unknown as Record<string, unknown>).ProfilePanel = function ProfilePanel({ anchor, extras }: { anchor: string; extras: string[] }) {
+      return React.createElement("div", { "data-testid": "me-menu", "data-anchor": anchor, "data-extras": String(extras) });
+    };
+  });
 
-  it("titles the row Explore with See all, and draws large image cards nearest first with km", () => {
+  it("rests on the crown alone, and the crown shows and hides the Where to… tiles (no title text, only the handle)", () => {
+    render(React.createElement(Harness));
+    expect(mode()).toBe("rest");
+    expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("inert")).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    expect(mode()).toBe("strip");
+    expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("inert")).toBe(false);
+    expect(screen.getByRole("button", { name: "Coffee" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Kids" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Contributors" })).toBeNull();
+    // the strip says nothing but its tiles: no "Explore", "Where to…", "Near you" or count line
+    expect(screen.queryByRole("heading")).toBeNull();
+    expect(document.querySelector("[data-mv2='explore-peek']")).toBeNull();
+    expect(document.querySelector("[data-mv2='explore-handle']")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: P().close }));
+    expect(mode()).toBe("rest");
+  });
+
+  it("a tile takes the panel to its focus: grey tabs and its cards, and All types (plain words) goes back", () => {
+    render(React.createElement(Harness));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    fireEvent.click(screen.getByRole("button", { name: "Coffee" }));
+    expect(mode()).toBe("focus");
+    expect(screen.getByRole("tab", { name: "Coffee" }).getAttribute("aria-selected")).toBe("true");
+    expect(document.querySelector("[data-row='tile'] [data-explore-id='two']")).toBeTruthy();
+    expect(document.querySelector("[data-row='tile'] [data-explore-id='two'] [data-mv2='xcard-by']")!.textContent).toBe("by Anchor Community Church");
+    expect(document.querySelector("[data-row='tile'] [data-explore-id='one']")).toBeNull();
+    // another tab keeps the focus (and so the panel's height): only the row changes
+    fireEvent.click(screen.getByRole("tab", { name: "Kids" }));
+    expect(mode()).toBe("focus");
+    expect(document.querySelector("[data-row='tile'] [data-explore-id='three']")).toBeTruthy();
+    const reset = screen.getByRole("button", { name: P().allTypes });
+    expect(reset.getAttribute("data-mv2")).toBe("explore-reset");
+    fireEvent.click(reset);
+    expect(mode()).toBe("strip");
+    expect(screen.queryByRole("tab")).toBeNull();
+  });
+
+  it("the handle opens every row; Explore more calls onSeeAll; a card there takes its row over and reports the listing", () => {
     const onSeeAll = vi.fn();
-    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll }));
-    expect(screen.getByRole("heading", { name: S.explore.title as string })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: S.explore.seeAllLabel as string }));
-    expect(onSeeAll).toHaveBeenCalled();
-    const cards = document.querySelectorAll("[data-mv2='explore-card']");
-    expect([...cards].map((c) => c.getAttribute("data-explore-id"))).toEqual(["one", "two", "three"]);
-    expect(cards[0].textContent).toContain("1 km from the map centre");
-    expect(cards[0].querySelector("img")!.getAttribute("src")).toBe("https://img.test/one.jpg");
-    // no picture: a neutral tile with the category icon, so the row keeps one shape
-    expect(cards[1].querySelector("[data-tile]")).toBeTruthy();
-    // the group colour rides on the card and its dot
-    expect(cards[1].querySelector("[data-mv2='card2']")!.getAttribute("data-cat")).toBe("business");
-    expect(cards[2].querySelector("[data-mv2='card-dot']")!.getAttribute("data-cat")).toBe("audiences");
-  });
-
-  it("says 'away' once the person's position is known, and names the region by it", () => {
-    view.user = ORIGIN;
-    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(screen.getByRole("region", { name: S.explore.label as string })).toBeTruthy();
-    expect(document.querySelector("[data-explore-id='one']")!.textContent).toContain("1 km away");
-    view.user = null;
-  });
-
-  it("outlines the chosen card, says what the next tap does, announces it, and a card tap reports that listing", () => {
     const onOpen = vi.fn();
-    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "two", onOpen, onSeeAll: vi.fn() }));
-    const sel = document.querySelector("[data-explore-id='two']")!;
+    render(React.createElement(Harness, { selectedId: "two", onOpen, onSeeAll }));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    fireEvent.click(screen.getByRole("button", { name: P().raise }));
+    expect(mode()).toBe("open");
+    fireEvent.click(screen.getByRole("button", { name: P().seeAll }));
+    expect(onSeeAll).toHaveBeenCalled();
+    const sel = document.querySelector("[data-row='more'] [data-explore-id='two']")!;
     expect(sel.hasAttribute("data-selected")).toBe(true);
-    expect(document.querySelectorAll("[data-selected]").length).toBe(1);
-    expect(sel.querySelector("[data-mv2='explore-badge']")!.textContent).toBe("Tap again to open");
-    expect(sel.querySelector("[aria-current='true']")).toBeTruthy();
-    expect(screen.getByRole("status").textContent).toBe("Second café is chosen. Press it again to open it.");
-    fireEvent.click(sel.querySelector("button")!);
-    expect(onOpen).toHaveBeenCalledWith("two", "place");
+    expect(sel.querySelector("[data-mv2='xcard-badge']")!.textContent).toBe(S.explore.selectedBadge);
+    fireEvent.click(sel);
+    // the third argument is where the cards measured from, so the sheet's distance says what the card said
+    expect(onOpen).toHaveBeenCalledWith("two", "place", { centre: ORIGIN, user: null });
+    expect(mode()).toBe("focus");
+    expect(screen.getByRole("tablist", { name: P().rows })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: P().more }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: P().closeRow }));
+    expect(mode()).toBe("strip");
   });
 
-  it("scrolls the row to a card only for a PIN tap (a card tap leaves the row exactly where it is)", () => {
-    const { rerender } = render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    scrollTo.mockClear();
-    // a card was tapped: it is chosen, and nothing scrolls
-    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "two", reveal: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(scrollTo).not.toHaveBeenCalled();
-    // a pin was tapped: its card is brought into view
-    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "three", reveal: { id: "three", focus: false, n: 1 }, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(scrollTo).toHaveBeenCalled();
+  it("tells the map which pins a row in focus holds", () => {
+    const onSectionIds = vi.fn();
+    render(React.createElement(Harness, { onSectionIds }));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    fireEvent.click(screen.getByRole("button", { name: P().raise }));
+    fireEvent.click(screen.getByRole("button", { name: P().more }));
+    expect(mode()).toBe("focus");
+    expect(onSectionIds).toHaveBeenLastCalledWith(["two", "three"]);
   });
 
-  it("moves focus to the card only when the keyboard chose the pin", () => {
-    const { rerender } = render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "two", reveal: { id: "two", focus: false, n: 1 }, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(document.activeElement?.closest("[data-explore-id]")).toBeNull();
-    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: "three", reveal: { id: "three", focus: true, n: 2 }, onOpen: vi.fn(), onSeeAll: vi.fn() }));
+  it("with a filter on, the crown clears everything and comes back to rest", () => {
+    const onReset = vi.fn();
+    render(React.createElement(Harness, { onReset }));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    fireEvent.click(screen.getByRole("button", { name: "Coffee" }));
+    fireEvent.click(screen.getByRole("button", { name: P().reset }));
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect(mode()).toBe("rest");
+    // a search filter from the map screen counts too
+    render(React.createElement(Harness, { onReset, filtered: true }));
+    expect(screen.getAllByRole("button", { name: P().reset }).length).toBe(1);
+  });
+
+  it("a keyboard pin opens the panel onto that card", () => {
+    const { rerender } = render(React.createElement(Harness, { reveal: null }));
+    rerender(React.createElement(Harness, { selectedId: "three", reveal: { id: "three", focus: true, n: 1 } }));
+    expect(mode()).toBe("focus");
     expect(document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id")).toBe("three");
   });
 
-  it("holds its ranking while a listing is chosen, so the cards never reshuffle under the thumb; it ranks again once nothing is chosen", () => {
-    vi.useFakeTimers();
-    let centre = ORIGIN;
-    let tell: () => void = () => {};
-    const live = { current: { view: () => ({ centre, user: null }), onView: (fn: () => void) => { tell = fn; return () => {}; } } };
-    const here = [mk("a", 1, { title: "A" }), mk("b", 9, { title: "B" })];
-    const order = () => [...document.querySelectorAll("[data-mv2='explore-card']")].map((c) => c.getAttribute("data-explore-id"));
-    const { rerender } = render(React.createElement(X.Explore, { markers: here, sources, apiRef: live, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(order()).toEqual(["a", "b"]);
-    // a card is chosen, the map jumps next to "b": the row stays as it was
-    rerender(React.createElement(X.Explore, { markers: here, sources, apiRef: live, selectedId: "a", onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    centre = at(9);
-    act(() => { tell(); vi.advanceTimersByTime(200); });
-    expect(order()).toEqual(["a", "b"]);
-    // nothing chosen any more: it ranks again around where the map is now
-    rerender(React.createElement(X.Explore, { markers: here, sources, apiRef: live, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(order()).toEqual(["b", "a"]);
+  it("hides Do and Central, keeps Map in the middle, and Me opens the account menu with Messages and Alerts", () => {
+    const onGo = vi.fn();
+    render(React.createElement(Harness, { onGo }));
+    fireEvent.click(screen.getByRole("button", { name: P().open }));
+    fireEvent.click(screen.getByRole("button", { name: P().raise }));
+    const dock = screen.getByRole("navigation", { name: P().dock });
+    expect([...dock.querySelectorAll("[data-nav]")].map((b) => b.getAttribute("data-nav"))).toEqual(["explore", "map", "me"]);
+    expect(document.querySelector("[data-nav='do']")).toBeNull();
+    expect(document.querySelector("[data-nav='central']")).toBeNull();
+    // the crown has given way to the nav outright
+    expect(document.querySelector("[data-mv2='explore-crown']")).toBeNull();
+    const me = dock.querySelector("[data-nav='me']")!;
+    fireEvent.click(me);
+    expect(me.getAttribute("aria-expanded")).toBe("true");
+    const menu = screen.getByTestId("me-menu");
+    expect(menu.getAttribute("data-anchor")).toBe("dock");
+    expect(menu.getAttribute("data-extras")).toBe("messages,notifications");
+    fireEvent.click(dock.querySelector("[data-nav='map']")!);
+    expect(mode()).toBe("rest");
+    expect(document.querySelector("[data-mv2='explore-crown']")).toBeTruthy();
   });
 
-  it("holds the ranking only once the map has told it where it is (a pin tapped before the first reading still gets its distances)", () => {
-    vi.useFakeTimers();
-    let now: { centre: typeof ORIGIN | null; user: null } = { centre: null, user: null };
-    let tell: () => void = () => {};
-    const early = { current: { view: () => now, onView: (fn: () => void) => { tell = fn; return () => {}; } } };
-    const here = [mk("a", 1, { title: "A" }), mk("b", 5, { title: "B" })];
-    // a listing is chosen while the map has not reported a position yet: the cards have no distance line
-    render(React.createElement(X.Explore, { markers: here, sources, apiRef: early, selectedId: "a", onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(document.querySelector("[data-explore-id='a'] [data-mv2='row-meta']")).toBeNull();
-    // the first reading arrives: it must not be held back by the choice
-    now = { centre: ORIGIN, user: null };
-    act(() => { tell(); vi.advanceTimersByTime(200); });
-    expect(document.querySelector("[data-explore-id='a'] [data-mv2='row-meta']")!.textContent).toContain("from the map centre");
-  });
-
-  it("makes its title a switch to the category list: the groups, Events and Ideas, a check on what is on", () => {
-    const onPill = vi.fn();
-    const onIdeas = vi.fn();
-    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, pill: "serve", ideas: true, onPill, onIdeas, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    const sw = screen.getByRole("button", { name: S.explore.title as string });
-    expect(sw.getAttribute("aria-expanded")).toBe("false");
-    expect(sw.getAttribute("aria-controls")).toBe("mv2-explore-body");
-    // what the panel is filtered to is said beside the title
-    expect(document.querySelector("[data-mv2='explore-filter']")!.textContent).toBe("Serve & care · Ideas");
-    fireEvent.click(sw);
-    expect(sw.getAttribute("aria-expanded")).toBe("true");
-    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cats");
-    const list = screen.getByRole("list", { name: S.explore.categoriesLabel as string });
-    const rows = [...list.querySelectorAll("[data-mv2='cat']")];
-    expect(rows.map((r) => r.getAttribute("data-cat-id"))).toEqual([...X.PILLS.map((p) => p.id), "ideas"]);
-    const on = (id: string) => rows.find((r) => r.getAttribute("data-cat-id") === id)!;
-    expect(on("serve").getAttribute("aria-pressed")).toBe("true");
-    expect(on("serve").querySelector("[data-icon='Check']")).toBeTruthy();
-    expect(on("ideas").getAttribute("aria-pressed")).toBe("true");
-    expect(on("worship").getAttribute("aria-pressed")).toBe("false");
-    expect(on("worship").querySelector("[data-cat='worship']")).toBeTruthy();   // the group's own colour dot
-    // Ideas is a switch beside the groups: it leaves the list open
-    fireEvent.click(on("ideas"));
-    expect(onIdeas).toHaveBeenCalledTimes(1);
-    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cats");
-    // a group sends the panel back to its cards, filtered, and focus returns to the title
-    fireEvent.click(on("culture"));
-    expect(onPill).toHaveBeenCalledWith("culture");
-    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cards");
-    expect(document.activeElement).toBe(sw);
-  });
-
-  it("opens Where to… from the list, filters by that intent, and says so when nothing is near", () => {
-    const onIntent = vi.fn();
-    const onPill = vi.fn();
-    const word = (id: string) => (S.explore.intents as Record<string, string>)[id];
-    const whereTo = (id: string) => (S.explore.whereTo as (w: string) => string)(word(id));
-    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, pill: "all", intent: null, onPill, onIntent, onIdeas: vi.fn(), onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    const sw = screen.getByRole("button", { name: S.explore.title as string });
-    fireEvent.click(sw);
-    const tabs = screen.getByRole("tablist", { name: S.explore.listLabel as string });
-    expect(tabs).toBeTruthy();
-    expect(screen.getByRole("tab", { name: S.explore.categoriesTab as string }).getAttribute("aria-selected")).toBe("true");
-    // the category rows are unchanged until the person asks for intents
-    expect(screen.getByRole("list", { name: S.explore.categoriesLabel as string }).querySelectorAll("[data-mv2='cat']").length).toBe(9);
-    fireEvent.click(screen.getByRole("tab", { name: S.explore.intentsTab as string }));
-    const intents = screen.getByRole("list", { name: S.explore.intentsLabel as string });
-    const rows = [...intents.querySelectorAll("[data-mv2='intent']")];
-    expect(rows.map((r) => r.getAttribute("data-intent-id"))).toEqual(X.INTENTS.map((intent) => intent.id));
-    expect(screen.queryByRole("list", { name: S.explore.categoriesLabel as string })).toBeNull();
-    const serve = rows.find((r) => r.getAttribute("data-intent-id") === "serve")!;
-    expect(serve.hasAttribute("disabled")).toBe(false);
-    expect(serve.textContent).toBe(whereTo("serve"));
-    fireEvent.keyDown(tabs, { key: "ArrowLeft" });
-    expect(screen.getByRole("list", { name: S.explore.categoriesLabel as string })).toBeTruthy();
-    fireEvent.keyDown(tabs, { key: "End" });
-    fireEvent.click(screen.getByRole("button", { name: whereTo("coffee") }));
-    expect(onIntent).toHaveBeenCalledWith("coffee");
-    expect(onPill).not.toHaveBeenCalled();
-    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cards");
-    expect(document.activeElement).toBe(sw);
-  });
-
-  it("reopens on Where to… when an intent is filtering, with that row checked, and is honest when the row is empty", () => {
-    const word = (S.explore.intents as Record<string, string>).parent;
-    render(React.createElement(X.Explore, {
-      markers: [], sources, apiRef, selectedId: null, pill: "all", intent: "parent",
-      onPill: vi.fn(), onIntent: vi.fn(), onIdeas: vi.fn(), onOpen: vi.fn(), onSeeAll: vi.fn(),
-    }));
-    expect(document.querySelector("[data-mv2='explore-filter']")!.textContent).toBe((S.explore.whereTo as (w: string) => string)(word));
-    expect(screen.getByText((S.explore.emptyIntent as (w: string) => string)(word))).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: S.explore.title as string }));
-    expect(screen.getByRole("tab", { name: S.explore.intentsTab as string }).getAttribute("aria-selected")).toBe("true");
-    const parent = document.querySelector("[data-intent-id='parent']")!;
-    expect(parent.getAttribute("aria-pressed")).toBe("true");
-    expect(parent.querySelector("[data-icon='Check']")).toBeTruthy();
-  });
-
-  it("goes back from the list on Escape, and the view that is not shown cannot be reached", () => {
-    render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, pill: "all", onPill: vi.fn(), onIdeas: vi.fn(), onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    const views = () => [...document.querySelectorAll("[data-mv2='explore-view']")].map((v) => [v.getAttribute("data-view"), v.hasAttribute("inert")]);
-    expect(views()).toEqual([["cards", false], ["cats", true]]);
-    fireEvent.click(screen.getByRole("button", { name: S.explore.title as string }));
-    expect(views()).toEqual([["cards", true], ["cats", false]]);
-    fireEvent.keyDown(document.querySelector("[data-mv2='cat']")!, { key: "Escape" });
-    expect(document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode")).toBe("cards");
-  });
-
-  it("is lowered to its title strip by the handle (a tap, or a swipe down), raised by it again, and a swipe is not also a tap", () => {
-    const onMin = vi.fn();
-    const { rerender } = render(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, min: false, onMin, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    const grab = screen.getByRole("button", { name: S.explore.lower as string });
-    expect(grab.getAttribute("aria-expanded")).toBe("true");
-    fireEvent.click(grab);
-    expect(onMin).toHaveBeenLastCalledWith(true);
-    // a swipe down lowers it once (the click that may follow a mouse drag is ignored)
-    onMin.mockClear();
-    fireEvent.pointerDown(grab, { clientY: 100 });
-    fireEvent.pointerUp(grab, { clientY: 140 });
-    fireEvent.click(grab);
-    expect(onMin.mock.calls).toEqual([[true]]);
-    // lowered: the handle says it raises, a swipe up raises it, and the title raises it too
-    rerender(React.createElement(X.Explore, { markers, sources, apiRef, selectedId: null, min: true, onMin, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("data-min")).toBe(true);
-    const up = screen.getByRole("button", { name: S.explore.raise as string });
-    expect(up.getAttribute("aria-expanded")).toBe("false");
-    onMin.mockClear();
-    fireEvent.pointerDown(up, { clientY: 140 });
-    fireEvent.pointerUp(up, { clientY: 100 });
-    expect(onMin.mock.calls).toEqual([[false]]);
-    onMin.mockClear();
-    fireEvent.click(screen.getByRole("button", { name: S.explore.title as string }));
-    expect(onMin).toHaveBeenCalledWith(false);
-  });
-
-  it("shows a plain line when nothing is near", () => {
-    render(React.createElement(X.Explore, { markers: [], sources, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() }));
-    expect(screen.getByText(S.explore.empty as string)).toBeTruthy();
+  it("puts every live category on exactly one tile", () => {
+    const seen = new Set<string>();
+    for (const t of (X as unknown as { TILES: { id: string; categories: string[] }[] }).TILES) {
+      for (const c of t.categories) {
+        expect(seen.has(c), c).toBe(false);
+        seen.add(c);
+      }
+    }
+    for (const id of new Set(Object.keys(X.GROUP_OF))) {
+      if (!seen.has(id) && id !== "") expect(seen.has(id), id).toBe(true);
+    }
   });
 });
 
@@ -574,23 +502,221 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261101b"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261117a"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261101c");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261117a");
     const home = read("src/frontend/app/home.jsx");
-    expect(home).toContain("X.matchesFilter(pill, intent, m)");
-    expect(home).toContain("onIntent: (id) => { setPill('all'); setIntent(id); }");
-    expect(home).toContain("onPill: (id) => { setIntent(null); setPill(id); }");
+    expect(home).toContain("X.tileMatches(tile, m)");
+    expect(home).toContain("onSeeAll: () => app.go('explore')");
+    expect(read("src/frontend/app/shell.jsx")).toContain("SHOW_CREATE_ON_MAP = false");
   });
 
   it("the folding nav is the only nav: no bottom bar is left in the shell", () => {
     const shell = read("src/frontend/app/shell.jsx");
     expect(shell).toContain("React.createElement(window.MapV2Nav)");
     expect(shell).not.toContain("BottomNav");
+  });
+});
+
+describe("the map home's levels (founder, 2026-11-18): the pin carousel and the crown", () => {
+  type PeekApi = {
+    peekOrder: (target: Marker | null, markers: Marker[], visible: string[] | null, cap?: number) => Marker[];
+    nearestIndex: (centres: number[], mid: number) => number;
+    PinCarousel: React.ComponentType<Record<string, unknown>>;
+  };
+  const Y = () => X as unknown as PeekApi;
+  const PK = () => (S.explore as unknown as { peek: Record<string, unknown> & { count: (i: number, n: number) => string; details: (n: string) => string } }).peek;
+  const P = () => (S.explore as unknown as { panel: Record<string, string> }).panel;
+  const pins = [
+    mk("a", 0, { type: "place", title: "Alpha", category: "hospitality-cafes" }),
+    mk("b", 2, { type: "event", title: "Bravo", category: "kids" }),
+    mk("c", 1, { type: "place", title: "Charlie", category: "retail-shopping" }),
+    mk("d", 5, { type: "place", title: "Delta", category: "kids" }),
+    mk("i", 0.5, { type: "idea", title: "An idea" }),
+  ];
+
+  it("orders the carousel from the tapped pin: it first, then the pins in view, nearest to it first, ideas never", () => {
+    const b = pins.find((m) => m.id === "b")!;
+    expect(Y().peekOrder(b, pins, null).map((m) => m.id)).toEqual(["b", "c", "a", "d"]);
+    // only the pins in view (the tapped one is always first, in view or not)
+    expect(Y().peekOrder(b, pins, ["a", "d"]).map((m) => m.id)).toEqual(["b", "a", "d"]);
+    // capped, the cap counting the tapped pin
+    expect(Y().peekOrder(b, pins, null, 2).map((m) => m.id)).toEqual(["b", "c"]);
+    expect(Y().peekOrder(null, pins, null)).toEqual([]);
+  });
+
+  it("knows which card a swipe settled on: the one whose middle is nearest the row's middle", () => {
+    expect(Y().nearestIndex([74, 234, 394], 240)).toBe(1);
+    expect(Y().nearestIndex([74, 234, 394], 0)).toBe(0);
+    expect(Y().nearestIndex([74, 234, 394], 9999)).toBe(2);
+    expect(Y().nearestIndex([], 10)).toBe(-1);
+  });
+
+  function carousel(props: Record<string, unknown> = {}) {
+    const calls = { onIndex: vi.fn(), onRaise: vi.fn(), onBack: vi.fn(), onClose: vi.fn() };
+    const items = [pins[0], pins[2], pins[1]];
+    const r = render(React.createElement(Y().PinCarousel, {
+      items, index: 0, raised: false, origin: ORIGIN, distWords: S.explore, sources: { places: [], events: [], contributors: [] },
+      details: (m: Marker) => React.createElement("p", { "data-testid": "details" }, "About " + m.title),
+      ...calls, ...props,
+    }));
+    return { calls, items, ...r };
+  }
+  const cardsIn = () => [...document.querySelectorAll<HTMLElement>("[data-mv2='pinpeek'] [data-mv2='xcard']")];
+
+  it("draws the Explore row's own cards, the chosen one outlined with what its next tap does, and its count", () => {
+    carousel();
+    const cards = cardsIn();
+    expect(cards.map((c) => c.getAttribute("data-explore-id"))).toEqual(["a", "c", "b"]);
+    expect(cards[0].hasAttribute("data-selected")).toBe(true);
+    expect(cards[0].getAttribute("aria-current")).toBe("true");
+    expect(cards[0].textContent).toContain(PK().detailsBadge as string);
+    expect(cards[1].hasAttribute("data-selected")).toBe(false);
+    expect(screen.getByRole("status").textContent).toContain(PK().count(1, 3));
+    expect(screen.getByRole("status").textContent).toContain("Alpha");
+    // no arrow points past the first card; the next one does
+    expect(screen.queryByRole("button", { name: PK().prev as string })).toBeNull();
+    expect(screen.getByRole("button", { name: PK().next as string })).toBeTruthy();
+    // lowered: no details, no Back
+    expect(screen.queryByTestId("details")).toBeNull();
+    expect(screen.queryByRole("button", { name: PK().back as string })).toBeNull();
+  });
+
+  it("an arrow or a neighbour's tap chooses that card; the chosen card's tap raises the panel", () => {
+    const { calls } = carousel({ index: 1 });
+    fireEvent.click(screen.getByRole("button", { name: PK().next as string }));
+    expect(calls.onIndex).toHaveBeenLastCalledWith(2);
+    fireEvent.click(screen.getByRole("button", { name: PK().prev as string }));
+    expect(calls.onIndex).toHaveBeenLastCalledWith(0);
+    fireEvent.click(cardsIn()[2]);
+    expect(calls.onIndex).toHaveBeenLastCalledWith(2);
+    expect(calls.onRaise).not.toHaveBeenCalled();
+    fireEvent.click(cardsIn()[1]);
+    expect(calls.onRaise).toHaveBeenCalledTimes(1);
+    // Close goes home from any level
+    fireEvent.click(screen.getByRole("button", { name: PK().close as string }));
+    expect(calls.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("raised: the chosen card's details sit below the cards, with Back and Close in the bar; Escape steps back", () => {
+    const { calls } = carousel({ index: 1, raised: true });
+    expect(document.querySelector("[data-mv2='pinpeek']")!.hasAttribute("data-raised")).toBe(true);
+    expect(screen.getByTestId("details").textContent).toBe("About Charlie");
+    expect(screen.getByRole("region", { name: PK().details("Charlie") })).toBeTruthy();
+    // the details come after the cards
+    const row = document.querySelector("[data-row='peek']")!;
+    expect(row.compareDocumentPosition(screen.getByTestId("details")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // the chosen card no longer says "tap again": it already did
+    expect(cardsIn()[1].textContent).not.toContain(PK().detailsBadge as string);
+    fireEvent.click(cardsIn()[1]);
+    expect(calls.onRaise).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: PK().back as string }));
+    expect(calls.onBack).toHaveBeenCalledTimes(1);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(calls.onBack).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves Escape to a full sheet open over it (hidden), and gives focus back when it closes with focus inside", () => {
+    const returnFocus = vi.fn();
+    const { calls, rerender, unmount } = carousel({ hidden: true, returnFocus });
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(calls.onBack).not.toHaveBeenCalled();
+    rerender(React.createElement(Y().PinCarousel, {
+      items: [pins[0]], index: 0, ...calls, returnFocus, sources: {}, focusCard: 1,
+    }));
+    // a pin chosen from the keyboard: focus goes into the cards
+    expect(document.activeElement && document.activeElement.getAttribute("data-explore-id")).toBe("a");
+    unmount();
+    expect(returnFocus).toHaveBeenCalledTimes(1);
+    expect(returnFocus).toHaveBeenCalledWith("a");
+  });
+
+  it("a pull up on the lowered panel raises it; a pull down steps back (and swallows the tap that ends it)", () => {
+    const { calls } = carousel();
+    const panel = document.querySelector("[data-mv2='pinpeek']")!;
+    const card = cardsIn()[0];
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 1, pointerType: "touch" });
+    expect(calls.onRaise).toHaveBeenCalledTimes(1);
+    fireEvent.click(card);
+    expect(calls.onRaise).toHaveBeenCalledTimes(1);
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 2, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 2, pointerType: "touch" });
+    expect(calls.onBack).toHaveBeenCalledTimes(1);
+    // a short or sideways move is a swipe of the row, never a pull
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 3, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 220, clientY: 340, pointerId: 3, pointerType: "touch" });
+    expect(calls.onBack).toHaveBeenCalledTimes(1);
+  });
+
+  describe("the Explore panel under the carousel", () => {
+    const view = { centre: ORIGIN, user: null };
+    const apiRef = { current: { view: () => view, onView: () => () => {} } };
+    const base = { markers: pins.filter((m) => m.type !== "idea"), sources: { contributors: [], places: [], events: [] }, apiRef, selectedId: null, onOpen: vi.fn(), onSeeAll: vi.fn() };
+    const mode = () => document.querySelector("[data-mv2='explore']")!.getAttribute("data-mode");
+
+    it("rests while the carousel is up, and its crown then goes straight back to the map's rest", () => {
+      const onLevelReset = vi.fn();
+      const onMode = vi.fn();
+      const { rerender } = render(React.createElement(X.Explore, { ...base, onMode }));
+      fireEvent.click(screen.getByRole("button", { name: P().open }));
+      expect(mode()).toBe("strip");
+      rerender(React.createElement(X.Explore, { ...base, onMode, peek: true, level: 1, onLevelReset }));
+      expect(mode()).toBe("rest");
+      expect(onMode).toHaveBeenLastCalledWith("rest");
+      const crown = document.querySelector<HTMLButtonElement>("[data-mv2='explore-crown']")!;
+      expect(crown.getAttribute("aria-label")).toBe(P().home);
+      fireEvent.click(crown);
+      expect(onLevelReset).toHaveBeenCalledTimes(1);
+      // the panel's own look comes back as it was once the carousel is gone
+      rerender(React.createElement(X.Explore, { ...base, onMode, peek: false, level: 0, onLevelReset }));
+      expect(mode()).toBe("rest");
+    });
+
+    it("a tap on empty map (restSignal) folds the Where to… strip back to the crown alone", () => {
+      const { rerender } = render(React.createElement(X.Explore, { ...base, restSignal: 0 }));
+      fireEvent.click(screen.getByRole("button", { name: P().open }));
+      expect(mode()).toBe("strip");
+      rerender(React.createElement(X.Explore, { ...base, restSignal: 1 }));
+      expect(mode()).toBe("rest");
+    });
+
+    it("the desktop crown resets the levels too, and only folds the nav at the map's rest", () => {
+      const onLevelReset = vi.fn();
+      const { rerender } = render(React.createElement(X.Explore, { ...base, level: 1, onLevelReset }));
+      const crown = () => document.querySelector<HTMLButtonElement>("[data-mv2='desktop-crown']")!;
+      expect(crown().getAttribute("aria-label")).toBe(P().home);
+      fireEvent.click(crown());
+      expect(onLevelReset).toHaveBeenCalledTimes(1);
+      expect(crown().getAttribute("aria-expanded")).toBe("true");
+      rerender(React.createElement(X.Explore, { ...base, level: 0, onLevelReset }));
+      fireEvent.click(crown());
+      expect(onLevelReset).toHaveBeenCalledTimes(1);
+      expect(crown().getAttribute("aria-expanded")).toBe("false");
+    });
+  });
+
+  it("wires the levels into the map screen: one history entry per level, the chips row, and the inline details", () => {
+    const home = read("src/frontend/app/home.jsx");
+    expect(home).toContain("useBackGuard(searchOpen,");
+    expect(home).toContain("useBackGuard(!!peek, closePeek)");
+    expect(home).toContain("useBackGuard(!!(peek && peek.raised), lowerPeek)");
+    expect(home).toContain("React.createElement(X.PinCarousel");
+    expect(home).toContain("inline: true");
+    expect(home).toContain("'aria-label': XS.chipsLabel");
+    const css = read("src/frontend/assets/map-v2.css");
+    // the chips: one row that scrolls sideways (no column), and the carousel moves by transform only
+    const chips = css.slice(css.search(/^\[data-mv2='home-filters'\] \{/m));
+    expect(chips.slice(0, chips.indexOf("}"))).toMatch(/flex-direction: row;[\s\S]*overflow-x: auto;/);
+    expect(css).toMatch(/\[data-mv2='pinpeek'\] \{[^}]*transform: translateY\(calc\(100% - var\(--pp-peek\)\)\);/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\[data-mv2='pinpeek'\] \{\s*transition: none;\s*animation: none;/);
+    const store = read("src/frontend/app/store.jsx");
+    // closing several levels at once takes all their entries off in ONE step
+    expect(store).toContain("window.history.go(-k)");
   });
 });

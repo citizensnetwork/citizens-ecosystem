@@ -268,6 +268,12 @@
       pillsLabel: 'Show on the map',
       search: 'Search events, places, people…',
       clearSearch: 'Clear search',
+      // the round Search button where the account button was (founder, 2026-11-17); on a phone it opens the bar
+      searchButton: 'Search',
+      closeSearch: 'Close search',
+      // the small chip at the top while a filter is on, in that filter's colour, with its own clear button
+      filterChip: (name) => 'Showing ' + name,
+      clearFilter: (name) => 'Clear ' + name,
       groups: {
         all: 'All',
         worship: 'Churches & worship',
@@ -282,6 +288,21 @@
       // a card (or a pin) chosen: the card says what the next tap does, in words laid over its picture
       selectedBadge: 'Tap again to open',
       selectedAnnounce: (name) => name + ' is chosen. Press it again to open it.',
+      // the search bar's category chips (founder, 2026-11-18: one small row that swipes sideways)
+      chipsLabel: 'Filter the map by category',
+      // the pin carousel (founder, 2026-11-18): a pin's card and its neighbours at the foot of the map
+      peek: {
+        label: 'On the map here',
+        detailsBadge: 'Tap again for details',
+        count: (i, n) => i + ' of ' + n,
+        prev: 'Previous on the map',
+        next: 'Next on the map',
+        back: 'Back',
+        close: 'Close and go back to the map',
+        raise: 'Show details',
+        lower: 'Back to the cards',
+        details: (name) => 'Details of ' + name,
+      },
       // the panel's own controls (founder, 2026-10-30): the title switches to the category list, the handle lowers the panel
       chooseCategory: 'Choose a category',
       backToListings: 'Back to the listings',
@@ -308,6 +329,44 @@
         km: (n) => n + ' km from the map centre',
       },
       empty: 'Nothing here yet. Move the map or pick another category.',
+      // Pack 08: the home sheet. Tiles and tabs stay frosted grey; gold is only the crown's ring.
+      panel: {
+        where: 'Where to…',
+        peek: 'Where to…',
+        around: 'Near and Now…',
+        aroundHint: 'Live, starting soon, and places nearby',
+        weekend: 'This weekend',
+        weekendHint: 'Saturday and Sunday',
+        online: 'Online',
+        onlineHint: 'Join from wherever you are',
+        fresh: 'New on Connect',
+        freshHint: 'Added in the last 30 days',
+        more: 'More near you',
+        moreHint: 'Closest of every kind',
+        seeAll: 'Explore more',
+        seeAllHint: 'The full page: every type, area and group',
+        allTypes: 'All types',
+        closeRow: 'Close',
+        rows: 'Explore rows',
+        scrollLeft: 'Scroll left',
+        scrollRight: 'Scroll right',
+        hideNav: 'Hide navigation',
+        showNav: 'Show navigation',
+        // the crown (founder, 2026-11-17): it shows and hides Where to…, and with a filter on it clears everything
+        open: 'Show Where to…',
+        close: 'Hide Where to…',
+        reset: 'Clear filters and go back to the map',
+        home: 'Close and go back to the map',
+        // the handle
+        raise: 'Show every row',
+        lower: 'Lower the panel',
+        emptyTile: (word) => 'Nothing for ' + word + ' near here yet.',
+        emptyRow: 'Nothing in this row near here yet.',
+        matches: (n, kind) => n + ' ' + kind + ' · nearest first',
+        kind: { event: 'events', place: 'places', contributor: 'contributors', idea: 'ideas' },
+        dock: 'Connect',
+        nav: { me: 'Me', map: 'Map', central: 'Central', do: 'Do', explore: 'Explore' },
+      },
     },
 
     // Issue #210 part 3: the Discover page that "See all" and the nav's Explore open (app/map-v2-discover.jsx).

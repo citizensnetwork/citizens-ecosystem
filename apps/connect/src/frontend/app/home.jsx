@@ -2,7 +2,7 @@
 //  Citizens Connect — Discover (map home) + Impact Idea preview panel
 // ════════════════════════════════════════════════════════════════════
 (function () {
-  const { useState, useRef, useMemo, useCallback } = React;
+  const { useState, useRef, useMemo, useCallback, useEffect } = React;
   const { CategoryBadge, Button } = window.UI;
   const Icon = window.Icon;
   const useBackGuard = window.useBackGuard || function () {};
@@ -67,22 +67,11 @@
     });
   }
 
-  // #210: a card tapped on the home screen moves the map so its pin sits in the OPEN part of the map: below the search
-  // bar, above the Explore panel (measured, as the map's own first framing is), with OPEN_GAP of clear map around it.
-  const OPEN_GAP = 28;
   const CARD_ZOOM = 14;     // a card never lands on a map zoomed out further than this: the pin has to be seen
-  function openMapPad(root) {
-    if (!root) return null;
-    const box = root.getBoundingClientRect();
-    const rect = (sel) => { const el = root.querySelector(sel); return el && !el.hidden ? el.getBoundingClientRect() : null; };
-    const top = rect("[data-mv2='home-top']");
-    const row = rect("[data-mv2='explore']");
-    return {
-      top: (top ? Math.max(0, top.bottom - box.top) : 0) + OPEN_GAP,
-      bottom: (row ? Math.max(0, box.bottom - row.top) : 0) + OPEN_GAP,
-      left: 0, right: 0,
-    };
-  }
+  // A Where to… tile or a row in focus shows its town, not its province (founder, 2026-11-17): every pin is drawn from 9.5.
+  const TOWN_ZOOM = 11;
+  // The crown's reset lands on the person's own place at the zoom the map first opens on.
+  const HOME_ZOOM = 12;
 
   // ── Home / Discover ──
   function HomePage() {
@@ -94,8 +83,11 @@
     const [selType, setSelType] = useState('event');
     const [showIdeas, setShowIdeas] = useState(false);
     const [query, setQuery] = useState('');
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [group, setGroup] = useState('');
+    const [litId, setLitId] = useState(null);
     // Which entity types the current zoom is showing ('all' | 'places' |
-    // 'contributors' | 'none' — see map.jsx zoomBandFor). The map owns the
+    // 'none' — see map.jsx zoomBandFor). The map owns the
     // thresholds and only reports when the band actually changes, so this is
     // one state update per crossing, not one per zoom frame.
     const [zoomBand, setZoomBand] = useState('all');
@@ -104,79 +96,249 @@
     // lowered to its title strip, and which pin was just tapped (so the panel brings that card into view; a card tap
     // never does, the panel stays exactly where it is).
     const X = window.MapV2Explore;
-    const [pill, setPill] = useState('all');
-    // "Where to…" (C40): a saved set of categories. It replaces the pill while it is on.
-    const [intent, setIntent] = useState(null);
+    // What the Explore panel has in focus (founder, 2026-11-17): { kind: 'tile', id } for a Where to… tile, { kind: 'sec', id }
+    // for one of its rows (Near and Now…, New on Connect…), or null. It filters the pins, and the chip at the top clears it.
+    // Ideas ride their own tile.
+    const [focus, setFocus] = useState(null);
+    const [secIds, setSecIds] = useState([]);
     const [sheet, setSheet] = useState(null);
-    const [min, setMin] = useState(false);
-    const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a second tap on a pin scrolls to its card again
+    const [panelOpen, setPanelOpen] = useState(false);
+    const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a keyboard pin brings its card into the sheet
     const rootRef = useRef(null);
     const skipFrame = useRef(false);
-    const minRef = useRef(false);
-    const chosen = useRef({ id: null, type: null });   // the latest choice, so a second tap never reads a render's old one
+    // The map home's levels (founder, 2026-11-18). 0: the crown alone. 1: the search bar open, with its row of category
+    // chips (searchOpen). 2: a pin tapped, its card and its neighbours in the pin carousel at the foot (peek). 3: the chosen
+    // card tapped again, the carousel raised with that card's details below it (peek.raised). Each level is ONE history
+    // entry (useBackGuard below), so the phone's Back, the browser's Back, the carousel's Back and a pull down all step
+    // back one level, and each level keeps what it was entered with (the camera, the card) so Back puts it all back. The
+    // crown, the carousel's Close and a tap on empty map go straight to level 0 and take every entry off at once.
+    // peek: { ids (the cards, in order), index, camera + view (as level 2 was entered), raised, raisedAt ({ index, camera }
+    // as level 3 was entered), focusCard (a counter: a pin chosen from the keyboard takes focus into the cards) }
+    const [peek, setPeek] = useState(null);
+    const peekRef = useRef(null);
+    peekRef.current = peek;
+    const [exploreMode, setExploreMode] = useState('rest');
+    const press = useRef(null);       // where a press on the map began: a pan is not a tap on empty map
+    const [restSignal, setRestSignal] = useState(0);   // a tap on empty map: the Explore panel goes back to its rest too
+    const chosen = useRef({ id: null, type: null });
     const narrow = X.useNarrow();
     const clean = !!(app.nav && app.nav.params && app.nav.params.view === 'map');
-    const pillTest = useMemo(() => (
-      (intent && X.intentOf(intent)) || (pill && pill !== 'all') ? (m) => X.matchesFilter(pill, intent, m) : null
-    ), [X, pill, intent]);
-    // The panel's height goes straight onto the screen as a CSS variable (the map's controls and credit sit above it): no re-render.
-    // The data is framed again as the panel grows, but never because the person lowered or raised it (the map would jump).
+    const XS = window.MapV2Strings.explore;
+    const tile = focus && focus.kind === 'tile' ? focus.id : null;
+    const tileRec = tile && X.tileOf ? X.tileOf(tile) : null;
+    const secKey = focus && focus.kind === 'sec' ? secIds.join('|') : '';
+    const focusTest = useMemo(() => {
+      if (tileRec && !tileRec.ideas && X.tileMatches) return (m) => X.tileMatches(tile, m);
+      if (secKey) { const set = new Set(secKey.split('|')); return (m) => set.has(m.id); }
+      return null;
+    }, [X, tile, tileRec, secKey]);
+    const pinFilter = useMemo(() => {
+      if (!focusTest && !group) return null;
+      return (m) => (focusTest ? focusTest(m) : true) && (!group || (X.groupOf && X.groupOf(m) === group));
+    }, [focusTest, group, X]);
+    // A new focus brings its town into view, 25% above the middle. One anchor per focus: switching tabs inside it keeps the
+    // map still (re-measuring "the middle" after each move would creep the map upward, tab after tab).
+    const focusKey = focus ? focus.kind + ':' + focus.id : '';
+    const anchor = useRef(null);
+    useEffect(() => {
+      setShowIdeas(!!(tileRec && tileRec.ideas));
+      if (!focusKey) { anchor.current = null; return; }
+      const api = mapApi.current;
+      if (!api || !api.survey) return;
+      if (!anchor.current) {
+        const v = api.view ? api.view() : null;
+        anchor.current = v && (v.user || v.centre);
+      }
+      const c = anchor.current;
+      if (c) api.survey(c.lat, c.lng, TOWN_ZOOM);
+    }, [focusKey]);
+    // How much room the panel takes is the stylesheet's job (--explore-h follows the panel's look, map-v2.css Pack 08), so it is
+    // right even when the CSS arrives after the first render. This only frames the data again as the panel takes room, but
+    // never because the person lowered or raised it (the map would jump).
     const onExploreHeight = useCallback((px) => {
-      if (!rootRef.current) return;
-      rootRef.current.style.setProperty('--explore-h', px + 'px');
-      if (px <= 0) return;
+      if (!rootRef.current || !(px > 0)) return;
       if (skipFrame.current) { skipFrame.current = false; return; }
       if (mapApi.current && mapApi.current.reframe) mapApi.current.reframe();
     }, []);
     // Lower or raise the panel (the handle, or a pin tap that needs its card). Only a real change skips the next framing.
-    const lower = useCallback((down) => {
-      if (minRef.current === down) return;
-      minRef.current = down;
-      skipFrame.current = true;
-      setMin(down);
+    const onPanel = useCallback((isOpen) => {
+      setPanelOpen(!!isOpen);
     }, []);
 
     const q = query.trim().toLowerCase();
     const matches = (t) => !q || (t.title || t.name || '').toLowerCase().includes(q) || (t.organizerName || '').toLowerCase().includes(q);
+    // Owner display name from the contributors already loaded. No new request. Blank when the owner isn't in that list.
+    const ownerName = (id, fallback) => {
+      const row = id && contributors.find((c) => c.id === id);
+      return (row && row.name) || fallback || '';
+    };
     const now = Date.now();
     const markers = [
       // A finished event is history, not a place to turn up: it leaves the map
       // (it stays on its organiser's profile and dashboard, under "Past events").
-      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast })),
-      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast })),
-      // Contributors: same marker shape, minus the event-only isLive/isBusy/
-      // broadcast fields (a Contributor pin is just a plain coloured pin —
-      // see V1_SCOPE.md, "leave live-pulse/broadcast as-is" was scoped to
-      // events only, contributors never had those states to begin with).
-      ...contributors.filter(matches).filter((c) => c.lat != null && c.lng != null).map((c) => ({ id: c.id, type: 'contributor', title: c.name, category: c.category, kind: c.kind, lat: c.lat, lng: c.lng, profilePhoto: c.profilePhoto })),
-      ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY })) : []),
+      ...events.filter((e) => !window.DATA.isPastEvent(e, now)).filter(matches).map((e) => ({ id: e.id, type: 'event', title: e.title, category: e.category, lat: e.lat, lng: e.lng, mapX: e.mapX, mapY: e.mapY, isLive: e.isLive, isBusy: e.isBusy, broadcast: e.broadcast, coverPhoto: e.coverPhoto, startsAt: e.startsAt, endsAt: e.endsAt, createdAt: e.createdAt, location: e.location, address: e.address, ownerName: ownerName(e.organizerId, e.organizerName) })),
+      ...places.filter(matches).map((p) => ({ id: p.id, type: 'place', title: p.name, category: p.category, lat: p.lat, lng: p.lng, mapX: p.mapX, mapY: p.mapY, broadcast: p.broadcast, coverPhoto: p.coverPhoto, openHours: p.openHours, createdAt: p.createdAt, location: p.location, address: p.address, ownerName: ownerName(p.organizerId, p.organizerName) })),
+      ...(showIdeas ? ideas.filter((i) => i.status === 'voting' && (i.lat != null || i.mapX != null)).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY, createdAt: i.createdAt })) : []),
     ];
     // What decides which pin keeps its name label when two collide, and who heads a "+N" group:
     // an upcoming event first (soonest), then the most recent activity, then the name. Never popularity.
     decorateForV2(markers, events, newsPosts || [], now);
 
+    const rowMarkers = markers.filter((m) => m.type !== 'idea');
+    const byId = new Map(rowMarkers.map((m) => [m.id, m]));
+    const sources = useMemo(() => ({ events, places, contributors }), [events, places, contributors]);
+
+    // ── the levels ──
+    const camera = () => (mapApi.current && mapApi.current.camera ? mapApi.current.camera() : null);
+    const putCamera = (c) => { if (c && mapApi.current && mapApi.current.setCamera) mapApi.current.setCamera(c); };
+    const choose = (id) => {
+      const m = byId.get(id);
+      setSelected(m ? id : null); if (m) setSelType(m.type); setLitId(null);
+    };
+    // How much of the map the lowered carousel covers (its token, map-v2.css: it may still be sliding in), so the chosen
+    // card's pin is brought clear of it. Raised, the carousel covers the map: nothing to bring into view.
+    const revealChosen = () => {
+      const home = rootRef.current;
+      const api = mapApi.current;
+      if (!home || !api || !api.revealSelected || (peekRef.current && peekRef.current.raised)) return;
+      const foot = parseFloat(window.getComputedStyle(home).getPropertyValue('--pp-peek'));
+      api.revealSelected(Number.isFinite(foot) ? foot : 0);
+    };
+    // Level 2: a pin tapped. Its card first, then the other pins in view (the filter's, when one is on), nearest first. A pin
+    // tapped while the carousel is up chooses its card there, or starts the row again from it: the same level, no new entry.
+    const openPeek = (id, t, byKey) => {
+      const m = byId.get(id);
+      if (!m) return;
+      setSheet(null); choose(id);
+      const cur = peekRef.current;
+      const at = cur ? cur.ids.indexOf(id) : -1;
+      if (cur && at !== -1) { setPeek(Object.assign({}, cur, { index: at, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
+      const api = mapApi.current;
+      const visible = api && api.visibleIds ? api.visibleIds() : null;
+      const pool = pinFilter ? rowMarkers.filter((x) => x.id === id || pinFilter(x)) : rowMarkers;
+      const ids = X.peekOrder(m, pool, visible).map((x) => x.id);
+      if (cur) { setPeek(Object.assign({}, cur, { ids, index: 0, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
+      setPeek({ ids, index: 0, camera: camera(), view: api && api.view ? api.view() : null, raised: false, raisedAt: null, focusCard: byKey ? 1 : 0 });
+      revealChosen();
+    };
+    const peekTo = (i) => {
+      const cur = peekRef.current;
+      if (!cur || !cur.ids[i]) return;
+      setPeek(Object.assign({}, cur, { index: i }));
+      choose(cur.ids[i]);
+      revealChosen();
+    };
+    // Level 3: the chosen card tapped again (or the carousel pulled up).
+    const raisePeek = () => {
+      const cur = peekRef.current;
+      if (!cur || cur.raised) return;
+      setPeek(Object.assign({}, cur, { raised: true, raisedAt: { index: cur.index, camera: camera() } }));
+    };
+    // Back from level 3: the cards again, on the card and the map the details were opened from.
+    const lowerPeek = () => {
+      const cur = peekRef.current;
+      if (!cur || !cur.raised) return;
+      const at = cur.raisedAt || { index: cur.index, camera: null };
+      setPeek(Object.assign({}, cur, { raised: false, raisedAt: null, index: at.index }));
+      choose(cur.ids[at.index]);
+      putCamera(at.camera);
+    };
+    // Back from level 2: the carousel closes, nothing is chosen, and the map goes back to where the pin was tapped.
+    const closePeek = () => {
+      const cur = peekRef.current;
+      if (!cur) return;
+      setPeek(null); setSelected(null); setLitId(null);
+      putCamera(cur.camera);
+    };
+    const peekBack = () => { const cur = peekRef.current; if (cur && cur.raised) lowerPeek(); else closePeek(); };
+    // Level 0 from anywhere: the crown, the carousel's Close, a tap on empty map. The map stays where it is; a filter stays
+    // on (its chip shows it). The crown with a filter on clears that too (resetHome).
+    const resetLevels = () => { setPeek(null); setSearchOpen(false); setSelected(null); setLitId(null); setSheet(null); };
+    useBackGuard(searchOpen, () => setSearchOpen(false));
+    useBackGuard(!!peek, closePeek);
+    useBackGuard(!!(peek && peek.raised), lowerPeek);
+    const peekItems = peek ? peek.ids.map((id) => byId.get(id)).filter(Boolean) : [];
+    // Words typed into the search can take every card's listing off the map: the carousel then has nothing to show, so it
+    // steps back as Back would.
+    const peekEmpty = !!peek && peekItems.length === 0;
+    useEffect(() => { if (peekEmpty) closePeek(); }, [peekEmpty]);
+    // When the carousel closes with focus inside it, focus goes back to the pin it was opened for (else the Search button).
+    const peekReturn = (id) => {
+      const home = rootRef.current;
+      if (!home) return;
+      const pins = id ? Array.prototype.slice.call(home.querySelectorAll('.maplibregl-marker[data-cc-id]')) : [];
+      const pin = pins.find((el) => el.getAttribute('data-cc-id') === String(id));
+      const target = pin || home.querySelector("[data-mv2='home-find']");
+      if (target && target.focus) target.focus({ preventScroll: true });
+    };
+
     // #210: where the map is looking as the sheet opens, so its distance says what the card said (the map moves under the sheet)
     const openSheet = (id, t, from) => {
       const view = from || (mapApi.current && mapApi.current.view ? mapApi.current.view() : null);
-      setSelected(id); setSelType(t); setSheet({ id, type: t, view }); if (t === 'event') trackImpression(id);
+      // A Contributor (reached by a place's or an event's owner line) has no pin and no card: the listing that led there
+      // stays the chosen one, so closing the sheet comes back to that card, still outlined.
+      if (t !== 'contributor') { setSelected(id); setSelType(t); }
+      setSheet({ id, type: t, view }); if (t === 'event') trackImpression(id);
     };
     const closeSheet = () => setSheet(null);
     // The first tap on a card CHOOSES it: it keeps its place in the panel (outlined, "Tap again to open"), and the map
     // eases to its pin, clear of the search bar above and the panel below. The second tap on the chosen card opens the
     // full listing; closing that returns to this very panel and map (the map never moved for it).
     chosen.current = { id: selected, type: selType };
-    const tapCard = (id, t) => {
-      if (chosen.current.id === id && chosen.current.type === t) { openSheet(id, t); return; }
+    // A card's first tap chooses it: its pin glows and the map brings it 25% above the middle, while the panel stays exactly
+    // as it is. The second tap on the chosen card opens its preview (founder, 2026-11-17).
+    const tapCard = (id, t, from) => {
+      if (t === 'idea') { setSheet(null); setSelected(id); setSelType(t); return; }
+      // chosen already (by its own tap, or by its pin): the card says "Tap again to open", so this tap opens it
+      if (selected === id) { openSheet(id, t, from); return; }
       chosen.current = { id, type: t };
-      setSheet(null); setSelected(id); setSelType(t);
-      if (mapApi.current) mapApi.current.focusSelected(openMapPad(rootRef.current), CARD_ZOOM);
+      setSelected(id); setSelType(t); setLitId(id);
+      if (mapApi.current && mapApi.current.focusLifted) mapApi.current.focusLifted(CARD_ZOOM);
     };
-    const rowMarkers = pillTest ? markers.filter((m) => m.type !== 'idea' && pillTest(m)) : markers.filter((m) => m.type !== 'idea');
-    const XS = window.MapV2Strings.explore;
-    return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-explore-min': min ? '' : undefined },
-      React.createElement('div', { className: 'absolute inset-0', onClick: () => { setSelected(null); setSheet(null); } },
+    // The filter chip: what is on, in its colour, and a clear button. A tile takes the colour of its group.
+    const chip = (() => {
+      if (tileRec) {
+        const g = tileRec.categories && tileRec.categories.length && X.groupOf ? X.groupOf({ category: tileRec.categories[0] }) : '';
+        return { label: tileRec.word, colour: g ? 'var(--grp-' + g + ')' : 'var(--accent)' };
+      }
+      if (focus && focus.kind === 'sec') return { label: (XS.panel && XS.panel[focus.id]) || focus.id, colour: 'var(--accent)' };
+      if (group) return { label: (XS.groups && XS.groups[group]) || group, colour: 'var(--grp-' + group + ')' };
+      return null;
+    })();
+    const clearFilter = () => { setFocus(null); setGroup(''); setLitId(null); };
+    // The crown with a filter on: everything clears, and the map goes back to the person's own place (or the first framing).
+    const resetHome = () => {
+      setFocus(null); setGroup(''); setQuery(''); setSearchOpen(false); setSelected(null); setLitId(null); setSheet(null); setPeek(null);
+      const api = mapApi.current;
+      if (!api) return;
+      const v = api.view ? api.view() : null;
+      if (v && v.user && api.survey) api.survey(v.user.lat, v.user.lng, HOME_ZOOM);
+      else if (api.restore) api.restore();
+    };
+    const searchRef = useRef(null);
+    const showSearch = !narrow || searchOpen || !!query;
+    const onFind = () => {
+      if (narrow && searchOpen) { setSearchOpen(false); return; }
+      setSearchOpen(true);
+      requestAnimationFrame(() => { if (searchRef.current) searchRef.current.focus(); });
+    };
+    const ideaMarkers = ideas.filter((i) => i.status === 'voting').filter(matches).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY, createdAt: i.createdAt }));
+    return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-crown': clean ? undefined : '', 'data-explore-min': (!clean && !panelOpen) ? '' : undefined },
+      // A tap on empty map (not a pan, not a map control) goes back to level 0 from any level.
+      React.createElement('div', {
+        className: 'absolute inset-0',
+        onPointerDownCapture: (e) => { press.current = { x: e.clientX, y: e.clientY }; },
+        onClick: (e) => {
+          const p = press.current;
+          press.current = null;
+          if (p && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) return;
+          if (e.target && e.target.closest && e.target.closest('.maplibregl-ctrl, .maplibregl-marker')) return;
+          resetLevels();
+          setRestSignal((n) => n + 1);
+        },
+      },
         React.createElement(window.StylizedMap, {
-          markers, filterCategory: pillTest, selectedId: selected, apiRef: mapApi,
+          markers, filterCategory: pinFilter, selectedId: selected, litId: litId, apiRef: mapApi,
           // #210: a pin chooses its card in the Explore panel (the panel scrolls to it); the card's second tap opens the
           // full listing. The clean map (the nav's Map) has no panel, so there a pin opens the sheet as before. Ideas keep their panel.
           onSelect: (id, t) => {
@@ -184,30 +346,51 @@
             if (clean) { openSheet(id, t); return; }
             const a = document.activeElement;
             const byKey = !!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })());
-            // A second tap on the same pin keeps it chosen (and brings its card back into view); a tap on the map clears it.
-            // A pin tap raises a lowered panel: its card has to be there to be chosen.
-            setSheet(null); setSelected(id); setSelType(t); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 })); lower(false);
+            // founder, 2026-11-18: a pin opens the pin carousel (level 2), unless the panel already holds a row of cards (a
+            // focus, or every row), where the pin chooses its card in that row as before
+            if (exploreMode !== 'focus' && exploreMode !== 'open') { openPeek(id, t, byKey); return; }
+            // A pin chooses itself. The keyboard follows into the sheet; a finger tap leaves the sheet where it is.
+            setSheet(null); setSelected(id); setSelType(t); setLitId(null); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 }));
           },
           onDismissBubble: dismissBubble,
           onZoomBandChange: setZoomBand,
         })),
 
-      // top: search and the account button, round and glassy (#210). The category choice is inside the Explore panel now.
+      // top: the search bar, the filter chip, and a round Search button where the account button was (founder, 2026-11-17: the
+      // account lives in the nav's Me now). On a phone the bar folds into that button until it is tapped (or holds words).
       React.createElement('div', { 'data-mv2': 'home-top' },
-        React.createElement('div', { 'data-mv2': 'home-bar' },
-          React.createElement('label', { 'data-mv2': 'home-search' },
+        React.createElement('div', { 'data-mv2': 'home-bar', 'data-search': showSearch ? '' : undefined },
+          showSearch && React.createElement('div', { 'data-mv2': 'home-search', 'data-open': searchOpen ? '' : undefined, onClick: () => setSearchOpen(true) },
             React.createElement(Icon, { name: 'Search', size: 18 }),
-            React.createElement('input', { value: query, onChange: (e) => setQuery(e.target.value), placeholder: XS.search, 'aria-label': XS.search }),
-            query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 16 }))),
-          React.createElement(window.AccountButton, { variant: 'round' }))),
+            React.createElement('input', {
+              ref: searchRef, value: query, onChange: (e) => setQuery(e.target.value), onFocus: () => setSearchOpen(true),
+              placeholder: XS.search, 'aria-label': XS.search, 'aria-expanded': searchOpen ? 'true' : 'false',
+            }),
+            query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 16 })),
+            // founder, 2026-11-18: one row of small chips that swipes sideways (it was a list down the screen)
+            searchOpen && React.createElement('div', { 'data-mv2': 'home-filters', role: 'radiogroup', 'aria-label': XS.chipsLabel },
+              (X.GROUPS || []).map((id) => React.createElement('button', {
+                key: id, type: 'button', role: 'radio', 'data-mv2': 'filter-row', 'aria-checked': group === id ? 'true' : 'false',
+                style: { '--chip': 'var(--grp-' + id + ')' },
+                onClick: (e) => { e.stopPropagation(); setGroup((cur) => (cur === id ? '' : id)); },
+              }, React.createElement('span', { 'data-mv2': 'filter-dot', 'aria-hidden': 'true' }), (XS.groups && XS.groups[id]) || id)))),
+          chip && !(narrow && searchOpen) && React.createElement('div', { 'data-mv2': 'filter-chip', role: 'status', style: { '--chip': chip.colour } },
+            React.createElement('span', { 'data-mv2': 'filter-dot', 'aria-hidden': 'true' }),
+            React.createElement('span', { 'data-mv2': 'filter-chip-label', title: XS.filterChip(chip.label) }, chip.label),
+            React.createElement('button', { type: 'button', 'data-mv2': 'filter-chip-x', 'aria-label': XS.clearFilter(chip.label), onClick: clearFilter },
+              React.createElement(Icon, { name: 'X', size: 14 }))),
+          React.createElement('button', {
+            type: 'button', 'data-mv2': 'home-find', onClick: onFind,
+            'aria-label': narrow && searchOpen ? XS.closeSearch : XS.searchButton,
+            'aria-expanded': searchOpen ? 'true' : 'false',
+          }, React.createElement(Icon, { name: narrow && searchOpen ? 'X' : 'Search', size: 20 })))),
 
       // zoom-gate hint + the MapTiler logo, kept above the Explore row (MapTiler's Free plan needs the logo bottom-left)
       React.createElement('div', { 'data-mv2': 'home-corner' },
-        zoomBand !== 'all' && React.createElement('div', { 'data-mv2': 'zoom-hint', 'data-zoom-hint': zoomBand },
+        zoomBand !== 'all' && !focus && !group && React.createElement('div', { 'data-mv2': 'zoom-hint', 'data-zoom-hint': zoomBand },
           React.createElement(Icon, { name: 'ZoomIn', size: 16 }),
           React.createElement('span', null,
-            zoomBand === 'none' ? 'Zoom in to see contributors, events and places'
-              : zoomBand === 'contributors' ? 'Zoom in to see events and places'
+            zoomBand === 'none' ? 'Zoom in to see events and places'
               : 'Zoom in to see places')),
         window.MapTilerLogo && React.createElement(window.MapTilerLogo)),
 
@@ -217,11 +400,31 @@
       // stays mounted (hidden) under the listing, so it keeps its place and the card that opened it gets focus back.
       !clean && React.createElement(X.Explore, {
         hidden: !!sheet,
-        markers: rowMarkers, sources: { events, places, contributors }, apiRef: mapApi, selectedId: selected, reveal,
-        pill, onPill: (id) => { setIntent(null); setPill(id); },
-        intent, onIntent: (id) => { setPill('all'); setIntent(id); },
-        ideas: showIdeas, onIdeas: () => setShowIdeas((v) => !v), min, onMin: lower,
+        markers: rowMarkers, ideas: ideaMarkers, sources, apiRef: mapApi, selectedId: selected, reveal,
+        focus, filtered: !!group || !!q,
+        peek: !!peek, level: searchOpen || peek ? 1 : 0, onLevelReset: resetLevels, onMode: setExploreMode, restSignal,
+        onFocus: (next) => { setFocus(next); setLitId(null); },
+        onSectionIds: setSecIds,
+        onReset: resetHome,
+        onOpenChange: onPanel,
         onOpen: tapCard, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
+        onGo: (page, params) => app.go(page, params),
+      }),
+      // Levels 2 and 3: the pin carousel, and the chosen card's details below it once raised (the listing sheet, inline).
+      // Under a full sheet (a Nearby row or an owner line picked in the details) it stays mounted, hidden, as it was.
+      peek && !clean && React.createElement(X.PinCarousel, {
+        items: peekItems, index: Math.max(0, peekItems.findIndex((m) => m.id === peek.ids[peek.index])), raised: peek.raised,
+        hidden: !!sheet, focusCard: peek.focusCard,
+        origin: peek.view ? (peek.view.user || peek.view.centre) : null,
+        distWords: peek.view && peek.view.user ? XS : (XS.centre || {}),
+        sources,
+        onIndex: (i) => { if (peekItems[i]) peekTo(peek.ids.indexOf(peekItems[i].id)); },
+        onRaise: raisePeek, onBack: peekBack, onClose: resetLevels, returnFocus: peekReturn,
+        // the inline sheet only calls onClose right after it navigated away (a link to the full page): nothing to undo here
+        details: (m) => React.createElement(window.MapV2Sheet, {
+          id: m.id, type: m.type, inline: true, view: peek.view, nearby: markers,
+          onClose: () => {}, onPick: (id, t) => openSheet(id, t, peek.view),
+        }),
       }),
       // a chosen card tapped again opens the expanded sheet (#210: full, its cover and distance, swipe down back to the
       // panel; it never moves the map); the clean map's pin opens today's half sheet

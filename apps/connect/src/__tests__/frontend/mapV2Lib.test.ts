@@ -141,7 +141,7 @@ describe("motion tokens and reduced motion", () => {
 
   it("the stylesheet collapses every duration under prefers-reduced-motion", () => {
     const block = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? "";
-    for (const t of ["--dur-fast", "--dur-base", "--dur-slow", "--shimmer-dur"]) {
+    for (const t of ["--dur-fast", "--dur-base", "--dur-slow", "--dur-morph", "--shimmer-dur"]) {
       expect(block).toMatch(new RegExp(`${t}:\\s*0ms;`));
     }
   });
@@ -162,6 +162,12 @@ describe("the map look follows the phone (founder, D1 as revised 2026-10-12)", (
   it("ignores a choice stored by the retired Map look control", () => {
     expect(boot({ storage: memoryStorage({ cc_map_theme: "dark" }), dark: false }).api.resolvedTheme()).toBe("light");
     expect(boot({ storage: memoryStorage({ cc_map_theme: "light" }), dark: true }).api.resolvedTheme()).toBe("dark");
+  });
+
+  it("a Settings override in citizens-theme wins over the device", () => {
+    expect(boot({ storage: memoryStorage({ "citizens-theme": "dark" }), dark: false }).api.resolvedTheme()).toBe("dark");
+    expect(boot({ storage: memoryStorage({ "citizens-theme": "light" }), dark: true }).api.resolvedTheme()).toBe("light");
+    expect(boot({ storage: memoryStorage({ "citizens-theme": "system" }), dark: true }).api.resolvedTheme()).toBe("dark");
   });
 
   it("offers no way to set a look in-app", () => {

@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { FAKE_PROJECT, FAKE_PROJECT_CORS, mockAppShell, signInToFakeProject, type FakeUser } from "./support/fake-project";
-import { smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
+import { smallSeed, FIXED_NOW, type MapSeed, openListing, rememberSeed } from "./support/map-v2";
 import { goTo } from "./support/app-hooks";
 
 // ════════════════════════════════════════════════════════════════════
@@ -42,6 +42,7 @@ const newDb = (): Db => ({ saved: [], cohosts: [], ownEvents: [], notifications:
 /** Answers the fake project's REST tables like RLS would: the caller's own rows only. */
 async function openAs(page: Page, user: FakeUser, profile: { role: string; contributor_status: string }, db: Db, seed = seed0()) {
   await page.clock.setFixedTime(FIXED_NOW);
+  rememberSeed(page, seed); // a Contributor's sheet opens through the owner line of a place they run
   await mockAppShell(page, { supabaseUrl: FAKE_PROJECT, anonKey: "e2e-anon-key" });
   await signInToFakeProject(page, { user, profile });
   await page.route("**/api/contributor/claim", (route: Route) => route.fulfill({ status: 404, json: { error: "nothing_to_claim" } }));

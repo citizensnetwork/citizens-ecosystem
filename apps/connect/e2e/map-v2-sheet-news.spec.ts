@@ -70,7 +70,7 @@ async function openSheetNews(page: Page, seed: Seed, posts: Post[]) {
   await installNews(page, posts);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { gallery: 0 });
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
   await openPinSheet(page, c.id);
   await expect(sheet(page)).toBeVisible();
@@ -101,7 +101,7 @@ test("News tab: newest first, with a plain 'posted' time, and the tab appears on
   }, posts);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { gallery: 0 });
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
   await openPinSheet(page, c.id);
   const sheet = page.locator("[data-mv2='sheet']");

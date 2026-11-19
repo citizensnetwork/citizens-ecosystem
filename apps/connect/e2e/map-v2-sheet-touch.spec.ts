@@ -37,21 +37,20 @@ async function at(loc: Locator): Promise<Pt> {
 }
 
 /** A phone with a thumb: the sheet opens by a real tap on the pin's card in the Explore row (#210). */
-async function openSheet(page: Page, kind: "contributor" | "place" | "event" = "contributor", size?: { width: number; height: number }) {
+async function openSheet(page: Page, kind: "contributor" | "place" | "event" = "place", size?: { width: number; height: number }) {
   if (size) await page.setViewportSize(size);
   const seed = seed0();
+  (seed.places[0] as { description?: string }).description = "A fictional place used only to measure the map. ".repeat(40);
   await recordPointerEvents(page);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { gallery: 40, covers: 2 });
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   const pick = kind === "contributor" ? seed.contributors[0] : (seed[kind === "place" ? "places" : "events"][0] as unknown as C);
   const lng = (pick as unknown as { physical_longitude?: number; longitude?: number }).physical_longitude ?? (pick as unknown as { longitude: number }).longitude;
   const lat = (pick as unknown as { physical_latitude?: number; latitude?: number }).physical_latitude ?? (pick as unknown as { latitude: number }).latitude;
   await jump(page, lng, lat, 15.5);
   await openPinSheet(page, pick.id, "tap");
   await expect(sheet(page)).toBeVisible();
-  // a Contributor's photos arrive from the per-slug fetch: wait for the Gallery panel so the content has its real height
-  if (kind === "contributor") await expect(page.getByRole("tab", { name: "Gallery" })).toBeVisible();
   const h = await innerH(page);
   await expect.poll(() => top(page), { timeout: 3000 }).toBeCloseTo(h * 0.6, -1);
   const cdp = await touchSession(page);
@@ -59,8 +58,7 @@ async function openSheet(page: Page, kind: "contributor" | "place" | "event" = "
 }
 /** Open the Gallery tab (42 photos): enough content that the sheet has something to scroll at full. */
 async function showGallery(page: Page) {
-  await page.getByRole("tab", { name: "Gallery" }).tap();
-  await expect(page.locator("[data-mv2='panel'] img").first()).toBeVisible();
+  await expect(page.locator("[data-entity-card='place']").first()).toBeVisible();
 }
 /** A short phone (the sheet is 90 % of it, so the Gallery's 12 tiles overflow it and the content can scroll). */
 const SHORT = { width: 360, height: 600 };
@@ -119,14 +117,14 @@ test.describe("R7 swipes with real touch (phone, portrait)", () => {
   });
 
   test("at full with the content scrolled, a swipe down SCROLLS the content and does not collapse the sheet; a swipe up scrolls it further", async ({ page }) => {
-    const { cdp, h } = await openSheet(page, "contributor", SHORT);
+    const { cdp, h } = await openSheet(page, "place", SHORT);
     await goTo(page, "full");
     await settledAt(page, h * 0.1);
     await showGallery(page);
     const room = await scroller(page).evaluate((e) => e.scrollHeight - e.clientHeight);
     expect(room, "fixture must have content to scroll").toBeGreaterThan(150);
 
-    const p = await at(page.locator("[data-mv2='tabs'], [data-mv2='panel']").first());
+    const p = await at(page.locator("[data-entity-card='place']").first());
     // swipe up: the content scrolls, the sheet stays at full
     await swipe(cdp, { x: p.x, y: 500 }, -200, { ms: 400, steps: 14 });
     await expect.poll(() => scrollTopOf(page), { message: "swipe up scrolls", timeout: 3000 }).toBeGreaterThan(60);
@@ -141,7 +139,7 @@ test.describe("R7 swipes with real touch (phone, portrait)", () => {
   });
 
   test("once the content is back at the top, the next swipe down collapses the sheet to half", async ({ page }) => {
-    const { cdp, h } = await openSheet(page, "contributor", SHORT);
+    const { cdp, h } = await openSheet(page, "place", SHORT);
     await goTo(page, "full");
     await showGallery(page);
     await scroller(page).evaluate((e) => { e.scrollTop = 80; });
@@ -161,7 +159,7 @@ test.describe("R7 swipes with real touch (phone, portrait)", () => {
     await flickTouch(cdp, await at(scroller(page).locator("[data-mv2='actions']")), -140);
     await expect.poll(() => snapOf(page), { timeout: 3000 }).toBe("full");
     await settledAt(page, h * 0.1);
-    await flickTouch(cdp, await at(page.locator("[data-mv2='name']")), 160);
+    await flickTouch(cdp, await at(page.locator("[data-mv2='handle']")), 160);
     await expect.poll(() => snapOf(page), { timeout: 3000 }).toBe("half");
     await settledAt(page, h * 0.6);
     await flickTouch(cdp, await at(scroller(page).locator("[data-mv2='actions']")), 160);
@@ -245,7 +243,7 @@ test.describe("R7 content position and the mouse (phone width)", () => {
   test.describe("touch", () => {
     test.use({ viewport: { width: 360, height: 600 }, hasTouch: true, isMobile: true });
     test("leaving full puts the content back at the top (a collapsed sheet never shows scrolled content)", async ({ page }) => {
-      const { h } = await openSheet(page, "contributor", SHORT);
+      const { h } = await openSheet(page, "place", SHORT);
       await goTo(page, "full");
       await settledAt(page, h * 0.1);
       await showGallery(page);
@@ -266,10 +264,10 @@ test.describe("R7 content position and the mouse (phone width)", () => {
       const seed = seed0();
       await mockMapNetwork(page, seed);
       await mockContributorDetail(page, seed, { gallery: 3 });
-      await openMap(page, "/?map=v2", 8);
-      const c = seed.contributors[0];
-      await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-      await openPinSheet(page, c.id);
+      await openMap(page, "/?map=v2", 5);
+      const place = seed.places[0] as unknown as { id: string; longitude: number; latitude: number };
+      await jump(page, place.longitude, place.latitude, 15.5);
+      await openPinSheet(page, place.id);
       await expect(sheet(page)).toBeVisible();
       await page.locator("[data-mv2='handle']").click();
       await expect.poll(() => snapOf(page)).toBe("full");
@@ -292,7 +290,7 @@ test.describe("R7 swipes that start on a photo tile (phone)", () => {
     await goTo(page, "full");
     await settledAt(page, h * 0.1);
     await showGallery(page);
-    const tile = page.locator("[data-mv2='panel'] img").first();
+    const tile = page.locator("[data-entity-card='place']").first();
     await swipe(cdp, await at(tile), 330, { ms: 1200, steps: 20 });
     await expect.poll(() => snapOf(page), { timeout: 3000 }).toBe("half");
   });
@@ -302,7 +300,7 @@ test.describe("R7 swipes that start on a photo tile (phone)", () => {
     await goTo(page, "full");
     await settledAt(page, h * 0.1);
     await showGallery(page);
-    await swipe(cdp, await at(page.locator("[data-mv2='panel'] img").nth(4)), -200, { ms: 400, steps: 14 });
+    await swipe(cdp, await at(page.locator("[data-entity-card='place']").first()), -200, { ms: 400, steps: 14 });
     await expect.poll(() => scrollTopOf(page), { timeout: 3000 }).toBeGreaterThan(40);
     expect(await snapOf(page)).toBe("full");
   });
@@ -357,10 +355,10 @@ test.describe("D16 a desktop with a mouse (1280 x 900)", () => {
     const seed = seed0();
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 3 });
-    await openMap(page, "/?map=v2", 8);
-    const c = seed.contributors[0];
-    await jump(page, c.physical_longitude, c.physical_latitude, 15.5);
-    await openPinSheet(page, c.id);
+    await openMap(page, "/?map=v2", 5);
+    const p = seed.places[0] as unknown as { id: string; longitude: number; latitude: number };
+    await jump(page, p.longitude, p.latitude, 15.5);
+    await openPinSheet(page, p.id);
     await expect(sheet(page)).toHaveAttribute("data-wide", "1");
     await expect(sheet(page)).toHaveAttribute("data-snap", "panel");
     await expect(page.locator("[data-mv2='handle']")).toHaveCount(0);

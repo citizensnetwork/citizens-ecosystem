@@ -1,5 +1,5 @@
 import { test, expect, type Page, type BrowserContext } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, openListing, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, openListing, openExploreAll, openPinSheet, ownedBy, smallSeed, FIXED_NOW, type MapSeed } from "./support/map-v2";
 import { touchSession, swipe, tapTouch, type Pt } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -63,7 +63,7 @@ async function setUp(page: Page, baseURL: string, o: { gallery?: number } = {}) 
   await installNews(page, [...postsFor(seed.contributors[0].id, 6), ...postsFor(seed.contributors[2].id, 2)]);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { gallery: o.gallery ?? 6 });
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   return seed;
 }
 
@@ -108,10 +108,10 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     expect(box.width / box.height).toBeCloseTo(16 / 9, 1);
     await expect(head(page).locator("[data-mv2='name']")).toHaveText("Fixture Fellowship 1");
 
-    // the chip is the card's: same words, the group's dot and outline (--cat-<group>)
+    // the chip names the category, with the group's dot and outline (--cat-<group>); a Contributor has no card of its own
+    // to compare with since PR 365 (it is reached through a place's owner line)
     const chip = head(page).locator("[data-mv2='card-chip']");
-    const cardChip = cardOf(page, c.id).locator("[data-mv2='card-chip-label']");
-    await expect(chip.locator("[data-mv2='card-chip-label']")).toHaveText(await cardChip.innerText());
+    await expect(chip.locator("[data-mv2='card-chip-label']")).not.toHaveText("");
     const group = await head(page).getAttribute("data-cat");
     expect(group).toBeTruthy();
     const colours = await chip.evaluate((el, g) => {
@@ -131,16 +131,21 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
 
   test("the distance on the sheet is the one on the card", async ({ page, baseURL }) => {
     const seed = await setUp(page, baseURL!);
-    const c = seed.contributors[1];
+    const p = seed.places[1] as unknown as { id: string };
     await jump(page, seed.contributors[0].physical_longitude, seed.contributors[0].physical_latitude);
-    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).dispatchEvent("click");
-    const meta = cardOf(page, c.id).locator("[data-mv2='row-meta']").first();
-    await expect(meta).toHaveText(/from the map centre$/);
-    // the map settles, the row ranks again; then the card itself is pressed (a second pin press would deselect it)
+    await openExploreAll(page);
+    const card = () => cardOf(page, p.id).first();
+    // the card's first tap chooses it (its row takes the panel over, the map moves to its pin); the row keeps measuring
+    // from where it measured, so the card's words do not change under the finger
+    await card().click();
+    await expect(card()).toHaveAttribute("data-selected", "");
+    const meta = card().locator("[data-mv2='row-meta']");
+    await expect(meta).toHaveText(/from the map centre/);
     let last = "";
     await expect.poll(async () => { const now = await meta.innerText(); const still = now === last; last = now; return still; }, { intervals: [300] }).toBe(true);
-    const onCard = last;
-    await cardOf(page, c.id).locator("[data-mv2='card2']").click();
+    // the line is "distance · hours": the sheet's distance is its first part, though the map has moved since
+    const onCard = last.split(" · ")[0];
+    await card().click();
     await expect(head(page).locator("[data-mv2='distance']")).toHaveText(onCard);
   });
 
@@ -223,11 +228,13 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     const seed = await setUp(page, baseURL!);
     const c = seed.contributors[0];
     await openCard(page, c, "tap");
+    // a Contributor's sheet opens from the owner line of a place they run: that place's card is the one it closes to
+    const opener = ownedBy(page, c.id)!.id;
     await page.getByRole("button", { name: "Close details" }).tap();
     await expect(sheet(page)).toHaveCount(0);
     await expect(explore(page)).toBeVisible();
-    await expect(cardOf(page, c.id)).toHaveAttribute("data-selected", "");
-    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"))).toBe(c.id);
+    await expect(cardOf(page, opener)).toHaveAttribute("data-selected", "");
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"))).toBe(opener);
   });
 
   test("a swipe down at the top closes to the Explore row; a short one springs back", async ({ page, baseURL }) => {
@@ -247,8 +254,9 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     // from the cover (content at its top: the scroll hand-off), a long way down
     await swipe(cdp, onCover, 320, { steps: 16, ms: 640 });
     await expect(sheet(page)).toHaveCount(0);
-    await expect(cardOf(page, c.id)).toHaveAttribute("data-selected", "");
-    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"))).toBe(c.id);
+    const opener = ownedBy(page, c.id)!.id; // the place whose owner line opened it
+    await expect(cardOf(page, opener)).toHaveAttribute("data-selected", "");
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"))).toBe(opener);
   });
 
   test("a swipe up on the content scrolls it; the sheet does not move", async ({ page, baseURL }) => {
@@ -274,25 +282,35 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);
     await expect(explore(page)).toBeVisible();
-    await expect(cardOf(page, c.id)).toHaveAttribute("data-selected", "");
+    await expect(cardOf(page, ownedBy(page, c.id)!.id)).toHaveAttribute("data-selected", "");
     expect(new URL(page.url()).pathname).toBe("/");
   });
 
-  test("keyboard: Enter on the card opens it, the arrows move between tabs, Escape returns focus to the card", async ({ page, baseURL }) => {
+  test("keyboard: Enter on the card opens it, the owner line opens its owner, the arrows move between tabs, Escape returns focus to the card", async ({ page, baseURL }) => {
     const seed = await setUp(page, baseURL!);
     const c = seed.contributors[0];
-    await jump(page, c.physical_longitude, c.physical_latitude);
-    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).dispatchEvent("click");
-    await cardOf(page, c.id).locator("[data-mv2='card2']").focus();
+    const own = ownedBy(page, c.id)!;
+    await jump(page, own.lng, own.lat);
+    await openExploreAll(page);
+    const card = () => cardOf(page, own.id).first();
+    // Enter chooses the card, Enter again opens it
+    await card().focus();
+    await page.keyboard.press("Enter");
+    await expect(card()).toHaveAttribute("data-selected", "");
+    await card().focus();
     await page.keyboard.press("Enter");
     await expect(sheet(page)).toHaveAttribute("data-expanded", "");
     await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-mv2"))).toBe("name");
+    // the place's owner line, by keyboard, opens the Contributor in the same sheet
+    await sheet(page).locator(`[data-owner="${c.id}"]`).focus();
+    await page.keyboard.press("Enter");
+    await expect(head(page).locator("[data-mv2='name']")).toHaveText("Fixture Fellowship 1");
     await page.getByRole("tab", { name: "Events" }).focus();
     await page.keyboard.press("ArrowRight");
     await expect.poll(() => selectedTab(page)).toBe("News");
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"))).toBe(c.id);
+    await expect.poll(() => page.evaluate(() => document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id"))).toBe(own.id);
   });
 
   test("every control in the header bar and the tab bar is at least 44 px", async ({ page, baseURL }) => {
@@ -326,8 +344,8 @@ test.describe("#210 the clean map keeps the half sheet", () => {
     const c = seed.contributors[0];
     await page.evaluate(() => (window as unknown as { __cc: { go: (p: string, q: object) => void } }).__cc.go("home", { view: "map" }));
     await expect(explore(page)).toHaveCount(0);
-    await jump(page, c.physical_longitude, c.physical_latitude);
-    await page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`).click({ force: true });
+    // a Contributor has no pin: its place's pin opens the half sheet, and the place's owner line opens theirs, still at half
+    await openPinSheet(page, c.id);
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
     await expect(sheet(page)).not.toHaveAttribute("data-expanded", "");
     await expect(sheet(page).locator("[data-mv2='handle']")).toBeVisible();
