@@ -108,6 +108,7 @@
     const [edges, setEdges] = useState(SAME);
     const fine = useMedia(FINE_MQ);
     const list = useRef(null);
+    const swipeStart = useRef(null);
     const last = useRef(SAME);
     const stack = expanded && hidden;
     const shown = visibleItems(items, cap, stack);
@@ -144,6 +145,11 @@
       if (!el) return;
       const cards = el.children;
       const step = cards.length > 1 ? cards[1].offsetLeft - cards[0].offsetLeft : el.clientWidth;
+      const end = el.scrollWidth - el.clientWidth;
+      if ((dir < 0 && el.scrollLeft <= EDGE_PX) || (dir > 0 && el.scrollLeft >= end - EDGE_PX)) {
+        el.scrollTo({ left: dir < 0 ? end : 0, behavior: 'auto' });
+        return;
+      }
       const dx = dir * pageStep(step, el.clientWidth);
       if (typeof el.scrollBy === 'function') el.scrollBy({ left: dx, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
       else el.scrollLeft += dx;
@@ -164,8 +170,7 @@
     const arrows = fine && !stack && edges.scrollable;
     const arrow = (dir, atEdge, label, name) => h('button', {
       type: 'button', 'data-mv2': 'hrow-btn', 'aria-label': label, 'aria-controls': listId,
-      'aria-disabled': atEdge ? 'true' : undefined,
-      onClick: () => { if (!atEdge) move(dir); },
+      onClick: () => move(dir),
     }, Icon ? h(Icon, { name: name, size: 20 }) : null);
 
     const head = (hidden || arrows) && h('div', { 'data-mv2': 'hrow-head' },
@@ -182,7 +187,18 @@
       'data-mv2': 'hrow', role: 'region', 'aria-label': str.label,
     },
       head,
-      h('ul', { id: listId, ref: list, 'data-mv2': 'list', 'data-layout': stack ? 'stack' : 'row', role: 'list', onFocus },
+      h('ul', { id: listId, ref: list, 'data-mv2': 'list', 'data-layout': stack ? 'stack' : 'row', role: 'list', onFocus,
+        onTouchStart: (e) => { if (!stack) swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, left: list.current.scrollLeft }; },
+        onTouchEnd: (e) => {
+          const el = list.current, start = swipeStart.current; swipeStart.current = null;
+          if (!el || !start || !e.changedTouches.length) return;
+          const dx = e.changedTouches[0].clientX - start.x, end = el.scrollWidth - el.clientWidth;
+          if (Math.abs(dx) <= Math.abs(e.changedTouches[0].clientY - start.y)) return;
+          if (end <= EDGE_PX) return;
+          if (dx > 40 && start.left <= EDGE_PX) el.scrollTo({ left: end, behavior: 'auto' });
+          else if (dx < -40 && start.left >= end - EDGE_PX) el.scrollTo({ left: 0, behavior: 'auto' });
+        },
+      },
         shown.map((item, i) => h('li', { key: props.keyOf ? props.keyOf(item, i) : i, 'data-mv2': 'hrow-item' }, props.render(item, i)))));
   }
 

@@ -87,7 +87,7 @@
     h('div', { className: 'w-8 h-8 rounded-full border-2 border-gold/30 border-t-gold animate-spin' }));
 
   // ── Event ──
-  function EventProfilePage({ id }) {
+  function EventProfilePage({ id, inline = false }) {
     const app = window.useApp();
     const { contributors, connected, considering, toggleConnect, toggleConsider, go, startConversationWith, trackImpression, realUser, myProfileMeta, user, toast } = app;
     // findEvent also finds a cancelled event (the public `events` list never holds
@@ -110,11 +110,11 @@
     const nudgeable = !!realUser && window.CCConvince.eligibleEvent(ev);
     const sharesConsidering = !(myProfileMeta && myProfileMeta.notificationPrefs && myProfileMeta.notificationPrefs.share_considering === false);
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'event' },
-      h(Scroll, null,
+      h(inline ? React.Fragment : Scroll, null,
         h('div', { className: 'relative h-56 sm:h-64' },
           h(SmartImage, { src: ev.coverPhoto, cat, label: 'Event', alt: ev.title, className: 'w-full h-full' }),
           h('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/20' }),
-          h(BackBar, { onBack: () => go('home'), floating: true }),
+          !inline && h(BackBar, { onBack: () => go('home'), floating: true }),
           h('div', { className: 'absolute bottom-4 left-4 right-4' },
             h('div', { className: 'flex items-center gap-2 mb-2' },
               cat && h('span', { className: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white', style: { background: cat.hex } }, h(Icon, { name: cat.icon, size: 10 }), cat.name),
@@ -176,7 +176,7 @@
   }
 
   // ── Place ──
-  function PlaceProfilePage({ id }) {
+  function PlaceProfilePage({ id, inline = false }) {
     const app = window.useApp();
     const { events, contributors, followedPlaces, togglePlaceFollow, go, startConversationWith } = app;
     const pl = app.findPlace(id); // includes a cancelled place for its owner (see EventProfilePage)
@@ -187,11 +187,11 @@
     const orgName = (org && org.name) || pl.organizerName || '';
     const assoc = events.filter((e) => (pl.associatedEventIds || []).includes(e.id));
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'place' },
-      h(Scroll, null,
+      h(inline ? React.Fragment : Scroll, null,
         h('div', { className: 'relative h-52 sm:h-60' },
           h(SmartImage, { src: pl.coverPhoto, cat, label: 'Place', alt: pl.name, className: 'w-full h-full' }),
           h('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/75 to-black/10' }),
-          h(BackBar, { onBack: () => go('home'), floating: true }),
+          !inline && h(BackBar, { onBack: () => go('home'), floating: true }),
           h('div', { className: 'absolute bottom-4 left-4 right-4' },
             cat && h('span', { className: 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white mb-2', style: { background: cat.hex } }, h(Icon, { name: cat.icon, size: 10 }), cat.name),
             h('h1', { className: 'text-white text-2xl font-display drop-shadow' }, pl.name))),
@@ -264,7 +264,7 @@
   }
 
   // ── Contributor ──
-  function ContributorProfilePage({ id }) {
+  function ContributorProfilePage({ id, inline = false }) {
     const app = window.useApp();
     const { contributors, events, places, newsPosts, followedOrgs, toggleFollow, go, startConversationWith } = app;
     const [reading, setReading] = useState(null); // { id, from }: the shared news reader, map v2 only
@@ -293,11 +293,11 @@
     const cNews = (newsPosts || []).filter((n) => n.contributorId === c.id).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const collabs = (c.collaborators || []).map((cid) => contributors.find((x) => x.id === cid)).filter(Boolean);
     return h('div', { className: 'flex-1 flex flex-col min-h-0', 'data-screen': 'profile' },
-      h(Scroll, null,
+      h(inline ? React.Fragment : Scroll, null,
         h('div', { className: 'relative h-44 sm:h-52' },
           h(SmartImage, { src: c.coverPhoto, cat, alt: c.name, className: 'w-full h-full' }),
           h('div', { className: 'absolute inset-0 bg-gradient-to-t from-black/60 to-transparent' }),
-          h(BackBar, { onBack: () => go('home'), floating: true })),
+          !inline && h(BackBar, { onBack: () => go('home'), floating: true })),
         h('div', { className: 'px-4 max-w-2xl mx-auto -mt-12 relative' },
           h(Avatar, { src: c.profilePhoto, name: c.name, size: 84, rounded: 'xl', ring: '#F7F4EE', fit: logoFit(c.kind) }),
           h('div', { className: 'mt-3 mb-4' },

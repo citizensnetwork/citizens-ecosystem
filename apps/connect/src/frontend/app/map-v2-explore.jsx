@@ -395,6 +395,7 @@
 
   function XRow(props) {
     const scroller = useRef(null);
+    const start = useRef(null);
     const [edges, setEdges] = useState({ l: false, r: false });
     const measure = () => {
       const el = scroller.current;
@@ -410,14 +411,32 @@
     }, [props.children && props.children.length]);
     const nudge = (dir) => {
       const el = scroller.current;
-      if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+      if (!el) return;
+      const end = el.scrollWidth - el.clientWidth;
+      if ((dir < 0 && el.scrollLeft <= 4) || (dir > 0 && el.scrollLeft >= end - 4)) {
+        el.scrollTo({ left: dir < 0 ? end : 0, behavior: 'auto' });
+      } else {
+        el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+      }
     };
     const Icon = window.Icon;
     const P = S().panel || {};
     return h('div', { 'data-mv2': 'xrow-wrap' },
-      props.fine && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
-      h('div', { 'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure }, props.children),
-      props.fine && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
+      props.fine && (edges.l || edges.r) ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
+      h('div', { 'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure,
+        onTouchStart: (e) => { const el = scroller.current; start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, left: el.scrollLeft }; },
+        onTouchEnd: (e) => {
+          const el = scroller.current, p = start.current;
+          start.current = null;
+          if (!el || !p || !e.changedTouches.length) return;
+          const dx = e.changedTouches[0].clientX - p.x, end = el.scrollWidth - el.clientWidth;
+          if (Math.abs(dx) <= Math.abs(e.changedTouches[0].clientY - p.y)) return;
+          if (end <= 4) return;
+          if (dx > 40 && p.left <= 4) el.scrollTo({ left: end, behavior: 'auto' });
+          else if (dx < -40 && p.left >= end - 4) el.scrollTo({ left: 0, behavior: 'auto' });
+        },
+      }, props.children),
+      props.fine && (edges.l || edges.r) ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
   }
 
   /**
@@ -439,6 +458,7 @@
     const desk = useMedia(DESK_MQ);
     const fine = useMedia(FINE_MQ);
     const [stage, setStage] = useState(() => (matches(DESK_MQ) ? 'strip' : 'rest'));
+    const [visibleHeight, setVisibleHeight] = useState(null);
     const [rail, setRail] = useState(true);
     const [me, setMe] = useState('');          // '' | 'rail' | 'dock': where the account menu is open
     const [view, setView] = useState(() => (api && api.current ? api.current.view() : { centre: null, user: null }));
@@ -580,10 +600,11 @@
     }, [mode, tile, props.reveal]);
 
     // A tile or a row taken over: the panel settles at its focus height (from the full panel too).
-    const chooseTile = (id) => { setFocus(tile === id ? null : { kind: 'tile', id: id }); setStage('strip'); };
-    const chooseRow = (id) => { setFocus(sec === id ? null : { kind: 'sec', id: id }); setStage('strip'); };
-    const raise = () => setStage('open');
+    const chooseTile = (id) => { setVisibleHeight(null); setFocus(tile === id ? null : { kind: 'tile', id: id }); setStage('strip'); };
+    const chooseRow = (id) => { setVisibleHeight(null); setFocus(sec === id ? null : { kind: 'sec', id: id }); setStage('strip'); };
+    const raise = () => { setVisibleHeight(null); setStage('open'); };
     const lower = () => {
+      setVisibleHeight(null);
       if (open) { setStage('strip'); return; }
       if (focus) { setFocus(null); return; }
       if (!desk) setStage('rest');
@@ -591,16 +612,29 @@
     // A drag on the handle raises or lowers the panel; a tap (or a screen reader's activation, which sends a click and
     // no pointer events) toggles it. A drag swallows the click that follows it, so it never toggles twice.
     const dragged = useRef(false);
-    const onGrabDown = (e) => { drag.current = { y: e.clientY }; dragged.current = false; };
+    const onGrabDown = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const panel = root.current;
+      if (!panel) return;
+      drag.current = { y: e.clientY, height: Math.min(panel.offsetHeight, host.current.getBoundingClientRect().bottom - panel.getBoundingClientRect().top), id: e.pointerId };
+      dragged.current = false;
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    };
+    const onGrabMove = (e) => {
+      const d = drag.current;
+      if (!d || d.id !== e.pointerId) return;
+      const delta = d.y - e.clientY;
+      if (Math.abs(delta) < 4 && !dragged.current) return;
+      dragged.current = true;
+      setStage('open');
+      setVisibleHeight(Math.max(100, Math.min(host.current.clientHeight, d.height + delta)));
+    };
     const onGrabUp = (e) => {
       const d = drag.current;
       drag.current = null;
-      if (!d) return;
-      const dy = e.clientY - d.y;
-      if (Math.abs(dy) < 24) return;
-      dragged.current = true;
-      if (dy < 0) raise();
-      else lower();
+      if (!d || d.id !== e.pointerId || !dragged.current) return;
+      // Opening the content leaves it scrollable at the height chosen by the user.
+      setStage('open');
     };
     const onGrabClick = () => {
       if (dragged.current) { dragged.current = false; return; }
@@ -699,7 +733,7 @@
     };
 
     return h('div', {
-      ref: host, 'data-mv2': 'explore-host', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
+      ref: host, style: open && visibleHeight != null ? { '--drag-height': visibleHeight + 'px' } : undefined, 'data-mv2': 'explore-host', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
       hidden: props.hidden || undefined,
     },
       !open && h('div', { 'data-mv2': 'desktop-nav' },
@@ -729,7 +763,7 @@
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
           'aria-label': open ? (P.lower) : (P.raise),
-          onPointerDown: onGrabDown, onPointerUp: onGrabUp, onClick: onGrabClick,
+          onPointerDown: onGrabDown, onPointerMove: onGrabMove, onPointerCancel: () => { drag.current = null; }, onPointerUp: onGrabUp, onClick: onGrabClick,
           onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (open) lower(); else raise(); } },
         },
           h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' })),
@@ -786,7 +820,6 @@
   }
 
   const SWIPE_SETTLE_MS = 140;   // a swipe has ended once the row has been still this long (snap and momentum included)
-  const PULL_PX = 36;            // a vertical pull this long on the panel raises it or steps back
   /**
    * props: items (markers, in order), index, raised, origin + distWords (the cards' distance), sources (indexSources()),
    *        hidden, focusCard (a counter: move focus to the chosen card, for a pin chosen from the keyboard), onIndex(i),
@@ -807,6 +840,9 @@
     const fromSwipe = useRef(false);
     const mounted = useRef(false);
     const pull = useRef(null);
+    const swipeStart = useRef(null);
+    const detailsRef = useRef(null);
+    const [panelHeight, setPanelHeight] = useState(null);
     const swallow = useRef(false);
     const back = useRef(props.onBack);
     back.current = props.onBack;
@@ -872,36 +908,47 @@
     // A vertical pull on the panel (its bar, or the cards while lowered): up raises it, down steps back one level.
     const onPullDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (raised && !(e.target.closest && e.target.closest("[data-mv2='pinpeek-bar']"))) return;
-      pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      if (!(e.target.closest && e.target.closest("[data-mv2='pinpeek-bar']")) || e.target.closest('button')) return;
+      const el = root.current;
+      const height = Math.min(el.offsetHeight, el.parentElement.getBoundingClientRect().bottom - el.getBoundingClientRect().top);
+      pull.current = { y: e.clientY, height, id: e.pointerId, moved: false };
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    };
+    const onPullMove = (e) => {
+      const p = pull.current;
+      if (!p || p.id !== e.pointerId) return;
+      const dy = e.clientY - p.y;
+      if (Math.abs(dy) < 4 && !p.moved) return;
+      p.moved = true;
+      if (!raised) props.onRaise();
+      setPanelHeight(Math.max(96, Math.min(root.current.parentElement.clientHeight, p.height - dy)));
     };
     const onPullUp = (e) => {
       const p = pull.current;
       pull.current = null;
-      if (!p || p.id !== e.pointerId) return;
-      const dx = e.clientX - p.x;
-      const dy = e.clientY - p.y;
-      if (Math.abs(dy) < PULL_PX || Math.abs(dy) < 1.5 * Math.abs(dx)) return;
+      if (!p || p.id !== e.pointerId || !p.moved) return;
       swallow.current = true;
       setTimeout(() => { swallow.current = false; }, 0);
-      if (dy < 0) { if (!raised) props.onRaise(); } else props.onBack();
     };
+    useEffect(() => { if (!raised) setPanelHeight(null); }, [raised]);
 
+    useLayoutEffect(() => { if (root.current) root.current.scrollTop = 0; if (raised && detailsRef.current) detailsRef.current.focus({ preventScroll: true }); }, [index, raised]);
     const tap = (id) => {
       if (swallow.current) return;
       const i = items.findIndex((m) => m.id === id);
       if (i === -1) return;
       if (i !== index) { props.onIndex(i); return; }
+      setPanelHeight(null);
       if (!raised) props.onRaise();
     };
-    const step = (d) => { const i = index + d; if (i >= 0 && i < n) props.onIndex(i); };
+    const step = (d) => { if (n > 1) props.onIndex((index + d + n) % n); };
     const meters = (m) => (props.origin && near ? near.metersBetween(props.origin, m) : NaN);
     const iconBtn = (attrs, icon, word) => h('button', Object.assign({ type: 'button' }, attrs),
       Icon ? h(Icon, { name: icon, size: 18 }) : null, word ? h('span', null, word) : null);
 
     return h('section', {
-      ref: root, 'data-mv2': 'pinpeek', 'data-raised': raised ? '' : undefined, hidden: props.hidden || undefined,
-      'aria-label': P.label, onPointerDown: onPullDown, onPointerUp: onPullUp,
+      ref: root, style: raised && panelHeight != null ? { height: 'min(var(--pp-full), ' + panelHeight + 'px)' } : undefined, 'data-mv2': 'pinpeek', 'data-raised': raised ? '' : undefined, hidden: props.hidden || undefined,
+      'aria-label': P.label, onPointerDown: onPullDown, onPointerMove: onPullMove, onPointerUp: onPullUp,
       onPointerCancel: () => { pull.current = null; },
     },
       h('div', { 'data-mv2': 'pinpeek-bar' },
@@ -909,22 +956,31 @@
         h('span', { 'data-mv2': 'pinpeek-count', role: 'status', 'aria-live': 'polite' },
           n > 1 && P.count ? P.count(index + 1, n) : '',
           current ? h('span', { 'data-mv2': 'sr' }, ' ' + (current.title || '')) : null),
-        raised ? h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }) : null,
+        h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }),
         iconBtn({ 'data-mv2': 'pinpeek-close', 'aria-label': P.close, onClick: props.onClose }, 'X')),
       h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
-        n > 1 && index > 0 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
+        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
         h('div', {
           ref: row, 'data-mv2': 'xrow', 'data-row': 'peek', onScroll: onRowScroll,
-          onPointerDownCapture: touch, onTouchStart: touch, onWheel: touch,
+          onPointerDownCapture: touch, onTouchStart: (e) => {
+            touch(); swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, index: indexRef.current };
+          }, onTouchEnd: (e) => {
+            const start = swipeStart.current; swipeStart.current = null;
+            if (!start || !e.changedTouches.length || n < 2) return;
+            const dx = e.changedTouches[0].clientX - start.x;
+          if (Math.abs(dx) <= Math.abs(e.changedTouches[0].clientY - start.y)) return;
+            if (start.index === 0 && dx > 40) { touched.current = false; props.onIndex(n - 1); }
+            else if (start.index === n - 1 && dx < -40) { touched.current = false; props.onIndex(0); }
+          }, onWheel: touch,
         }, items.map((m, i) => h(XCard, {
           key: 'peek:' + m.id, m: m, meters: meters(m), rec: byKey.get(m.type + ':' + m.id),
           groupWords: str.groups, distWords: props.distWords || {},
           selected: i === index, badge: raised ? '' : P.detailsBadge,
           onOpen: tap,
         }))),
-        n > 1 && index < n - 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
+        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
       raised && current && props.details ? h('div', {
-        'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
+        ref: detailsRef, tabIndex: -1, 'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
       }, props.details(current)) : null);
   }
 

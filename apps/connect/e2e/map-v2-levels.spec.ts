@@ -193,8 +193,11 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await expect(page.locator("[data-mv2='pinpeek-count']")).toContainText("2 of");
       await page.getByRole("button", { name: "Previous on the map" }).click();
       await expect(chosenCard(page)).toHaveAttribute("data-explore-id", pins[0]);
-      // no arrow points past either end
-      await expect(page.getByRole("button", { name: "Previous on the map" })).toHaveCount(0);
+      // The first and last cards are neighbours.
+      await page.getByRole("button", { name: "Previous on the map" }).click();
+      await expect(chosenCard(page)).toHaveAttribute("data-explore-id", (await cards(page).last().getAttribute("data-explore-id"))!);
+      await page.getByRole("button", { name: "Next on the map" }).click();
+      await expect(chosenCard(page)).toHaveAttribute("data-explore-id", pins[0]);
 
       // a sideways swipe (a trackpad's sideways wheel here) chooses the card it settles on
       const row = page.locator("[data-row='peek']");
@@ -223,9 +226,10 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await expect(chosenCard(page)).toContainText("Tap again for details");
       await chosenCard(page).click();
       await expect(peek(page)).toHaveAttribute("data-raised", "");
-      const details = page.locator("[data-mv2='pinpeek-details'] [data-mv2='sheet'][data-inline]");
+      const details = page.locator("[data-mv2='pinpeek-details']");
       await expect(details).toBeVisible();
-      await expect(details.locator("[data-mv2='name']")).toBeFocused();
+      await expect(details).toBeFocused();
+      await expect(details.getByRole("heading", { level: 1 })).toBeVisible();
       await expect(page.locator("[data-mv2='pinpeek-bar']").getByRole("button", { name: "Back", exact: true })).toBeVisible();
       expect((await depth(page)).idx).toBe(start.idx + 2);
       // the raised panel is most of the screen, the cards above the details
@@ -254,26 +258,29 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       expect((await depth(page)).idx).toBe(start.idx);
     });
 
-    test("the raised panel's Back button and a pull down each step back one level", async ({ page }) => {
+    test("a repeated pin tap opens the profile and dragging retains the chosen height", async ({ page }) => {
       await open(page);
       const start = await depth(page);
       const pins = await visiblePins(page);
       await tapPin(page, pins[1]);
-      await chosenCard(page).click();
+      await tapPin(page, pins[1]);
       await expect(peek(page)).toHaveAttribute("data-raised", "");
       await page.locator("[data-mv2='pinpeek-bar']").getByRole("button", { name: "Back", exact: true }).click();
       await expect(peek(page)).not.toHaveAttribute("data-raised", "");
       await expect(chosenCard(page)).toHaveAttribute("data-explore-id", pins[1]);
       await expect.poll(async () => (await depth(page)).idx).toBe(start.idx + 1);
-      // a pull down on the lowered carousel closes it
-      await still(page);
+      // Drag from the preview, then release between the preview and full heights.
+      const previewTop = await still(page);
       const bar = (await page.locator("[data-mv2='pinpeek-count']").boundingBox())!;
       await page.mouse.move(bar.x + 10, bar.y + bar.height / 2);
       await page.mouse.down();
-      await page.mouse.move(bar.x + 10, bar.y + 90, { steps: 6 });
+      await page.mouse.move(bar.x + 10, bar.y - 90, { steps: 6 });
       await page.mouse.up();
-      await expect(peek(page)).toHaveCount(0);
-      await expect.poll(async () => (await depth(page)).idx).toBe(start.idx);
+      const adjusted = await still(page);
+      expect(adjusted).toBeLessThan(previewTop - 40);
+      expect(adjusted).toBeGreaterThan(size.height * 0.2);
+      await expect(peek(page)).toHaveAttribute("data-raised", "");
+      expect((await depth(page)).idx).toBe(start.idx + 2);
     });
 
     test("the crown and a tap on empty map go straight back to the crown alone, leaving no history behind", async ({ page }) => {

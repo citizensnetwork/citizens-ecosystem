@@ -263,7 +263,7 @@ describe("where the reader is wired", () => {
     expect(build.indexOf("'map-v2-gallery.jsx'")).toBeLessThan(build.indexOf("'map-v2-news.jsx'"));
     expect(build.indexOf("'map-v2-news.jsx'")).toBeLessThan(build.indexOf("'map-v2-sheet.jsx'"));
     expect(html).toContain("app/map-v2-news.jsx?v=20261019a");
-    expect(html).toContain("app/profiles.jsx?v=20261101b");
+    expect(html).toContain("app/profiles.jsx?v=20261120a");
     expect(html).toContain("app/map-v2-strings.jsx?v=20261117a");
   });
 

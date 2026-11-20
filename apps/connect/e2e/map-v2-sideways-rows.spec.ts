@@ -323,14 +323,14 @@ test.describe("a phone, 375 px, real touch", () => {
 test.describe("a laptop, a mouse and the keyboard", () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 
-  test("the arrows move one card, Previous is dimmed at the start and Next at the end, and neither drops focus", async ({ page, baseURL }) => {
+  test("the arrows page forward and wrap across either end without dropping focus", async ({ page, baseURL }) => {
     const seed = seedOf();
     await openSheet(page, seed, whoOf(seed), { touch: false, baseURL: baseURL! });
     expect(await sheet(page).getAttribute("data-wide")).toBe("1");
     const region = newsRegion(page);
     const prev = region.getByRole("button", { name: "Previous" });
     const next = region.getByRole("button", { name: "Next" });
-    await expect(prev).toHaveAttribute("aria-disabled", "true");
+    await expect(prev).toBeEnabled();
     await expect(next).not.toHaveAttribute("aria-disabled", "true");
     await next.click();
     await expect.poll(() => scrollLeftOf(page, region), { timeout: 3000 }).toBeCloseTo(272, -1);
@@ -338,21 +338,14 @@ test.describe("a laptop, a mouse and the keyboard", () => {
     expect(Math.abs((await scrollLeftOf(page, region)) - 272)).toBeLessThan(2);
     expect((await scrollByCalls(page)).at(-1)).toEqual({ left: 272, behavior: "smooth" });
     await expect(prev).not.toHaveAttribute("aria-disabled", "true");
-    // walk to the end with the button that has focus: at the end it is dimmed, still the focused element
-    await next.focus();
-    for (let i = 0; i < 12 && (await next.getAttribute("aria-disabled")) !== "true"; i++) {
-      await next.click();
-      await page.waitForTimeout(450);
-    }
-    await expect(next).toHaveAttribute("aria-disabled", "true");
-    await expect(next).toBeFocused();
+    await prev.click();
+    await expect.poll(() => scrollLeftOf(page, region)).toBeLessThan(2);
+    await prev.click();
     const end = await geom(page, "Latest news");
     expect(end.scrollLeft).toBeGreaterThan(end.scrollWidth - end.clientWidth - 3);
-    const calls = (await scrollByCalls(page)).length;
-    await next.click({ force: true });                              // Playwright treats aria-disabled as not enabled
-    expect((await scrollByCalls(page)).length).toBe(calls);        // dimmed means nothing happens
-    await prev.click();
-    await expect.poll(() => scrollLeftOf(page, region), { timeout: 3000 }).toBeLessThan(end.scrollLeft - 100);
+    await next.click();
+    await expect.poll(() => scrollLeftOf(page, region)).toBeLessThan(2);
+    await expect(next).toBeFocused();
   });
 
   test("a person who asked for reduced motion gets a jump, not a glide", async ({ page, baseURL }) => {

@@ -4359,3 +4359,36 @@ a[data-mv2='card2'],
     animation: none;
   }
 }
+
+/* The chosen height is also the scroll viewport, keeping the final action reachable. */
+[data-mv2='explore'][data-open] {
+  height: min(var(--drag-height, 100%), calc(100% - var(--xp-dock-h) - env(safe-area-inset-bottom, 0px)));
+}
+[data-mv2='pinpeek-details'] {
+  padding: 0;
+  color: var(--text-1);
+  background: var(--surface-1);
+}
+[data-mv2='profile-suggestions'] {
+  max-width: 42rem;
+  margin: auto;
+  padding: var(--space-4);
+  border-top: 1px solid var(--divider);
+}
+[data-mv2='profile-suggestions'] h2 {
+  font-weight: var(--fw-semibold);
+  margin-bottom: var(--space-2);
+}
+[data-mv2='profile-suggestions'] button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--hit);
+  text-align: start;
+  border-bottom: 1px solid var(--divider);
+}
+[data-mv2='profile-suggestions'] small {
+  color: var(--text-2);
+}

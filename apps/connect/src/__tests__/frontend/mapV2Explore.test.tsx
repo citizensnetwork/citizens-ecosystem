@@ -502,14 +502,14 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261117a"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261120a"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261117a");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261120a");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");
@@ -570,7 +570,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
   const cardsIn = () => [...document.querySelectorAll<HTMLElement>("[data-mv2='pinpeek'] [data-mv2='xcard']")];
 
   it("draws the Explore row's own cards, the chosen one outlined with what its next tap does, and its count", () => {
-    carousel();
+    const { calls } = carousel();
     const cards = cardsIn();
     expect(cards.map((c) => c.getAttribute("data-explore-id"))).toEqual(["a", "c", "b"]);
     expect(cards[0].hasAttribute("data-selected")).toBe(true);
@@ -579,8 +579,8 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(cards[1].hasAttribute("data-selected")).toBe(false);
     expect(screen.getByRole("status").textContent).toContain(PK().count(1, 3));
     expect(screen.getByRole("status").textContent).toContain("Alpha");
-    // no arrow points past the first card; the next one does
-    expect(screen.queryByRole("button", { name: PK().prev as string })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: PK().prev as string }));
+    expect(calls.onIndex).toHaveBeenCalledWith(2);
     expect(screen.getByRole("button", { name: PK().next as string })).toBeTruthy();
     // lowered: no details, no Back
     expect(screen.queryByTestId("details")).toBeNull();
@@ -636,22 +636,15 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(returnFocus).toHaveBeenCalledWith("a");
   });
 
-  it("a pull up on the lowered panel raises it; a pull down steps back (and swallows the tap that ends it)", () => {
+  it("dragging the handle opens the profile without stepping back on release", () => {
     const { calls } = carousel();
-    const panel = document.querySelector("[data-mv2='pinpeek']")!;
-    const card = cardsIn()[0];
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 1, pointerType: "touch" });
+    const bar = document.querySelector("[data-mv2='pinpeek-bar']")!;
+    const point = { clientX: 100, pointerId: 1, pointerType: "touch" };
+    fireEvent.pointerDown(bar, { ...point, clientY: 400 });
+    fireEvent.pointerMove(bar, { ...point, clientY: 330 });
+    fireEvent.pointerUp(bar, { ...point, clientY: 330 });
     expect(calls.onRaise).toHaveBeenCalledTimes(1);
-    fireEvent.click(card);
-    expect(calls.onRaise).toHaveBeenCalledTimes(1);
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 2, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 2, pointerType: "touch" });
-    expect(calls.onBack).toHaveBeenCalledTimes(1);
-    // a short or sideways move is a swipe of the row, never a pull
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 3, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 220, clientY: 340, pointerId: 3, pointerType: "touch" });
-    expect(calls.onBack).toHaveBeenCalledTimes(1);
+    expect(calls.onBack).not.toHaveBeenCalled();
   });
 
   describe("the Explore panel under the carousel", () => {
