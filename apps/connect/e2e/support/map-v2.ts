@@ -188,15 +188,9 @@ export async function openListing(page: Page, id: string, how: "click" | "tap" =
  * the nav beside the search bar; on a phone it is in the sticky nav of the open Explore panel. This opens that menu.
  */
 export async function openMe(page: Page) {
-  // already open (Me toggles, so pressing it again would close it)
-  if (await page.getByRole("button", { name: "View Profile" }).isVisible()) return;
-  const rail = page.locator("[data-mv2='desktop-item'][data-nav='me']");
-  if (await rail.isVisible()) {
-    await rail.click();
-    return;
-  }
-  await openExploreAll(page);
-  await page.locator("[data-mv2='explore-dock'] [data-nav='me']").click();
+  if (new URL(page.url()).pathname.endsWith('/me')) return;
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Me', exact: true }).click();
+  await expect(page).toHaveURL(/\/me$/);
 }
 
 /**

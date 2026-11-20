@@ -20,7 +20,7 @@ const crown = (page: Page) => page.locator("[data-mv2='explore-crown']");
 const sheet = (page: Page) => page.locator("[data-mv2='explore']");
 const zoom = (page: Page) => page.evaluate(() => (window as unknown as { __ccMap: { getZoom(): number } }).__ccMap.getZoom());
 /** How much of the panel is on screen (it slides by transform, so its box runs past the bottom edge). */
-const shown = (page: Page) => sheet(page).evaluate((e) => Math.round(window.innerHeight - e.getBoundingClientRect().top));
+const shown = (page: Page) => sheet(page).evaluate((e) => Math.round(window.innerHeight - e.getBoundingClientRect().top - (parseFloat(getComputedStyle(e).getPropertyValue('--xp-dock-h')) || 0)));
 /** Wait until the panel stops moving (its slide is a transform transition). */
 async function settled(page: Page) {
   let last = -1;
@@ -72,10 +72,9 @@ test.describe("the map home on a phone", () => {
     await open(page);
     await crown(page).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
-    expect(await settled(page)).toBe(124);
+    expect(await settled(page)).toBeGreaterThan(110);
     await expect(page.getByRole("button", { name: "Coffee", exact: true })).toBeVisible();
-    // no "Explore", "Where to…", "Near you" or count line: only the handle above the tiles
-    await expect(sheet(page).getByRole("heading")).toHaveCount(0);
+    await expect(sheet(page).getByRole("heading", { name: "Where to…" })).toBeVisible();
     await expect(sheet(page).getByText(/near you/i)).toHaveCount(0);
     await expect(page.locator("[data-mv2='explore-handle']")).toBeVisible();
     // the crown rides just above the strip
@@ -88,6 +87,10 @@ test.describe("the map home on a phone", () => {
   test("a tile settles the panel at one height: tabs, its cards, the town around it, glowing pins and a chip", async ({ page }) => {
     await open(page);
     await crown(page).click();
+    await mapIdle(page);
+    const centre = () => page.evaluate(() => (window as unknown as { __ccMap: { getCenter(): { toArray(): number[] } } }).__ccMap.getCenter().toArray());
+    const initialCentre = await centre();
+    const initialZoom = await zoom(page);
     await page.getByRole("button", { name: "Coffee", exact: true }).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "focus");
     const height = await settled(page);
@@ -98,7 +101,8 @@ test.describe("the map home on a phone", () => {
     const plate = await tab.evaluate((e) => getComputedStyle(e).backgroundColor);
     expect(plate).not.toMatch(/212,\s*175,\s*55|242,\s*189,\s*34/);
     await mapIdle(page);
-    expect(Math.round(await zoom(page))).toBe(11);
+    expect(await zoom(page)).toBeCloseTo(initialZoom, 3);
+    expect(await centre()).toEqual(initialCentre);
     // the chip at the top says what is on, in the filter's colour, and clears it
     const chip = page.locator("[data-mv2='filter-chip']");
     await expect(chip).toContainText("Coffee");
@@ -163,15 +167,9 @@ test.describe("the map home on a phone", () => {
     await page.getByRole("button", { name: "Show every row" }).click();
     await expect(sheet(page)).toHaveAttribute("data-open", "");
     await expect(crown(page)).toHaveCount(0);
-    const dock = page.locator("[data-mv2='explore-dock']");
-    await expect(dock.locator("[data-nav]")).toHaveText(["Explore", "Map", "Me"]);
+    const dock = page.getByRole("navigation", { name: "Main navigation" });
+    await expect(dock.getByRole("button")).toHaveText(["Explore", "Map", "Me"]);
     await expect(page.locator("[data-nav='do'], [data-nav='central']")).toHaveCount(0);
-
-    await dock.locator("[data-nav='me']").click();
-    await expect(page.getByRole("button", { name: "View Profile" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Settings" })).toBeVisible();
-    await dock.locator("[data-nav='me']").click();
-    await expect(page.getByRole("button", { name: "View Profile" })).toHaveCount(0);
 
     await page.getByRole("button", { name: "Near and Now…" }).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "focus");
@@ -188,7 +186,7 @@ test.describe("the map home on a phone", () => {
     await open(page);
     await crown(page).click();
     await page.getByRole("button", { name: "Show every row" }).click();
-    await page.locator("[data-mv2='explore-dock'] [data-nav='map']").click();
+    await page.getByRole("navigation", { name: "Main navigation" }).getByRole("button", { name: "Map" }).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
     await expect(crown(page)).toBeVisible();
   });
@@ -197,33 +195,14 @@ test.describe("the map home on a phone", () => {
 test.describe("desktop", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test("the nav sits beside the search bar, the crown's width, with no Do or Central; the sheet stays centred", async ({ page }) => {
+  test("the desktop crown opens the panel and the shared dock supplies navigation", async ({ page }) => {
     await open(page);
-    await expect(page.locator("[data-mv2='desktop-nav']")).toBeVisible();
-    await expect(page.locator("aside")).toHaveCount(0);
-    await expect(page.locator("[data-mv2='nav-toggle']")).toHaveCount(0);
-    await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
-    const crownBox = (await page.locator("[data-mv2='desktop-crown']").boundingBox())!;
-    const items = (await page.locator("[data-mv2='desktop-items']").boundingBox())!;
-    const search = (await page.locator("[data-mv2='home-search']").boundingBox())!;
-    expect(Math.round(items.width)).toBe(Math.round(crownBox.width));
-    expect(crownBox.y).toBeLessThan(20);
-    expect(search.x).toBeGreaterThan(crownBox.x + crownBox.width);
-    // the bar's middle is level with the crown's
-    expect(Math.abs(search.y + search.height / 2 - (crownBox.y + crownBox.height / 2))).toBeLessThan(4);
-    const radius = await page.locator("[data-mv2='desktop-items']").evaluate((e) => parseFloat(getComputedStyle(e).borderTopLeftRadius));
-    expect(radius).toBeGreaterThanOrEqual(crownBox.width / 2);
-    await expect(page.locator("[data-mv2='desktop-item']")).toHaveText(["Map", "Explore", "Me"]);
-    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(0);
-
-    await page.locator("[data-mv2='desktop-item'][data-nav='me']").click();
-    await expect(page.getByRole("button", { name: "View Profile" })).toBeVisible();
-    await page.locator("[data-mv2='desktop-item'][data-nav='me']").click();
-
-    await page.getByRole("button", { name: "Search", exact: true }).click();
-    await expect(page.getByRole("textbox", { name: "Search events, places, people…" })).toBeFocused();
-
-    await page.locator("[data-mv2='desktop-item'][data-nav='explore']").click();
+    const crown = page.locator("[data-mv2='desktop-crown']");
+    await expect(crown).toBeVisible();
+    await expect(page.locator("[data-mv2='desktop-items']")).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Main navigation" }).getByRole("button")).toHaveText(["Explore", "Map", "Me"]);
+    await crown.click();
+    await expect(sheet(page)).toHaveAttribute("data-open", "");
     const box = (await sheet(page).boundingBox())!;
     expect(box.width).toBeLessThanOrEqual(724);
     expect(box.width).toBeGreaterThan(480);

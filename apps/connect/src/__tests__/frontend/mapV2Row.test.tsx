@@ -42,6 +42,7 @@ const layout = { client: 343, scroll: 343, scrollLeft: 0, step: 272 };
 let fine = true;
 let reduced = false;
 const scrollBy = vi.fn();
+const scrollTo = vi.fn();
 
 beforeAll(() => {
   const w = window as unknown as Record<string, unknown>;
@@ -63,12 +64,14 @@ beforeAll(() => {
     get(this: HTMLElement) { return this.parentElement ? Array.prototype.indexOf.call(this.parentElement.children, this) * layout.step : 0; },
   });
   proto.scrollBy = scrollBy;
+  proto.scrollTo = scrollTo;
 });
 
 beforeEach(() => {
   layout.client = 343; layout.scroll = 343; layout.scrollLeft = 0;
   fine = true; reduced = false;
   scrollBy.mockClear();
+  scrollTo.mockClear();
   (window as unknown as { matchMedia: unknown }).matchMedia = (query: string) => ({
     matches: query.includes("pointer: fine") ? fine : query.includes("prefers-reduced-motion") ? reduced : false,
     addEventListener() {},
@@ -286,17 +289,17 @@ describe("the row", () => {
 describe("the arrows (a mouse only)", () => {
   beforeEach(() => { layout.scroll = 1200; });
 
-  it("show on a fine pointer while the row overflows: Previous is dimmed at the start but stays focusable", () => {
+  it("wraps Previous from the first card to the end", () => {
     mount(6);
     const prev = screen.getByRole("button", { name: "Previous" });
     const next = screen.getByRole("button", { name: "Next" });
-    expect(prev.getAttribute("aria-disabled")).toBe("true");
+    expect(prev.getAttribute("aria-disabled")).toBeNull();
     expect(prev.hasAttribute("disabled")).toBe(false);
     expect(next.getAttribute("aria-disabled")).toBeNull();
     prev.focus();
     expect(document.activeElement).toBe(prev);
     fireEvent.click(prev);
-    expect(scrollBy).not.toHaveBeenCalled();
+    expect(scrollTo).toHaveBeenCalledWith({ left: 857, behavior: "auto" });
   });
 
   it("Next moves one whole card on a phone, smoothly", () => {
@@ -313,14 +316,14 @@ describe("the arrows (a mouse only)", () => {
     expect(scrollBy).toHaveBeenCalledWith({ left: 272, behavior: "auto" });
   });
 
-  it("follow the scroll position: at the end Next is dimmed and Previous is live", () => {
+  it("wraps Next from the end to the first card", () => {
     const { container } = mount(6);
     layout.scrollLeft = 857;
     act(() => { container.querySelector("ul")!.dispatchEvent(new Event("scroll")); });
-    expect(screen.getByRole("button", { name: "Next" }).getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("button", { name: "Next" }).getAttribute("aria-disabled")).toBeNull();
     expect(screen.getByRole("button", { name: "Previous" }).getAttribute("aria-disabled")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
-    expect(scrollBy).not.toHaveBeenCalled();
+    expect(scrollTo).toHaveBeenCalledWith({ left: 0, behavior: "auto" });
     fireEvent.click(screen.getByRole("button", { name: "Previous" }));
     expect(scrollBy).toHaveBeenCalledWith({ left: -272, behavior: "smooth" });
   });
@@ -382,7 +385,7 @@ describe("the stylesheet and the wiring", () => {
   it("is registered before Nearby, after the card, in the page and in the build, with the new version", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    expect(html).toContain('src="app/map-v2-row.jsx?v=20261025b"');
+    expect(html).toContain('src="app/map-v2-row.jsx?v=20261119b"');
     expect(html.indexOf("app/map-v2-card.jsx")).toBeLessThan(html.indexOf("app/map-v2-row.jsx"));
     expect(html.indexOf("app/map-v2-row.jsx")).toBeLessThan(html.indexOf("app/map-v2-nearby.jsx"));
     expect(build.indexOf("'map-v2-card.jsx'")).toBeLessThan(build.indexOf("'map-v2-row.jsx'"));

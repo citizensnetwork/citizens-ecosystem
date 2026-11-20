@@ -309,22 +309,6 @@
     for (let i = 0; i < TILES.length; i++) if (tileMatches(TILES[i].id, m)) return TILES[i];
     return null;
   }
-  // The map home's nav. Do and Central are hidden until they are built out (founder, 2026-11-17); with them gone the
-  // sticky nav keeps Map in the middle (Explore, Map, Me). Me opens the account menu (the top-right person button is a
-  // Search button now), so everything that button held is one tap from the nav.
-  const DOCK = [
-    { id: 'explore', icon: 'Compass', page: 'explore' },
-    { id: 'map', icon: 'Map', close: true, emphasis: true },
-    { id: 'me', icon: 'User', me: true },
-  ];
-  const RAIL = [
-    { id: 'map', icon: 'Map', act: 'map', emphasis: true },
-    { id: 'explore', icon: 'Compass', act: 'open' },
-    { id: 'me', icon: 'User', me: true },
-  ];
-  // The account menu's extra rows on the map home: Let's\u2026 is a Do page, so it is hidden with Do.
-  const ME_EXTRAS = ['messages', 'notifications'];
-
   // The panel's rows. Each one can take the panel over as a "focus" (founder, 2026-11-17): the panel settles at ONE
   // height with that row's cards, and stays there while the person taps through cards and tabs.
   const SECTIONS = ['around', 'weekend', 'online', 'fresh', 'more'];
@@ -395,6 +379,7 @@
 
   function XRow(props) {
     const scroller = useRef(null);
+    const start = useRef(null);
     const [edges, setEdges] = useState({ l: false, r: false });
     const measure = () => {
       const el = scroller.current;
@@ -410,14 +395,31 @@
     }, [props.children && props.children.length]);
     const nudge = (dir) => {
       const el = scroller.current;
-      if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+      if (!el) return;
+      const end = el.scrollWidth - el.clientWidth;
+      if ((dir < 0 && el.scrollLeft <= 4) || (dir > 0 && el.scrollLeft >= end - 4)) {
+        el.scrollTo({ left: dir < 0 ? end : 0, behavior: 'auto' });
+      } else {
+        el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+      }
     };
     const Icon = window.Icon;
     const P = S().panel || {};
     return h('div', { 'data-mv2': 'xrow-wrap' },
-      props.fine && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
-      h('div', { 'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure }, props.children),
-      props.fine && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
+      props.fine && (edges.l || edges.r) ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
+      h('div', { 'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure,
+        onTouchStart: (e) => { const el = scroller.current; start.current = { x: e.touches[0].clientX, left: el.scrollLeft }; },
+        onTouchEnd: (e) => {
+          const el = scroller.current, p = start.current;
+          start.current = null;
+          if (!el || !p || !e.changedTouches.length) return;
+          const dx = e.changedTouches[0].clientX - p.x, end = el.scrollWidth - el.clientWidth;
+          if (end <= 4) return;
+          if (dx > 40 && p.left <= 4) el.scrollTo({ left: end, behavior: 'auto' });
+          else if (dx < -40 && p.left >= end - 4) el.scrollTo({ left: 0, behavior: 'auto' });
+        },
+      }, props.children),
+      props.fine && (edges.l || edges.r) ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
   }
 
   /**
@@ -439,8 +441,7 @@
     const desk = useMedia(DESK_MQ);
     const fine = useMedia(FINE_MQ);
     const [stage, setStage] = useState(() => (matches(DESK_MQ) ? 'strip' : 'rest'));
-    const [rail, setRail] = useState(true);
-    const [me, setMe] = useState('');          // '' | 'rail' | 'dock': where the account menu is open
+    const [visibleHeight, setVisibleHeight] = useState(null);
     const [view, setView] = useState(() => (api && api.current ? api.current.view() : { centre: null, user: null }));
     const host = useRef(null);
     const root = useRef(null);
@@ -506,11 +507,10 @@
       if (mode === 'rest') el.setAttribute('inert', '');
       else el.removeAttribute('inert');
     }, [mode]);
-    useEffect(() => { if (open || props.hidden) setMe(''); }, [open, props.hidden]);
     // A tap on empty map (founder, 2026-11-18): back to the crown alone. A focus stays (it is a filter, and its chip says so);
     // the Where to… strip and the menu fold away. A wide screen's rest is its strip.
     const restSignal = props.restSignal || 0;
-    useEffect(() => { if (restSignal) { setStage('rest'); setMe(''); } }, [restSignal]);
+    useEffect(() => { if (restSignal) { setStage('rest'); } }, [restSignal]);
 
     // the chosen tab in view, in the middle of its row
     const tabKey = tile || sec;
@@ -580,10 +580,11 @@
     }, [mode, tile, props.reveal]);
 
     // A tile or a row taken over: the panel settles at its focus height (from the full panel too).
-    const chooseTile = (id) => { setFocus(tile === id ? null : { kind: 'tile', id: id }); setStage('strip'); };
-    const chooseRow = (id) => { setFocus(sec === id ? null : { kind: 'sec', id: id }); setStage('strip'); };
-    const raise = () => setStage('open');
+    const chooseTile = (id) => { setVisibleHeight(null); setFocus(tile === id ? null : { kind: 'tile', id: id }); setStage('strip'); };
+    const chooseRow = (id) => { setVisibleHeight(null); setFocus(sec === id ? null : { kind: 'sec', id: id }); setStage('strip'); };
+    const raise = () => { setVisibleHeight(null); setStage('open'); };
     const lower = () => {
+      setVisibleHeight(null);
       if (open) { setStage('strip'); return; }
       if (focus) { setFocus(null); return; }
       if (!desk) setStage('rest');
@@ -591,16 +592,28 @@
     // A drag on the handle raises or lowers the panel; a tap (or a screen reader's activation, which sends a click and
     // no pointer events) toggles it. A drag swallows the click that follows it, so it never toggles twice.
     const dragged = useRef(false);
-    const onGrabDown = (e) => { drag.current = { y: e.clientY }; dragged.current = false; };
+    const onGrabDown = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const panel = root.current;
+      if (!panel) return;
+      drag.current = { y: e.clientY, height: Math.min(panel.offsetHeight, Math.max(0, window.innerHeight - panel.getBoundingClientRect().top)), id: e.pointerId };
+      dragged.current = false;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    };
+    const onGrabMove = (e) => {
+      const d = drag.current;
+      if (!d || d.id !== e.pointerId) return;
+      const delta = d.y - e.clientY;
+      if (Math.abs(delta) < 4 && !dragged.current) return;
+      dragged.current = true;
+      setVisibleHeight(Math.max(100, Math.min(root.current.offsetHeight, d.height + delta)));
+    };
     const onGrabUp = (e) => {
       const d = drag.current;
       drag.current = null;
-      if (!d) return;
-      const dy = e.clientY - d.y;
-      if (Math.abs(dy) < 24) return;
-      dragged.current = true;
-      if (dy < 0) raise();
-      else lower();
+      if (!d || d.id !== e.pointerId || !dragged.current) return;
+      // Opening the content leaves it scrollable at the height chosen by the user.
+      setStage('open');
     };
     const onGrabClick = () => {
       if (dragged.current) { dragged.current = false; return; }
@@ -613,7 +626,7 @@
     // Above the map's rest (search open, or the pin carousel: `level`, founder 2026-11-18) it goes straight back to the crown
     // alone, closing every level at once.
     const onCrown = () => {
-      setMe('');
+      setVisibleHeight(null);
       if (filtered) { if (props.onReset) props.onReset(); setStage('rest'); return; }
       if (props.level) { if (props.onLevelReset) props.onLevelReset(); setStage('rest'); return; }
       setStage((s) => (s === 'rest' ? 'strip' : 'rest'));
@@ -643,12 +656,12 @@
       key: id, type: 'button', 'data-mv2': 'explore-tile', 'data-tab': id,
       role: 'tab', 'aria-selected': on ? 'true' : 'false', onClick: onClick,
     }, extra), icon && Icon ? h(Icon, { name: icon, size: 16 }) : null, h('span', null, word));
-    const tilesBig = () => h('div', {
+    const tilesBig = () => h(React.Fragment, null, h('h2', { 'data-mv2': 'where-heading' }, P.where), h('div', {
       ref: tabsRef, 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where,
     }, TILES.map((t) => h('button', {
       key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
       onClick: () => chooseTile(t.id),
-    }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word))));
+    }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word)))));
     const tileTabs = () => h('div', { ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.where },
       TILES.map((t) => tab(t.id, t.word, t.icon, tile === t.id, () => chooseTile(t.id), { 'data-tile': t.id })));
     const rowTabs = () => h('div', { ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.rows },
@@ -684,43 +697,19 @@
       h('span', { 'data-mv2': 'explore-more-ring' }, Icon ? h(Icon, { name: 'Compass', size: 22 }) : null),
       h('small', null, P.seeAll))]);
 
-    // Me: the account menu, beside the desktop nav or above the sticky nav.
-    const meItem = (where, item, attrs, lead) => h('div', { key: item.id, 'data-mv2': 'me-wrap' },
-      h('button', Object.assign({
-        type: 'button', 'data-nav': item.id, 'aria-expanded': me === where ? 'true' : 'false', 'aria-haspopup': 'true',
-        onClick: () => setMe((v) => (v === where ? '' : where)),
-      }, attrs), lead, h('small', null, (P.nav && P.nav[item.id]) || item.id)),
-      me === where && window.ProfilePanel ? h(window.ProfilePanel, { anchor: where, extras: ME_EXTRAS, onClose: () => setMe('') }) : null);
-    const navIcon = (item) => (Icon ? h(Icon, { name: item.icon, size: 20 }) : null);
-    const railGo = (item) => {
-      setMe('');
-      if (item.act === 'map') { setStage('strip'); return; }
-      if (item.act === 'open') raise();
-    };
-
     return h('div', {
-      ref: host, 'data-mv2': 'explore-host', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
+      ref: host, style: visibleHeight == null ? undefined : { '--xp-vis': visibleHeight + 'px' }, 'data-mv2': 'explore-host', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
       hidden: props.hidden || undefined,
     },
       !open && h('div', { 'data-mv2': 'desktop-nav' },
         h('button', {
-          type: 'button', 'data-mv2': 'desktop-crown', 'aria-expanded': rail ? 'true' : 'false',
-          'aria-label': props.level ? P.home : (rail ? P.hideNav : P.showNav),
+          type: 'button', 'data-mv2': 'desktop-crown', 'aria-expanded': 'false',
+          'aria-label': props.level ? P.home : P.openPanel,
           onClick: () => {
-            setMe('');
-            // the desktop crown is the crown too: above the map's rest it goes back to it, and only then folds the nav
             if (props.level && props.onLevelReset) { props.onLevelReset(); return; }
-            setRail((v) => !v);
+            raise();
           },
-        }, window.CrownMark ? h(window.CrownMark, { size: 26 }) : (Icon ? h(Icon, { name: 'Crown', size: 22 }) : null)),
-        rail && h('nav', { 'data-mv2': 'desktop-items', 'aria-label': P.dock }, RAIL.map((item) => (item.me
-          ? meItem('rail', item, { 'data-mv2': 'desktop-item' }, navIcon(item))
-          : h('button', {
-            key: item.id, type: 'button', 'data-mv2': 'desktop-item', 'data-nav': item.id,
-            'data-emphasis': item.emphasis ? '' : undefined,
-            'aria-current': item.act === 'map' ? 'page' : undefined,
-            onClick: () => railGo(item),
-          }, navIcon(item), h('small', null, (P.nav && P.nav[item.id]) || item.id)))))),
+        }, window.CrownMark ? h(window.CrownMark, { size: 26 }) : (Icon ? h(Icon, { name: 'Crown', size: 22 }) : null))),
       h('div', { 'data-mv2': 'explore-scrim', onClick: () => setStage('strip') }),
       h('section', {
         ref: root, 'data-mv2': 'explore', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
@@ -729,7 +718,7 @@
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
           'aria-label': open ? (P.lower) : (P.raise),
-          onPointerDown: onGrabDown, onPointerUp: onGrabUp, onClick: onGrabClick,
+          onPointerDown: onGrabDown, onPointerMove: onGrabMove, onPointerUp: onGrabUp, onPointerCancel: onGrabUp, onClick: onGrabClick,
           onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (open) lower(); else raise(); } },
         },
           h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' })),
@@ -740,21 +729,7 @@
         type: 'button', 'data-mv2': 'explore-crown', 'aria-label': crownLabel,
         'data-filtered': filtered ? '' : undefined, onClick: onCrown,
       }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)) : null,
-      open ? h('nav', { 'data-mv2': 'explore-dock', 'aria-label': P.dock },
-        DOCK.map((item) => {
-          const lead = navIcon(item);
-          if (item.me) return meItem('dock', item, { 'data-mv2': 'explore-nav' }, lead);
-          return h('button', {
-            key: item.id, type: 'button', 'data-mv2': 'explore-nav', 'data-nav': item.id,
-            'data-emphasis': item.emphasis ? '' : undefined,
-            'aria-current': item.id === 'explore' ? 'page' : undefined,
-            onClick: () => {
-              setMe('');
-              if (item.close) { setStage(desk ? 'strip' : 'rest'); return; }
-              if (item.page && props.onGo) props.onGo(item.page, {});
-            },
-          }, lead, h('small', null, (P.nav && P.nav[item.id]) || item.id));
-        })) : null);
+      null);
   }
 
   // ── The pin carousel (founder, 2026-11-18) ───────────────────────────
@@ -802,11 +777,13 @@
     const row = useRef(null);
     const indexRef = useRef(index);
     indexRef.current = index;
+    const swipeStart = useRef(null);
     const touched = useRef(false);     // the person's own finger, wheel or trackpad moved the row
     const settle = useRef(null);
     const fromSwipe = useRef(false);
     const mounted = useRef(false);
     const pull = useRef(null);
+    const [panelOffset, setPanelOffset] = useState(null);
     const swallow = useRef(false);
     const back = useRef(props.onBack);
     back.current = props.onBack;
@@ -872,20 +849,29 @@
     // A vertical pull on the panel (its bar, or the cards while lowered): up raises it, down steps back one level.
     const onPullDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (raised && !(e.target.closest && e.target.closest("[data-mv2='pinpeek-bar']"))) return;
-      pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      if (!(e.target.closest && e.target.closest("[data-mv2='pinpeek-bar']")) || e.target.closest('button')) return;
+      const el = root.current;
+      const offset = Math.max(0, el.getBoundingClientRect().top - (el.parentElement.getBoundingClientRect().bottom - el.offsetHeight));
+      pull.current = { y: e.clientY, offset, id: e.pointerId, moved: false };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    };
+    const onPullMove = (e) => {
+      const p = pull.current;
+      if (!p || p.id !== e.pointerId) return;
+      const dy = e.clientY - p.y;
+      if (Math.abs(dy) < 4 && !p.moved) return;
+      p.moved = true;
+      setPanelOffset(Math.max(0, Math.min(root.current.offsetHeight - 100, p.offset + dy)));
     };
     const onPullUp = (e) => {
       const p = pull.current;
       pull.current = null;
-      if (!p || p.id !== e.pointerId) return;
-      const dx = e.clientX - p.x;
-      const dy = e.clientY - p.y;
-      if (Math.abs(dy) < PULL_PX || Math.abs(dy) < 1.5 * Math.abs(dx)) return;
+      if (!p || p.id !== e.pointerId || !p.moved) return;
       swallow.current = true;
       setTimeout(() => { swallow.current = false; }, 0);
-      if (dy < 0) { if (!raised) props.onRaise(); } else props.onBack();
+      if (!raised) props.onRaise();
     };
+    useEffect(() => { if (!raised) setPanelOffset(null); }, [raised]);
 
     const tap = (id) => {
       if (swallow.current) return;
@@ -894,14 +880,14 @@
       if (i !== index) { props.onIndex(i); return; }
       if (!raised) props.onRaise();
     };
-    const step = (d) => { const i = index + d; if (i >= 0 && i < n) props.onIndex(i); };
+    const step = (d) => { if (n > 1) props.onIndex((index + d + n) % n); };
     const meters = (m) => (props.origin && near ? near.metersBetween(props.origin, m) : NaN);
     const iconBtn = (attrs, icon, word) => h('button', Object.assign({ type: 'button' }, attrs),
       Icon ? h(Icon, { name: icon, size: 18 }) : null, word ? h('span', null, word) : null);
 
     return h('section', {
-      ref: root, 'data-mv2': 'pinpeek', 'data-raised': raised ? '' : undefined, hidden: props.hidden || undefined,
-      'aria-label': P.label, onPointerDown: onPullDown, onPointerUp: onPullUp,
+      ref: root, style: panelOffset == null ? undefined : { '--pp-offset': panelOffset + 'px' }, 'data-mv2': 'pinpeek', 'data-adjusted': panelOffset == null ? undefined : '', 'data-raised': raised ? '' : undefined, hidden: props.hidden || undefined,
+      'aria-label': P.label, onPointerDown: onPullDown, onPointerMove: onPullMove, onPointerUp: onPullUp,
       onPointerCancel: () => { pull.current = null; },
     },
       h('div', { 'data-mv2': 'pinpeek-bar' },
@@ -912,17 +898,25 @@
         raised ? h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }) : null,
         iconBtn({ 'data-mv2': 'pinpeek-close', 'aria-label': P.close, onClick: props.onClose }, 'X')),
       h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
-        n > 1 && index > 0 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
+        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
         h('div', {
           ref: row, 'data-mv2': 'xrow', 'data-row': 'peek', onScroll: onRowScroll,
-          onPointerDownCapture: touch, onTouchStart: touch, onWheel: touch,
+          onPointerDownCapture: touch, onTouchStart: (e) => {
+            touch(); swipeStart.current = { x: e.touches[0].clientX, index: indexRef.current };
+          }, onTouchEnd: (e) => {
+            const start = swipeStart.current; swipeStart.current = null;
+            if (!start || !e.changedTouches.length || n < 2) return;
+            const dx = e.changedTouches[0].clientX - start.x;
+            if (start.index === 0 && dx > 40) { touched.current = false; props.onIndex(n - 1); }
+            else if (start.index === n - 1 && dx < -40) { touched.current = false; props.onIndex(0); }
+          }, onWheel: touch,
         }, items.map((m, i) => h(XCard, {
           key: 'peek:' + m.id, m: m, meters: meters(m), rec: byKey.get(m.type + ':' + m.id),
           groupWords: str.groups, distWords: props.distWords || {},
           selected: i === index, badge: raised ? '' : P.detailsBadge,
           onOpen: tap,
         }))),
-        n > 1 && index < n - 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
+        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
       raised && current && props.details ? h('div', {
         'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
       }, props.details(current)) : null);
@@ -938,7 +932,7 @@
   const useNarrow = () => useMedia(NARROW_MQ);
 
   window.MapV2Explore = {
-    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore, SECTIONS,
+    XRow, ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore, SECTIONS,
     peekOrder, nearestIndex, PinCarousel,
     lastView: () => lastView,
   };

@@ -243,8 +243,7 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(screen.getByRole("button", { name: "Coffee" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Kids" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Contributors" })).toBeNull();
-    // the strip says nothing but its tiles: no "Explore", "Where to…", "Near you" or count line
-    expect(screen.queryByRole("heading")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Where to…" })).toBeTruthy();
     expect(document.querySelector("[data-mv2='explore-peek']")).toBeNull();
     expect(document.querySelector("[data-mv2='explore-handle']")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: P().close }));
@@ -323,26 +322,12 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id")).toBe("three");
   });
 
-  it("hides Do and Central, keeps Map in the middle, and Me opens the account menu with Messages and Alerts", () => {
-    const onGo = vi.fn();
-    render(React.createElement(Harness, { onGo }));
+  it("uses the shell navigation while the panel is open", () => {
+    render(React.createElement(Harness));
     fireEvent.click(screen.getByRole("button", { name: P().open }));
     fireEvent.click(screen.getByRole("button", { name: P().raise }));
-    const dock = screen.getByRole("navigation", { name: P().dock });
-    expect([...dock.querySelectorAll("[data-nav]")].map((b) => b.getAttribute("data-nav"))).toEqual(["explore", "map", "me"]);
-    expect(document.querySelector("[data-nav='do']")).toBeNull();
-    expect(document.querySelector("[data-nav='central']")).toBeNull();
-    // the crown has given way to the nav outright
+    expect(document.querySelector("[data-mv2='explore-dock']")).toBeNull();
     expect(document.querySelector("[data-mv2='explore-crown']")).toBeNull();
-    const me = dock.querySelector("[data-nav='me']")!;
-    fireEvent.click(me);
-    expect(me.getAttribute("aria-expanded")).toBe("true");
-    const menu = screen.getByTestId("me-menu");
-    expect(menu.getAttribute("data-anchor")).toBe("dock");
-    expect(menu.getAttribute("data-extras")).toBe("messages,notifications");
-    fireEvent.click(dock.querySelector("[data-nav='map']")!);
-    expect(mode()).toBe("rest");
-    expect(document.querySelector("[data-mv2='explore-crown']")).toBeTruthy();
   });
 
   it("puts every live category on exactly one tile", () => {
@@ -502,23 +487,23 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261117a"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261119b"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261117a");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261119b");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");
     expect(read("src/frontend/app/shell.jsx")).toContain("SHOW_CREATE_ON_MAP = false");
   });
 
-  it("the folding nav is the only nav: no bottom bar is left in the shell", () => {
+  it("uses the shared dock in the shell", () => {
     const shell = read("src/frontend/app/shell.jsx");
-    expect(shell).toContain("React.createElement(window.MapV2Nav)");
+    expect(shell).toContain("React.createElement(window.ConnectChrome.Dock");
     expect(shell).not.toContain("BottomNav");
   });
 });
@@ -579,8 +564,8 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(cards[1].hasAttribute("data-selected")).toBe(false);
     expect(screen.getByRole("status").textContent).toContain(PK().count(1, 3));
     expect(screen.getByRole("status").textContent).toContain("Alpha");
-    // no arrow points past the first card; the next one does
-    expect(screen.queryByRole("button", { name: PK().prev as string })).toBeNull();
+    // Both arrows are available for looping.
+    expect(screen.getByRole("button", { name: PK().prev as string })).toBeTruthy();
     expect(screen.getByRole("button", { name: PK().next as string })).toBeTruthy();
     // lowered: no details, no Back
     expect(screen.queryByTestId("details")).toBeNull();
@@ -636,22 +621,12 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(returnFocus).toHaveBeenCalledWith("a");
   });
 
-  it("a pull up on the lowered panel raises it; a pull down steps back (and swallows the tap that ends it)", () => {
-    const { calls } = carousel();
-    const panel = document.querySelector("[data-mv2='pinpeek']")!;
-    const card = cardsIn()[0];
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 1, pointerType: "touch" });
-    expect(calls.onRaise).toHaveBeenCalledTimes(1);
-    fireEvent.click(card);
-    expect(calls.onRaise).toHaveBeenCalledTimes(1);
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 2, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 2, pointerType: "touch" });
+  it("keeps Back and Close available from the raised panel", () => {
+    const { calls } = carousel({ raised: true });
+    fireEvent.click(screen.getByRole("button", { name: PK().back as string }));
     expect(calls.onBack).toHaveBeenCalledTimes(1);
-    // a short or sideways move is a swipe of the row, never a pull
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 3, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 220, clientY: 340, pointerId: 3, pointerType: "touch" });
-    expect(calls.onBack).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: PK().close as string }));
+    expect(calls.onClose).toHaveBeenCalledTimes(1);
   });
 
   describe("the Explore panel under the carousel", () => {
@@ -686,18 +661,19 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
       expect(mode()).toBe("rest");
     });
 
-    it("the desktop crown resets the levels too, and only folds the nav at the map's rest", () => {
+    it("the desktop crown resets levels and opens the panel", () => {
       const onLevelReset = vi.fn();
       const { rerender } = render(React.createElement(X.Explore, { ...base, level: 1, onLevelReset }));
       const crown = () => document.querySelector<HTMLButtonElement>("[data-mv2='desktop-crown']")!;
       expect(crown().getAttribute("aria-label")).toBe(P().home);
       fireEvent.click(crown());
       expect(onLevelReset).toHaveBeenCalledTimes(1);
-      expect(crown().getAttribute("aria-expanded")).toBe("true");
+      expect(crown().getAttribute("aria-expanded")).toBe("false");
       rerender(React.createElement(X.Explore, { ...base, level: 0, onLevelReset }));
       fireEvent.click(crown());
       expect(onLevelReset).toHaveBeenCalledTimes(1);
-      expect(crown().getAttribute("aria-expanded")).toBe("false");
+      expect(mode()).toBe("open");
+      expect(document.querySelector("[data-mv2=desktop-items]")).toBeNull();
     });
   });
 

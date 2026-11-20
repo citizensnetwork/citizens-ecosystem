@@ -300,7 +300,7 @@
       case 'home': return React.createElement(window.HomePage);
       case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
       // #210: Map v2's Discover page.
-      case 'explore': return React.createElement(window.MapV2Discover.Discover);
+      case 'explore': return React.createElement(window.ConnectExplore.Page);
       case 'lets': return React.createElement(window.LetsPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
@@ -315,7 +315,7 @@
       case 'place': return React.createElement(window.PlaceProfilePage, { id: nav.params.id });
       case 'profile': return nav.params.id
         ? React.createElement(window.ContributorProfilePage, { id: nav.params.id })
-        : React.createElement(window.CitizenProfilePage);
+        : React.createElement(window.ConnectMe.Page, { key: nav.params.id || "me" });
       default: return React.createElement(window.HomePage);
     }
   }
@@ -337,19 +337,14 @@
 
   function Shell() {
     const { createKind, createEditing, authed, guestMode, authResolved, nav } = window.useApp();
-    // On the map home the crown is the home button. The folding nav stays for every other screen,
-    // and for the clean map (view=map), which has no crown.
-    const onMapHome = nav && nav.page === 'home' && !(nav.params && nav.params.view === 'map');
     // Signed out: the landing — but while a probable session is still resolving,
     // the loading splash instead, so a returning member sees no "sign in" flash.
     if (!authed && !guestMode) return React.createElement(authResolved ? window.AuthScreen : window.LoadingSplash);
-    return React.createElement('div', { className: 'flex h-full w-full overflow-hidden bg-background' },
-      !onMapHome && React.createElement(Sidebar),
+    return React.createElement('div', { className: 'connect-shell-layout w-full overflow-hidden bg-background' },
       React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },
         React.createElement(AssistBanner),
         React.createElement(CurrentPage)),
-      // Map v2 (#210): one folding round button instead of a bottom bar. The map home uses the crown instead.
-      !onMapHome && React.createElement(window.MapV2Nav),
+      React.createElement(window.ConnectChrome.Dock, { page: nav.page, entity: nav.params?.id }),
       React.createElement(CreateFab),
       createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),

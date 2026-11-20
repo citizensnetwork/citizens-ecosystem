@@ -69,7 +69,6 @@
 
   const CARD_ZOOM = 14;     // a card never lands on a map zoomed out further than this: the pin has to be seen
   // A Where to… tile or a row in focus shows its town, not its province (founder, 2026-11-17): every pin is drawn from 9.5.
-  const TOWN_ZOOM = 11;
   // The crown's reset lands on the person's own place at the zoom the map first opens on.
   const HOME_ZOOM = 12;
 
@@ -105,7 +104,6 @@
     const [panelOpen, setPanelOpen] = useState(false);
     const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a keyboard pin brings its card into the sheet
     const rootRef = useRef(null);
-    const skipFrame = useRef(false);
     // The map home's levels (founder, 2026-11-18). 0: the crown alone. 1: the search bar open, with its row of category
     // chips (searchOpen). 2: a pin tapped, its card and its neighbours in the pin carousel at the foot (peek). 3: the chosen
     // card tapped again, the carousel raised with that card's details below it (peek.raised). Each level is ONE history
@@ -117,7 +115,6 @@
     const [peek, setPeek] = useState(null);
     const peekRef = useRef(null);
     peekRef.current = peek;
-    const [exploreMode, setExploreMode] = useState('rest');
     const press = useRef(null);       // where a press on the map began: a pan is not a tap on empty map
     const [restSignal, setRestSignal] = useState(0);   // a tap on empty map: the Explore panel goes back to its rest too
     const chosen = useRef({ id: null, type: null });
@@ -136,30 +133,10 @@
       if (!focusTest && !group) return null;
       return (m) => (focusTest ? focusTest(m) : true) && (!group || (X.groupOf && X.groupOf(m) === group));
     }, [focusTest, group, X]);
-    // A new focus brings its town into view, 25% above the middle. One anchor per focus: switching tabs inside it keeps the
-    // map still (re-measuring "the middle" after each move would creep the map upward, tab after tab).
-    const focusKey = focus ? focus.kind + ':' + focus.id : '';
-    const anchor = useRef(null);
+    // Category and row filters change the visible pins without moving the map.
     useEffect(() => {
       setShowIdeas(!!(tileRec && tileRec.ideas));
-      if (!focusKey) { anchor.current = null; return; }
-      const api = mapApi.current;
-      if (!api || !api.survey) return;
-      if (!anchor.current) {
-        const v = api.view ? api.view() : null;
-        anchor.current = v && (v.user || v.centre);
-      }
-      const c = anchor.current;
-      if (c) api.survey(c.lat, c.lng, TOWN_ZOOM);
-    }, [focusKey]);
-    // How much room the panel takes is the stylesheet's job (--explore-h follows the panel's look, map-v2.css Pack 08), so it is
-    // right even when the CSS arrives after the first render. This only frames the data again as the panel takes room, but
-    // never because the person lowered or raised it (the map would jump).
-    const onExploreHeight = useCallback((px) => {
-      if (!rootRef.current || !(px > 0)) return;
-      if (skipFrame.current) { skipFrame.current = false; return; }
-      if (mapApi.current && mapApi.current.reframe) mapApi.current.reframe();
-    }, []);
+    }, [tileRec]);
     // Lower or raise the panel (the handle, or a pin tap that needs its card). Only a real change skips the next framing.
     const onPanel = useCallback((isOpen) => {
       setPanelOpen(!!isOpen);
@@ -212,6 +189,7 @@
       setSheet(null); choose(id);
       const cur = peekRef.current;
       const at = cur ? cur.ids.indexOf(id) : -1;
+      if (cur && at === cur.index && !cur.raised) { raisePeek(); return; }
       if (cur && at !== -1) { setPeek(Object.assign({}, cur, { index: at, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
       const api = mapApi.current;
       const visible = api && api.visibleIds ? api.visibleIds() : null;
@@ -305,7 +283,8 @@
       if (group) return { label: (XS.groups && XS.groups[group]) || group, colour: 'var(--grp-' + group + ')' };
       return null;
     })();
-    const clearFilter = () => { setFocus(null); setGroup(''); setLitId(null); };
+    const keepCamera = () => mapApi.current?.keepCamera?.();
+    const clearFilter = () => { keepCamera(); setFocus(null); setGroup(''); setLitId(null); };
     // The crown with a filter on: everything clears, and the map goes back to the person's own place (or the first framing).
     const resetHome = () => {
       setFocus(null); setGroup(''); setQuery(''); setSearchOpen(false); setSelected(null); setLitId(null); setSheet(null); setPeek(null);
@@ -315,6 +294,15 @@
       if (v && v.user && api.survey) api.survey(v.user.lat, v.user.lng, HOME_ZOOM);
       else if (api.restore) api.restore();
     };
+    useEffect(() => {
+      const returnToMap = () => {
+        setFocus(null); setGroup(''); setQuery('');
+        setPeek(null); setSearchOpen(false); setSelected(null); setLitId(null); setSheet(null);
+        setRestSignal((n) => n + 1);
+      };
+      window.addEventListener('cc-return-to-map', returnToMap);
+      return () => window.removeEventListener('cc-return-to-map', returnToMap);
+    }, []);
     const searchRef = useRef(null);
     const showSearch = !narrow || searchOpen || !!query;
     const onFind = () => {
@@ -346,11 +334,7 @@
             if (clean) { openSheet(id, t); return; }
             const a = document.activeElement;
             const byKey = !!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })());
-            // founder, 2026-11-18: a pin opens the pin carousel (level 2), unless the panel already holds a row of cards (a
-            // focus, or every row), where the pin chooses its card in that row as before
-            if (exploreMode !== 'focus' && exploreMode !== 'open') { openPeek(id, t, byKey); return; }
-            // A pin chooses itself. The keyboard follows into the sheet; a finger tap leaves the sheet where it is.
-            setSheet(null); setSelected(id); setSelType(t); setLitId(null); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 }));
+            openPeek(id, t, byKey);
           },
           onDismissBubble: dismissBubble,
           onZoomBandChange: setZoomBand,
@@ -372,7 +356,7 @@
               (X.GROUPS || []).map((id) => React.createElement('button', {
                 key: id, type: 'button', role: 'radio', 'data-mv2': 'filter-row', 'aria-checked': group === id ? 'true' : 'false',
                 style: { '--chip': 'var(--grp-' + id + ')' },
-                onClick: (e) => { e.stopPropagation(); setGroup((cur) => (cur === id ? '' : id)); },
+                onClick: (e) => { e.stopPropagation(); keepCamera(); setGroup((cur) => (cur === id ? '' : id)); },
               }, React.createElement('span', { 'data-mv2': 'filter-dot', 'aria-hidden': 'true' }), (XS.groups && XS.groups[id]) || id)))),
           chip && !(narrow && searchOpen) && React.createElement('div', { 'data-mv2': 'filter-chip', role: 'status', style: { '--chip': chip.colour } },
             React.createElement('span', { 'data-mv2': 'filter-dot', 'aria-hidden': 'true' }),
@@ -402,12 +386,12 @@
         hidden: !!sheet,
         markers: rowMarkers, ideas: ideaMarkers, sources, apiRef: mapApi, selectedId: selected, reveal,
         focus, filtered: !!group || !!q,
-        peek: !!peek, level: searchOpen || peek ? 1 : 0, onLevelReset: resetLevels, onMode: setExploreMode, restSignal,
-        onFocus: (next) => { setFocus(next); setLitId(null); },
+        peek: !!peek, level: searchOpen || peek ? 1 : 0, onLevelReset: resetLevels, restSignal,
+        onFocus: (next) => { keepCamera(); setFocus(next); setLitId(null); },
         onSectionIds: setSecIds,
         onReset: resetHome,
         onOpenChange: onPanel,
-        onOpen: tapCard, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
+        onOpen: tapCard, onSeeAll: () => app.go('explore'),
         onGo: (page, params) => app.go(page, params),
       }),
       // Levels 2 and 3: the pin carousel, and the chosen card's details below it once raised (the listing sheet, inline).
