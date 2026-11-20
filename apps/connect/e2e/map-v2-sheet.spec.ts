@@ -184,7 +184,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     const before = await page.evaluate(() => history.length);
     await openOn(page, p.id, p.longitude, p.latitude);
     const open = await page.evaluate(() => history.length);
-    expect(open).toBe(before + 1); // exactly ONE guard entry, pushed by the tap that opened it
+    expect(open).toBe(before + 2); // the preview and its listing actions each own one Back step
 
     await page.locator("[data-mv2='handle']").click(); // half -> full
     await page.locator("[data-mv2='handle']").click(); // full -> half
@@ -278,8 +278,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await expect.poll(card).toBe(p.id);
     await expect(sheet(page)).toHaveCount(0);
     await page.keyboard.press("Enter");
-    await expect(sheet(page)).toBeVisible();
-    await expect.poll(() => page.evaluate(() => document.activeElement?.getAttribute("data-mv2"))).toBe("name");
+    await expect(page.locator("[data-mv2='pinpeek-details']")).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
     await expect.poll(card).toBe(p.id);
@@ -292,7 +291,7 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await openMap(page, "/?map=v2", 5);
     const p = seed.places[0] as PlacePin;
     await openOn(page, p.id, p.longitude, p.latitude);
-    const live = page.locator("[data-mv2='sr']");
+    const live = sheet(page).locator("[data-mv2='sr']");
     await expect(live).toHaveAttribute("aria-live", "polite");
     await expect(live).toHaveText("Showing details");
     await page.locator("[data-mv2='handle']").click();

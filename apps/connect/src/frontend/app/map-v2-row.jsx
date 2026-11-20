@@ -168,7 +168,7 @@
     };
 
     const arrows = fine && !stack && edges.scrollable;
-    const arrow = (dir, atEdge, label, name) => h('button', {
+    const arrow = (dir, label, name) => h('button', {
       type: 'button', 'data-mv2': 'hrow-btn', 'aria-label': label, 'aria-controls': listId,
       onClick: () => move(dir),
     }, Icon ? h(Icon, { name: name, size: 20 }) : null);
@@ -176,8 +176,8 @@
     const head = (hidden || arrows) && h('div', { 'data-mv2': 'hrow-head' },
       hidden && h('p', { 'data-mv2': 'hrow-count' }, stack ? str.all(total) : str.count(shown.length, total)),
       arrows && h('div', { 'data-mv2': 'hrow-nav' },
-        arrow(-1, edges.start, words.prev, 'ChevronLeft'),
-        arrow(1, edges.end, words.next, 'ChevronRight')),
+        arrow(-1, words.prev, 'ChevronLeft'),
+        arrow(1, words.next, 'ChevronRight')),
       hidden && h('button', {
         type: 'button', 'data-mv2': 'hrow-all', 'aria-expanded': stack, 'aria-controls': listId,
         onClick: () => setExpanded((v) => !v),

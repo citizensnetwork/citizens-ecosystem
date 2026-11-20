@@ -211,11 +211,15 @@
       setSheet(null); choose(id);
       const cur = peekRef.current;
       const at = cur ? cur.ids.indexOf(id) : -1;
-      if (cur && cur.ids[cur.index] === id) { raisePeek(); return; }
+      if (cur && cur.ids[cur.index] === id) {
+        if (cur.raised) setPeek({ ...cur, expandSignal: (cur.expandSignal || 0) + 1 });
+        else raisePeek();
+        return;
+      }
       if (cur && at !== -1) { setPeek(Object.assign({}, cur, { index: at, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
       const api = mapApi.current;
       const visible = api && api.visibleIds ? api.visibleIds() : null;
-      const pool = pinFilter ? rowMarkers.filter((x) => x.id === id || pinFilter(x)) : rowMarkers;
+      const pool = pinFilter ? markers.filter((x) => x.id === id || pinFilter(x)) : markers;
       const ids = X.peekOrder(m, pool, visible).map((x) => x.id);
       if (cur) { setPeek(Object.assign({}, cur, { ids, index: 0, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
       setPeek({ ids, index: 0, camera: camera(), view: api && api.view ? api.view() : null, raised: false, raisedAt: null, focusCard: byKey ? 1 : 0 });
@@ -232,15 +236,15 @@
     const raisePeek = () => {
       const cur = peekRef.current;
       if (!cur || cur.raised) return;
-      setPeek(Object.assign({}, cur, { raised: true, raisedAt: { index: cur.index, camera: camera() } }));
+      setPeek(Object.assign({}, cur, { raised: true, raisedAt: { ids: cur.ids, index: cur.index, camera: camera() } }));
     };
     // Back from level 3: the cards again, on the card and the map the details were opened from.
     const lowerPeek = () => {
       const cur = peekRef.current;
       if (!cur || !cur.raised) return;
       const at = cur.raisedAt || { index: cur.index, camera: null };
-      setPeek(Object.assign({}, cur, { raised: false, raisedAt: null, index: at.index }));
-      choose(cur.ids[at.index]);
+      setPeek(Object.assign({}, cur, { raised: false, raisedAt: null, ids: at.ids || cur.ids, index: at.index, focusCard: cur.focusCard + 1 }));
+      choose((at.ids || cur.ids)[at.index]);
       putCamera(at.camera);
     };
     // Back from level 2: the carousel closes, nothing is chosen, and the map goes back to where the pin was tapped.
@@ -339,8 +343,7 @@
       },
         React.createElement(window.StylizedMap, {
           markers, filterCategory: pinFilter, selectedId: selected, litId: litId, apiRef: mapApi,
-          // #210: a pin chooses its card in the Explore panel (the panel scrolls to it); the card's second tap opens the
-          // full listing. The clean map (the nav's Map) has no panel, so there a pin opens the sheet as before. Ideas keep their panel.
+          // Every visible pin enters the same preview, including pins on the clean map.
           onSelect: (id, t) => {
             const a = document.activeElement;
             const byKey = !!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })());
@@ -408,11 +411,12 @@
       // Under a full sheet (a Nearby row or an owner line picked in the details) it stays mounted, hidden, as it was.
       peek && React.createElement(X.PinCarousel, {
         items: peekItems, index: Math.max(0, peekItems.findIndex((m) => m.id === peek.ids[peek.index])), raised: peek.raised,
-        hidden: !!sheet, focusCard: peek.focusCard,
+        hidden: !!sheet, focusCard: peek.focusCard, expandSignal: peek.expandSignal,
         origin: peek.view ? (peek.view.user || peek.view.centre) : null,
         distWords: peek.view && peek.view.user ? XS : (XS.centre || {}),
         sources,
         onIndex: (i) => { if (peekItems[i]) peekTo(peek.ids.indexOf(peekItems[i].id)); },
+        onActions: (m) => openSheet(m.id, m.type, peek.view),
         onRaise: raisePeek, onBack: peekBack, onClose: resetLevels, returnFocus: peekReturn,
         // the inline sheet only calls onClose right after it navigated away (a link to the full page): nothing to undo here
         details: (m) => {

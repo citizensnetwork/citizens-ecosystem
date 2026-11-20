@@ -123,13 +123,13 @@
    * The Explore row's order: listings with a position, nearest to `origin` first (then by name), at most `cap`.
    * The selected listing is always included: when it is further than the cap it is added at the END, so the cards
    * already in the row never move (no reorder, no layout shift under the person's thumb).
-   * Returns [{ m, meters }]. Ideas are not listings and never appear.
+   * Returns [{ m, meters }].
    */
-  function rank(origin, markers, selectedId, cap) {
+  function rank(origin, markers, selectedId, cap, includeIdeas = false) {
     const near = window.MapV2Nearby;
     const max = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : ROW_CAP;
     const list = (Array.isArray(markers) ? markers : [])
-      .filter((m) => m && m.type !== 'idea' && typeof m.lat === 'number' && typeof m.lng === 'number')
+      .filter((m) => m && (includeIdeas || m.type !== 'idea') && typeof m.lat === 'number' && typeof m.lng === 'number')
       .map((m) => ({ m: m, meters: origin && near ? near.metersBetween(origin, m) : NaN }));
     list.sort((a, b) => {
       const da = Number.isFinite(a.meters) ? a.meters : Infinity;
@@ -800,15 +800,15 @@
 
   /**
    * The carousel's order: `target` first, then the other listings in `visible` (ids; null = every one), nearest to the
-   * target first (rank()'s order), at most `cap` cards in all. Ideas are not listings and never appear. Returns markers.
+   * target first (rank()'s order), at most `cap` cards in all. Returns markers.
    */
   function peekOrder(target, markers, visible, cap) {
     if (!target) return [];
     const max = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : ROW_CAP;
     const vis = Array.isArray(visible) ? new Set(visible) : null;
     const pool = (Array.isArray(markers) ? markers : [])
-      .filter((m) => m && m.id !== target.id && m.type !== 'idea' && (!vis || vis.has(m.id)));
-    return [target].concat(rank(target, pool, null, Math.max(0, max - 1)).slice(0, Math.max(0, max - 1)).map((r) => r.m));
+      .filter((m) => m && m.id !== target.id && (!vis || vis.has(m.id)));
+    return [target].concat(rank(target, pool, null, Math.max(0, max - 1), true).slice(0, Math.max(0, max - 1)).map((r) => r.m));
   }
 
   /** Which card's middle is closest to `mid` (the row's middle, in the row's scroll coordinates)? -1 for no cards. */
@@ -905,7 +905,7 @@
     };
     const touch = () => { touched.current = true; };
 
-    // A vertical pull on the panel (its bar, or the cards while lowered): up raises it, down steps back one level.
+    // The handle resizes the viewport. Swipes in the content stay native.
     const onPullDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (!(e.target.closest && e.target.closest("[data-mv2='pinpeek-bar']")) || e.target.closest('button')) return;
@@ -932,7 +932,13 @@
     };
     useEffect(() => { if (!raised) setPanelHeight(null); }, [raised]);
 
-    useLayoutEffect(() => { if (root.current) root.current.scrollTop = 0; if (raised && detailsRef.current) detailsRef.current.focus({ preventScroll: true }); }, [index, raised]);
+    useEffect(() => {
+      if (props.expandSignal) setPanelHeight(null);
+    }, [props.expandSignal]);
+    useLayoutEffect(() => {
+      if (root.current) root.current.scrollTop = 0;
+      if (raised && detailsRef.current) detailsRef.current.focus({ preventScroll: true });
+    }, [current && current.id, raised, props.expandSignal]);
     const tap = (id) => {
       if (swallow.current) return;
       const i = items.findIndex((m) => m.id === id);
@@ -957,6 +963,10 @@
           n > 1 && P.count ? P.count(index + 1, n) : '',
           current ? h('span', { 'data-mv2': 'sr' }, ' ' + (current.title || '')) : null),
         h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }),
+        current && current.type !== 'idea' && props.onActions && iconBtn({
+          'data-mv2': 'pinpeek-actions', 'aria-label': 'More listing actions',
+          onClick: () => props.onActions(current),
+        }, 'MoreHorizontal'),
         iconBtn({ 'data-mv2': 'pinpeek-close', 'aria-label': P.close, onClick: props.onClose }, 'X')),
       h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
         n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,

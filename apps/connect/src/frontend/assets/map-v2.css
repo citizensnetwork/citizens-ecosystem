@@ -4245,6 +4245,7 @@ a[data-mv2='card2'],
   line-height: var(--lh-1);
   font-weight: var(--fw-semibold);
 }
+[data-mv2='pinpeek-actions'],
 [data-mv2='pinpeek-back'],
 [data-mv2='pinpeek-close'] {
   flex: none;
@@ -4264,6 +4265,7 @@ a[data-mv2='card2'],
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
+[data-mv2='pinpeek-actions']:focus-visible,
 [data-mv2='pinpeek-back']:focus-visible,
 [data-mv2='pinpeek-close']:focus-visible,
 [data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow']:focus-visible {

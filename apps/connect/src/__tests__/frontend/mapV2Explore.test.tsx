@@ -540,9 +540,9 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     mk("i", 0.5, { type: "idea", title: "An idea" }),
   ];
 
-  it("orders the carousel from the tapped pin: it first, then the pins in view, nearest to it first, ideas never", () => {
+  it("orders the carousel from the tapped pin: it first, then the pins in view, nearest to it first, including visible ideas", () => {
     const b = pins.find((m) => m.id === "b")!;
-    expect(Y().peekOrder(b, pins, null).map((m) => m.id)).toEqual(["b", "c", "a", "d"]);
+    expect(Y().peekOrder(b, pins, null).map((m) => m.id)).toEqual(["b", "c", "i", "a", "d"]);
     // only the pins in view (the tapped one is always first, in view or not)
     expect(Y().peekOrder(b, pins, ["a", "d"]).map((m) => m.id)).toEqual(["b", "a", "d"]);
     // capped, the cap counting the tapped pin
