@@ -11,11 +11,11 @@
   //  A Contributor, a Place and an Event open the Map v2 bottom sheet (map-v2-sheet.jsx). Impact Ideas
   //  are not listings — they have no organiser, no category profile page and no socials — so they keep
   //  this small panel.
-  function IdeaPanel({ id, onClose }) {
+  function IdeaPanel({ id, onClose, inline }) {
     const app = window.useApp();
     // A Back press dismisses the pin preview before it leaves the map —
     // the same expectation a native map app sets.
-    useBackGuard(true, onClose);
+    useBackGuard(!inline, onClose);
     const { ideas, toggleIdeaVote } = app;
     const item = ideas.find((i) => i.id === id);
     if (!item) return null;
@@ -29,7 +29,7 @@
           React.createElement('span', { className: 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-accent text-gold-dark flex items-center gap-1' }, React.createElement(Icon, { name: 'Lightbulb', size: 10 }), 'Impact Idea'),
           cat && React.createElement(CategoryBadge, { cat })),
         React.createElement('h3', { className: 'text-lg text-foreground leading-tight mb-1' }, item.title),
-        React.createElement('p', { className: 'text-xs text-muted-foreground leading-relaxed line-clamp-3 mb-3' }, item.description),
+        React.createElement('p', { className: 'text-xs text-muted-foreground leading-relaxed mb-3' }, item.description),
         React.createElement('div', { className: 'flex items-center justify-between mb-1' },
           React.createElement('span', { className: 'text-xs font-bold text-foreground' }, item.votes.toLocaleString() + ' votes'),
           React.createElement('span', { className: 'text-[10px] text-muted-foreground' }, 'Goal ' + item.threshold.toLocaleString())),
@@ -40,6 +40,7 @@
           React.createElement(Button, { variant: 'outline', icon: 'X', onClick: onClose }, 'Dismiss'))));
 
     function Wrapper(children) {
+      if (inline) return children;
       return React.createElement('div', {
         className: 'fixed z-[120] left-0 right-0 bottom-16 md:bottom-4 md:left-[280px] md:right-auto md:w-[370px]',
       },
@@ -103,7 +104,6 @@
     const [secIds, setSecIds] = useState([]);
     const [sheet, setSheet] = useState(null);
     const [panelOpen, setPanelOpen] = useState(false);
-    const [reveal, setReveal] = useState(null);   // { id, focus, n }: n counts pin taps, so a keyboard pin brings its card into the sheet
     const rootRef = useRef(null);
     const skipFrame = useRef(false);
     // The map home's levels (founder, 2026-11-18). 0: the crown alone. 1: the search bar open, with its row of category
@@ -117,7 +117,6 @@
     const [peek, setPeek] = useState(null);
     const peekRef = useRef(null);
     peekRef.current = peek;
-    const [exploreMode, setExploreMode] = useState('rest');
     const press = useRef(null);       // where a press on the map began: a pan is not a tap on empty map
     const [restSignal, setRestSignal] = useState(0);   // a tap on empty map: the Explore panel goes back to its rest too
     const chosen = useRef({ id: null, type: null });
@@ -185,7 +184,7 @@
     decorateForV2(markers, events, newsPosts || [], now);
 
     const rowMarkers = markers.filter((m) => m.type !== 'idea');
-    const byId = new Map(rowMarkers.map((m) => [m.id, m]));
+    const byId = new Map(markers.map((m) => [m.id, m]));
     const sources = useMemo(() => ({ events, places, contributors }), [events, places, contributors]);
 
     // ── the levels ──
@@ -212,10 +211,15 @@
       setSheet(null); choose(id);
       const cur = peekRef.current;
       const at = cur ? cur.ids.indexOf(id) : -1;
+      if (cur && cur.ids[cur.index] === id) {
+        if (cur.raised) setPeek({ ...cur, expandSignal: (cur.expandSignal || 0) + 1 });
+        else raisePeek();
+        return;
+      }
       if (cur && at !== -1) { setPeek(Object.assign({}, cur, { index: at, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
       const api = mapApi.current;
       const visible = api && api.visibleIds ? api.visibleIds() : null;
-      const pool = pinFilter ? rowMarkers.filter((x) => x.id === id || pinFilter(x)) : rowMarkers;
+      const pool = pinFilter ? markers.filter((x) => x.id === id || pinFilter(x)) : markers;
       const ids = X.peekOrder(m, pool, visible).map((x) => x.id);
       if (cur) { setPeek(Object.assign({}, cur, { ids, index: 0, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
       setPeek({ ids, index: 0, camera: camera(), view: api && api.view ? api.view() : null, raised: false, raisedAt: null, focusCard: byKey ? 1 : 0 });
@@ -232,15 +236,15 @@
     const raisePeek = () => {
       const cur = peekRef.current;
       if (!cur || cur.raised) return;
-      setPeek(Object.assign({}, cur, { raised: true, raisedAt: { index: cur.index, camera: camera() } }));
+      setPeek(Object.assign({}, cur, { raised: true, raisedAt: { ids: cur.ids, index: cur.index, camera: camera() } }));
     };
     // Back from level 3: the cards again, on the card and the map the details were opened from.
     const lowerPeek = () => {
       const cur = peekRef.current;
       if (!cur || !cur.raised) return;
       const at = cur.raisedAt || { index: cur.index, camera: null };
-      setPeek(Object.assign({}, cur, { raised: false, raisedAt: null, index: at.index }));
-      choose(cur.ids[at.index]);
+      setPeek(Object.assign({}, cur, { raised: false, raisedAt: null, ids: at.ids || cur.ids, index: at.index, focusCard: cur.focusCard + 1 }));
+      choose((at.ids || cur.ids)[at.index]);
       putCamera(at.camera);
     };
     // Back from level 2: the carousel closes, nothing is chosen, and the map goes back to where the pin was tapped.
@@ -339,18 +343,11 @@
       },
         React.createElement(window.StylizedMap, {
           markers, filterCategory: pinFilter, selectedId: selected, litId: litId, apiRef: mapApi,
-          // #210: a pin chooses its card in the Explore panel (the panel scrolls to it); the card's second tap opens the
-          // full listing. The clean map (the nav's Map) has no panel, so there a pin opens the sheet as before. Ideas keep their panel.
+          // Every visible pin enters the same preview, including pins on the clean map.
           onSelect: (id, t) => {
-            if (t === 'idea') { setSheet(null); setSelected((p) => (p === id ? null : id)); setSelType(t); return; }
-            if (clean) { openSheet(id, t); return; }
             const a = document.activeElement;
             const byKey = !!(a && a.closest && a.closest('.maplibregl-marker') && a.matches && (() => { try { return a.matches(':focus-visible'); } catch { return false; } })());
-            // founder, 2026-11-18: a pin opens the pin carousel (level 2), unless the panel already holds a row of cards (a
-            // focus, or every row), where the pin chooses its card in that row as before
-            if (exploreMode !== 'focus' && exploreMode !== 'open') { openPeek(id, t, byKey); return; }
-            // A pin chooses itself. The keyboard follows into the sheet; a finger tap leaves the sheet where it is.
-            setSheet(null); setSelected(id); setSelType(t); setLitId(null); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 }));
+            openPeek(id, t, byKey);
           },
           onDismissBubble: dismissBubble,
           onZoomBandChange: setZoomBand,
@@ -400,9 +397,9 @@
       // stays mounted (hidden) under the listing, so it keeps its place and the card that opened it gets focus back.
       !clean && React.createElement(X.Explore, {
         hidden: !!sheet,
-        markers: rowMarkers, ideas: ideaMarkers, sources, apiRef: mapApi, selectedId: selected, reveal,
+        markers: rowMarkers, ideas: ideaMarkers, sources, apiRef: mapApi, selectedId: selected,
         focus, filtered: !!group || !!q,
-        peek: !!peek, level: searchOpen || peek ? 1 : 0, onLevelReset: resetLevels, onMode: setExploreMode, restSignal,
+        peek: !!peek, level: searchOpen || peek ? 1 : 0, onLevelReset: resetLevels, restSignal,
         onFocus: (next) => { setFocus(next); setLitId(null); },
         onSectionIds: setSecIds,
         onReset: resetHome,
@@ -412,19 +409,27 @@
       }),
       // Levels 2 and 3: the pin carousel, and the chosen card's details below it once raised (the listing sheet, inline).
       // Under a full sheet (a Nearby row or an owner line picked in the details) it stays mounted, hidden, as it was.
-      peek && !clean && React.createElement(X.PinCarousel, {
+      peek && React.createElement(X.PinCarousel, {
         items: peekItems, index: Math.max(0, peekItems.findIndex((m) => m.id === peek.ids[peek.index])), raised: peek.raised,
-        hidden: !!sheet, focusCard: peek.focusCard,
+        hidden: !!sheet, focusCard: peek.focusCard, expandSignal: peek.expandSignal,
         origin: peek.view ? (peek.view.user || peek.view.centre) : null,
         distWords: peek.view && peek.view.user ? XS : (XS.centre || {}),
         sources,
         onIndex: (i) => { if (peekItems[i]) peekTo(peek.ids.indexOf(peekItems[i].id)); },
+        onActions: (m) => openSheet(m.id, m.type, peek.view),
         onRaise: raisePeek, onBack: peekBack, onClose: resetLevels, returnFocus: peekReturn,
         // the inline sheet only calls onClose right after it navigated away (a link to the full page): nothing to undo here
-        details: (m) => React.createElement(window.MapV2Sheet, {
-          id: m.id, type: m.type, inline: true, view: peek.view, nearby: markers,
-          onClose: () => {}, onPick: (id, t) => openSheet(id, t, peek.view),
-        }),
+        details: (m) => {
+          const Profile = { place: window.PlaceProfilePage, event: window.EventProfilePage, contributor: window.ContributorProfilePage, idea: IdeaPanel }[m.type];
+          const suggestions = window.MapV2Nearby.rank(m, markers, { skip: (other) => other.id === m.id });
+          return React.createElement(React.Fragment, { key: m.id },
+            Profile && React.createElement(Profile, { id: m.id, inline: true, onClose: resetLevels }),
+            suggestions.length > 0 && React.createElement('section', { 'data-mv2': 'profile-suggestions' },
+              React.createElement('h2', null, XS.peek.suggestions),
+              suggestions.map(({ marker, meters }) => React.createElement('button', {
+                key: marker.id, type: 'button', onClick: () => openPeek(marker.id, marker.type),
+              }, React.createElement('strong', null, marker.title), React.createElement('small', null, window.MapV2Nearby.distanceText(meters, XS))))));
+        },
       }),
       // a chosen card tapped again opens the expanded sheet (#210: full, its cover and distance, swipe down back to the
       // panel; it never moves the map); the clean map's pin opens today's half sheet
@@ -435,7 +440,7 @@
         // a Nearby pick keeps the place the distances were measured from (the map has moved under the sheet since)
         onPick: (id, t) => openSheet(id, t, sheet.view),
       }),
-      selected && selType === 'idea' && React.createElement(IdeaPanel, { id: selected, onClose: () => setSelected(null) }));
+      !peek && selected && selType === 'idea' && React.createElement(IdeaPanel, { id: selected, onClose: () => setSelected(null) }));
   
   }
 

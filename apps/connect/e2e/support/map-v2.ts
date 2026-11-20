@@ -181,6 +181,9 @@ export async function openListing(page: Page, id: string, how: "click" | "tap" =
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
   if (how === "tap") await pin.tap({ force: true });
   else await pin.click({ force: true });
+  const actions = page.getByRole("button", { name: "More listing actions" });
+  if (how === "tap") await actions.tap();
+  else await actions.click();
 }
 
 /**
@@ -222,6 +225,9 @@ export async function openPinSheet(page: Page, id: string, how: "click" | "tap" 
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
   if (how === "tap") await pin.tap({ force: true });
   else await pin.click({ force: true });
+  const actions = page.getByRole("button", { name: "More listing actions" });
+  if (how === "tap") await actions.tap();
+  else await actions.click();
 }
 
 /**
