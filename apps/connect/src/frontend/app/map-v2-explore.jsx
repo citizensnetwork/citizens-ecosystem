@@ -964,7 +964,7 @@
           current ? h('span', { 'data-mv2': 'sr' }, ' ' + (current.title || '')) : null),
         h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }),
         current && current.type !== 'idea' && props.onActions && iconBtn({
-          'data-mv2': 'pinpeek-actions', 'aria-label': 'More listing actions',
+          'data-mv2': 'pinpeek-actions', 'aria-label': P.actions,
           onClick: () => props.onActions(current),
         }, 'MoreHorizontal'),
         iconBtn({ 'data-mv2': 'pinpeek-close', 'aria-label': P.close, onClick: props.onClose }, 'X')),

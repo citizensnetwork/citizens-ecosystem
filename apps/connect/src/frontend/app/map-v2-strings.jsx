@@ -294,6 +294,8 @@
       peek: {
         label: 'On the map here',
         detailsBadge: 'Tap again for details',
+        actions: 'More listing actions',
+        suggestions: 'Explore nearby',
         count: (i, n) => i + ' of ' + n,
         prev: 'Previous on the map',
         next: 'Next on the map',

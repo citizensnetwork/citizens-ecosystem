@@ -425,7 +425,7 @@
           return React.createElement(React.Fragment, { key: m.id },
             Profile && React.createElement(Profile, { id: m.id, inline: true, onClose: resetLevels }),
             suggestions.length > 0 && React.createElement('section', { 'data-mv2': 'profile-suggestions' },
-              React.createElement('h2', null, 'Explore nearby'),
+              React.createElement('h2', null, XS.peek.suggestions),
               suggestions.map(({ marker, meters }) => React.createElement('button', {
                 key: marker.id, type: 'button', onClick: () => openPeek(marker.id, marker.type),
               }, React.createElement('strong', null, marker.title), React.createElement('small', null, window.MapV2Nearby.distanceText(meters, XS))))));
