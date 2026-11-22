@@ -162,17 +162,13 @@ test.describe("a phone, 375 px, real touch", () => {
     await resetPointerCounts(page);
     await swipe(cdp, at, 0, { dx: -230, ms: 320, steps: 14 });
     await expect.poll(() => scrollLeftOf(page, newsRegion(page)), { timeout: 3000 }).toBeGreaterThan(200);
-    // wait for the snap to finish (a fixed 500 ms was not enough on a loaded runner: it read 12 px short of the card twice)
-    let last = -1;
-    await expect.poll(async () => {
-      const now = await scrollLeftOf(page, newsRegion(page));
-      const still = now === last;
-      last = now;
-      return still;
-    }, { timeout: 5_000, intervals: [150] }).toBe(true);
-    // settled on a card: scrollLeft is a whole number of card steps (264 + 8)
-    const sl = await scrollLeftOf(page, newsRegion(page));
-    expect(Math.abs(sl / 272 - Math.round(sl / 272))).toBeLessThan(0.02);
+    // it comes to rest on a card: scrollLeft a whole number of card steps (264 + 8). Waited for, not timed: a fixed 500 ms
+    // read the snap still finishing (12 px short) on a loaded runner, and "two equal readings" caught a pause mid-swipe.
+    const offStep = async () => { const sl = await scrollLeftOf(page, newsRegion(page)); return Math.abs(sl / 272 - Math.round(sl / 272)); };
+    await expect.poll(offStep, { timeout: 5_000 }).toBeLessThan(0.02);
+    // and it stays there (a snap point is where the row rests, not a frame it passes through)
+    await page.waitForTimeout(300);
+    expect(await offStep()).toBeLessThan(0.02);
     expect(await snapOf(page)).toBe("full");
     expect(await scroller(page).evaluate((e) => e.scrollTop)).toBe(top);
     await expect(page.locator("[data-mv2='news-card']")).toHaveCount(0);
