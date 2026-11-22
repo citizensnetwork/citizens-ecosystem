@@ -33,19 +33,28 @@ async function open(page: Page) {
   await idle(page);
 }
 /**
- * The map has settled: not moving, and its camera unchanged for 300 ms. A carousel choice eases the map one frame later
- * (requestAnimationFrame), so "not moving" alone can be read in the frame before an ease begins (CI saw that).
+ * The map has settled: not moving, and its camera unchanged for 300 ms AND across at least three painted frames. A
+ * carousel choice starts its ease in the next animation frame (requestAnimationFrame). CI draws the map in software, so
+ * frames can be held back for longer than 300 ms while this check's timers keep running: a camera diagnostic showed the
+ * time alone passing before the ease had even begun, so the "settled" camera was read just before it moved.
  */
 async function idle(page: Page) {
   await page.waitForFunction(() => {
-    const w = window as unknown as { __ccMap: MapLike; __idle?: { sig: string; at: number } };
+    type W = { __ccMap: MapLike; __idle?: { sig: string; at: number; frame: number }; __frames?: number };
+    const w = window as unknown as W;
+    // one painted-frame counter per page (a requestAnimationFrame loop, like the app's own eases)
+    if (w.__frames === undefined) {
+      w.__frames = 0;
+      const tick = () => { w.__frames = (w.__frames || 0) + 1; requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    }
     const m = w.__ccMap;
     if (m.isMoving()) { w.__idle = undefined; return false; }
     const c = m.getCenter();
     const sig = `${c.lng.toFixed(9)},${c.lat.toFixed(9)},${m.getZoom().toFixed(6)}`;
     const now = performance.now();
-    if (!w.__idle || w.__idle.sig !== sig) { w.__idle = { sig, at: now }; return false; }
-    return now - w.__idle.at > 300;
+    if (!w.__idle || w.__idle.sig !== sig) { w.__idle = { sig, at: now, frame: w.__frames }; return false; }
+    return now - w.__idle.at > 300 && w.__frames - w.__idle.frame >= 3;
   }, undefined, { polling: 50, timeout: 15_000 });
 }
 const cam = (page: Page) => page.evaluate(() => {
@@ -277,6 +286,8 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
     });
 
     test("the crown and a tap on empty map go straight back to the crown alone, leaving no history behind", async ({ page }) => {
+      // a long journey (two full climbs, the strip, bare-map taps and a pan): close to the 30 s default on a busy machine
+      test.slow();
       await open(page);
       const start = await depth(page);
       const pins = await visiblePins(page);
