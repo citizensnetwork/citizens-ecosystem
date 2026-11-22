@@ -187,10 +187,10 @@
   --xp-max: 720px;                          /* the desktop Explore sheet */
   --xp-tile-size: 84px;                     /* a Where to… tile */
   --xp-dock-h: 64px;                        /* the sticky nav the crown becomes */
-  --pp-peek: 368px;                         /* pin carousel lowered: cards fill the strip (Pack 09) */
-  --pp-card-w: 176px;                       /* preview card width in the pin carousel */
-  --pp-card-img: 128px;                     /* preview photo height */
-  --pp-card-body: 132px;                    /* body fills remaining strip under the photo */
+  --pp-peek: 392px;                         /* pin carousel lowered: cards fill the strip (Pack 09) */
+  --pp-card-w: 180px;                       /* preview card width in the pin carousel */
+  --pp-card-img: 136px;                     /* preview photo height */
+  --pp-card-body: 148px;                    /* body fills remaining strip under the photo */
   --xp-sheet: rgba(249, 248, 243, 0.95);
   --xp-tile: rgba(236, 238, 240, 0.72);     /* frosted grey glass: tiles and tabs, including the selected one */
   --xp-tile-line: rgba(39, 42, 37, 0.1);
@@ -3655,11 +3655,15 @@ a[data-mv2='card2'],
 }
 [data-mv2='xrow'] {
   display: flex;
+  align-items: stretch;
   gap: var(--space-3);
   overflow-x: auto;
   padding: var(--space-1) var(--space-5) var(--space-3);
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
+}
+[data-mv2='xrow'][data-row='peek'] {
+  padding-bottom: var(--space-4);
 }
 /* The panel's cards (founder, 2026-11-17: smaller, so a row shows more of them and the map more of itself). */
 [data-mv2='xcard'] {
