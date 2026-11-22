@@ -151,7 +151,7 @@ test.describe("the map home on a phone", () => {
     await crown(page).click();
     await page.getByRole("button", { name: "Coffee", exact: true }).click();
     await expect(page.locator("[data-mv2='filter-chip']")).toBeVisible();
-    await page.getByRole("button", { name: "Clear filters and go back to the map" }).click();
+    await page.getByRole("button", { name: "Clear filters" }).click();
     await expect(page.locator("[data-mv2='filter-chip']")).toHaveCount(0);
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
     await expect(page.locator(".mv2-pin[data-match]")).toHaveCount(0);
@@ -160,7 +160,7 @@ test.describe("the map home on a phone", () => {
   test("the handle opens every row; a row's title takes it over; the sticky nav is Explore, Map, Me", async ({ page }) => {
     await open(page);
     await crown(page).click();
-    await page.getByRole("button", { name: "Show every row" }).click();
+    await page.getByRole("button", { name: "Show all rows" }).click();
     await expect(sheet(page)).toHaveAttribute("data-open", "");
     await expect(crown(page)).toHaveCount(0);
     const dock = page.locator("[data-mv2='explore-dock']");
@@ -173,12 +173,12 @@ test.describe("the map home on a phone", () => {
     await dock.locator("[data-nav='me']").click();
     await expect(page.getByRole("button", { name: "View Profile" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Near and Now…" }).click();
+    await page.getByRole("button", { name: "Near & now" }).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "focus");
-    await expect(page.getByRole("tab", { name: "Near and Now…" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.locator("[data-mv2='filter-chip']")).toContainText("Near and Now…");
+    await expect(page.getByRole("tab", { name: "Near & now" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("[data-mv2='filter-chip']")).toContainText("Near & now");
 
-    await page.getByRole("button", { name: "Show every row" }).click();
+    await page.getByRole("button", { name: "Show all rows" }).click();
     await page.getByRole("button", { name: "Explore more" }).click();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page.locator("[data-screen='explore']")).toBeVisible();
@@ -187,7 +187,7 @@ test.describe("the map home on a phone", () => {
   test("Map in the sticky nav goes back to the crown", async ({ page }) => {
     await open(page);
     await crown(page).click();
-    await page.getByRole("button", { name: "Show every row" }).click();
+    await page.getByRole("button", { name: "Show all rows" }).click();
     await page.locator("[data-mv2='explore-dock'] [data-nav='map']").click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
     await expect(crown(page)).toBeVisible();

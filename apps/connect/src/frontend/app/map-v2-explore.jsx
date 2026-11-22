@@ -368,53 +368,60 @@
       Icon ? h(Icon, { name: 'ArrowUpRight', size: 16 }) : null);
   }
 
+  /**
+   * Shared preview card (Explore rows + pin carousel). Event and Place differ by a kind pill and a fact line
+   * (when / hours); the foot keeps organiser left and distance right so the body can grow into the strip.
+   */
   function XCard(props) {
     const m = props.m;
     const rec = props.rec || {};
     const group = groupOf(m);
     const words = props.groupWords || {};
     const peek = !!props.peek;
+    const kinds = (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.kinds) || {};
+    const kind = m.type === 'event' || m.type === 'place' || m.type === 'contributor' ? m.type : '';
+    const kindWord = kind ? (kinds[kind] || '') : '';
+    const kindIcon = kind === 'event' ? 'Calendar' : (kind === 'place' ? 'MapPin' : (kind === 'contributor' ? 'User' : ''));
     const raw = rec.coverPhoto || m.coverPhoto || (m.type === 'contributor' ? m.profilePhoto : '') || '';
     const cover = window.UI && window.UI.safeUrl ? (window.UI.safeUrl(raw) || '') : (/^https?:\/\//i.test(raw) ? raw : '');
     const Icon = window.Icon;
     const cat = window.DATA && window.DATA.getItemCategory ? window.DATA.getItemCategory(m) : null;
     const near = window.MapV2Nearby;
     const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
-    const when = whenLine(m, rec);
-    const meta = peek ? '' : [dist, when].filter(Boolean).join(' · ');
+    const fact = whenLine(m, rec);
+    const factIcon = kind === 'event' ? 'Clock' : (kind === 'place' && fact ? 'Clock' : '');
     const owner = m.ownerName ? String(m.ownerName).trim() : '';
     const catLabel = (cat && cat.name) || (group && words[group]) || '';
-    const catLine = catLabel
-      ? h('span', { 'data-mv2': 'xcard-chip' },
-          peek ? null : h('i', { 'data-cat': group || undefined, 'aria-hidden': 'true' }),
-          h('span', { 'data-mv2': 'card-chip-label' }, catLabel))
-      : null;
     return h('button', {
       type: 'button', 'data-mv2': 'xcard', 'data-explore-id': m.id,
       'data-peek': peek ? '' : undefined,
+      'data-kind': kind || undefined,
       'data-cat': group || undefined,
       'data-selected': props.selected ? '' : undefined,
       'aria-current': props.selected ? 'true' : undefined,
       onClick: () => props.onOpen && props.onOpen(m.id, m.type),
     },
       h('span', { 'data-mv2': 'xcard-img' },
-        cover ? h('img', { src: cover, alt: '' }) : (Icon ? h(Icon, { name: (cat && cat.icon), size: 22 }) : null),
+        cover ? h('img', { src: cover, alt: '' }) : (Icon ? h(Icon, { name: (cat && cat.icon) || kindIcon || 'MapPin', size: 22 }) : null),
         m.isLive ? h('span', { 'data-mv2': 'xcard-live' }, h('i', { 'aria-hidden': 'true' }), 'Live') : null,
-        // peek: light SVG cue (second tap); explore rows still use the word badge
         props.selected && props.detailsCue ? h(DetailsCue) : null,
         props.selected && props.badge ? h('span', { 'data-mv2': 'xcard-badge' }, props.badge) : null,
         props.selected && props.detailsCue && props.cueLabel
           ? h('span', { 'data-mv2': 'sr' }, props.cueLabel) : null),
       h('span', { 'data-mv2': 'xcard-body' },
-        peek ? null : catLine,
-        h('b', null, m.title || ''),
-        peek ? catLine : null,
-        meta ? h('small', { 'data-mv2': 'row-meta' }, meta) : null,
-        peek
-          ? h('span', { 'data-mv2': 'xcard-foot' },
-              owner ? h('small', { 'data-mv2': 'xcard-by' }, owner) : h('span'),
-              dist ? h('small', { 'data-mv2': 'xcard-dist' }, dist) : null)
-          : (owner ? h('small', { 'data-mv2': 'xcard-by' }, owner) : null)));
+        h('span', { 'data-mv2': 'xcard-top' },
+          kindWord ? h('span', { 'data-mv2': 'xcard-kind' },
+            Icon && kindIcon ? h(Icon, { name: kindIcon, size: 12 }) : null,
+            h('span', null, kindWord)) : null,
+          h('b', null, m.title || ''),
+          catLabel ? h('span', { 'data-mv2': 'xcard-chip' },
+            h('span', { 'data-mv2': 'card-chip-label' }, catLabel)) : null,
+          fact ? h('span', { 'data-mv2': 'xcard-fact' },
+            Icon && factIcon ? h(Icon, { name: factIcon, size: 12 }) : null,
+            h('span', null, fact)) : null),
+        h('span', { 'data-mv2': 'xcard-foot' },
+          owner ? h('small', { 'data-mv2': 'xcard-by' }, owner) : h('span'),
+          dist ? h('small', { 'data-mv2': 'xcard-dist' }, dist) : null)));
   }
 
   function XRow(props) {
@@ -653,9 +660,10 @@
       }
       if (props.onOpen) props.onOpen(id, type, measuredFrom);
     };
+    const cardDist = (str.peek && str.peek.dist) || distWords;
     const cards = (id, list) => h(XRow, { id: id, fine: fine, list: list }, list.map((r) => h(XCard, {
       key: id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
-      groupWords: str.groups, distWords: distWords,
+      groupWords: str.groups, distWords: cardDist,
       selected: props.selectedId === r.m.id, badge: str.selectedBadge,
       onOpen: openCard(id),
     })));
