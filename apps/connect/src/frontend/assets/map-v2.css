@@ -3662,9 +3662,6 @@ a[data-mv2='card2'],
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
-[data-mv2='xrow'][data-row='peek'] {
-  padding-bottom: var(--space-4);
-}
 /* The panel's cards (founder, 2026-11-17: smaller, so a row shows more of them and the map more of itself). */
 [data-mv2='xcard'] {
   flex: 0 0 auto;
@@ -4405,6 +4402,7 @@ a[data-mv2='card2'],
 [data-mv2='xrow'][data-row='peek'] {
   position: relative;
   padding-inline: calc(50% - var(--pp-card-w) / 2);
+  padding-bottom: var(--space-4);
   scroll-padding-inline: calc(50% - var(--pp-card-w) / 2);
   touch-action: pan-x;
 }
