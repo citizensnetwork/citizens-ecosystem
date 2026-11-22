@@ -149,15 +149,21 @@
 
   // #210: the expanded sheet's 16:9 cover, in the card's own media box; a neutral tile with the category icon when
   // there is no picture or it fails to load (so every expanded sheet starts with the same shape).
-  function Cover({ src, icon }) {
+  function Cover({ src, icon, blank }) {
     const [bad, setBad] = useState(false);
     useEffect(() => setBad(false), [src]);
     const url = window.UI.safeUrl(src);
     const Icon = window.Icon;
-    return url && !bad
-      ? h('span', { 'data-mv2': 'card-media', 'data-cover': '' },
-        h('img', { src: url, alt: '', decoding: 'async', onError: () => setBad(true), 'data-mv2': 'card-photo' }))
-      : h('span', { 'data-mv2': 'card-media', 'data-cover': '', 'data-tile': '', 'aria-hidden': 'true' }, h(Icon, { name: icon, size: 40 }));
+    if (url && !bad) {
+      return h('span', { 'data-mv2': 'card-media', 'data-cover': '' },
+        h('img', { src: url, alt: '', decoding: 'async', onError: () => setBad(true), 'data-mv2': 'card-photo' }));
+    }
+    // Raised hero: empty 16:9 plane (no category glyph). Expanded sheet still uses the tile icon.
+    if (blank) {
+      return h('span', { 'data-mv2': 'card-media', 'data-cover': '', 'data-blank': '', 'aria-hidden': 'true' });
+    }
+    return h('span', { 'data-mv2': 'card-media', 'data-cover': '', 'data-tile': '', 'aria-hidden': 'true' },
+      Icon ? h(Icon, { name: icon || 'MapPin', size: 40 }) : null);
   }
 
   function Action({ icon, label, href, onClick, external, primary, on }) {
@@ -999,23 +1005,23 @@
       (expanded || inline) && collabChip,
       facts.length > 0 && h('span', { 'data-mv2': 'sub' },
         facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), [])));
-    // Raised pinpeek: landscape cover across the drawer, title/category/distance on the photo,
-    // circular org/user avatar bottom-left overlapping the cover, handles indented below (founder, 2026-11-22).
+    // Raised pinpeek: 16:9 cover; avatar bottom-left overlapping; title/category/distance to its right (founder, 2026-11-22).
     const coverSrc = item.coverPhoto || (org && org.coverPhoto) || '';
     const faceSrc = avatarSrc || item.profilePhoto || (org && org.profilePhoto) || '';
     const xhead = (expanded || inline) && (inline
       ? h('header', { 'data-mv2': 'xhead', 'data-hero': '', 'data-map-sheet-header': '', 'data-cat': group || undefined },
         h('div', { 'data-mv2': 'cover-hero' },
-          h(Cover, { src: coverSrc, icon: (cat && cat.icon) || 'MapPin' }),
+          h(Cover, { src: coverSrc, blank: true }),
           h('div', { 'data-mv2': 'cover-scrim', 'aria-hidden': 'true' }),
-          h('div', { 'data-mv2': 'cover-copy' },
-            h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
-            chipMeta),
-          h('div', { 'data-mv2': 'cover-avatar' },
-            h(Avatar, {
-              src: faceSrc, name: avatarName || name, hex, size: 'half',
-              glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 22 }),
-            }))),
+          h('div', { 'data-mv2': 'cover-foot' },
+            h('div', { 'data-mv2': 'cover-avatar' },
+              h(Avatar, {
+                src: faceSrc, name: avatarName || name, hex, size: 'half',
+                glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 22 }),
+              })),
+            h('div', { 'data-mv2': 'cover-copy' },
+              h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
+              chipMeta))),
         h(HandleRow, { item: item }))
       : h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
         h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
