@@ -5,18 +5,23 @@
  * subject. Look and sign-off match the Google Form's welcome email
  * (docs/handoffs/intake-v2.gs `sendWelcome_`) so a person gets one voice from us.
  *
- * Nothing here knows a real person or organisation: callers pass the values.
+ * Nothing here knows a real person or organisation: callers pass the values. The world's
+ * words (its name, what it calls a partner, the sign-off) come from `@/lib/world` (engine
+ * step E7); each one is escaped like any other value in the HTML part.
  */
 
 import { escapeHtml } from "@/lib/email/send";
+import { lowerTerm, world } from "@/lib/world";
 
 export type Email = { subject: string; html: string; text: string };
 
 const GOLD = "#F2BD22"; // the crown gold: the button and the rule beside a note
 const GOLD_INK = "#836100"; // gold text and links (4.5:1 on white; the crown gold itself is 1.74:1)
-const SIGN_OFF_HTML =
-  "Connecting the Kingdom — one citizen, one contributor, one need at a time.<br>The Citizens Connect team";
-const SIGN_OFF_TEXT = "Connecting the Kingdom — one citizen, one contributor, one need at a time.\nThe Citizens Connect team";
+/** The plain-text sign-off every email ends with (the HTML one is inside `layout`). */
+export const SIGN_OFF_TEXT = world.t("email.signOff");
+const SIGN_OFF_HTML = escapeHtml(SIGN_OFF_TEXT).split("\n").join("<br>");
+/** The world's name, escaped for the HTML part. */
+const WORLD_HTML = escapeHtml(world.term("world"));
 
 /** A subject line is one short line; never trust a user-supplied name inside one. */
 export function subjectSafe(value: string): string {
@@ -50,22 +55,24 @@ export function newApplicationAdminEmail(input: {
 }): Email {
   const category = input.categoryLabel || "No category chosen";
   const area = input.area || "Online / no fixed location";
-  const where = "Open Citizens Connect, then Admin → Applications.";
+  const where = `${world.t("email.openApp")}, then Admin → Applications.`;
+  const waiting = `A new ${world.term("partner")} application is waiting`;
+  const applied = `has applied to become ${world.term("partner", "a")}.`;
   return {
-    subject: subjectSafe(`New Contributor application: ${input.name}`),
+    subject: subjectSafe(world.t("email.partnerApplication.adminSubject", { name: input.name })),
     html: layout(
-      "A new Contributor application is waiting",
-      `<p><strong>${escapeHtml(input.name)}</strong> has applied to become a Contributor.</p>` +
+      waiting,
+      `<p><strong>${escapeHtml(input.name)}</strong> ${escapeHtml(applied)}</p>` +
         '<table style="border-collapse:collapse;margin:0 0 14px">' +
         `<tr><td style="padding:2px 14px 2px 0;color:#555">Category</td><td>${escapeHtml(category)}</td></tr>` +
         `<tr><td style="padding:2px 14px 2px 0;color:#555">Area</td><td>${escapeHtml(area)}</td></tr>` +
         "</table>" +
         `<p>${escapeHtml(where)} Nothing of theirs is public until you approve it.</p>` +
-        button(input.siteUrl, "Open Citizens Connect"),
+        button(input.siteUrl, world.t("email.openApp")),
     ),
     text:
-      "A new Contributor application is waiting\n\n" +
-      `${input.name} has applied to become a Contributor.\n` +
+      `${waiting}\n\n` +
+      `${input.name} ${applied}\n` +
       `Category: ${category}\nArea: ${area}\n\n` +
       `${where} Nothing of theirs is public until you approve it.\n${input.siteUrl}\n\n${SIGN_OFF_TEXT}`,
   };
@@ -79,7 +86,7 @@ export function newApplicationAdminEmail(input: {
  * An online-only Contributor ("no fixed location") must never be promised a pin.
  */
 function listedWhere(onMap: boolean): string {
-  return onMap ? "on the map and in Kingdom Discovery" : "in Kingdom Discovery";
+  return onMap ? world.t("screen.listing.whereMapAndDirectory") : world.t("screen.listing.whereDirectory");
 }
 
 // ── To the applicant: approved ───────────────────────────────────────────
@@ -92,23 +99,24 @@ export function applicationApprovedEmail(input: {
   onMap: boolean;
 }): Email {
   const where = listedWhere(input.onMap);
+  const portal = world.t("screen.portal.title");
   return {
-    subject: subjectSafe(`You're live on Citizens Connect: ${input.name}`),
+    subject: subjectSafe(world.t("email.partnerApproved.subject", { name: input.name })),
     html: layout(
-      `${input.name} is live on Citizens Connect 🎉`,
-      "<p>Thank you for joining the Body on Citizens Connect. Your application was approved: " +
-        `you're now ${where}, where citizens across the city can find, ` +
+      `${input.name} is live on ${world.term("world")} 🎉`,
+      `<p>${escapeHtml(world.t("email.welcomeThanks"))} Your application was approved: ` +
+        `you're now ${escapeHtml(where)}, where ${escapeHtml(lowerTerm("user", "many"))} across the city can find, ` +
         "follow and connect with you.</p>" +
         `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD_INK}">View your listing</a></p>` +
         "<p>You can add events and places, post news and keep your profile up to date from your " +
-        "Contributor Portal:</p>" +
-        button(input.dashboardUrl, "Open your Contributor Portal"),
+        `${escapeHtml(portal)}:</p>` +
+        button(input.dashboardUrl, `Open your ${portal}`),
     ),
     text:
-      `${input.name} is live on Citizens Connect.\n\n` +
-      `Thank you for joining the Body. Your application was approved: you're now ${where}.\n\n` +
+      `${input.name} is live on ${world.term("world")}.\n\n` +
+      `${world.t("email.welcomeThanks")} Your application was approved: you're now ${where}.\n\n` +
       `View your listing: ${input.listingUrl}\n` +
-      `Open your Contributor Portal: ${input.dashboardUrl}\n\n${SIGN_OFF_TEXT}`,
+      `Open your ${portal}: ${input.dashboardUrl}\n\n${SIGN_OFF_TEXT}`,
   };
 }
 
@@ -119,26 +127,29 @@ export function applicationRejectedEmail(input: {
   reason: string;
   siteUrl: string;
 }): Email {
+  const about = world.t("email.partnerDeclined.subject");
+  const thanks = `Thank you for taking the time to apply to become ${world.term("partner", "a")} on ${world.term("world")}. `;
+  const invite = world.t("screen.apply.invite");
   return {
-    subject: "About your Contributor application",
+    subject: about,
     html: layout(
-      "About your Contributor application",
+      about,
       `<p>Hi ${escapeHtml(input.name)},</p>` +
-        "<p>Thank you for taking the time to apply to become a Contributor on Citizens Connect. " +
+        `<p>${escapeHtml(thanks)}` +
         "We weren't able to approve it just yet, and we'd like you to know why:</p>" +
         `<p style="background:#faf6ea;border-left:3px solid ${GOLD};padding:10px 14px;margin:0 0 14px">${escapeHtml(input.reason)}</p>` +
         "<p>This isn't a closed door. You can make those changes and apply again whenever you're " +
-        "ready: open Citizens Connect, go to <strong>Settings</strong> and choose " +
-        "<strong>Apply to become a Contributor</strong>. We would be glad to look again.</p>" +
-        button(input.siteUrl, "Open Citizens Connect"),
+        `ready: open ${WORLD_HTML}, go to <strong>Settings</strong> and choose ` +
+        `<strong>${escapeHtml(invite)}</strong>. We would be glad to look again.</p>` +
+        button(input.siteUrl, world.t("email.openApp")),
     ),
     text:
       `Hi ${input.name},\n\n` +
-      "Thank you for taking the time to apply to become a Contributor on Citizens Connect. " +
+      thanks +
       "We weren't able to approve it just yet, and we'd like you to know why:\n\n" +
       `${input.reason}\n\n` +
       "This isn't a closed door. You can make those changes and apply again whenever you're ready: " +
-      "open Citizens Connect, go to Settings and choose \"Apply to become a Contributor\". " +
+      `open ${world.term("world")}, go to Settings and choose "${invite}". ` +
       `We would be glad to look again.\n${input.siteUrl}\n\n${SIGN_OFF_TEXT}`,
   };
 }
@@ -174,10 +185,10 @@ export function applicationRejectedEmail(input: {
 export function intakeUpgradeEmail(input: { name: string; confirmUrl: string; declineUrl: string; expiresOn: string }): Email {
   const name = escapeHtml(input.name);
   return {
-    subject: subjectSafe(`Is ${input.name} your organisation?`),
+    subject: subjectSafe(world.t("email.listingInvite.subject", { name: input.name })),
     html: layout(
       "Is this your organisation?",
-      `<p>A listing for <strong>${name}</strong> was submitted to Citizens Connect on your account.</p>` +
+      `<p>A listing for <strong>${name}</strong> was submitted to ${WORLD_HTML} on your account.</p>` +
         "<p>Nothing is public, and your account is unchanged, until you confirm it. " +
         "If this is your organisation, confirm the upgrade. If it is not yours, tell us.</p>" +
         button(input.confirmUrl, "Confirm the upgrade") +
@@ -187,7 +198,7 @@ export function intakeUpgradeEmail(input: { name: string; confirmUrl: string; de
     ),
     text:
       "Is this your organisation?\n\n" +
-      `A listing for ${input.name} was submitted to Citizens Connect on your account.\n\n` +
+      `A listing for ${input.name} was submitted to ${world.term("world")} on your account.\n\n` +
       "Nothing is public, and your account is unchanged, until you confirm it.\n\n" +
       `Confirm the upgrade: ${input.confirmUrl}\n` +
       `This is not my organisation: ${input.declineUrl}\n\n` +
@@ -203,12 +214,12 @@ export function intakeUpgradeFlagEmail(input: { name: string; outcome: "declined
     subject: subjectSafe(`Intake upgrade ${happened}: ${input.name}`),
     html: layout(
       `An intake upgrade ${happened}`,
-      `<p><strong>${escapeHtml(input.name)}</strong> ${happened}. The citizen account was not changed, and no listing was created.</p>` +
+      `<p><strong>${escapeHtml(input.name)}</strong> ${happened}. The ${escapeHtml(lowerTerm("user"))} account was not changed, and no listing was created.</p>` +
         `<p>The sheet row should read <strong>${sheet}</strong>. Request ${escapeHtml(input.requestId)}.</p>`,
     ),
     text:
       `An intake upgrade ${happened}.\n\n` +
-      `${input.name} ${happened}. The citizen account was not changed, and no listing was created.\n` +
+      `${input.name} ${happened}. The ${lowerTerm("user")} account was not changed, and no listing was created.\n` +
       `The sheet row should read ${sheet}. Request ${input.requestId}.\n\n${SIGN_OFF_TEXT}`,
   };
 }
@@ -219,45 +230,45 @@ export function ownerWelcomeEmail(input: {
   listingUrl: string;
   signInUrl: string;
   onMap: boolean;
-  /** The address already has a Citizens Connect account (the listing is offered to it, never merged). */
+  /** The address already has an account here (the listing is offered to it, never merged). */
   hasAccount?: boolean;
 }): Email {
   const email = escapeHtml(input.ownerEmail);
   const where = listedWhere(input.onMap);
   const hasAccount = input.hasAccount === true;
   const askHtml = hasAccount
-    ? `<p>You already have a Citizens Connect account with <strong>${email}</strong>. When you sign in as usual we will ask: ` +
+    ? `<p>You already have ${escapeHtml(world.term("world", "a"))} account with <strong>${email}</strong>. When you sign in as usual we will ask: ` +
       `<em>"Attach ${escapeHtml(input.name)} to your account?"</em> Nothing on your account changes unless you tap <strong>Confirm</strong>. ` +
       "If this listing is not yours, tap <strong>Not me</strong> and we will hide it straight away.</p>"
     : "<p>When you sign in we will ask you to confirm that this listing is yours. " +
       "If it is not, tap <strong>Not me</strong> and we will hide it straight away.</p>";
   const askText = hasAccount
-    ? `You already have a Citizens Connect account with ${input.ownerEmail}. When you sign in as usual we will ask: "Attach ${input.name} to your account?" ` +
+    ? `You already have ${world.term("world", "a")} account with ${input.ownerEmail}. When you sign in as usual we will ask: "Attach ${input.name} to your account?" ` +
       "Nothing on your account changes unless you tap Confirm. If this listing is not yours, tap Not me and we will hide it straight away."
     : "When you sign in we will ask you to confirm that this listing is yours. If it is not, tap Not me and we will hide it straight away.";
   return {
-    subject: subjectSafe(`You're live on Citizens Connect — ${input.name}`),
+    subject: subjectSafe(`You're live on ${world.term("world")} — ${input.name}`),
     html: layout(
-      `${input.name} is live on Citizens Connect 🎉`,
-      "<p>Thank you for joining the Body on Citizens Connect. A listing for you has been added, " +
-        `and it is now ${where}, where citizens across the city can find, ` +
+      `${input.name} is live on ${world.term("world")} 🎉`,
+      `<p>${escapeHtml(world.t("email.welcomeThanks"))} A listing for you has been added, ` +
+        `and it is now ${escapeHtml(where)}, where ${escapeHtml(lowerTerm("user", "many"))} across the city can find, ` +
         "follow and connect with you.</p>" +
         `<p><a href="${escapeHtml(input.listingUrl)}" style="color:${GOLD_INK}">View your listing</a></p>` +
         `<p><strong>To see your listing and manage it</strong>, sign in with <strong>${email}</strong>. ` +
         "You don't need a Google account:</p>" +
         '<ol style="padding-left:20px;margin:0 0 14px">' +
-        `<li>Open <a href="${escapeHtml(input.signInUrl)}" style="color:${GOLD_INK}">Citizens Connect</a> and tap <strong>Continue with email</strong>.</li>` +
+        `<li>Open <a href="${escapeHtml(input.signInUrl)}" style="color:${GOLD_INK}">${WORLD_HTML}</a> and tap <strong>Continue with email</strong>.</li>` +
         `<li>Enter <strong>${email}</strong>. We'll email you a 6-digit code (check your junk folder too).</li>` +
         "<li>Type the code in, then confirm the listing is yours.</li>" +
         "</ol>" +
         askHtml +
-        button(input.signInUrl, "Sign in to your Contributor Portal") +
+        button(input.signInUrl, `Sign in to your ${world.t("screen.portal.title")}`) +
         `<p style="font-size:13px;color:#555">Is ${email} a Google account? You can tap the Google button instead. ` +
         `Signed in with a different address by mistake? Sign out, then sign in again with ${email}.</p>`,
     ),
     text:
-      `${input.name} is live on Citizens Connect.\n\n` +
-      `Thank you for joining the Body. A listing for you has been added, and it is now ${where}.\n\n` +
+      `${input.name} is live on ${world.term("world")}.\n\n` +
+      `${world.t("email.welcomeThanks")} A listing for you has been added, and it is now ${where}.\n\n` +
       `View your listing: ${input.listingUrl}\n\n` +
       `To see your listing and manage it, sign in with ${input.ownerEmail}. You don't need a Google account:\n` +
       `1. Open ${input.signInUrl} and tap "Continue with email".\n` +

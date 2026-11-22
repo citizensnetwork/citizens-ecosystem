@@ -4,6 +4,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { useState } = React;
   const { cx, Avatar, SmartImage, Button, Segmented, Empty } = window.UI;
@@ -275,7 +276,7 @@
       const ev6 = [3, 4, 6, 8, 10, events.length].map((n, i) => Math.max(1, n - (5 - i)));
       const us6 = WEEKS.slice(0, 6).map((_, i) => 40 + Math.round(seed(i + 3) * 30) + i * 14);
       growthGroups = WEEKS.slice(0, 6);
-      growthSeries = [{ name: 'Events', color: '#F2BD22', data: ev6 }, { name: 'Citizens', color: '#2563EB', data: us6 }];
+      growthSeries = [{ name: 'Events', color: '#F2BD22', data: ev6 }, { name: W.term('user', 'Many'), color: '#2563EB', data: us6 }];
     }
 
     // activity feed: real mode = latest created events (honest, derivable
@@ -301,16 +302,16 @@
         h('button', {
           type: 'button', onClick: () => setTab('citizens'),
           className: 'bg-card rounded-2xl p-3 border border-border text-left hover:border-[#836100] transition-colors min-h-[44px]',
-          'aria-label': viewCount(memberCount, real ? 'member' : 'citizen'),
+          'aria-label': viewCount(memberCount, real ? 'member' : W.term('user').toLocaleLowerCase('en')),
         },
-          h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, real ? 'Members' : 'Citizens'),
+          h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, real ? 'Members' : W.term('user', 'Many')),
           h('p', { className: 'text-xl font-bold mt-1', style: { color: '#16A34A' } }, memberCount)),
         h('button', {
           type: 'button', onClick: () => setTab('contributors'),
           className: 'bg-card rounded-2xl p-3 border border-border text-left hover:border-[#836100] transition-colors min-h-[44px]',
-          'aria-label': viewCount(contributorCount, 'contributor'),
+          'aria-label': viewCount(contributorCount, W.term('partner').toLocaleLowerCase('en')),
         },
-          h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, 'Contributors'),
+          h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, W.term('partner', 'Many')),
           h('p', { className: 'text-xl font-bold mt-1', style: { color: '#9B59B6' } }, contributorCount)),
         KpiCard('Live now', liveNow, '#DC2626', liveNow ? { up: false, text: 'on the map' } : null)),
 

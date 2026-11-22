@@ -275,7 +275,7 @@
     const [enter, setEnter] = useState(null);       // 'next' | 'prev': the side a newly chosen tab's panel slides in from
     const [viewer, setViewer] = useState(null);     // { index, from }
     const [evSort, setEvSort] = useState(null);     // 'upcoming' | 'recent' | null (null = Upcoming when there is any, else Recent)
-    const [qr, setQr] = useState(null);             // { from }: the QR code dialog (Contributor only)
+    const [qr, setQr] = useState(null);             // { from }: the QR code dialog (partner listings only)
     const [reading, setReading] = useState(null);   // { id, from }: the news reader (one post, one dialog)
     const [announce, setAnnounce] = useState(Str.snapMessage[opensAt]);
     const dragState = useRef(null);

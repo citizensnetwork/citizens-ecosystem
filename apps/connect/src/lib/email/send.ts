@@ -23,6 +23,7 @@
 
 import { normaliseEmail } from "@/lib/contributorFields";
 import { isPlaceholderEmail } from "@/lib/placeholderEmail";
+import { world } from "@/lib/world";
 
 export type EmailOutcome = "sent" | "failed" | "skipped";
 
@@ -37,7 +38,7 @@ export type OutgoingEmail = {
 };
 
 /** The verified Resend sending domain (see RESUME §2). */
-export const EMAIL_FROM = "Citizens Connect <no-reply@citizenscentral.co.za>";
+export const EMAIL_FROM = `${world.t("email.senderName")} <no-reply@citizenscentral.co.za>`;
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const TIMEOUT_MS = 8_000;
