@@ -258,7 +258,7 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(mode()).toBe("focus");
     expect(screen.getByRole("tab", { name: "Coffee" }).getAttribute("aria-selected")).toBe("true");
     expect(document.querySelector("[data-row='tile'] [data-explore-id='two']")).toBeTruthy();
-    expect(document.querySelector("[data-row='tile'] [data-explore-id='two'] [data-mv2='xcard-by']")!.textContent).toBe("by Anchor Community Church");
+    expect(document.querySelector("[data-row='tile'] [data-explore-id='two'] [data-mv2='xcard-by']")!.textContent).toBe("Anchor Community Church");
     expect(document.querySelector("[data-row='tile'] [data-explore-id='one']")).toBeNull();
     // another tab keeps the focus (and so the panel's height): only the row changes
     fireEvent.click(screen.getByRole("tab", { name: "Kids" }));
@@ -509,7 +509,7 @@ describe("the stylesheet and the wiring", () => {
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261119a");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122a");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");
@@ -540,11 +540,12 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     mk("i", 0.5, { type: "idea", title: "An idea" }),
   ];
 
-  it("orders the carousel from the tapped pin: it first, then the pins in view, nearest to it first, ideas never", () => {
+  it("orders the carousel with the tapped pin centred among nearest neighbours (left/right), ideas never", () => {
     const b = pins.find((m) => m.id === "b")!;
-    expect(Y().peekOrder(b, pins, null).map((m) => m.id)).toEqual(["b", "c", "a", "d"]);
-    // only the pins in view (the tapped one is always first, in view or not)
-    expect(Y().peekOrder(b, pins, ["a", "d"]).map((m) => m.id)).toEqual(["b", "a", "d"]);
+    // nearest alternate right then left: b, then c (right), a (left), d (right) → [a, b, c, d]
+    expect(Y().peekOrder(b, pins, null).map((m) => m.id)).toEqual(["a", "b", "c", "d"]);
+    // only the pins in the given set (the tapped one is always included)
+    expect(Y().peekOrder(b, pins, ["a", "d"]).map((m) => m.id)).toEqual(["d", "b", "a"]);
     // capped, the cap counting the tapped pin
     expect(Y().peekOrder(b, pins, null, 2).map((m) => m.id)).toEqual(["b", "c"]);
     expect(Y().peekOrder(null, pins, null)).toEqual([]);
@@ -569,30 +570,45 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
   }
   const cardsIn = () => [...document.querySelectorAll<HTMLElement>("[data-mv2='pinpeek'] [data-mv2='xcard']")];
 
-  it("draws the Explore row's own cards, the chosen one outlined with what its next tap does, and its count", () => {
+  it("draws the Explore row's own cards, the chosen one with a details cue, and no counter", () => {
     carousel();
     const cards = cardsIn();
     expect(cards.map((c) => c.getAttribute("data-explore-id"))).toEqual(["a", "c", "b"]);
     expect(cards[0].hasAttribute("data-selected")).toBe(true);
     expect(cards[0].getAttribute("aria-current")).toBe("true");
-    expect(cards[0].textContent).toContain(PK().detailsBadge as string);
+    expect(cards[0].querySelector("[data-mv2='xcard-cue']")).toBeTruthy();
+    expect(cards[0].textContent).toContain((PK().detailsCue || PK().detailsBadge) as string);
     expect(cards[1].hasAttribute("data-selected")).toBe(false);
-    expect(screen.getByRole("status").textContent).toContain(PK().count(1, 3));
     expect(screen.getByRole("status").textContent).toContain("Alpha");
-    // no arrow points past the first card; the next one does
-    expect(screen.queryByRole("button", { name: PK().prev as string })).toBeNull();
+    expect(screen.getByRole("status").textContent).not.toMatch(/\d+\s*(of|\/)\s*\d+/);
+    // wrap: both arrows stay available at either end
+    expect(screen.getByRole("button", { name: PK().prev as string })).toBeTruthy();
     expect(screen.getByRole("button", { name: PK().next as string })).toBeTruthy();
     // lowered: no details, no Back
     expect(screen.queryByTestId("details")).toBeNull();
     expect(screen.queryByRole("button", { name: PK().back as string })).toBeNull();
   });
 
-  it("an arrow or a neighbour's tap chooses that card; the chosen card's tap raises the panel", () => {
-    const { calls } = carousel({ index: 1 });
+  it("an arrow or a neighbour's tap chooses that card; the chosen card's tap raises the panel; arrows wrap", () => {
+    const { calls, rerender, items } = carousel({ index: 1 });
+    const base = {
+      items, raised: false, origin: ORIGIN, distWords: S.explore, sources: { places: [], events: [], contributors: [] },
+      details: (m: Marker) => React.createElement("p", { "data-testid": "details" }, "About " + m.title),
+      ...calls,
+    };
     fireEvent.click(screen.getByRole("button", { name: PK().next as string }));
     expect(calls.onIndex).toHaveBeenLastCalledWith(2);
     fireEvent.click(screen.getByRole("button", { name: PK().prev as string }));
     expect(calls.onIndex).toHaveBeenLastCalledWith(0);
+    // wrap from the last card back to the first
+    rerender(React.createElement(Y().PinCarousel, { ...base, index: 2 }));
+    fireEvent.click(screen.getByRole("button", { name: PK().next as string }));
+    expect(calls.onIndex).toHaveBeenLastCalledWith(0);
+    // wrap from the first card to the last
+    rerender(React.createElement(Y().PinCarousel, { ...base, index: 0 }));
+    fireEvent.click(screen.getByRole("button", { name: PK().prev as string }));
+    expect(calls.onIndex).toHaveBeenLastCalledWith(2);
+    rerender(React.createElement(Y().PinCarousel, { ...base, index: 1 }));
     fireEvent.click(cardsIn()[2]);
     expect(calls.onIndex).toHaveBeenLastCalledWith(2);
     expect(calls.onRaise).not.toHaveBeenCalled();
@@ -611,8 +627,8 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     // the details come after the cards
     const row = document.querySelector("[data-row='peek']")!;
     expect(row.compareDocumentPosition(screen.getByTestId("details")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    // the chosen card no longer says "tap again": it already did
-    expect(cardsIn()[1].textContent).not.toContain(PK().detailsBadge as string);
+    // the chosen card no longer shows the details cue: it already opened
+    expect(cardsIn()[1].querySelector("[data-mv2='xcard-cue']")).toBeNull();
     fireEvent.click(cardsIn()[1]);
     expect(calls.onRaise).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: PK().back as string }));
