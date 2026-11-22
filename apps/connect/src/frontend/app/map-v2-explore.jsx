@@ -421,9 +421,9 @@
     const near = window.MapV2Nearby;
     const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
     const meta = cardMetaLine(m, rec);
-    // Every place / event has a contributor owner; show "by …" indented under the title (founder, 2026-11-22).
+    // Every place / event has a contributor owner; "by …" sits indented under the tile body (founder, 2026-11-22).
     const byWord = (window.MapV2Strings && window.MapV2Strings.sheet && window.MapV2Strings.sheet.by) || 'by';
-    const ownerRaw = (m.ownerName || rec.organizerName || '').trim();
+    const ownerRaw = (m.ownerName || rec.organizerName || rec.organizer || '').trim();
     const ownerLine = (kind === 'place' || kind === 'event') && ownerRaw
       ? (byWord + ' ' + ownerRaw)
       : '';
@@ -447,14 +447,13 @@
       h('span', { 'data-mv2': 'xcard-body' },
         h('span', { 'data-mv2': 'xcard-top' },
           h('b', null, m.title || ''),
-          ownerLine ? h('small', { 'data-mv2': 'xcard-by' }, ownerLine) : null,
           catLabel ? h('span', { 'data-mv2': 'xcard-chip' },
             h('span', { 'data-mv2': 'card-chip-label' }, catLabel)) : null,
           meta.text ? h('span', { 'data-mv2': 'xcard-meta' },
             Icon && meta.icon ? h(Icon, { name: meta.icon, size: 12 }) : null,
             h('span', null, meta.text)) : null),
         h('span', { 'data-mv2': 'xcard-foot' },
-          h('span'),
+          ownerLine ? h('small', { 'data-mv2': 'xcard-by' }, ownerLine) : h('span'),
           dist ? h('small', { 'data-mv2': 'xcard-dist' }, dist) : null)));
   }
 
@@ -1050,15 +1049,27 @@
     const touch = () => { touched.current = true; };
 
     // Snap stages stay; only the handle pill (and the crown on the phone) starts a vertical pull (founder, 2026-11-22).
+    // Do not setPointerCapture on pointerdown: capture on the section steals the click from Back / handle / Close.
     const onPullDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       const fromHandle = e.target.closest && (
         e.target.closest("[data-mv2='handle']") ||
         e.target.closest("[data-mv2='handle-bar']") ||
+        e.target.closest("[data-mv2='pinpeek-bar']") ||
         e.target.closest("[data-mv2='explore-crown']")
       );
       if (!fromHandle) return;
-      pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      // Back / Close own their clicks — do not start a pull from them.
+      if (e.target.closest && e.target.closest("[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close']")) return;
+      pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId, captured: false };
+    };
+    const onPullMove = (e) => {
+      const p = pull.current;
+      if (!p || p.id !== e.pointerId || p.captured) return;
+      const dx = e.clientX - p.x;
+      const dy = e.clientY - p.y;
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      p.captured = true;
       if (e.currentTarget && e.currentTarget.setPointerCapture) {
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture is optional */ }
       }
@@ -1069,6 +1080,13 @@
       if (!p || p.id !== e.pointerId) return;
       const dx = e.clientX - p.x;
       const dy = e.clientY - p.y;
+      // Short press on the handle / sticky bar = tap → step down (founder, 2026-11-22).
+      if (Math.hypot(dx, dy) < 24) {
+        swallow.current = true;
+        setTimeout(() => { swallow.current = false; }, 50);
+        if (props.onBack) props.onBack();
+        return;
+      }
       if (Math.abs(dy) < PULL_PX || Math.abs(dy) < 1.5 * Math.abs(dx)) return;
       swallow.current = true;
       setTimeout(() => { swallow.current = false; }, 0);
@@ -1090,22 +1108,19 @@
 
     return h('section', {
       ref: root, 'data-mv2': 'pinpeek', 'data-raised': raised ? '' : undefined, hidden: props.hidden || undefined,
-      'aria-label': P.label, onPointerDown: onPullDown, onPointerUp: onPullUp,
+      'aria-label': P.label,
+      onPointerDown: onPullDown, onPointerMove: onPullMove, onPointerUp: onPullUp,
       onPointerCancel: () => { pull.current = null; },
     },
-      h('div', {
-        'data-mv2': 'pinpeek-bar',
-        // Tapping empty bar chrome (not Back / Close) also steps down — same as the handle.
-        onClick: (e) => {
-          if (swallow.current) { swallow.current = false; return; }
-          const t = e.target;
-          if (t && t.closest && t.closest("[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close'], [data-mv2='handle']")) return;
-          if (props.onBack) props.onBack();
-        },
-      },
+      h('div', { 'data-mv2': 'pinpeek-bar' },
         raised ? iconBtn({
           'data-mv2': 'pinpeek-back',
-          onClick: (e) => { e.stopPropagation(); if (props.onBack) props.onBack(); },
+          // Back = one level (raised → cards → closed via onBack).
+          onClick: (e) => {
+            e.stopPropagation();
+            if (swallow.current) { swallow.current = false; return; }
+            if (props.onBack) props.onBack();
+          },
         }, 'ChevronLeft', P.back) : null,
         h('span', { 'data-mv2': 'pinpeek-status', role: 'status', 'aria-live': 'polite' },
           current ? h('span', { 'data-mv2': 'sr' }, current.title || '') : null),
@@ -1114,8 +1129,8 @@
           'aria-label': P.lower || P.back || '',
           // Lowest (cards) shows flat bar + slight up chevron; raised is flat only (founder, 2026-11-22).
           'data-hint': raised ? undefined : 'up',
+          // Handle = minimize / step down (same as Back). Tap is handled in onPullUp; click is the keyboard fallback.
           onClick: (e) => {
-            // Always step down / reveal the map (founder, 2026-11-22). Drag already called onBack + swallow.
             if (swallow.current) { swallow.current = false; return; }
             e.stopPropagation();
             if (props.onBack) props.onBack();
@@ -1127,8 +1142,13 @@
           (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.panel
             && window.MapV2Strings.explore.panel.brandMark) || ''),
         iconBtn({
+          // X = close the whole carousel / go home.
           'data-mv2': 'pinpeek-close', 'aria-label': P.close,
-          onClick: (e) => { e.stopPropagation(); if (props.onClose) props.onClose(); },
+          onClick: (e) => {
+            e.stopPropagation();
+            if (swallow.current) { swallow.current = false; return; }
+            if (props.onClose) props.onClose();
+          },
         }, 'X')),
       h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
         n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,

@@ -353,29 +353,35 @@
       .filter((e) => e && e.id !== item.id && !window.DATA.isPastEvent(e, now) && (orgId ? e.organizerId === orgId : false))
       .sort((a, b) => Date.parse(a.startsAt || 0) - Date.parse(b.startsAt || 0))
       .slice(0, 8);
-    const posts = (Array.isArray(newsPosts) && orgId)
-      ? newsPosts.filter((n) => n.contributorId === orgId).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 8)
+    const oid = orgId != null ? String(orgId) : '';
+    const posts = (Array.isArray(newsPosts) && oid)
+      ? newsPosts.filter((n) => n && String(n.contributorId || n.contributor_id || '') === oid)
+        .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || ''))).slice(0, 8)
       : [];
     const sections = [];
     const XP = (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.panel) || {};
-    const rowStr = { scrollLeft: XP.scrollLeft || '', scrollRight: XP.scrollRight || '' };
+    const rowStr = {
+      label: Str.tabs.posts || Str.tabs.news || '',
+      scrollLeft: XP.scrollLeft || '', scrollRight: XP.scrollRight || '',
+    };
     const listingName = item.title || item.name || '';
-    if (gallery.length && window.MapV2Row) {
+    const safeImg = (u) => (u && window.UI && window.UI.safeUrl ? window.UI.safeUrl(u) : '');
+    if (gallery.length && window.MapV2Row && window.MapV2Card) {
       sections.push(h('section', { key: 'gal', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.gallery },
         h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.gallery),
         h(window.MapV2Row.Row, {
           items: gallery.map((src, i) => ({ id: 'g' + i, src: src })),
-          idPrefix: 'mv2-ig', strings: rowStr, nav: 'float', keyOf: (x) => x.id,
+          idPrefix: 'mv2-ig', strings: Object.assign({}, rowStr, { label: Str.tabs.gallery }), nav: 'float', keyOf: (x) => x.id,
           render: (x) => h(window.MapV2Card, {
-            variant: 'image', title: listingName, media: { src: x.src }, idPrefix: 'mv2-ig-' + x.id,
+            variant: 'image', title: listingName, media: { src: x.src }, tile: true, idPrefix: 'mv2-ig-' + x.id,
           }),
         })));
     }
-    if (evList.length && window.MapV2Row) {
+    if (evList.length && window.MapV2Row && window.MapV2Card) {
       sections.push(h('section', { key: 'ev', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.events },
         h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.events),
         h(window.MapV2Row.Row, {
-          items: evList, idPrefix: 'mv2-ie', strings: rowStr, nav: 'float', keyOf: (e) => e.id,
+          items: evList, idPrefix: 'mv2-ie', strings: Object.assign({}, rowStr, { label: Str.tabs.events }), nav: 'float', keyOf: (e) => e.id,
           render: (e) => h(window.MapV2Card, {
             variant: 'event',
             item: { type: 'event', category: e.category },
@@ -388,18 +394,24 @@
           }),
         })));
     }
-    if (posts.length && window.MapV2Row) {
+    if (posts.length && window.MapV2Row && window.MapV2Card) {
       sections.push(h('section', { key: 'posts', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.posts || Str.tabs.news },
         h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.posts || Str.tabs.news),
         h(window.MapV2Row.Row, {
           items: posts, idPrefix: 'mv2-ip', strings: rowStr, nav: 'float', keyOf: (p) => p.id,
           render: (p) => {
-            const img = p.image && window.UI.safeUrl(p.image);
+            const ago = time && time.postedAgo ? time.postedAgo(p.createdAt || p.date, now) : '';
+            const img = safeImg(p.image || p.image_url);
             return h(window.MapV2Card, {
-              variant: img ? 'image' : 'text', title: p.title, excerpt: p.body,
-              media: img ? { src: img } : null, idPrefix: 'mv2-ip-' + p.id,
-              onClick: (e) => { if (onReadPost) onReadPost(p, e && e.currentTarget); },
+              variant: img ? 'image' : 'text',
+              title: p.title || '',
+              excerpt: p.body || '',
+              meta: ago ? [ago] : [],
+              media: img ? { src: img } : null,
+              tile: !!img,
               moreLabel: Str.news && Str.news.readMore,
+              idPrefix: 'mv2-ip-' + p.id,
+              onClick: (e) => { if (onReadPost) onReadPost(p, e && e.currentTarget); },
               'data-news': '',
               'aria-haspopup': 'dialog',
             });
@@ -475,12 +487,18 @@
       return [...byId.values()].filter((e) => Number.isFinite(Date.parse(e.when))).sort((a, b) => Date.parse(b.when) - Date.parse(a.when)).slice(0, RECENT_MAX);
     }, [events, item, isContributor, detail.data, contributors]);
     const posts = useMemo(() => (isContributor && item
-      ? newsPosts.filter((n) => n.contributorId === item.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      ? newsPosts.filter((n) => n && String(n.contributorId || n.contributor_id || '') === String(item.id))
+        .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
       : []), [newsPosts, item, isContributor]);
-    // The owner deleted the post while it was open (Dashboard writes straight into newsPosts).
+    // Close the reader if the post disappeared (Dashboard deletes straight into newsPosts).
+    // Check the full feed — place/event peeks open posts via ProfileCarousels while `posts` is
+    // contributor-scoped only, so an empty `posts` must not wipe a place owner's article (founder, 2026-11-22).
     useEffect(() => {
-      if (reading && !posts.some((p) => p.id === reading.id)) setReading(null);
-    }, [reading, posts]);
+      if (!reading) return;
+      const still = (Array.isArray(newsPosts) ? newsPosts : []).some((p) => p && p.id === reading.id)
+        || posts.some((p) => p && p.id === reading.id);
+      if (!still) setReading(null);
+    }, [reading, posts, newsPosts]);
     // P2-01 Nearby: the closest listings the map is drawing, nearest first. What is already on this sheet is left out:
     // the listing itself, a Contributor's own upcoming events (its Events tab), and an Event's organiser (its header).
     const near = useMemo(() => {
@@ -846,6 +864,12 @@
       }
     } else {
       const bio = item.bio ? h('p', { 'data-mv2': 'bio' }, item.bio) : null;
+      // Raised pinpeek: Gallery / Events / Posts carousels (ProfileCarousels) — same as places.
+      // Tabs stay for the full / expanded sheet only (founder, 2026-11-22).
+      if (inline) {
+        leadBody = bio;
+        body = null;
+      } else {
       let panel = null;
       if (active === 'events') {
         const mode = evSort || (orgEvents.length ? 'upcoming' : 'recent');
@@ -888,13 +912,15 @@
           keyOf: (p) => p.id,
           render: (p) => {
             const ago = T().postedAgo(p.createdAt || p.date, now);
-            const img = p.image && window.UI.safeUrl(p.image);
+            const img = (p.image || p.image_url) && window.UI && window.UI.safeUrl
+              ? window.UI.safeUrl(p.image || p.image_url) : '';
             return h(window.MapV2Card, {
               variant: img ? 'image' : 'text',
-              title: p.title,
-              excerpt: p.body,
+              title: p.title || '',
+              excerpt: p.body || '',
               meta: ago ? [ago] : [],
               media: img ? { src: img } : null,
+              tile: !!img,
               moreLabel: Str.news.readMore,
               idPrefix: 'mv2-post-' + p.id,
               onClick: (e) => setReading({ id: p.id, from: e.currentTarget }),
@@ -941,6 +967,7 @@
           h('p', { 'data-mv2': 'empty-title' }, Str.empty.title(name)),
           h('p', { 'data-mv2': 'empty-hint' }, Str.empty.hint),
           h('div', { 'data-mv2': 'actions' }, dir ? actions.filter((a) => a.key === 'dir') : (site ? actions.filter((a) => a.key === 'web') : (email ? actions.filter((a) => a.key === 'mail') : null)))));
+      }
     }
 
     // P2-01: each nearby listing described the way its own sheet header would be (name, category, how far)
@@ -1087,8 +1114,8 @@
         leadBody,
         h('div', { 'data-mv2': 'actions' }, actions),
         body,
-        inline && !isContributor ? h(ProfileCarousels, {
-          item: item, type: type, org: org, events: events, newsPosts: newsPosts, onPick: onPick,
+        inline ? h(ProfileCarousels, {
+          item: item, type: type, org: isContributor ? item : org, events: events, newsPosts: newsPosts, onPick: onPick,
           onReadPost: (p, from) => setReading({ id: p.id, from: from || null }),
         }) : null,
         // Report (compact) + View Full sit above the slogan divider on raised pinpeek (founder, 2026-11-22).

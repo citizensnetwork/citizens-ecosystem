@@ -2062,6 +2062,13 @@ a[data-mv2='card2'],
 [data-mv2='hrow-item'] > [data-mv2='card2'] {
   flex: 1 1 auto;
   min-width: 0;
+  min-height: calc(var(--hit) + var(--space-6));
+}
+/* News / text posts in profile carousels: keep a readable card even without a photo */
+[data-mv2='profile-row'] [data-mv2='card2'][data-variant='text'],
+[data-mv2='profile-row'] [data-mv2='card2'][data-news] {
+  min-height: calc(var(--hit) * 2);
+  background: var(--surface-0);
 }
 /* the cards in a row share a height, so "Read more" sits at the bottom of each */
 [data-mv2='hrow'] > [data-layout='row'] [data-mv2='card-copy'] > [data-mv2='post-more'] {
@@ -4213,6 +4220,16 @@ a[data-mv2='card2'],
   }
   [data-mv2='home'] [data-mv2='home-bar'] {
     padding-left: calc(var(--space-3) + var(--crown) + var(--space-3));
+  }
+  /* category chips start under the left edge of the search field (founder, 2026-11-22) */
+  [data-mv2='home'] [data-mv2='home-filters'] {
+    padding-left: calc(var(--space-3) + var(--crown) + var(--space-3));
+  }
+  [data-mv2='home'] [data-mv2='home-filters-wrap']::before {
+    left: calc(var(--space-3) + var(--crown) + var(--space-3));
+  }
+  [data-mv2='home'] [data-mv2='home-filters-arrow'][data-dir='prev'] {
+    left: calc(var(--space-3) + var(--crown) + var(--space-3));
   }
 }
 [data-mv2='desktop-crown'],

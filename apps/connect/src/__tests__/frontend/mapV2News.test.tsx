@@ -264,9 +264,9 @@ describe("where the reader is wired", () => {
     expect(html.indexOf("app/map-v2-news.jsx")).toBeLessThan(html.indexOf("app/map-v2-sheet.jsx"));
     expect(build.indexOf("'map-v2-gallery.jsx'")).toBeLessThan(build.indexOf("'map-v2-news.jsx'"));
     expect(build.indexOf("'map-v2-news.jsx'")).toBeLessThan(build.indexOf("'map-v2-sheet.jsx'"));
-    expect(html).toContain("app/map-v2-news.jsx?v=20261122k");
+    expect(html).toContain("app/map-v2-news.jsx?v=20261122m");
     expect(html).toContain("app/profiles.jsx?v=20261101b");
-    expect(html).toContain("app/map-v2-strings.jsx?v=20261122k");
+    expect(html).toContain("app/map-v2-strings.jsx?v=20261122m");
   });
 
   it("adds only the scrim blur and the reading width, and the card motion follows the duration token", () => {
@@ -295,5 +295,15 @@ describe("where the reader is wired", () => {
     expect(sheet).toContain("aria-haspopup");
     expect(sheet).toContain("Str.news.readMore");
     expect(sheet).not.toMatch(/history\.pushState\(/);
+  });
+
+  it("raised pinpeek keeps the reader open for place/event posts (newsPosts, not only contributor posts)", () => {
+    const sheet = read("src/frontend/app/map-v2-sheet.jsx");
+    // ProfileCarousels on every inline sheet (places, events, and contributors)
+    expect(sheet).toMatch(/inline \? h\(ProfileCarousels/);
+    expect(sheet).toContain("org: isContributor ? item : org");
+    // Deletion cleanup must consult newsPosts so a place peek does not wipe reading on mount
+    expect(sheet).toMatch(/Array\.isArray\(newsPosts\).*some\(\(p\) => p && p\.id === reading\.id\)/s);
+    expect(sheet).not.toMatch(/if \(reading && !posts\.some/);
   });
 });
