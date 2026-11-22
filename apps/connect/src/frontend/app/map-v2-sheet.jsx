@@ -1015,23 +1015,27 @@
       (expanded || inline) && collabChip,
       facts.length > 0 && h('span', { 'data-mv2': 'sub' },
         facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), [])));
-    // Raised cover meta: soft theme tiles for distance + event calendar date·time (theme-inverted text).
+    // Raised cover: chip (+ owner) beside the avatar; distance / event when sit bottom-right.
+    const ownerBy = (!isContributor && ((org && org.name) || item.organizerName))
+      ? (Str.by + ' ' + ((org && org.name) || item.organizerName))
+      : '';
     const coverMeta = h('div', { 'data-mv2': 'cover-meta' },
       h('span', { 'data-mv2': 'card-chip' },
         h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
         h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
-      distance
-        ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'distance' }, distance)
-        : null,
-      eventWhen
-        ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'when' },
-          Icon ? h(Icon, { name: 'Calendar', size: 12 }) : null,
-          h('span', null, eventWhen))
-        : null,
-      type === 'place' && state
-        ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'state', 'data-status': state.status }, state.text)
-        : null);
-    // Raised pinpeek: larger avatar, title/meta to its right and kept inside the 16:9 cover.
+      ownerBy ? h('span', { 'data-mv2': 'cover-by' }, ownerBy) : null);
+    const coverRail = (distance || eventWhen)
+      ? h('div', { 'data-mv2': 'cover-rail' },
+        distance
+          ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'distance' }, distance)
+          : null,
+        eventWhen
+          ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'when' },
+            Icon ? h(Icon, { name: 'Calendar', size: 12 }) : null,
+            h('span', null, eventWhen))
+          : null)
+      : null;
+    // Raised pinpeek: avatar back at the cover foot (slightly larger than original); copy ~10px up.
     const coverSrc = item.coverPhoto || (org && org.coverPhoto) || '';
     const faceSrc = avatarSrc || item.profilePhoto || (org && org.profilePhoto) || '';
     const xhead = (expanded || inline) && (inline
@@ -1043,11 +1047,12 @@
             h('div', { 'data-mv2': 'cover-avatar' },
               h(Avatar, {
                 src: faceSrc, name: avatarName || name, hex, size: 'half',
-                glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 30 }),
+                glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 22 }),
               })),
             h('div', { 'data-mv2': 'cover-copy' },
               h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
-              coverMeta))),
+              coverMeta)),
+          coverRail),
         h(HandleRow, { item: item }))
       : h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
         h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),

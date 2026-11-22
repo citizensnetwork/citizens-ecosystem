@@ -137,6 +137,8 @@
   --on-media-chip: rgba(0, 0, 0, 0.28);
   --cover-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
   --cover-scrim: linear-gradient(180deg, rgba(0, 0, 0, 0.02) 40%, rgba(0, 0, 0, 0.5) 100%);
+  --cover-foot-inset: 10px;            /* title / tiles sit this far above the cover bottom edge */
+
   --handle-stack-gap: 1px;             /* bar + chevron in the grab handle */
   --handle-chevron-nudge: calc(var(--focus-w) * -1);
   --report-compact-h: calc(var(--space-6) + var(--space-1)); /* 28px: quiet Report under hero */
@@ -3941,6 +3943,17 @@ a[data-mv2='card2'],
   font-weight: var(--fw-semibold);
   line-height: var(--lh-2);
 }
+[data-mv2='xcard-by'] {
+  display: block;
+  padding-left: var(--space-3);
+  color: var(--xp-muted);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-regular);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 [data-mv2='xcard-body'] small,
 [data-mv2='xcard-chip'],
 [data-mv2='xcard-meta'] {
@@ -4466,7 +4479,8 @@ a[data-mv2='card2'],
 [data-mv2='pinpeek-bar'] {
   position: sticky;
   top: 0;
-  z-index: calc(var(--z-xp-layer) + 1);
+  /* above cover-foot / details so the handle stays tappable (founder, 2026-11-22) */
+  z-index: var(--z-xp-rail);
   flex: none;
   display: flex;
   align-items: center;
@@ -4515,7 +4529,7 @@ a[data-mv2='card2'],
   position: absolute;
   left: 50%;
   top: var(--space-1);
-  z-index: var(--z-xp-layer);
+  z-index: calc(var(--z-xp-rail) + 1);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4698,7 +4712,7 @@ a[data-mv2='card2'],
   outline: var(--focus-w) solid var(--focus-ring);
   outline-offset: var(--focus-offset);
 }
-/* Raised pinpeek: 16:9 cover; avatar bottom-left; title/meta to its right (founder, 2026-11-22) */
+/* Raised pinpeek: 16:9 cover; avatar + copy ~10px above bottom; tiles bottom-right (founder, 2026-11-22) */
 [data-mv2='xhead'][data-hero] {
   gap: 0;
   padding: 0 0 var(--space-2);
@@ -4709,6 +4723,7 @@ a[data-mv2='card2'],
   margin: 0;
   border-radius: var(--radius-md);
   overflow: visible;
+  isolation: isolate;
 }
 [data-mv2='cover-hero'] > [data-mv2='card-media'] {
   display: block;
@@ -4737,40 +4752,37 @@ a[data-mv2='card2'],
   left: 0;
   right: 0;
   top: 0;
-  height: 100%;
-  max-height: 100%;
+  bottom: 0;
   border-radius: var(--radius-md);
   background: var(--cover-scrim);
   pointer-events: none;
-  aspect-ratio: 16 / 9;
+  z-index: var(--z-sticky);
 }
 [data-mv2='cover-foot'] {
   position: absolute;
   left: var(--space-3);
   right: var(--space-3);
-  /* sit higher so title/meta stay inside the 16:9 cover (founder, 2026-11-22) */
-  bottom: 18%;
-  z-index: var(--z-xp-crown);
+  bottom: var(--cover-foot-inset);
+  z-index: var(--z-xp-layer);
   display: flex;
   flex-direction: row;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: var(--space-3);
   pointer-events: none;
 }
 [data-mv2='cover-avatar'] {
   flex: none;
-  /* ~88px: larger face on the cover */
-  width: calc(var(--space-8) * 2 - var(--space-2));
-  height: calc(var(--space-8) * 2 - var(--space-2));
-  margin-top: 0;
+  /* slightly larger than the pre-raise size (~52 → ~60) */
+  width: calc(var(--space-8) + var(--space-3));
+  height: calc(var(--space-8) + var(--space-3));
+  margin: 0;
   border-radius: var(--radius-full);
   border: var(--pin-ring-w) solid var(--surface-0);
   box-shadow: var(--elev-2);
   background: var(--surface-0);
   overflow: hidden;
-  pointer-events: auto;
-  /* slight hang under the cover; copy stays higher beside it */
-  transform: translateY(22%);
+  /* gentle hang under the cover edge — kept low so it does not climb the sticky nav */
+  transform: translateY(18%);
 }
 [data-mv2='cover-avatar'] [data-mv2='avatar'] {
   width: 100%;
@@ -4781,10 +4793,10 @@ a[data-mv2='card2'],
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: flex-end;
   gap: var(--space-1);
-  padding-top: 0;
-  padding-bottom: 0;
+  padding-bottom: var(--space-1);
+  padding-right: calc(var(--space-8) + var(--space-4));
   color: var(--viewer-fg);
   text-shadow: var(--cover-text-shadow);
   pointer-events: none;
@@ -4810,12 +4822,36 @@ a[data-mv2='card2'],
   background: var(--on-media-chip);
   color: var(--viewer-fg);
 }
+[data-mv2='cover-meta'] > [data-mv2='cover-by'] {
+  display: block;
+  width: 100%;
+  padding-left: var(--space-3);
+  color: var(--on-media-muted);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-regular);
+  text-shadow: var(--cover-text-shadow);
+}
+[data-mv2='cover-rail'] {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--cover-foot-inset);
+  z-index: var(--z-xp-layer);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 55%;
+  pointer-events: none;
+}
 [data-mv2='cover-tile'] {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   max-width: 100%;
-  padding: 3px var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-full);
   background: color-mix(in srgb, var(--surface-0) 88%, transparent);
   color: var(--text-1);
@@ -4832,34 +4868,36 @@ a[data-mv2='card2'],
   color: var(--accent-ink);
 }
 [data-mv2='xhead'][data-hero] > [data-mv2='handle-row'] {
-  margin-top: calc(var(--space-7) + var(--space-2));
+  /* room for the slight avatar hang only — no large empty gap */
+  margin-top: calc(var(--space-4) + var(--space-1));
   padding-left: var(--space-4);
 }
 [data-mv2='sheet-foot'] {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: var(--space-2);
   margin: var(--space-3) 0 var(--space-2);
 }
 [data-mv2='sheet-foot'] > [data-mv2='view-full'] {
-  width: fit-content;
-  min-width: 0;
-  max-width: 16rem;
-  align-self: center;
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
   margin-top: 0;
   padding-inline: var(--space-5);
-  border: 0;
-  background: var(--accent);
-  color: var(--accent-contrast);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--text-1);
 }
 [data-mv2='sheet-foot'] > [data-mv2='view-full']:hover,
 [data-mv2='sheet-foot'] > [data-mv2='view-full']:focus-visible {
-  filter: brightness(0.97);
+  background: var(--surface-2);
 }
 [data-mv2='report-compact'] {
   display: flex;
   justify-content: flex-start;
+  align-self: flex-start;
+  width: auto;
 }
 [data-mv2='report-compact'] [data-mv2='action'] {
   min-width: 0;

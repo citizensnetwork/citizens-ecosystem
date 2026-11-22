@@ -421,7 +421,12 @@
     const near = window.MapV2Nearby;
     const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
     const meta = cardMetaLine(m, rec);
-    const owner = m.ownerName ? String(m.ownerName).trim() : '';
+    // Every place / event has a contributor owner; show "by …" indented under the title (founder, 2026-11-22).
+    const byWord = (window.MapV2Strings && window.MapV2Strings.sheet && window.MapV2Strings.sheet.by) || 'by';
+    const ownerRaw = (m.ownerName || rec.organizerName || '').trim();
+    const ownerLine = (kind === 'place' || kind === 'event') && ownerRaw
+      ? (byWord + ' ' + ownerRaw)
+      : '';
     const catLabel = (cat && cat.name) || (group && words[group]) || '';
     return h('button', {
       type: 'button', 'data-mv2': 'xcard', 'data-explore-id': m.id,
@@ -442,13 +447,14 @@
       h('span', { 'data-mv2': 'xcard-body' },
         h('span', { 'data-mv2': 'xcard-top' },
           h('b', null, m.title || ''),
+          ownerLine ? h('small', { 'data-mv2': 'xcard-by' }, ownerLine) : null,
           catLabel ? h('span', { 'data-mv2': 'xcard-chip' },
             h('span', { 'data-mv2': 'card-chip-label' }, catLabel)) : null,
           meta.text ? h('span', { 'data-mv2': 'xcard-meta' },
             Icon && meta.icon ? h(Icon, { name: meta.icon, size: 12 }) : null,
             h('span', null, meta.text)) : null),
         h('span', { 'data-mv2': 'xcard-foot' },
-          owner ? h('small', { 'data-mv2': 'xcard-by' }, owner) : h('span'),
+          h('span'),
           dist ? h('small', { 'data-mv2': 'xcard-dist' }, dist) : null)));
   }
 
@@ -1096,9 +1102,11 @@
           'aria-label': P.lower || P.back || '',
           // Lowest (cards) shows flat bar + slight up chevron; raised is flat only (founder, 2026-11-22).
           'data-hint': raised ? undefined : 'up',
-          onClick: () => {
-            if (swallow.current) return;
-            // Tap steps down one level (raised → cards → closed); pull-up still raises (founder option B).
+          onClick: (e) => {
+            // Always step down / reveal the map on a handle tap (founder, 2026-11-22).
+            // A drag already called onBack and set swallow so the synthetic click is ignored once.
+            if (swallow.current) { swallow.current = false; return; }
+            e.stopPropagation();
             if (props.onBack) props.onBack();
           },
         },
