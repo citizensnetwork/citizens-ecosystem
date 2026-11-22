@@ -415,16 +415,24 @@ describe('Kingdom Projects is "Suggest a need" (founder, 2026-11-04)', () => {
   });
 
   it('quotes the tier sizes as Connect really has them (a small volunteer group up to 20 votes, a provincial vision of 10,000)', () => {
+    // Connect's ideas screen reads its ladder from the Citizens configuration (engine step E7).
+    const citizens = readFileSync(
+      fileURLToPath(
+        new URL('../../../packages/engine-config/src/configs/citizens.ts', import.meta.url),
+      ),
+      'utf8',
+    );
+    expect(citizens).toContain(
+      "{ id: 'small_volunteer', label: 'Small Volunteer', min: 1, max: 20, fixed: false }",
+    );
+    expect(citizens).toContain(
+      "{ id: 'provincial_vision', label: 'Provincial Vision', min: 10000, max: 10000, fixed: true }",
+    );
     const connectPages = readFileSync(
       fileURLToPath(new URL('../../connect/src/frontend/app/pages.jsx', import.meta.url)),
       'utf8',
     );
-    expect(connectPages).toContain(
-      "{ id: 'small_volunteer', label: 'Small Volunteer', min: 1, max: 20 }",
-    );
-    expect(connectPages).toContain(
-      "{ id: 'provincial_vision', label: 'Provincial Vision', min: 10000, max: 10000, fixed: true }",
-    );
+    expect(connectPages).toContain('W.configuration.ideas ? W.configuration.ideas.tiers : []');
     const rally = KINGDOM_PROJECTS.steps.find((step) => step.name === 'Rally')!.text;
     expect(rally).toContain('up to 20 votes');
     expect(rally).toContain('10,000 votes');
