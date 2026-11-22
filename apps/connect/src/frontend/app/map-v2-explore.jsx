@@ -346,13 +346,45 @@
     end.setHours(23, 59, 59, 999);
     return { start: sat.getTime(), end: end.getTime() };
   }
-  function whenLine(m, rec) {
+  /** Street-like address fragment (number or road word). Used to prefer building → street → suburb. */
+  function looksStreet(part) {
+    return /^\d/.test(part) || /\b(rd|road|st\.?|street|ave\.?|avenue|dr\.?|drive|ln\.?|lane|way|blvd|boulevard|cres(?:cent)?|close|straat)\b/i.test(part);
+  }
+
+  /**
+   * Short place line for a preview card: building name if the address has one, else the street,
+   * else the suburb (founder, 2026-11-22). City/town is never shown here.
+   */
+  function placeWhereLine(address, location) {
+    const raw = String(address || location || '').trim();
+    if (!raw) return '';
+    const parts = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return '';
+    if (parts.length === 1) return parts[0];
+    const local = parts.slice(0, -1);
+    // Building only when it leads the address (before any street); else street, else suburb.
+    if (local[0] && !looksStreet(local[0])) return local[0];
+    const street = local.find(looksStreet);
+    if (street) return street;
+    return local[local.length - 1] || parts[0];
+  }
+
+  /** Event date only on preview cards (no weekday · time). */
+  function eventDateLine(m, rec) {
     if (!m) return '';
-    if (m.type === 'place') return (rec && rec.openHours) || m.openHours || '';
-    const t = Date.parse(m.startsAt || (rec && rec.startsAt) || '');
+    const t = Date.parse(m.startsAt || (rec && rec.startsAt) || m.date || (rec && rec.date) || '');
     if (isNaN(t)) return '';
-    const d = new Date(t);
-    return d.toLocaleDateString('en-GB', { weekday: 'short' }) + ' · ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  /** Meta under the category: gold pin + where (place) or gold calendar + date (event). */
+  function cardMetaLine(m, rec) {
+    if (!m) return { icon: '', text: '' };
+    if (m.type === 'place') {
+      return { icon: 'MapPin', text: placeWhereLine((rec && rec.address) || m.address, (rec && rec.location) || m.location) };
+    }
+    if (m.type === 'event') return { icon: 'Calendar', text: eventDateLine(m, rec) };
+    return { icon: '', text: '' };
   }
   function looksOnline(m, rec) {
     const bits = [m && m.location, m && m.address, rec && rec.location, rec && rec.address, rec && rec.website];
@@ -369,8 +401,8 @@
   }
 
   /**
-   * Shared preview card (Explore rows + pin carousel). Event and Place differ by a kind pill and a fact line
-   * (when / hours); the foot keeps organiser left and distance right so the body can grow into the strip.
+   * Shared preview card (Explore rows + pin carousel). Title, then category, then a gold pin/calendar with
+   * building·street·suburb or the event date (no "Place"/"Event" wording). Foot: organiser left, distance right.
    */
   function XCard(props) {
     const m = props.m;
@@ -378,9 +410,7 @@
     const group = groupOf(m);
     const words = props.groupWords || {};
     const peek = !!props.peek;
-    const kinds = (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.kinds) || {};
     const kind = m.type === 'event' || m.type === 'place' || m.type === 'contributor' ? m.type : '';
-    const kindWord = kind ? (kinds[kind] || '') : '';
     const kindIcon = kind === 'event' ? 'Calendar' : (kind === 'place' ? 'MapPin' : (kind === 'contributor' ? 'User' : ''));
     const raw = rec.coverPhoto || m.coverPhoto || (m.type === 'contributor' ? m.profilePhoto : '') || '';
     const cover = window.UI && window.UI.safeUrl ? (window.UI.safeUrl(raw) || '') : (/^https?:\/\//i.test(raw) ? raw : '');
@@ -388,8 +418,7 @@
     const cat = window.DATA && window.DATA.getItemCategory ? window.DATA.getItemCategory(m) : null;
     const near = window.MapV2Nearby;
     const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
-    const fact = whenLine(m, rec);
-    const factIcon = kind === 'event' ? 'Clock' : (kind === 'place' && fact ? 'Clock' : '');
+    const meta = cardMetaLine(m, rec);
     const owner = m.ownerName ? String(m.ownerName).trim() : '';
     const catLabel = (cat && cat.name) || (group && words[group]) || '';
     return h('button', {
@@ -410,15 +439,12 @@
           ? h('span', { 'data-mv2': 'sr' }, props.cueLabel) : null),
       h('span', { 'data-mv2': 'xcard-body' },
         h('span', { 'data-mv2': 'xcard-top' },
-          kindWord ? h('span', { 'data-mv2': 'xcard-kind' },
-            Icon && kindIcon ? h(Icon, { name: kindIcon, size: 12 }) : null,
-            h('span', null, kindWord)) : null,
           h('b', null, m.title || ''),
           catLabel ? h('span', { 'data-mv2': 'xcard-chip' },
             h('span', { 'data-mv2': 'card-chip-label' }, catLabel)) : null,
-          fact ? h('span', { 'data-mv2': 'xcard-fact' },
-            Icon && factIcon ? h(Icon, { name: factIcon, size: 12 }) : null,
-            h('span', null, fact)) : null),
+          meta.text ? h('span', { 'data-mv2': 'xcard-meta' },
+            Icon && meta.icon ? h(Icon, { name: meta.icon, size: 12 }) : null,
+            h('span', null, meta.text)) : null),
         h('span', { 'data-mv2': 'xcard-foot' },
           owner ? h('small', { 'data-mv2': 'xcard-by' }, owner) : h('span'),
           dist ? h('small', { 'data-mv2': 'xcard-dist' }, dist) : null)));
@@ -650,6 +676,32 @@
       setStage((s) => (s === 'rest' ? 'strip' : 'rest'));
     };
     const crownLabel = filtered ? (P.reset) : props.level ? P.home : (base === 'rest' ? (P.open) : (P.close));
+    // Crown drag (phone): same snap stages as the pill — pull down lowers / closes; a short tap keeps onCrown.
+    const crownPull = useRef(null);
+    const crownDragged = useRef(false);
+    const onCrownDown = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      crownPull.current = { y: e.clientY, id: e.pointerId };
+      crownDragged.current = false;
+    };
+    const onCrownUp = (e) => {
+      const p = crownPull.current;
+      crownPull.current = null;
+      if (!p || p.id !== e.pointerId) return;
+      const dy = e.clientY - p.y;
+      if (Math.abs(dy) < 24) return;
+      crownDragged.current = true;
+      if (dy > 0) {
+        if (props.level && props.onLevelReset) props.onLevelReset();
+        else lower();
+      } else if (!props.level) {
+        raise();
+      }
+    };
+    const onCrownClick = () => {
+      if (crownDragged.current) { crownDragged.current = false; return; }
+      onCrown();
+    };
 
     // A card in the full panel takes its row over first; the map screen then chooses it (a second tap opens it).
     const openCard = (row) => (id, type) => {
@@ -770,7 +822,9 @@
       // The crown and the sticky nav swap outright (founder, 2026-11-17: the morph was slow on a phone).
       !open ? h('button', {
         type: 'button', 'data-mv2': 'explore-crown', 'aria-label': crownLabel,
-        'data-filtered': filtered ? '' : undefined, onClick: onCrown,
+        'data-filtered': filtered ? '' : undefined,
+        onPointerDown: onCrownDown, onPointerUp: onCrownUp, onClick: onCrownClick,
+        onPointerCancel: () => { crownPull.current = null; },
       }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)) : null,
       open ? h('nav', { 'data-mv2': 'explore-dock', 'aria-label': P.dock },
         DOCK.map((item) => {
@@ -911,11 +965,19 @@
     };
     const touch = () => { touched.current = true; };
 
-    // A vertical pull on the panel (its bar, or the cards while lowered): up raises it, down steps back one level.
+    // Snap stages stay; only the handle pill (and the crown on the phone) starts a vertical pull (founder, 2026-11-22).
     const onPullDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (raised && !(e.target.closest && e.target.closest("[data-mv2='pinpeek-bar']"))) return;
+      const fromHandle = e.target.closest && (
+        e.target.closest("[data-mv2='handle']") ||
+        e.target.closest("[data-mv2='handle-bar']") ||
+        e.target.closest("[data-mv2='explore-crown']")
+      );
+      if (!fromHandle) return;
       pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      if (e.currentTarget && e.currentTarget.setPointerCapture) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture is optional */ }
+      }
     };
     const onPullUp = (e) => {
       const p = pull.current;
@@ -951,7 +1013,15 @@
         raised ? iconBtn({ 'data-mv2': 'pinpeek-back', onClick: props.onBack }, 'ChevronLeft', P.back) : null,
         h('span', { 'data-mv2': 'pinpeek-status', role: 'status', 'aria-live': 'polite' },
           current ? h('span', { 'data-mv2': 'sr' }, current.title || '') : null),
-        raised ? h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }) : null,
+        h('button', {
+          type: 'button', 'data-mv2': 'handle',
+          'aria-label': raised ? (P.lower || P.back) : (P.raise || P.detailsCue || ''),
+          onClick: () => {
+            if (swallow.current) return;
+            if (raised) props.onBack();
+            else props.onRaise();
+          },
+        }, h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' })),
         iconBtn({ 'data-mv2': 'pinpeek-close', 'aria-label': P.close, onClick: props.onClose }, 'X')),
       h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
         n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
@@ -989,12 +1059,100 @@
     return window.CSS && window.CSS.escape ? window.CSS.escape(s) : s.replace(/["\\]/g, '\\$&');
   }
 
+  /**
+   * Nested Explore inside the raised pin peek (founder, 2026-11-22): the same Where to… tiles, Near & now /
+   * New / Nearby rows and Explore button as the default pull-up, below the profile. Choosing a tile or row
+   * focuses that block in this panel (and filters the map); clearing focus returns to the browse layout.
+   * props: markers, sources, origin, focus, distWords, selectedId, onFocus, onOpen(id, type), onSeeAll().
+   */
+  function PeekExplore(props) {
+    const str = S();
+    const P = str.panel || {};
+    const Icon = window.Icon;
+    const focus = props.focus || null;
+    const tile = focus && focus.kind === 'tile' ? focus.id : '';
+    const sec = focus && focus.kind === 'sec' ? focus.id : '';
+    const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
+    const origin = props.origin || null;
+    const markers = (Array.isArray(props.markers) ? props.markers : []).filter((m) => m && m.type !== 'idea' && m.type !== 'contributor');
+    const pool = markers;
+    const ranked = (list, cap) => rank(origin, list, props.selectedId, cap || 12);
+    const current = tileOf(tile);
+    const tileItems = current ? ranked(pool.filter((m) => tileMatches(current.id, m)), 12) : [];
+    const now = Date.now();
+    const soon = (m) => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= now && t - now <= 6 * HOUR; };
+    const weekend = weekendBounds(now);
+    const rows = {
+      around: ranked(pool.filter((m) => (m.type === 'event' && (m.isLive || soon(m))) || m.type === 'place'), 12),
+      weekend: ranked(pool.filter((m) => m.type === 'event' && (() => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= weekend.start && t <= weekend.end; })()), 12),
+      online: ranked(pool.filter((m) => looksOnline(m, byKey.get(m.type + ':' + m.id))), 12),
+      fresh: ranked(pool.filter((m) => { const t = Date.parse(m.createdAt || ''); return !isNaN(t) && now - t >= 0 && now - t <= NEW_WINDOW; }), 12)
+        .sort((a, b) => Date.parse(b.m.createdAt || '') - Date.parse(a.m.createdAt || '')),
+      more: ranked(pool.filter((m) => m.type !== 'idea'), 16),
+    };
+    const setFocus = (next) => { if (props.onFocus) props.onFocus(next); };
+    const chooseTile = (id) => setFocus(tile === id ? null : { kind: 'tile', id: id });
+    const chooseRow = (id) => setFocus(sec === id ? null : { kind: 'sec', id: id });
+    const rowTitle = (id) => P[id] || id;
+    const rowHint = (id) => P[id + 'Hint'] || '';
+    const distWords = props.distWords || str;
+    const cards = (id, list) => h(XRow, { id: id, fine: true, list: list }, list.map((r) => h(XCard, {
+      key: 'nest:' + id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
+      groupWords: str.groups, distWords: distWords,
+      selected: props.selectedId === r.m.id,
+      onOpen: (cid, ctype) => props.onOpen && props.onOpen(cid, ctype),
+    })));
+    const kindOf = current ? pool.find((m) => tileMatches(current.id, m)) : null;
+    const kindPlural = (kindOf && P.kind && P.kind[kindOf.type]) || 'listings';
+    const kindWord = tileItems.length === 1 ? ({ events: 'event', places: 'place', contributors: 'contributor', ideas: 'idea', listings: 'listing' })[kindPlural] || kindPlural : kindPlural;
+    const tab = (id, word, icon, on, onClick, extra) => h('button', Object.assign({
+      key: id, type: 'button', 'data-mv2': 'explore-tile', 'data-tab': id,
+      role: 'tab', 'aria-selected': on ? 'true' : 'false', onClick: onClick,
+    }, extra), icon && Icon ? h(Icon, { name: icon, size: 16 }) : null, h('span', null, word));
+
+    if (tile || sec) {
+      const list = tile ? tileItems : (rows[sec] || []);
+      const line = tile ? (P.matches ? P.matches(list.length, kindWord) : '') : rowHint(sec);
+      return h('div', { 'data-mv2': 'peek-explore', 'data-focus': tile ? 'tile' : 'sec' },
+        h('div', { 'data-mv2': 'xfocus', 'data-focus': tile ? 'tile' : 'sec' },
+          tile
+            ? h('div', { 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.where },
+              TILES.map((t) => tab(t.id, t.word, t.icon, tile === t.id, () => chooseTile(t.id), { 'data-tile': t.id })))
+            : h('div', { 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.rows },
+              SECTIONS.filter((id) => rows[id].length || id === sec).map((id) => tab(id, rowTitle(id), null, sec === id, () => chooseRow(id), { 'data-sec': id }))),
+          h('div', { 'data-mv2': 'xfocus-bar' },
+            h('small', null, line),
+            h('button', { type: 'button', 'data-mv2': 'explore-reset', onClick: () => setFocus(null) }, tile ? (P.allTypes) : (P.closeRow))),
+          list.length ? cards(tile ? 'tile' : sec, list)
+            : h('p', { 'data-mv2': 'explore-empty' }, tile ? (P.emptyTile ? P.emptyTile(current ? current.word : '') : '') : (P.emptyRow || ''))));
+    }
+
+    return h('div', { 'data-mv2': 'peek-explore' },
+      h('div', { 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where },
+        TILES.map((t) => h('button', {
+          key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
+          onClick: () => chooseTile(t.id),
+        }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word)))),
+      SECTIONS.map((id) => (rows[id].length ? h('section', { key: id, 'data-mv2': 'xsec', 'data-sec': id, 'aria-label': rowTitle(id) },
+        h('div', { 'data-mv2': 'xsec-h' },
+          h('h3', null, h('button', { type: 'button', 'data-mv2': 'xsec-go', onClick: () => chooseRow(id) }, rowTitle(id))),
+          rowHint(id) ? h('small', null, rowHint(id)) : null),
+        cards(id, rows[id])) : null)),
+      h('button', {
+        type: 'button', 'data-mv2': 'explore-more', 'aria-label': P.seeAll,
+        onClick: () => { if (props.onSeeAll) props.onSeeAll(); },
+      },
+        h('span', { 'data-mv2': 'explore-more-ring' }, Icon ? h(Icon, { name: 'Compass', size: 22 }) : null),
+        h('small', null, P.seeAll)));
+  }
+
   /** True on a phone-width screen, where the folding nav sits at the foot (the home screen clears room for it). */
   const useNarrow = () => useMedia(NARROW_MQ);
 
   window.MapV2Explore = {
     ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore, SECTIONS,
-    peekOrder, nearestIndex, PinCarousel,
+    peekOrder, nearestIndex, PinCarousel, PeekExplore,
+    placeWhereLine, eventDateLine, cardMetaLine, looksStreet,
     lastView: () => lastView,
   };
 })();

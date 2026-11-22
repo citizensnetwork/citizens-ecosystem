@@ -187,10 +187,11 @@
   --xp-max: 720px;                          /* the desktop Explore sheet */
   --xp-tile-size: 84px;                     /* a Where to… tile */
   --xp-dock-h: 64px;                        /* the sticky nav the crown becomes */
-  --pp-peek: 392px;                         /* pin carousel lowered: cards fill the strip (Pack 09) */
+  /* lowered strip hugs the cards (handle + photo + body + pads); no blank foot under the row */
   --pp-card-w: 180px;                       /* preview card width in the pin carousel */
   --pp-card-img: 136px;                     /* preview photo height */
-  --pp-card-body: 148px;                    /* body fills remaining strip under the photo */
+  --pp-card-body: 118px;                    /* title, category, gold meta, foot */
+  --pp-peek: calc(var(--hit) + var(--space-3) + var(--pp-card-img) + var(--pp-card-body) + var(--space-4) + env(safe-area-inset-bottom, 0px));
   --xp-sheet: rgba(249, 248, 243, 0.95);
   --xp-tile: rgba(236, 238, 240, 0.72);     /* frosted grey glass: tiles and tabs, including the selected one */
   --xp-tile-line: rgba(39, 42, 37, 0.1);
@@ -3065,9 +3066,19 @@ a[data-mv2='card2'],
   flex-direction: column;
   gap: var(--space-2);
   padding: 0 0 var(--space-3);
+  font-family: var(--font-body);
 }
 [data-mv2='xhead'] > [data-mv2='card-media'] {
   border-radius: var(--radius-md);
+}
+/* raised pin-peek / expanded card: PR 383 body font + spacing (not the old display serif) */
+[data-mv2='sheet'][data-inline] [data-mv2='xhead'] [data-mv2='name'],
+[data-mv2='sheet'][data-expanded] [data-mv2='xhead'] [data-mv2='name'] {
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
 }
 [data-mv2='xmeta'] {
   display: flex;
@@ -3075,6 +3086,7 @@ a[data-mv2='card2'],
   align-items: center;
   gap: var(--space-2);
   margin: 0;
+  font-family: var(--font-body);
 }
 /* C41: "Open to collaborate". Gold fill with the contrast label (never white on gold).
    Words carry the meaning; the icon is decorative. Not a control, so it does not take a hit target. */
@@ -3762,23 +3774,6 @@ a[data-mv2='card2'],
   gap: var(--space-1);
   min-width: 0;
 }
-[data-mv2='xcard-kind'] {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  max-width: 100%;
-  color: var(--cat-c, var(--text-2));
-  font-size: var(--fs-1);
-  line-height: var(--lh-1);
-  font-weight: var(--fw-semibold);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-[data-mv2='xcard-kind'] svg {
-  flex: none;
-  width: var(--icon-sm);
-  height: var(--icon-sm);
-}
 [data-mv2='xcard'][data-kind='event'] {
   border-color: color-mix(in srgb, var(--cat-c, var(--xp-tile-line)) 35%, var(--xp-tile-line));
 }
@@ -3797,7 +3792,7 @@ a[data-mv2='card2'],
 }
 [data-mv2='xcard-body'] small,
 [data-mv2='xcard-chip'],
-[data-mv2='xcard-fact'] {
+[data-mv2='xcard-meta'] {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -3817,18 +3812,19 @@ a[data-mv2='card2'],
   overflow: hidden;
   text-overflow: ellipsis;
 }
-[data-mv2='xcard-fact'] {
+/* gold pin / calendar under the category, with street·building·suburb or the event date */
+[data-mv2='xcard-meta'] {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   max-width: 100%;
   color: var(--text-2);
 }
-[data-mv2='xcard-fact'] svg {
+[data-mv2='xcard-meta'] svg {
   flex: none;
   width: var(--icon-sm);
   height: var(--icon-sm);
-  color: var(--cat-c, var(--text-2));
+  color: var(--accent);
 }
 [data-mv2='xcard-foot'] {
   display: flex;
@@ -4328,17 +4324,14 @@ a[data-mv2='card2'],
   padding: var(--space-1) var(--space-1) 0 var(--space-4);
   touch-action: none;
 }
-/* lowered: float Close above the cards so it does not consume card layout space; no counter */
+/* lowered: sticky handle pill (drag affordance) + floating Close; status is for the screen reader */
 [data-mv2='pinpeek']:not([data-raised]) [data-mv2='pinpeek-bar'] {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: auto;
-  min-height: 0;
-  padding: var(--space-2);
+  position: relative;
+  justify-content: center;
+  min-height: var(--hit);
+  padding: var(--space-1) var(--space-1) 0;
   background: transparent;
   border: 0;
-  pointer-events: none;
 }
 [data-mv2='pinpeek']:not([data-raised]) [data-mv2='pinpeek-status'] {
   position: absolute;
@@ -4348,7 +4341,9 @@ a[data-mv2='card2'],
   clip: rect(0 0 0 0);
 }
 [data-mv2='pinpeek']:not([data-raised]) [data-mv2='pinpeek-close'] {
-  pointer-events: auto;
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
   background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
@@ -4359,11 +4354,29 @@ a[data-mv2='card2'],
   background: var(--surface-1);
   border-bottom: 1px solid var(--divider);
 }
-[data-mv2='pinpeek-bar'] [data-mv2='handle-bar'] {
+[data-mv2='pinpeek-bar'] [data-mv2='handle'] {
   position: absolute;
   left: 50%;
   top: var(--space-1);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: calc(var(--hit) * 2);
+  min-height: var(--hit);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
   transform: translateX(-50%);
+  cursor: grab;
+  touch-action: none;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle']:active {
+  cursor: grabbing;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle-bar'] {
+  pointer-events: none;
 }
 [data-mv2='pinpeek-status'] {
   flex: 1 1 auto;
@@ -4428,9 +4441,9 @@ a[data-mv2='card2'],
 [data-mv2='xrow'][data-row='peek'] [data-mv2='xcard'][data-selected] {
   outline-color: var(--cat-c, var(--accent));
 }
-/* give the lowered carousel a little top pad so the floated Close clears the photo */
+/* handle already clears the photo; keep a small gap under the bar */
 [data-mv2='pinpeek']:not([data-raised]) [data-mv2='xrow-wrap'][data-peek] {
-  padding-top: var(--space-3);
+  padding-top: 0;
 }
 /* the arrows on every screen here (founder: "swipeable or with left/right arrows"), over the neighbours, never the chosen card */
 [data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow'] {
@@ -4459,8 +4472,50 @@ a[data-mv2='card2'],
 }
 [data-mv2='pinpeek-details'] {
   flex: none;
-  padding: 0 var(--space-4);
+  padding: 0 var(--space-4) var(--space-6);
   border-top: 1px solid var(--divider);
+}
+/* "Connecting the Kingdom" interrupted hairline between profile and nested Explore */
+[data-mv2='slogan-rule'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 var(--space-4);
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+[data-mv2='slogan-rule-line'] {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--divider);
+}
+[data-mv2='slogan-rule-text'] {
+  flex: none;
+  max-width: 70%;
+  text-align: center;
+  white-space: nowrap;
+}
+[data-mv2='peek-explore'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  font-family: var(--font-body);
+}
+[data-mv2='peek-explore'] [data-mv2='explore-tiles'] {
+  padding-inline: 0;
+}
+[data-mv2='peek-explore'] [data-mv2='xsec-h'] h3,
+[data-mv2='peek-explore'] [data-mv2='xsec-go'] {
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
 }
 /* the listing sheet, inline: no box, no motion, no scroller of its own (the raised carousel scrolls) */
 [data-mv2='sheet'][data-inline] {

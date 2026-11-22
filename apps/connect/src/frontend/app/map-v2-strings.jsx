@@ -38,6 +38,8 @@
       message: 'Message',
       by: 'by',
       with: 'with',
+      // interrupted divider under the raised pin-peek profile (founder, 2026-11-22)
+      slogan: 'Connecting the Kingdom',
       counts: (connected, considering) => connected + ' connected · ' + considering + ' considering',
       website: 'Website',
       call: 'Call',

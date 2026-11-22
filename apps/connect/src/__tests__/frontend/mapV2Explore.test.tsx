@@ -502,14 +502,14 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261117a"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261122c"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122b");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122c");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");
@@ -539,6 +539,19 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     mk("d", 5, { type: "place", title: "Delta", category: "kids" }),
     mk("i", 0.5, { type: "idea", title: "An idea" }),
   ];
+
+  it("prefers building, then street, then suburb for place meta; event date only", () => {
+    const api = Y() as PeekApi & {
+      placeWhereLine: (a?: string, l?: string) => string;
+      eventDateLine: (m: Marker, rec?: Record<string, unknown>) => string;
+    };
+    expect(api.placeWhereLine("Brooklyn Mall, Fehrsen Street, Brooklyn, Pretoria")).toBe("Brooklyn Mall");
+    expect(api.placeWhereLine("587 Rooihuiskraal Road, Garsfontein, Pretoria")).toBe("587 Rooihuiskraal Road");
+    expect(api.placeWhereLine("Garsfontein, Pretoria")).toBe("Garsfontein");
+    expect(api.placeWhereLine("Hatfield")).toBe("Hatfield");
+    expect(api.eventDateLine({ id: "e1", type: "event", title: "Gathering", startsAt: "2026-11-22T09:00:00Z" } as Marker))
+      .toMatch(/22\s+Nov\s+2026/);
+  });
 
   it("orders the carousel with the tapped pin centred among nearest neighbours (left/right), ideas never", () => {
     const b = pins.find((m) => m.id === "b")!;
@@ -652,21 +665,24 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(returnFocus).toHaveBeenCalledWith("a");
   });
 
-  it("a pull up on the lowered panel raises it; a pull down steps back (and swallows the tap that ends it)", () => {
+  it("a pull on the handle pill raises or steps back; a pull on a card does not (founder, 2026-11-22)", () => {
     const { calls } = carousel();
     const panel = document.querySelector("[data-mv2='pinpeek']")!;
+    const handle = document.querySelector("[data-mv2='handle']")!;
     const card = cardsIn()[0];
+    // card pull is ignored — only the handle (or crown) starts a snap pull
     fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
     fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 1, pointerType: "touch" });
+    expect(calls.onRaise).not.toHaveBeenCalled();
+    fireEvent.pointerDown(handle, { clientX: 100, clientY: 400, pointerId: 2, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 2, pointerType: "touch" });
     expect(calls.onRaise).toHaveBeenCalledTimes(1);
-    fireEvent.click(card);
-    expect(calls.onRaise).toHaveBeenCalledTimes(1);
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 2, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 2, pointerType: "touch" });
+    fireEvent.pointerDown(handle, { clientX: 100, clientY: 300, pointerId: 3, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 3, pointerType: "touch" });
     expect(calls.onBack).toHaveBeenCalledTimes(1);
-    // a short or sideways move is a swipe of the row, never a pull
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 3, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 220, clientY: 340, pointerId: 3, pointerType: "touch" });
+    // a short or sideways move on the handle is not a pull
+    fireEvent.pointerDown(handle, { clientX: 100, clientY: 300, pointerId: 4, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 220, clientY: 340, pointerId: 4, pointerType: "touch" });
     expect(calls.onBack).toHaveBeenCalledTimes(1);
   });
 

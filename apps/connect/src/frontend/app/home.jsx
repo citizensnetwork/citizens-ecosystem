@@ -136,13 +136,16 @@
       if (!focusTest && !group) return null;
       return (m) => (focusTest ? focusTest(m) : true) && (!group || (X.groupOf && X.groupOf(m) === group));
     }, [focusTest, group, X]);
-    // A new focus brings its town into view, 25% above the middle. One anchor per focus: switching tabs inside it keeps the
-    // map still (re-measuring "the middle" after each move would creep the map upward, tab after tab).
+    // A Where to… block tap zooms to town level with the centre kept in the screen centre (no lift). Section focus
+    // only filters pins — no camera jump. One anchor per tile focus so switching tabs inside it does not creep the map.
     const focusKey = focus ? focus.kind + ':' + focus.id : '';
+    const focusRef = useRef(focus);
+    focusRef.current = focus;
     const anchor = useRef(null);
     useEffect(() => {
       setShowIdeas(!!(tileRec && tileRec.ideas));
       if (!focusKey) { anchor.current = null; return; }
+      if (!(focus && focus.kind === 'tile')) return;
       const api = mapApi.current;
       if (!api || !api.survey) return;
       if (!anchor.current) {
@@ -150,14 +153,18 @@
         anchor.current = v && (v.user || v.centre);
       }
       const c = anchor.current;
-      if (c) api.survey(c.lat, c.lng, TOWN_ZOOM);
+      if (c) {
+        skipFrame.current = true;   // skip the panel-height reframe that would fitBounds ("landing snap")
+        api.survey(c.lat, c.lng, TOWN_ZOOM, { lift: false });
+      }
     }, [focusKey]);
     // How much room the panel takes is the stylesheet's job (--explore-h follows the panel's look, map-v2.css Pack 08), so it is
     // right even when the CSS arrives after the first render. This only frames the data again as the panel takes room, but
-    // never because the person lowered or raised it (the map would jump).
+    // never because the person lowered or raised it (the map would jump), and never under an active Where to… focus.
     const onExploreHeight = useCallback((px) => {
       if (!rootRef.current || !(px > 0)) return;
       if (skipFrame.current) { skipFrame.current = false; return; }
+      if (focusRef.current) return;
       if (mapApi.current && mapApi.current.reframe) mapApi.current.reframe();
     }, []);
     // Lower or raise the panel (the handle, or a pin tap that needs its card). Only a real change skips the next framing.
@@ -428,6 +435,14 @@
         details: (m) => React.createElement(window.MapV2Sheet, {
           id: m.id, type: m.type, inline: true, view: peek.view, nearby: markers,
           onClose: () => {}, onPick: (id, t) => openSheet(id, t, peek.view),
+          nest: {
+            markers: rowMarkers, sources, selectedId: selected, focus,
+            origin: peek.view ? (peek.view.user || peek.view.centre) : null,
+            distWords: (XS.peek && XS.peek.dist) || { under: '< 100 m', metres: (n) => n + ' m', km: (n) => n + ' km' },
+            onFocus: (next) => { setFocus(next); setLitId(null); },
+            onOpen: tapCard,
+            onSeeAll: () => app.go('explore'),
+          },
         }),
       }),
       // a chosen card tapped again opens the expanded sheet (#210: full, its cover and distance, swipe down back to the

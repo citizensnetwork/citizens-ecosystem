@@ -199,20 +199,22 @@
   //  Save, Share ...) is the one action row above, in the same pills. No white box, no second Follow button. The organiser
   //  and the co-hosts are links to their own profiles; the socials, the counts and, for an upcoming event, the Convince
   //  note follow. `data-card` and `data-entity-card` keep the hooks the card had.
-  function ListingBody({ item, type, org, go, onClose, onPick }) {
+  // part: 'lead' (description + where, above actions) | 'tail' (hours, organiser, socials) | omit = all
+  function ListingBody({ item, type, org, go, onClose, onPick, part }) {
     const { realUser, myProfileMeta, user, toast, contributors } = window.useApp();
     const Str = S();
     const Icon = window.Icon;
     const U = window.EntityCardUtils || {};
     const isEvent = type === 'event';
-    const facts = [];
+    const leadFacts = [];
+    const tailFacts = [];
     const where = isEvent ? item.location : item.address;
-    if (where) facts.push({ key: 'loc', icon: 'MapPin', text: where });
-    if (isEvent && item.date && U.fmtDate) facts.push({ key: 'date', icon: 'Calendar', text: U.fmtDate(item.date) + (item.time ? ' · ' + item.time : '') });
-    if (!isEvent && item.openHours) facts.push({ key: 'hours', icon: 'Clock', text: item.openHours });
-    if (isEvent) facts.push({ key: 'counts', icon: 'Users', text: Str.counts((item.connectCount || 0).toLocaleString(), (item.considerCount || 0).toLocaleString()) });
+    if (where) leadFacts.push({ key: 'loc', icon: 'MapPin', text: where });
+    if (isEvent && item.date && U.fmtDate) leadFacts.push({ key: 'date', icon: 'Calendar', text: U.fmtDate(item.date) + (item.time ? ' · ' + item.time : '') });
+    if (!isEvent && item.openHours) tailFacts.push({ key: 'hours', icon: 'Clock', text: item.openHours });
+    if (isEvent) tailFacts.push({ key: 'counts', icon: 'Users', text: Str.counts((item.connectCount || 0).toLocaleString(), (item.considerCount || 0).toLocaleString()) });
     const bucket = !isEvent && window.UI.followerBucket ? window.UI.followerBucket(item.followerCount) : '';
-    if (bucket) facts.push({ key: 'fol', icon: 'Heart', text: Str.followers(bucket) });
+    if (bucket) tailFacts.push({ key: 'fol', icon: 'Heart', text: Str.followers(bucket) });
 
     const orgName = (org && org.name) || item.organizerName || '';
     // to the organiser's own page: navigate first, then close, so the sheet's history entry is replaced (see BACK, above)
@@ -246,16 +248,30 @@
         h(window.FriendsConsidering, { sb: window.CC_SUPABASE, eventId: item.id, eventTitle: item.title, me: realUser.id, myName: realUser.nameIsFallback ? '' : (user && user.name) || '', authedFetch: window.authedFetch, toast }))
       : null;
     const socials = item.socials ? h('div', { 'data-mv2': 'socials' }, h(window.UI.SocialLinks, { socials: item.socials, variant: 'compact' })) : null;
-    const rows = facts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
+    const leadRows = leadFacts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
+    const tailRows = tailFacts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
+    const bio = item.description ? h('p', { 'data-mv2': 'bio' }, item.description) : null;
+    if (part === 'lead') {
+      return h('div', { 'data-mv2': 'card', 'data-entity-card': type, 'data-part': 'lead' },
+        bio,
+        leadRows.length ? h('ul', { 'data-mv2': 'facts', role: 'list' }, leadRows) : null);
+    }
+    if (part === 'tail') {
+      return h('div', { 'data-mv2': 'card', 'data-entity-card': type, 'data-part': 'tail' },
+        (tailRows.length || organiser || coHostLine) ? h('ul', { 'data-mv2': 'facts', role: 'list' }, tailRows, organiser, coHostLine) : null,
+        socials,
+        convince);
+    }
     return h('div', { 'data-mv2': 'card', 'data-entity-card': type },
-      item.description ? h('p', { 'data-mv2': 'bio' }, item.description) : null,
-      (rows.length || organiser || coHostLine) ? h('ul', { 'data-mv2': 'facts', role: 'list' }, rows, organiser, coHostLine) : null,
+      bio,
+      (leadRows.length || tailRows.length || organiser || coHostLine)
+        ? h('ul', { 'data-mv2': 'facts', role: 'list' }, leadRows, tailRows, organiser, coHostLine) : null,
       socials,
       convince);
   }
 
   // ── the sheet ────────────────────────────────────────────────────
-  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view, inline }) {
+  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view, inline, nest }) {
     const app = window.useApp();
     const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, savedContributors, savedPlaces, toggleSave, realUser } = app;
     // Place and Event actions (#210, founder 2026-10-30): the same pills as a Contributor's, so the sheet speaks one way
@@ -677,9 +693,17 @@
     const openProfile = () => { go(navTarget(type), { id }); onClose(); };
 
     // ── body ────────────────────────────────────────────────────────
+    // Inline profile (raised pin peek): wording/explanations sit above the action pills (founder, 2026-11-22).
+    const splitLead = inline && !isContributor;
     let body;
+    let leadBody = null;
     if (!isContributor) {
-      body = h(ListingBody, { item, type, org, go, onClose, onPick });
+      if (splitLead) {
+        leadBody = h(ListingBody, { item, type, org, go, onClose, onPick, part: 'lead' });
+        body = h(ListingBody, { item, type, org, go, onClose, onPick, part: 'tail' });
+      } else {
+        body = h(ListingBody, { item, type, org, go, onClose, onPick });
+      }
     } else {
       const bio = item.bio ? h('p', { 'data-mv2': 'bio' }, item.bio) : null;
       let panel = null;
@@ -785,7 +809,8 @@
       const mc = window.DATA.getItemCategory(m);
       const kind = (m.type === 'contributor' && window.MapV2Strings.pin.kind[m.kind]) || window.MapV2Strings.pin.type[m.type];
       const label = mc ? mc.name : kind;
-      const what = m.type === 'contributor' ? label : window.MapV2Strings.pin.type[m.type] + ' · ' + label;
+      // category alone (no "Place ·" / "Event ·" prefix — founder, 2026-11-22)
+      const what = label;
       let openState = null;
       if (m.type === 'place') {
         const pl = places.find((p) => p.id === m.id);
@@ -869,9 +894,18 @@
       grab,
       h('div', { ref: scroller, 'data-mv2': 'scroller' },
         xhead,
+        leadBody,
         h('div', { 'data-mv2': 'actions' }, actions),
         body,
-        N && nearRows.length > 0 && h(N.List, { key: type + ':' + id, rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
+        // Nested Explore under the slogan replaces the Nearby list on the raised pin peek (founder, 2026-11-22).
+        // Decorative interrupted hairline (not role=separator: the tabbed block's hairline rule in mapV2Tabbed).
+        inline && nest && Str.slogan ? h('div', { 'data-mv2': 'slogan-rule', 'aria-hidden': 'true' },
+          h('span', { 'data-mv2': 'slogan-rule-line' }),
+          h('span', { 'data-mv2': 'slogan-rule-text' }, Str.slogan),
+          h('span', { 'data-mv2': 'slogan-rule-line' })) : null,
+        inline && nest && window.MapV2Explore && window.MapV2Explore.PeekExplore
+          ? h(window.MapV2Explore.PeekExplore, nest) : null,
+        !(inline && nest) && N && nearRows.length > 0 && h(N.List, { key: type + ':' + id, rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
         qrAction,
         reportAction,
         h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),

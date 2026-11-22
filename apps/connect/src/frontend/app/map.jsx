@@ -612,11 +612,17 @@
             mp.easeTo(to, { originalEvent: {} });
           });
         },
-        survey(lat, lng, zoom) {
+        // opts.lift === false keeps the town in the screen centre (Where to… block tap); default still lifts clear of the panel.
+        survey(lat, lng, zoom, opts) {
           const mp = mapRef.current;
           if (!mp || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
           userMovedRef.current = true;
-          mp.easeTo({ center: [lng, lat], zoom: zoom, offset: liftOffset(containerRef.current), duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+          const lift = !(opts && opts.lift === false);
+          mp.easeTo({
+            center: [lng, lat], zoom: zoom,
+            offset: lift ? liftOffset(containerRef.current) : [0, 0],
+            duration: window.MapV2.dur('slow'), essential: true,
+          }, { originalEvent: {} });
         },
         restore() {
           const mp = mapRef.current;
