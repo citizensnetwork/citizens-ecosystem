@@ -140,9 +140,10 @@ export async function openExploreAll(page: Page, how: "click" | "tap" = "click")
   // Raised pinpeek covers Explore; Close it before opening the panel (2nd-tap surface, 2026-11-22).
   const peek = page.locator("[data-mv2='pinpeek']:not([hidden])");
   if (await peek.count()) {
+    // Prefer the X (full dismiss). Force: the centred handle used to paint over it (width:100%).
     const close = page.locator("[data-mv2='pinpeek-close']");
-    if (how === "tap") await close.tap();
-    else await close.click();
+    if (how === "tap") await close.tap({ force: true });
+    else await close.click({ force: true });
     await expect(peek).toHaveCount(0, { timeout: 5_000 });
   }
   const explore = page.locator("[data-mv2='explore']");

@@ -512,7 +512,7 @@ describe("the stylesheet and the wiring", () => {
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122m");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122n");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");
@@ -757,6 +757,17 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(home).toContain("closeSearch");
     expect(css).toMatch(/\[data-mv2='pinpeek'\] \{[^}]*transform: translateY\(calc\(100% - var\(--pp-peek\)\)\);/);
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\[data-mv2='pinpeek'\] \{\s*transition: none;\s*animation: none;/);
+    // pinpeek handle must not inherit sheet handle's width:100% (that covered Close/Back)
+    expect(css).toMatch(
+      /\[data-mv2='pinpeek-bar'\] \[data-mv2='handle'\] \{[^}]*width: auto;/,
+    );
+    // lowered peek: crown above pinpeek; raised peek: explore-host under pinpeek
+    expect(css).toContain(
+      ":has([data-mv2='pinpeek']:not([hidden]):not([data-raised])) [data-mv2='explore-crown']",
+    );
+    expect(css).toContain(
+      ":has([data-mv2='pinpeek'][data-raised]:not([hidden])) [data-mv2='explore-host']",
+    );
     const store = read("src/frontend/app/store.jsx");
     // closing several levels at once takes all their entries off in ONE step
     expect(store).toContain("window.history.go(-k)");

@@ -4586,7 +4586,8 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
 [data-mv2='pinpeek-back'],
 [data-mv2='pinpeek-close'] {
   pointer-events: auto;
-  z-index: var(--z-xp-crown);
+  /* above the centred handle (rail+1) so X / Back stay clickable */
+  z-index: calc(var(--z-xp-rail) + 2);
 }
 [data-mv2='pinpeek-bar'] [data-mv2='handle'] {
   pointer-events: auto;
@@ -4599,6 +4600,8 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   align-items: center;
   justify-content: center;
   gap: var(--handle-stack-gap);
+  /* sheet handle is width:100%; keep this a centred pill or it covers Close/Back */
+  width: auto;
   min-width: calc(var(--hit) * 2);
   min-height: var(--hit);
   margin: 0;
@@ -4633,9 +4636,17 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   min-width: 0;
   pointer-events: none;
 }
-/* While the pinpeek is up, keep Explore under it (host is full-bleed and was stealing taps). */
-[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden])) [data-mv2='explore-host'] {
+/* Raised pinpeek: keep Explore under it (host is full-bleed and was stealing taps). */
+[data-mv2='home']:has([data-mv2='pinpeek'][data-raised]:not([hidden])) [data-mv2='explore-host'] {
   z-index: calc(var(--z-controls) + 1);
+}
+/* Lowered carousel: crown rides the top edge and must sit above pinpeek (controls+3) to dismiss. */
+[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden]):not([data-raised])) [data-mv2='explore-host'] {
+  z-index: calc(var(--z-controls) + 4);
+  pointer-events: none;
+}
+[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden]):not([data-raised])) [data-mv2='explore-crown'] {
+  pointer-events: auto;
 }
 [data-mv2='pinpeek-back'],
 [data-mv2='pinpeek-close'] {
