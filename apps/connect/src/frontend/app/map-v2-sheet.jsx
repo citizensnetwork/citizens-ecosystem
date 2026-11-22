@@ -1047,7 +1047,7 @@
             h('div', { 'data-mv2': 'cover-avatar' },
               h(Avatar, {
                 src: faceSrc, name: avatarName || name, hex, size: 'half',
-                glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 22 }),
+                glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 24 }),
               })),
             h('div', { 'data-mv2': 'cover-copy' },
               h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),

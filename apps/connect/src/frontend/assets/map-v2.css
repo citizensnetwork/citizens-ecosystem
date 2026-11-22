@@ -2298,16 +2298,11 @@ a[data-mv2='card2'],
   color: var(--accent-ink);
   font-family: var(--font-body);
 }
-[data-mv2='home-search']:focus-within,
-[data-mv2='home-search'][data-open] {
-  flex-wrap: wrap;
-  align-items: stretch;
-  border-radius: var(--radius-lg);
-  border-color: var(--divider);
+[data-mv2='home-search']:focus-within {
+  border-color: var(--accent-ink);
   background: var(--surface-0);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  box-shadow: var(--elev-1);
 }
 [data-mv2='home-search'] input {
   flex: 1 1 auto;
@@ -4345,35 +4340,82 @@ a[data-mv2='card2'],
 .mv2-pin[data-match] {
   filter: drop-shadow(0 0 var(--space-2) var(--pin-cat));
 }
-/* open, the bar wraps its category list below: the magnifier stays level with the words */
-[data-mv2='home-search'][data-open] > svg {
-  align-self: flex-start;
-  height: var(--hit);
+/* Category chips float under the search bar (not inside it): full-bleed scroll past Find, edge fades + arrows
+   (founder, 2026-11-22). */
+[data-mv2='home-filters-wrap'] {
+  position: relative;
+  width: 100%;
+  margin-top: var(--space-1);
+  pointer-events: auto;
 }
-[data-mv2='home-search'][data-open] [data-mv2='home-filters'] {
-  flex: 1 0 100%;
-}
-/* The category chips (founder, 2026-11-18): ONE row of small chips under the words, swiped (or scrolled) sideways. Each
-   chip is 32px to the eye; its ::after reaches the 44px tap target, and the row's own padding keeps that inside the row
-   (a scroller clips what leaves it). */
 [data-mv2='home-filters'] {
   display: flex;
   flex-direction: row;
   gap: var(--space-2);
   min-width: 0;
-  max-width: 100%;
-  margin-top: var(--space-1);
-  padding: calc((var(--hit) - var(--space-7)) / 2) var(--space-1);
+  max-width: none;
+  margin: 0;
+  padding: calc((var(--hit) - var(--space-7)) / 2) var(--space-3);
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
-  scroll-padding-inline: var(--space-1);
+  scroll-padding-inline: var(--space-3);
   scrollbar-width: none;
   touch-action: pan-x;
   color: var(--text-1);
 }
 [data-mv2='home-filters']::-webkit-scrollbar {
   display: none;
+}
+/* Soft edge fades where further scrolling is available */
+[data-mv2='home-filters-wrap']::before,
+[data-mv2='home-filters-wrap']::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--space-7);
+  z-index: var(--z-sticky);
+  pointer-events: none;
+}
+[data-mv2='home-filters-wrap']::before {
+  left: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--surface-0) 88%, transparent), transparent);
+}
+[data-mv2='home-filters-wrap']::after {
+  right: 0;
+  background: linear-gradient(270deg, color-mix(in srgb, var(--surface-0) 88%, transparent), transparent);
+}
+[data-mv2='home-filters-arrow'] {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-xp-layer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+[data-mv2='home-filters-arrow'][data-dir='prev'] {
+  left: var(--space-2);
+}
+[data-mv2='home-filters-arrow'][data-dir='next'] {
+  right: var(--space-2);
+}
+/* Hide the folding nav while search categories are open (founder, 2026-11-22). */
+body:has([data-mv2='home-top'][data-search]) [data-mv2='nav'],
+body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
+  visibility: hidden;
+  pointer-events: none;
 }
 [data-mv2='filter-row'] {
   position: relative;
@@ -4430,7 +4472,8 @@ a[data-mv2='card2'],
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: calc(var(--z-controls) + 1);
+  /* above explore-host so the sticky bar stays tappable when raised (founder, 2026-11-22) */
+  z-index: calc(var(--z-controls) + 3);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -4567,6 +4610,11 @@ a[data-mv2='card2'],
 [data-mv2='pinpeek-status'] {
   flex: 1 1 auto;
   min-width: 0;
+  pointer-events: none;
+}
+/* While the pinpeek is up, keep Explore under it (host is full-bleed and was stealing taps). */
+[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden])) [data-mv2='explore-host'] {
+  z-index: calc(var(--z-controls) + 1);
 }
 [data-mv2='pinpeek-back'],
 [data-mv2='pinpeek-close'] {
@@ -4691,6 +4739,7 @@ a[data-mv2='card2'],
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
   padding-top: var(--space-1);
 }
@@ -4772,9 +4821,9 @@ a[data-mv2='card2'],
 }
 [data-mv2='cover-avatar'] {
   flex: none;
-  /* slightly larger than the pre-raise size (~52 → ~60) */
-  width: calc(var(--space-8) + var(--space-3));
-  height: calc(var(--space-8) + var(--space-3));
+  /* slightly larger again (~60 → ~64) */
+  width: calc(var(--space-8) + var(--space-4));
+  height: calc(var(--space-8) + var(--space-4));
   margin: 0;
   border-radius: var(--radius-full);
   border: var(--pin-ring-w) solid var(--surface-0);
@@ -4870,7 +4919,7 @@ a[data-mv2='card2'],
 [data-mv2='xhead'][data-hero] > [data-mv2='handle-row'] {
   /* room for the slight avatar hang only — no large empty gap */
   margin-top: calc(var(--space-4) + var(--space-1));
-  padding-left: var(--space-4);
+  padding-right: var(--space-4);
 }
 [data-mv2='sheet-foot'] {
   display: flex;

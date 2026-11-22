@@ -120,6 +120,7 @@
     const [exploreMode, setExploreMode] = useState('rest');
     const press = useRef(null);       // where a press on the map began: a pan is not a tap on empty map
     const [restSignal, setRestSignal] = useState(0);   // a tap on empty map: the Explore panel goes back to its rest too
+    const [stripSignal, setStripSignal] = useState(0); // close-search: reopen Where-to strip under the crown
     const chosen = useRef({ id: null, type: null });
     const narrow = X.useNarrow();
     const clean = !!(app.nav && app.nav.params && app.nav.params.view === 'map');
@@ -304,10 +305,16 @@
     // Handle / crown tap: step down one level (raised → cards → closed). Founder option B, 2026-11-22.
     const stepLevels = () => {
       if (peekRef.current) { peekBack(); return; }
-      if (searchOpen) { setSearchOpen(false); return; }
+      if (searchOpen) { closeSearch(); return; }
       resetLevels();
     };
-    useBackGuard(searchOpen, () => setSearchOpen(false));
+    // X / Back from search: close completely and bring back the crown + Where-to strip (founder, 2026-11-22).
+    const closeSearch = () => {
+      setSearchOpen(false);
+      setQuery('');
+      setStripSignal((n) => n + 1);
+    };
+    useBackGuard(searchOpen, closeSearch);
     // One history entry per level: raised Back/Escape steps down; cards-only Back closes (handle tap still uses peekBack).
     useBackGuard(!!peek, closePeek);
     useBackGuard(!!(peek && peek.raised), lowerPeek);
@@ -371,9 +378,28 @@
       else if (api.restore) api.restore();
     };
     const searchRef = useRef(null);
+    const filtersRef = useRef(null);
+    const [filterEdges, setFilterEdges] = useState({ l: false, r: false });
     const showSearch = !narrow || searchOpen || !!query;
+    const measureFilters = () => {
+      const el = filtersRef.current;
+      if (!el) { setFilterEdges({ l: false, r: false }); return; }
+      const l = el.scrollLeft > 4;
+      const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+      setFilterEdges((p) => (p.l === l && p.r === r ? p : { l: l, r: r }));
+    };
+    useEffect(() => {
+      if (!searchOpen) { setFilterEdges({ l: false, r: false }); return undefined; }
+      measureFilters();
+      const t = setTimeout(measureFilters, 80);
+      return () => clearTimeout(t);
+    }, [searchOpen, group]);
+    const nudgeFilters = (dir) => {
+      const el = filtersRef.current;
+      if (el) el.scrollBy({ left: dir * Math.max(120, el.clientWidth * 0.7), behavior: 'smooth' });
+    };
     const onFind = () => {
-      if (narrow && searchOpen) { setSearchOpen(false); return; }
+      if (searchOpen) { closeSearch(); return; }
       setSearchOpen(true);
       requestAnimationFrame(() => { if (searchRef.current) searchRef.current.focus(); });
     };
@@ -411,24 +437,17 @@
           onZoomBandChange: setZoomBand,
         })),
 
-      // top: the search bar, the filter chip, and a round Search button where the account button was (founder, 2026-11-17: the
-      // account lives in the nav's Me now). On a phone the bar folds into that button until it is tapped (or holds words).
-      React.createElement('div', { 'data-mv2': 'home-top' },
+      // top: search bar stays its own width; category chips float below and scroll under/past the Find button
+      // (founder, 2026-11-22). On a phone the bar folds into Find until tapped. X closes search → Where-to strip.
+      React.createElement('div', { 'data-mv2': 'home-top', 'data-search': searchOpen ? '' : undefined },
         React.createElement('div', { 'data-mv2': 'home-bar', 'data-search': showSearch ? '' : undefined },
-          showSearch && React.createElement('div', { 'data-mv2': 'home-search', 'data-open': searchOpen ? '' : undefined, onClick: () => setSearchOpen(true) },
+          showSearch && React.createElement('div', { 'data-mv2': 'home-search', onClick: () => setSearchOpen(true) },
             React.createElement(Icon, { name: 'Search', size: 18 }),
             React.createElement('input', {
               ref: searchRef, value: query, onChange: (e) => setQuery(e.target.value), onFocus: () => setSearchOpen(true),
               placeholder: XS.search, 'aria-label': XS.search, 'aria-expanded': searchOpen ? 'true' : 'false',
             }),
-            query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: () => setQuery('') }, React.createElement(Icon, { name: 'X', size: 16 })),
-            // founder, 2026-11-18: one row of small chips that swipes sideways (it was a list down the screen)
-            searchOpen && React.createElement('div', { 'data-mv2': 'home-filters', role: 'radiogroup', 'aria-label': XS.chipsLabel },
-              (X.GROUPS || []).map((id) => React.createElement('button', {
-                key: id, type: 'button', role: 'radio', 'data-mv2': 'filter-row', 'aria-checked': group === id ? 'true' : 'false',
-                style: { '--chip': 'var(--grp-' + id + ')' },
-                onClick: (e) => { e.stopPropagation(); setGroup((cur) => (cur === id ? '' : id)); },
-              }, React.createElement('span', { 'data-mv2': 'filter-dot', 'aria-hidden': 'true' }), (XS.groups && XS.groups[id]) || id)))),
+            query && React.createElement('button', { type: 'button', 'data-mv2': 'home-clear', 'aria-label': XS.clearSearch, onClick: (e) => { e.stopPropagation(); setQuery(''); } }, React.createElement(Icon, { name: 'X', size: 16 }))),
           chip && !(narrow && searchOpen) && React.createElement('div', { 'data-mv2': 'filter-chip', role: 'status', style: { '--chip': chip.colour } },
             React.createElement('span', { 'data-mv2': 'filter-dot', 'aria-hidden': 'true' }),
             React.createElement('span', { 'data-mv2': 'filter-chip-label', title: XS.filterChip(chip.label) }, chip.label),
@@ -436,9 +455,29 @@
               React.createElement(Icon, { name: 'X', size: 14 }))),
           React.createElement('button', {
             type: 'button', 'data-mv2': 'home-find', onClick: onFind,
-            'aria-label': narrow && searchOpen ? XS.closeSearch : XS.searchButton,
+            'aria-label': searchOpen ? XS.closeSearch : XS.searchButton,
             'aria-expanded': searchOpen ? 'true' : 'false',
-          }, React.createElement(Icon, { name: narrow && searchOpen ? 'X' : 'Search', size: 20 })))),
+          }, React.createElement(Icon, { name: searchOpen ? 'X' : 'Search', size: 20 }))),
+        searchOpen && React.createElement('div', { 'data-mv2': 'home-filters-wrap' },
+          filterEdges.l ? React.createElement('button', {
+            type: 'button', 'data-mv2': 'home-filters-arrow', 'data-dir': 'prev',
+            'aria-label': (XS.panel && XS.panel.scrollLeft) || '',
+            onClick: () => nudgeFilters(-1),
+          }, React.createElement(Icon, { name: 'ChevronLeft', size: 16 })) : null,
+          React.createElement('div', {
+            ref: filtersRef, 'data-mv2': 'home-filters', role: 'radiogroup', 'aria-label': XS.chipsLabel,
+            onScroll: measureFilters,
+          },
+            (X.GROUPS || []).map((id) => React.createElement('button', {
+              key: id, type: 'button', role: 'radio', 'data-mv2': 'filter-row', 'aria-checked': group === id ? 'true' : 'false',
+              style: { '--chip': 'var(--grp-' + id + ')' },
+              onClick: () => setGroup((cur) => (cur === id ? '' : id)),
+            }, React.createElement('span', { 'data-mv2': 'filter-dot', 'aria-hidden': 'true' }), (XS.groups && XS.groups[id]) || id))),
+          filterEdges.r ? React.createElement('button', {
+            type: 'button', 'data-mv2': 'home-filters-arrow', 'data-dir': 'next',
+            'aria-label': (XS.panel && XS.panel.scrollRight) || '',
+            onClick: () => nudgeFilters(1),
+          }, React.createElement(Icon, { name: 'ChevronRight', size: 16 })) : null)),
 
       // zoom-gate hint + the MapTiler logo, kept above the Explore row (MapTiler's Free plan needs the logo bottom-left)
       React.createElement('div', { 'data-mv2': 'home-corner' },
@@ -457,7 +496,7 @@
         hidden: !!sheet,
         markers: rowMarkers, ideas: ideaMarkers, sources, apiRef: mapApi, selectedId: selected, reveal,
         focus, filtered: !!group || !!q,
-        peek: !!peek, level: searchOpen || peek ? 1 : 0, onLevelReset: stepLevels, onMode: setExploreMode, restSignal,
+        peek: !!peek, level: searchOpen || peek ? 1 : 0, onLevelReset: stepLevels, onMode: setExploreMode, restSignal, stripSignal,
         onFocus: (next) => { setFocus(next); setLitId(null); },
         onSectionIds: setSecIds,
         onReset: resetHome,

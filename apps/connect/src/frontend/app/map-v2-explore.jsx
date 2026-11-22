@@ -595,6 +595,9 @@
     // the Where to… strip and the menu fold away. A wide screen's rest is its strip.
     const restSignal = props.restSignal || 0;
     useEffect(() => { if (restSignal) { setStage('rest'); setMe(''); } }, [restSignal]);
+    // Close-search (and similar): reopen the Where-to strip under the crown (founder, 2026-11-22).
+    const stripSignal = props.stripSignal || 0;
+    useEffect(() => { if (stripSignal) { setStage('strip'); setMe(''); } }, [stripSignal]);
 
     // the chosen tab in view, in the middle of its row
     const tabKey = tile || sec;
@@ -1090,7 +1093,16 @@
       'aria-label': P.label, onPointerDown: onPullDown, onPointerUp: onPullUp,
       onPointerCancel: () => { pull.current = null; },
     },
-      h('div', { 'data-mv2': 'pinpeek-bar' },
+      h('div', {
+        'data-mv2': 'pinpeek-bar',
+        // Tapping empty bar chrome (not Back / Close) also steps down — same as the handle.
+        onClick: (e) => {
+          if (swallow.current) { swallow.current = false; return; }
+          const t = e.target;
+          if (t && t.closest && t.closest("[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close'], [data-mv2='handle']")) return;
+          if (props.onBack) props.onBack();
+        },
+      },
         raised ? iconBtn({
           'data-mv2': 'pinpeek-back',
           onClick: (e) => { e.stopPropagation(); if (props.onBack) props.onBack(); },
@@ -1103,8 +1115,7 @@
           // Lowest (cards) shows flat bar + slight up chevron; raised is flat only (founder, 2026-11-22).
           'data-hint': raised ? undefined : 'up',
           onClick: (e) => {
-            // Always step down / reveal the map on a handle tap (founder, 2026-11-22).
-            // A drag already called onBack and set swallow so the synthetic click is ignored once.
+            // Always step down / reveal the map (founder, 2026-11-22). Drag already called onBack + swallow.
             if (swallow.current) { swallow.current = false; return; }
             e.stopPropagation();
             if (props.onBack) props.onBack();
