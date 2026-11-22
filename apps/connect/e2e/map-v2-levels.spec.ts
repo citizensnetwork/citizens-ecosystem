@@ -219,26 +219,6 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       const second = (await chosenCard(page).getAttribute("data-explore-id"))!;
       await idle(page);
       const atRaise = await cam(page);
-      // TEMPORARY diagnostic (removed before merge): log every camera call and container resize from here on
-      await page.evaluate(() => {
-        const w = window as unknown as { __ccMap: Record<string, (...a: unknown[]) => unknown> & { getCenter(): { lng: number; lat: number }; getContainer(): HTMLElement; on(e: string, f: () => void): void; isMoving(): boolean }; __camLog: string[] };
-        const m = w.__ccMap;
-        const log: string[] = [];
-        w.__camLog = log;
-        const t0 = performance.now();
-        const stamp = () => (performance.now() - t0).toFixed(0) + "ms c=" + m.getCenter().lng.toFixed(6) + "," + m.getCenter().lat.toFixed(6) + " w=" + m.getContainer().clientWidth + " doc=" + document.documentElement.clientWidth;
-        const nl = String.fromCharCode(10);
-        for (const k of ["easeTo", "jumpTo", "flyTo", "stop", "fitBounds", "panTo", "resize"]) {
-          const orig = m[k].bind(m);
-          m[k] = (...a: unknown[]) => {
-            const stack = (new Error().stack || "").split(nl).slice(2, 6).map((s) => s.trim().replace(/\(.*\/([^/]+:\d+:\d+)\)/, "($1)")).join(" < ");
-            log.push(stamp() + " " + k + " " + JSON.stringify(a[0] ?? null).slice(0, 140) + " | " + stack);
-            return orig(...a);
-          };
-        }
-        m.on("moveend", () => log.push(stamp() + " moveend moving=" + m.isMoving()));
-        m.on("resize", () => log.push(stamp() + " resize-event"));
-      });
       // the chosen card says what its next tap does; that tap raises the panel
       await expect(chosenCard(page)).toContainText("Tap again for details");
       await chosenCard(page).click();
@@ -264,13 +244,7 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await expect(chosenCard(page)).toHaveAttribute("data-explore-id", second);
       await expect(pinSelected(page, second)).toBeAttached();
       await idle(page);
-      // TEMPORARY diagnostic (removed before merge): what moved the map around Back
-      const gotRaise = await cam(page);
-      if (Math.abs(gotRaise.lng - atRaise.lng) > 1e-6 || Math.abs(gotRaise.lat - atRaise.lat) > 1e-6) {
-        const log = await page.evaluate(() => ((window as unknown as { __camLog?: string[] }).__camLog || []).join(String.fromCharCode(10)));
-        console.log("CAMDIAG want=" + JSON.stringify(atRaise) + " got=" + JSON.stringify(gotRaise) + String.fromCharCode(10) + log);
-      }
-      sameCam(gotRaise, atRaise);
+      sameCam(await cam(page), atRaise);
       // and once more: the carousel closes, nothing is chosen, and the map is where the pin was tapped
       await page.goBack();
       await expect(peek(page)).toHaveCount(0);
