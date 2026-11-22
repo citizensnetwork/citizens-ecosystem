@@ -471,12 +471,27 @@
       const el = scroller.current;
       if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
     };
+    // Edge tap rotates the carousel (same language as pinpeek arrows); does not select a card / snap a pin.
+    const onEdgeTap = (e) => {
+      const el = scroller.current;
+      if (!el || !(edges.l || edges.r)) return;
+      const box = el.getBoundingClientRect();
+      const x = e.clientX - box.left;
+      const band = Math.max(48, box.width * 0.18);
+      if (edges.l && x < band) { e.preventDefault(); e.stopPropagation(); nudge(-1); }
+      else if (edges.r && x > box.width - band) { e.preventDefault(); e.stopPropagation(); nudge(1); }
+    };
     const Icon = window.Icon;
     const P = S().panel || {};
+    // Always float arrows when the row overflows (phones included) — founder, 2026-11-22 Explore filters.
+    const showArrows = props.arrows !== false;
     return h('div', { 'data-mv2': 'xrow-wrap' },
-      props.fine && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
-      h('div', { 'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure }, props.children),
-      props.fine && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
+      showArrows && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
+      h('div', {
+        'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure,
+        onClickCapture: onEdgeTap,
+      }, props.children),
+      showArrows && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
   }
 
   /**
@@ -516,7 +531,11 @@
     // While the pin carousel is up (`peek`, founder 2026-11-18) the panel rests: the carousel has the foot of the map, and the
     // crown rides on its top edge. The panel's own look comes back exactly as it was when the carousel closes.
     const base = props.peek ? 'rest' : (stage === 'rest' && desk ? 'strip' : stage);
-    const mode = props.peek ? 'rest' : (base === 'open' ? 'open' : (focus ? 'focus' : base));
+    // Rest wins over focus so the handle can minimize the panel while the filter stays on (founder, 2026-11-22).
+    const mode = props.peek ? 'rest'
+      : (base === 'open' ? 'open'
+        : (base === 'rest' ? 'rest'
+          : (focus ? 'focus' : base)));
     const open = mode === 'open';
     const setFocus = (next) => { if (props.onFocus) props.onFocus(next); };
 
@@ -586,10 +605,10 @@
     const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
     // The rows rank from where the map looks, but a focus holds its first origin until it ends: the map moves for the
     // focus itself (to the town, to a chosen card), and re-ranking then would reorder the cards under the person's finger.
-    // Where-to tiles rank from the current town view (centre), not GPS — founder 2026-11-22.
-    const liveTile = view.centre || view.user;
+    // Where-to tiles and Explore section filters rank from the current town view (centre), not GPS — founder 2026-11-22.
+    const liveTown = view.centre || view.user;
     const liveElse = view.user || view.centre;
-    const live = (focus && focus.kind === 'tile') ? liveTile : liveElse;
+    const live = (focus && (focus.kind === 'tile' || focus.kind === 'sec')) ? liveTown : liveElse;
     const held = useRef(null);
     if (!focus) held.current = null;
     else if (!held.current && live) held.current = live;
@@ -647,7 +666,8 @@
     const raise = () => setStage('open');
     const lower = () => {
       if (open) { setStage('strip'); return; }
-      if (focus) { setFocus(null); return; }
+      // Focus (Where-to or Explore filter): minimize completely, keep the filter (founder, 2026-11-22).
+      if (focus || mode === 'focus') { setStage('rest'); return; }
       if (!desk) setStage('rest');
     };
     // A drag on the handle raises or lowers the panel; a tap (or a screen reader's activation, which sends a click and
@@ -666,7 +686,10 @@
     };
     const onGrabClick = () => {
       if (dragged.current) { dragged.current = false; return; }
+      // Filter / Where-to focus: tap collapses to crown-only rest and keeps the filter on.
+      if (mode === 'focus' || (focus && mode === 'open')) { setStage('rest'); return; }
       if (open) lower();
+      else if (focus && mode === 'rest') { setStage('strip'); }
       else raise();
     };
     // The crown: with any filter on, it clears them all and goes home (the map screen snaps to the person's place);
@@ -676,7 +699,13 @@
     // alone, closing every level at once.
     const onCrown = () => {
       setMe('');
-      if (filtered) { if (props.onReset) props.onReset(); setStage('rest'); return; }
+      // Minimized-with-filter: first tap reopens the focus panel; second tap (or chip) clears (founder, 2026-11-22).
+      if (filtered) {
+        if (mode === 'rest') { setStage('strip'); return; }
+        if (props.onReset) props.onReset();
+        setStage('rest');
+        return;
+      }
       if (props.level) { if (props.onLevelReset) props.onLevelReset(); setStage('rest'); return; }
       setStage((s) => (s === 'rest' ? 'strip' : 'rest'));
     };
@@ -718,7 +747,7 @@
       if (props.onOpen) props.onOpen(id, type, measuredFrom);
     };
     const cardDist = (str.peek && str.peek.dist) || distWords;
-    const cards = (id, list) => h(XRow, { id: id, fine: fine, list: list }, list.map((r) => h(XCard, {
+    const cards = (id, list) => h(XRow, { id: id, list: list }, list.map((r) => h(XCard, {
       key: id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
       groupWords: str.groups, distWords: cardDist,
       selected: props.selectedId === r.m.id, badge: str.selectedBadge,

@@ -161,29 +161,53 @@
       if (dx) el.scrollLeft += dx;
     };
 
-    const arrows = fine && !stack && edges.scrollable;
-    const arrow = (dir, atEdge, label, name) => h('button', {
-      type: 'button', 'data-mv2': 'hrow-btn', 'aria-label': label, 'aria-controls': listId,
+    // nav: 'float' = Where-to-style floating edge arrows (profile Gallery/Events/Posts); default = head buttons on fine pointers.
+    const floatNav = props.nav === 'float';
+    const arrows = !stack && edges.scrollable && (floatNav || fine);
+    const arrow = (dir, atEdge, label, name, kind) => h('button', {
+      type: 'button',
+      'data-mv2': kind === 'float' ? 'xarrow' : 'hrow-btn',
+      'data-dir': kind === 'float' ? (dir < 0 ? 'prev' : 'next') : undefined,
+      'aria-label': label, 'aria-controls': listId,
       'aria-disabled': atEdge ? 'true' : undefined,
       onClick: () => { if (!atEdge) move(dir); },
-    }, Icon ? h(Icon, { name: name, size: 20 }) : null);
+    }, Icon ? h(Icon, { name: name, size: kind === 'float' ? 16 : 20 }) : null);
 
-    const head = (hidden || arrows) && h('div', { 'data-mv2': 'hrow-head' },
+    const head = (hidden || (arrows && !floatNav)) && h('div', { 'data-mv2': 'hrow-head' },
       hidden && h('p', { 'data-mv2': 'hrow-count' }, stack ? str.all(total) : str.count(shown.length, total)),
-      arrows && h('div', { 'data-mv2': 'hrow-nav' },
-        arrow(-1, edges.start, words.prev, 'ChevronLeft'),
-        arrow(1, edges.end, words.next, 'ChevronRight')),
+      arrows && !floatNav && h('div', { 'data-mv2': 'hrow-nav' },
+        arrow(-1, edges.start, words.prev || str.scrollLeft, 'ChevronLeft'),
+        arrow(1, edges.end, words.next || str.scrollRight, 'ChevronRight')),
       hidden && h('button', {
         type: 'button', 'data-mv2': 'hrow-all', 'aria-expanded': stack, 'aria-controls': listId,
         onClick: () => setExpanded((v) => !v),
       }, stack ? str.showFewer : str.seeAll(total)));
 
+    // Edge tap scrolls the row (does not open the card) — same band language as Explore XRow.
+    const onEdgeTap = (e) => {
+      if (!floatNav || !arrows) return;
+      const el = list.current;
+      if (!el) return;
+      const box = el.getBoundingClientRect();
+      const x = e.clientX - box.left;
+      const band = Math.max(48, box.width * 0.18);
+      if (!edges.start && x < band) { e.preventDefault(); e.stopPropagation(); move(-1); }
+      else if (!edges.end && x > box.width - band) { e.preventDefault(); e.stopPropagation(); move(1); }
+    };
+
     return h('div', {
-      'data-mv2': 'hrow', role: 'region', 'aria-label': str.label,
+      'data-mv2': 'hrow', 'data-nav': floatNav ? 'float' : undefined, role: 'region', 'aria-label': str.label,
     },
       head,
-      h('ul', { id: listId, ref: list, 'data-mv2': 'list', 'data-layout': stack ? 'stack' : 'row', role: 'list', onFocus },
-        shown.map((item, i) => h('li', { key: props.keyOf ? props.keyOf(item, i) : i, 'data-mv2': 'hrow-item' }, props.render(item, i)))));
+      floatNav && arrows && !edges.start
+        ? arrow(-1, edges.start, words.prev || str.scrollLeft || '', 'ChevronLeft', 'float') : null,
+      h('ul', {
+        id: listId, ref: list, 'data-mv2': 'list', 'data-layout': stack ? 'stack' : 'row', role: 'list',
+        onFocus, onClickCapture: onEdgeTap,
+      },
+        shown.map((item, i) => h('li', { key: props.keyOf ? props.keyOf(item, i) : i, 'data-mv2': 'hrow-item' }, props.render(item, i)))),
+      floatNav && arrows && !edges.end
+        ? arrow(1, edges.end, words.next || str.scrollRight || '', 'ChevronRight', 'float') : null);
   }
 
   window.MapV2Row = { ROW_MAX, visibleItems, edgesOf, pageStep, focusShift, Row };

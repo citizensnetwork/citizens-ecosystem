@@ -359,7 +359,7 @@
         h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.gallery),
         h(window.MapV2Row.Row, {
           items: gallery.map((src, i) => ({ id: 'g' + i, src: src })),
-          idPrefix: 'mv2-ig', strings: rowStr, keyOf: (x) => x.id,
+          idPrefix: 'mv2-ig', strings: rowStr, nav: 'float', keyOf: (x) => x.id,
           render: (x) => h(window.MapV2Card, {
             variant: 'image', title: listingName, media: { src: x.src }, idPrefix: 'mv2-ig-' + x.id,
           }),
@@ -369,7 +369,7 @@
       sections.push(h('section', { key: 'ev', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.events },
         h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.events),
         h(window.MapV2Row.Row, {
-          items: evList, idPrefix: 'mv2-ie', strings: rowStr, keyOf: (e) => e.id,
+          items: evList, idPrefix: 'mv2-ie', strings: rowStr, nav: 'float', keyOf: (e) => e.id,
           render: (e) => h(window.MapV2Card, {
             variant: 'event',
             item: { type: 'event', category: e.category },
@@ -386,7 +386,7 @@
       sections.push(h('section', { key: 'posts', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.posts || Str.tabs.news },
         h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.posts || Str.tabs.news),
         h(window.MapV2Row.Row, {
-          items: posts, idPrefix: 'mv2-ip', strings: rowStr, keyOf: (p) => p.id,
+          items: posts, idPrefix: 'mv2-ip', strings: rowStr, nav: 'float', keyOf: (p) => p.id,
           render: (p) => {
             const img = p.image && window.UI.safeUrl(p.image);
             return h(window.MapV2Card, {
@@ -989,21 +989,42 @@
       if (state) facts.push(h('span', { key: 's', 'data-mv2': 'state', 'data-status': state.status }, state.text));
       if (followers) facts.push(h('span', { key: 'f', 'data-mv2': 'followers' }, Str.followers(followers)));
     }
-    const xhead = (expanded || inline) && h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
-      inline ? null : h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
-      h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
-      h('p', { 'data-mv2': 'xmeta' },
-        h('span', { 'data-mv2': 'card-chip' },
-          h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
-          h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
-        type === 'place' && ((org && org.name) || item.organizerName)
-          ? h('span', { 'data-mv2': 'xcard-by' }, Str.by + ' ' + ((org && org.name) || item.organizerName))
-          : null,
-        (expanded || inline) && collabChip,
-        facts.length > 0 && h('span', { 'data-mv2': 'sub' },
-          facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), []))),
-      // Circular Call / Web / social handles under the category (raised pinpeek + expanded)
-      h(HandleRow, { item: item }));
+    const chipMeta = h('p', { 'data-mv2': 'xmeta' },
+      h('span', { 'data-mv2': 'card-chip' },
+        h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
+        h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
+      type === 'place' && ((org && org.name) || item.organizerName)
+        ? h('span', { 'data-mv2': 'xcard-by' }, Str.by + ' ' + ((org && org.name) || item.organizerName))
+        : null,
+      (expanded || inline) && collabChip,
+      facts.length > 0 && h('span', { 'data-mv2': 'sub' },
+        facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), [])));
+    // Raised pinpeek: landscape cover across the drawer, title/category/distance on the photo,
+    // circular org/user avatar bottom-left overlapping the cover, handles indented below (founder, 2026-11-22).
+    const coverSrc = item.coverPhoto || (org && org.coverPhoto) || '';
+    const faceSrc = avatarSrc || item.profilePhoto || (org && org.profilePhoto) || '';
+    const xhead = (expanded || inline) && (inline
+      ? h('header', { 'data-mv2': 'xhead', 'data-hero': '', 'data-map-sheet-header': '', 'data-cat': group || undefined },
+        h('div', { 'data-mv2': 'cover-hero' },
+          h(Cover, { src: coverSrc, icon: (cat && cat.icon) || 'MapPin' }),
+          h('div', { 'data-mv2': 'cover-scrim', 'aria-hidden': 'true' }),
+          h('div', { 'data-mv2': 'cover-copy' },
+            h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
+            chipMeta),
+          h('div', { 'data-mv2': 'cover-avatar' },
+            h(Avatar, {
+              src: faceSrc, name: avatarName || name, hex, size: 'half',
+              glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 22 }),
+            }))),
+        h(HandleRow, { item: item }))
+      : h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
+        h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
+        h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
+        chipMeta,
+        h(HandleRow, { item: item })));
+    const footLinks = h('div', { 'data-mv2': 'sheet-foot' },
+      reportAction ? h('div', { 'data-mv2': 'report-compact' }, reportAction) : null,
+      h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull));
     return h(inline ? 'div' : 'section', {
       ref: root, 'data-mv2': 'sheet', 'data-snap': wide ? 'panel' : snap, 'data-wide': wide ? '1' : undefined,
       'data-expanded': expanded ? '' : undefined, 'data-inline': inline ? '' : undefined,
@@ -1032,7 +1053,9 @@
         inline && !isContributor ? h(ProfileCarousels, {
           item: item, type: type, org: org, events: events, newsPosts: newsPosts, onPick: onPick,
         }) : null,
-        // Nested Explore under the slogan replaces the Nearby list on the raised pin peek (founder, 2026-11-22).
+        // Report (compact) + View Full sit above the slogan divider on raised pinpeek (founder, 2026-11-22).
+        inline ? footLinks : null,
+        // Nested Explore under the slogan replaces the Nearby list on the raised pin peek.
         // Decorative interrupted hairline (not role=separator: the tabbed block's hairline rule in mapV2Tabbed).
         inline && nest && Str.slogan ? h('div', { 'data-mv2': 'slogan-rule', 'aria-hidden': 'true' },
           h('span', { 'data-mv2': 'slogan-rule-line' }),
@@ -1042,8 +1065,7 @@
           ? h(window.MapV2Explore.PeekExplore, nest) : null,
         !(inline && nest) && N && nearRows.length > 0 && h(N.List, { key: type + ':' + id, rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
         qrAction,
-        reportAction,
-        h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),
+        !inline ? footLinks : null),
       !inline && h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
       // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost;
       // the phone app has no web origin of its own, so its build supplies the public site's address, see CC_ROUTES.publicUrl)

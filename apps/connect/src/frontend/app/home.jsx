@@ -137,7 +137,8 @@
       return (m) => (focusTest ? focusTest(m) : true) && (!group || (X.groupOf && X.groupOf(m) === group));
     }, [focusTest, group, X]);
     // Where to… only: town zoom with the centre on the mid-band between search and the foot drawer (founder, 2026-11-22).
-    // Section focus only filters pins — no camera jump. One anchor per tile focus so switching tabs does not creep the map.
+    // Where-to tiles and Explore section filters share town zoom on the current camera centre (founder, 2026-11-22).
+    // One anchor per focus so switching tabs does not creep the map.
     const focusKey = focus ? focus.kind + ':' + focus.id : '';
     const focusRef = useRef(focus);
     focusRef.current = focus;
@@ -145,11 +146,11 @@
     useEffect(() => {
       setShowIdeas(!!(tileRec && tileRec.ideas));
       if (!focusKey) { anchor.current = null; return; }
-      if (!(focus && focus.kind === 'tile')) return;
+      if (!(focus && (focus.kind === 'tile' || focus.kind === 'sec'))) return;
       const api = mapApi.current;
       if (!api || !api.survey) return;
       if (!anchor.current) {
-        // Current town view (camera centre) — never jump to GPS/Pretoria. Rank from this point (founder, 2026-11-22).
+        // Current town view (camera centre) — never jump to GPS/Pretoria. Rank from this point.
         const cam = api.camera ? api.camera() : null;
         if (cam && Number.isFinite(cam.lat) && Number.isFinite(cam.lng)) {
           anchor.current = { lat: cam.lat, lng: cam.lng };
