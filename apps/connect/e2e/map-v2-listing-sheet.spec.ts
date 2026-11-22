@@ -143,7 +143,9 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     const meta = card().locator("[data-mv2='xcard-dist']");
     await expect(meta).toHaveText(/^(Under 100 m|\d+ m|\d+(\.\d)? km)( from( the map)? centre)?$/);
     await card().click();
-    await expect(head(page).locator("[data-mv2='distance']")).toHaveText(/^(Under 100 m|\d+ m|\d+(\.\d)? km)( from( the map)? centre)?$/);
+    // Raised pinpeek puts distance on a cover-tile; the expanded sheet still uses [data-mv2=distance].
+    const sheetDist = head(page).locator("[data-mv2='distance'], [data-mv2='cover-tile'][data-kind='distance']");
+    await expect(sheetDist).toHaveText(/^(Under 100 m|\d+ m|\d+(\.\d)? km)( from( the map)? centre)?$/);
   });
 
   test("a listing without a cover gets the neutral tile with its category icon", async ({ page, baseURL }) => {
