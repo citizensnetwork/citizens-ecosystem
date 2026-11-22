@@ -148,7 +148,18 @@ export async function openExploreAll(page: Page, how: "click" | "tap" = "click")
   const explore = page.locator("[data-mv2='explore']");
   if ((await explore.getAttribute("data-open")) !== null) return;
   const press = (l: Locator) => (how === "tap" ? l.tap() : l.click());
-  if ((await explore.getAttribute("data-mode")) === "rest") await press(page.locator("[data-mv2='explore-crown']"));
+  // Minimize-with-filter (founder, 2026-11-22): grab only toggles rest↔focus while a chip is on.
+  // Clear it so the handle can raise the full open panel again.
+  const chipX = page.locator("[data-mv2='filter-chip-x']");
+  if (await chipX.count()) {
+    if (how === "tap") await chipX.tap();
+    else await chipX.click();
+    await expect(page.locator("[data-mv2='filter-chip']")).toHaveCount(0, { timeout: 5_000 });
+  }
+  if ((await explore.getAttribute("data-mode")) === "rest") {
+    await press(page.locator("[data-mv2='explore-crown']"));
+    await expect(explore).not.toHaveAttribute("data-mode", "rest", { timeout: 5_000 });
+  }
   await press(page.locator("[data-mv2='explore-grab']"));
   await expect(explore).toHaveAttribute("data-open", "", { timeout: 5_000 });
 }

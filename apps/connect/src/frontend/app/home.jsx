@@ -307,9 +307,9 @@
       resetLevels();
     };
     useBackGuard(searchOpen, () => setSearchOpen(false));
-    // Cards-only peek: Back closes it. Raised peek: Back closes the whole drawer (handle tap still steps down via peekBack).
-    useBackGuard(!!peek && !peek.raised, closePeek);
-    useBackGuard(!!(peek && peek.raised), closePeek);
+    // One history entry per level: raised Back/Escape steps down; cards-only Back closes (handle tap still uses peekBack).
+    useBackGuard(!!peek, closePeek);
+    useBackGuard(!!(peek && peek.raised), lowerPeek);
     const peekItems = peek ? peek.ids.map((id) => byId.get(id)).filter(Boolean) : [];
     // Words typed into the search can take every card's listing off the map: the carousel then has nothing to show, so it
     // steps back as Back would.

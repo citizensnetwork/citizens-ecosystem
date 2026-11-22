@@ -72,15 +72,15 @@ test.describe("the map home on a phone", () => {
     await open(page);
     await crown(page).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
-    expect(await settled(page)).toBe(124);
+    expect(await settled(page)).toBe(152);
     await expect(page.getByRole("button", { name: "Coffee", exact: true })).toBeVisible();
-    // no "Explore", "Where to…", "Near you" or count line: only the handle above the tiles
-    await expect(sheet(page).getByRole("heading")).toHaveCount(0);
+    // strip lead above the tiles (founder, 2026-11-22); no old "Explore" / count / "Near you" line
+    await expect(sheet(page).getByRole("heading", { name: "Where Christians…" })).toBeVisible();
     await expect(sheet(page).getByText(/near you/i)).toHaveCount(0);
     await expect(page.locator("[data-mv2='explore-handle']")).toBeVisible();
     // the crown rides just above the strip
     const c = (await crown(page).boundingBox())!;
-    expect(844 - (c.y + c.height)).toBeGreaterThan(124);
+    expect(844 - (c.y + c.height)).toBeGreaterThan(152);
     await crown(page).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
   });

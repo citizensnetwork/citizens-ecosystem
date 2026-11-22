@@ -635,7 +635,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(calls.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("raised: the chosen card's details sit below the cards, with Back and Close in the bar; Escape closes", () => {
+  it("raised: the chosen card's details sit below the cards, with Back and Close in the bar; Escape steps back", () => {
     const { calls } = carousel({ index: 1, raised: true });
     expect(document.querySelector("[data-mv2='pinpeek']")!.hasAttribute("data-raised")).toBe(true);
     expect(screen.getByTestId("details").textContent).toBe("About Charlie");
@@ -649,9 +649,8 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(calls.onRaise).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: PK().back as string }));
     expect(calls.onBack).toHaveBeenCalledTimes(1);
-    // Escape matches Back from raised: close the whole drawer (handle tap still steps down)
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(calls.onClose).toHaveBeenCalledTimes(1);
+    expect(calls.onBack).toHaveBeenCalledTimes(2);
   });
 
   it("leaves Escape to a full sheet open over it (hidden), and gives focus back when it closes with focus inside", () => {
@@ -741,8 +740,8 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
   it("wires the levels into the map screen: one history entry per level, the chips row, and the inline details", () => {
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("useBackGuard(searchOpen,");
-    expect(home).toContain("useBackGuard(!!peek && !peek.raised, closePeek)");
-    expect(home).toContain("useBackGuard(!!(peek && peek.raised), closePeek)");
+    expect(home).toContain("useBackGuard(!!peek, closePeek)");
+    expect(home).toContain("useBackGuard(!!(peek && peek.raised), lowerPeek)");
     expect(home).toContain("React.createElement(X.PinCarousel");
     expect(home).toContain("inline: true");
     expect(home).toContain("'aria-label': XS.chipsLabel");

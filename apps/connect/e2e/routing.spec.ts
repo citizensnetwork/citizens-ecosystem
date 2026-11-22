@@ -342,7 +342,9 @@ test.describe("Browser Back and Forward", () => {
     await expect(page.locator('[data-entity-card="event"]')).toBeHidden();
     await expect.poll(() => screen(page)).toBe("discover");
     expect(path(page)).toBe("/");
-    // and Back is not now stuck: the second press leaves, it does not open the card again
+    // Raised pinpeek has two levels: one more Back closes the cards, then leave Connect
+    await page.goBack();
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     await page.goBack();
     await expect.poll(() => page.url()).toContain("manifest.json");
   });
