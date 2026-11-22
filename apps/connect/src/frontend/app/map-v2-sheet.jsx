@@ -247,7 +247,8 @@
         h(window.ConsiderNote, { shared: !(myProfileMeta && myProfileMeta.notificationPrefs && myProfileMeta.notificationPrefs.share_considering === false), onOpenSettings: () => go('settings') }),
         h(window.FriendsConsidering, { sb: window.CC_SUPABASE, eventId: item.id, eventTitle: item.title, me: realUser.id, myName: realUser.nameIsFallback ? '' : (user && user.name) || '', authedFetch: window.authedFetch, toast }))
       : null;
-    const socials = item.socials ? h('div', { 'data-mv2': 'socials' }, h(window.UI.SocialLinks, { socials: item.socials, variant: 'compact' })) : null;
+    // Socials sit under the category chip in the raised profile (HandleRow); keep a compact row in the full sheet only.
+    const socials = !part && item.socials ? h('div', { 'data-mv2': 'socials' }, h(window.UI.SocialLinks, { socials: item.socials, variant: 'compact' })) : null;
     const leadRows = leadFacts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
     const tailRows = tailFacts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
     const bio = item.description ? h('p', { 'data-mv2': 'bio' }, item.description) : null;
@@ -259,7 +260,6 @@
     if (part === 'tail') {
       return h('div', { 'data-mv2': 'card', 'data-entity-card': type, 'data-part': 'tail' },
         (tailRows.length || organiser || coHostLine) ? h('ul', { 'data-mv2': 'facts', role: 'list' }, tailRows, organiser, coHostLine) : null,
-        socials,
         convince);
     }
     return h('div', { 'data-mv2': 'card', 'data-entity-card': type },
@@ -268,6 +268,135 @@
         ? h('ul', { 'data-mv2': 'facts', role: 'list' }, leadRows, tailRows, organiser, coHostLine) : null,
       socials,
       convince);
+  }
+
+  /** Circular Call / Web / social handles under the category (only when a value exists; demo fakes a few when empty). */
+  function HandleRow({ item }) {
+    const Icon = window.Icon;
+    const D = window.DATA;
+    const U = window.UI || {};
+    const safe = U.safeUrl || ((u) => (/^https?:\/\//i.test(u) ? u : ''));
+    const raw = Object.assign({}, (item && item.socials) || {});
+    const tel = item && (item.phone || item.whatsapp) ? String(item.phone || item.whatsapp).trim() : '';
+    const web = item && item.website ? String(item.website).trim() : '';
+    // Demo polish: when a listing has no handles yet, show a few placeholders so the row's shape is reviewable.
+    const empty = !tel && !web && !Object.keys(raw).some((k) => raw[k]);
+    if (empty) {
+      raw.instagram = 'citizensconnect';
+      raw.facebook = 'https://facebook.com/citizensconnect';
+      raw.youtube = '@citizensconnect';
+      raw.whatsapp = '+27821234567';
+      raw.x = 'citizensconnect';
+      raw.discord = 'https://discord.gg/citizensconnect';
+    }
+    const bits = [];
+    if (tel) {
+      const href = 'tel:' + tel.replace(/[^\d+]/g, '');
+      bits.push({ key: 'call', href: href, icon: 'Phone', label: S().call });
+    }
+    if (web) {
+      const href = safe(web.indexOf('http') === 0 ? web : 'https://' + web);
+      if (href) bits.push({ key: 'web', href: href, icon: 'Globe', label: S().website });
+    }
+    // Core platforms (DB-backed) plus invite-style links Discord / Slack when present on the listing.
+    const platforms = (D && D.SOCIAL_PLATFORMS ? D.SOCIAL_PLATFORMS.slice() : []).concat([
+      { key: 'discord', label: 'Discord', icon: 'BrandDiscord', urlFor: (v) => {
+        const t = String(v || '').trim();
+        if (!t) return '';
+        if (/^https?:\/\//i.test(t)) return t;
+        return 'https://discord.gg/' + t.replace(/^@/, '');
+      } },
+      { key: 'slack', label: 'Slack', icon: 'BrandSlack', urlFor: (v) => {
+        const t = String(v || '').trim();
+        if (!t) return '';
+        if (/^https?:\/\//i.test(t)) return t;
+        return 'https://' + t.replace(/^(https?:\/\/)?/i, '');
+      } },
+    ]);
+    const seen = Object.create(null);
+    platforms.forEach((p) => {
+      if (seen[p.key]) return;
+      seen[p.key] = true;
+      const v = raw[p.key];
+      if (!v) return;
+      const href = safe(p.urlFor(v));
+      if (href) bits.push({ key: p.key, href: href, icon: p.icon, label: p.label });
+    });
+    if (!bits.length) return null;
+    return h('div', { 'data-mv2': 'handle-row', 'aria-label': S().tabsLabel },
+      bits.map((b) => h('a', {
+        key: b.key, href: b.href, target: b.key === 'call' ? undefined : '_blank',
+        rel: b.key === 'call' ? undefined : 'noopener noreferrer',
+        'aria-label': b.label, title: b.label, 'data-mv2': 'handle-chip',
+      }, Icon ? h(Icon, { name: b.icon, size: 14 }) : null)));
+  }
+
+  /** Gallery / Events / Posts sideways rows for the raised pinpeek (hidden when empty). */
+  function ProfileCarousels({ item, type, org, events, newsPosts, onPick }) {
+    const Str = S();
+    const time = T();
+    const now = Date.now();
+    const orgId = (org && org.id) || item.organizerId || (type === 'contributor' ? item.id : null);
+    const gallery = [];
+    const push = (u) => { const s = u && String(u).trim(); if (s && gallery.indexOf(s) === -1) gallery.push(s); };
+    if (item.coverPhoto) push(item.coverPhoto);
+    (item.gallery || []).forEach(push);
+    if (!gallery.length && item.profilePhoto) push(item.profilePhoto);
+    const evList = (Array.isArray(events) ? events : [])
+      .filter((e) => e && e.id !== item.id && !window.DATA.isPastEvent(e, now) && (orgId ? e.organizerId === orgId : false))
+      .sort((a, b) => Date.parse(a.startsAt || 0) - Date.parse(b.startsAt || 0))
+      .slice(0, 8);
+    const posts = (Array.isArray(newsPosts) && orgId)
+      ? newsPosts.filter((n) => n.contributorId === orgId).sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 8)
+      : [];
+    const sections = [];
+    const XP = (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.panel) || {};
+    const rowStr = { scrollLeft: XP.scrollLeft || '', scrollRight: XP.scrollRight || '' };
+    const listingName = item.title || item.name || '';
+    if (gallery.length && window.MapV2Row) {
+      sections.push(h('section', { key: 'gal', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.gallery },
+        h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.gallery),
+        h(window.MapV2Row.Row, {
+          items: gallery.map((src, i) => ({ id: 'g' + i, src: src })),
+          idPrefix: 'mv2-ig', strings: rowStr, keyOf: (x) => x.id,
+          render: (x) => h(window.MapV2Card, {
+            variant: 'image', title: listingName, media: { src: x.src }, idPrefix: 'mv2-ig-' + x.id,
+          }),
+        })));
+    }
+    if (evList.length && window.MapV2Row) {
+      sections.push(h('section', { key: 'ev', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.events },
+        h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.events),
+        h(window.MapV2Row.Row, {
+          items: evList, idPrefix: 'mv2-ie', strings: rowStr, keyOf: (e) => e.id,
+          render: (e) => h(window.MapV2Card, {
+            variant: 'event',
+            item: { type: 'event', category: e.category },
+            kind: window.MapV2Strings.pin.type.event,
+            title: e.title,
+            meta: [time && time.eventStartsIn ? time.eventStartsIn(e.startsAt, now, e.endsAt) : '', e.location].filter(Boolean),
+            date: time && time.dateParts ? time.dateParts(e.startsAt) : null,
+            idPrefix: 'mv2-ie-' + e.id,
+            onClick: () => { if (onPick) onPick(e.id, 'event'); },
+          }),
+        })));
+    }
+    if (posts.length && window.MapV2Row) {
+      sections.push(h('section', { key: 'posts', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.posts || Str.tabs.news },
+        h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.posts || Str.tabs.news),
+        h(window.MapV2Row.Row, {
+          items: posts, idPrefix: 'mv2-ip', strings: rowStr, keyOf: (p) => p.id,
+          render: (p) => {
+            const img = p.image && window.UI.safeUrl(p.image);
+            return h(window.MapV2Card, {
+              variant: img ? 'image' : 'text', title: p.title, excerpt: p.body,
+              media: img ? { src: img } : null, idPrefix: 'mv2-ip-' + p.id,
+            });
+          },
+        })));
+    }
+    if (!sections.length) return null;
+    return h('div', { 'data-mv2': 'profile-carousels' }, sections);
   }
 
   // ── the sheet ────────────────────────────────────────────────────
@@ -871,7 +1000,9 @@
           : null,
         (expanded || inline) && collabChip,
         facts.length > 0 && h('span', { 'data-mv2': 'sub' },
-          facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), []))));
+          facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), []))),
+      // Circular Call / Web / social handles under the category (raised pinpeek + expanded)
+      h(HandleRow, { item: item }));
     return h(inline ? 'div' : 'section', {
       ref: root, 'data-mv2': 'sheet', 'data-snap': wide ? 'panel' : snap, 'data-wide': wide ? '1' : undefined,
       'data-expanded': expanded ? '' : undefined, 'data-inline': inline ? '' : undefined,
@@ -897,6 +1028,9 @@
         leadBody,
         h('div', { 'data-mv2': 'actions' }, actions),
         body,
+        inline && !isContributor ? h(ProfileCarousels, {
+          item: item, type: type, org: org, events: events, newsPosts: newsPosts, onPick: onPick,
+        }) : null,
         // Nested Explore under the slogan replaces the Nearby list on the raised pin peek (founder, 2026-11-22).
         // Decorative interrupted hairline (not role=separator: the tabbed block's hairline rule in mapV2Tabbed).
         inline && nest && Str.slogan ? h('div', { 'data-mv2': 'slogan-rule', 'aria-hidden': 'true' },

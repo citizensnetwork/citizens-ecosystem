@@ -239,10 +239,35 @@
   }
 
   // The share of the map's height a focused point sits above the middle (founder, 2026-11-17: "25% higher").
+  // Explore card first-tap still uses this; Where to… and pin peek use bandOffset (search ↔ drawer mid-band).
   const FOCUS_LIFT = 0.25;
   function liftOffset(el) {
     const h = el ? (el.clientHeight || el.getBoundingClientRect().height || 0) : 0;
     return [0, -Math.round(h * FOCUS_LIFT)];
+  }
+
+  /**
+   * MapLibre easeTo offset so a point lands on the mid Y between the search bar (home-top) and a foot panel.
+   * Founder 2026-11-22: Where-to town centre and pin reveal share this band (no fixed % guess when measurable).
+   */
+  function bandOffset(el, footPx) {
+    if (!el) return [0, 0];
+    const h = el.clientHeight || 0;
+    if (!(h > 0)) return [0, 0];
+    const box = el.getBoundingClientRect();
+    const home = (el.closest && el.closest("[data-mv2='home']")) || el;
+    const topEl = home.querySelector && home.querySelector("[data-mv2='home-top']");
+    let top = 0;
+    if (topEl) top = Math.max(0, topEl.getBoundingClientRect().bottom - box.top);
+    let bottom = Math.max(0, Number(footPx) || 0);
+    if (!(bottom > 0)) {
+      const peek = home.querySelector && home.querySelector("[data-mv2='pinpeek']:not([hidden])");
+      const xp = home.querySelector && home.querySelector("[data-mv2='explore']:not([hidden])");
+      const footEl = peek || xp;
+      if (footEl) bottom = Math.max(0, box.bottom - footEl.getBoundingClientRect().top);
+    }
+    const mid = (top + (h - bottom)) / 2;
+    return [0, Math.round(mid - h / 2)];
   }
 
   // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
@@ -612,15 +637,17 @@
             mp.easeTo(to, { originalEvent: {} });
           });
         },
-        // opts.lift === false keeps the town in the screen centre (Where to… block tap); default still lifts clear of the panel.
+        // Where to…: opts.band centres the town between search and the foot drawer (founder, 2026-11-22).
+        // opts.lift === false keeps true screen centre; default still uses FOCUS_LIFT.
         survey(lat, lng, zoom, opts) {
           const mp = mapRef.current;
           if (!mp || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
           userMovedRef.current = true;
-          const lift = !(opts && opts.lift === false);
+          let offset = [0, 0];
+          if (opts && opts.band) offset = bandOffset(containerRef.current, opts.foot);
+          else if (!(opts && opts.lift === false)) offset = liftOffset(containerRef.current);
           mp.easeTo({
-            center: [lng, lat], zoom: zoom,
-            offset: lift ? liftOffset(containerRef.current) : [0, 0],
+            center: [lng, lat], zoom: zoom, offset,
             duration: window.MapV2.dur('slow'), essential: true,
           }, { originalEvent: {} });
         },
@@ -678,8 +705,7 @@
           });
           return out;
         },
-        // The selected pin, clear of the bar at the top and of `bottom` px at the foot (the pin carousel): left alone
-        // when it already is, otherwise eased to the middle of what is left (a carousel swipe to a pin off screen).
+        // The selected pin on the mid-band between search (home-top) and `bottom` px at the foot (pin carousel).
         revealSelected(bottom) {
           requestAnimationFrame(() => {
             const mp = mapRef.current;
@@ -687,14 +713,16 @@
             const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
             if (!mp || !el || !mk) return;
             const foot = Math.max(0, Number(bottom) || 0);
-            const pad = framePadding(el);
-            const top = typeof pad === 'object' ? pad.top : 0;
-            const low = el.clientHeight - foot;
+            const offset = bandOffset(el, foot);
+            const box = el.getBoundingClientRect();
+            const home = (el.closest && el.closest("[data-mv2='home']")) || el;
+            const topEl = home.querySelector && home.querySelector("[data-mv2='home-top']");
+            const bandTop = topEl ? Math.max(0, topEl.getBoundingClientRect().bottom - box.top) : 0;
+            const bandLow = el.clientHeight - foot;
             const p = mp.project(mk.getLngLat());
             const edge = 24;
-            if (p.x > edge && p.x < el.clientWidth - edge && p.y > top + edge && p.y < low - edge) return;
+            if (p.x > edge && p.x < el.clientWidth - edge && p.y > bandTop + edge && p.y < bandLow - edge) return;
             userMovedRef.current = true;
-            const offset = [0, Math.round((top + low) / 2 - el.clientHeight / 2)];
             mp.easeTo({ center: mk.getLngLat(), offset, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
           });
         },

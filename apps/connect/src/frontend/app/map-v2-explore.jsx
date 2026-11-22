@@ -727,25 +727,58 @@
       key: id, type: 'button', 'data-mv2': 'explore-tile', 'data-tab': id,
       role: 'tab', 'aria-selected': on ? 'true' : 'false', onClick: onClick,
     }, extra), icon && Icon ? h(Icon, { name: icon, size: 16 }) : null, h('span', null, word));
-    const tilesBig = () => h('div', {
-      ref: tabsRef, 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where,
+    // Where to… strip: sideways scroll with edge arrows (same language as card rows).
+    const [tileEdges, setTileEdges] = useState({ l: false, r: false });
+    const measureTiles = () => {
+      const el = tabsRef.current;
+      if (!el) return;
+      const l = el.scrollLeft > 4;
+      const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+      setTileEdges((p) => (p.l === l && p.r === r ? p : { l: l, r: r }));
+    };
+    useEffect(() => { measureTiles(); }, [mode, tile, sec, open]);
+    const nudgeTiles = (dir) => {
+      const el = tabsRef.current;
+      if (!el) return;
+      el.scrollBy({ left: dir * Math.max(120, el.clientWidth * 0.6), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+    };
+    const tilesShell = (inner) => h('div', { 'data-mv2': 'tiles-wrap' },
+      fine && tileEdges.l ? h('button', {
+        type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft,
+        onClick: () => nudgeTiles(-1),
+      }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
+      inner,
+      fine && tileEdges.r ? h('button', {
+        type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight,
+        onClick: () => nudgeTiles(1),
+      }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
+    const tilesBig = () => tilesShell(h('div', {
+      ref: tabsRef, 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where, onScroll: measureTiles,
     }, TILES.map((t) => h('button', {
       key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
       onClick: () => chooseTile(t.id),
-    }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word))));
-    const tileTabs = () => h('div', { ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.where },
-      TILES.map((t) => tab(t.id, t.word, t.icon, tile === t.id, () => chooseTile(t.id), { 'data-tile': t.id })));
-    const rowTabs = () => h('div', { ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.rows },
-      SECTIONS.filter((id) => rows[id].length || id === sec).map((id) => tab(id, rowTitle(id), null, sec === id, () => chooseRow(id), { 'data-sec': id })));
-    // The focus: tabs, one line (what is shown, and the plain-words way back), and the row's cards.
+    }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word)))));
+    const tileTabs = () => tilesShell(h('div', {
+      ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.where, onScroll: measureTiles,
+    }, TILES.map((t) => tab(t.id, t.word, t.icon, tile === t.id, () => chooseTile(t.id), { 'data-tile': t.id }))));
+    const rowTabs = () => tilesShell(h('div', {
+      ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.rows, onScroll: measureTiles,
+    }, SECTIONS.filter((id) => rows[id].length || id === sec).map((id) => tab(id, rowTitle(id), null, sec === id, () => chooseRow(id), { 'data-sec': id }))));
+    // The focus: Back + Close on the corners (subtle), tabs, and the row's cards — same drawer chrome language
+    // as pinpeek (founder, 2026-11-22: no "Live and nearby" / "Close" labels).
     const focusView = () => {
       const list = tile ? tileItems : (rows[sec] || []);
-      const line = tile ? (P.matches ? P.matches(list.length, kindWord) : '') : rowHint(sec);
       return h('div', { 'data-mv2': 'xfocus', 'data-focus': tile ? 'tile' : 'sec' },
+        h('div', { 'data-mv2': 'xfocus-chrome' },
+          h('button', {
+            type: 'button', 'data-mv2': 'xfocus-back', 'aria-label': P.closeRow || P.allTypes,
+            onClick: () => setFocus(null),
+          }, Icon ? h(Icon, { name: 'ChevronLeft', size: 18 }) : null),
+          h('button', {
+            type: 'button', 'data-mv2': 'xfocus-close', 'aria-label': P.lower,
+            onClick: () => { setFocus(null); setStage(desk ? 'strip' : 'rest'); },
+          }, Icon ? h(Icon, { name: 'X', size: 18 }) : null)),
         tile ? tileTabs() : rowTabs(),
-        h('div', { 'data-mv2': 'xfocus-bar' },
-          h('small', null, line),
-          h('button', { type: 'button', 'data-mv2': 'explore-reset', onClick: () => setFocus(null) }, tile ? (P.allTypes) : (P.closeRow))),
         list.length ? cards(tile ? 'tile' : sec, list)
           : h('p', { 'data-mv2': 'explore-empty' }, tile ? (P.emptyTile ? P.emptyTile(current ? current.word : '') : '') : (P.emptyRow || '')));
     };
@@ -1010,19 +1043,25 @@
       onPointerCancel: () => { pull.current = null; },
     },
       h('div', { 'data-mv2': 'pinpeek-bar' },
-        raised ? iconBtn({ 'data-mv2': 'pinpeek-back', onClick: props.onBack }, 'ChevronLeft', P.back) : null,
+        raised ? iconBtn({
+          'data-mv2': 'pinpeek-back',
+          onClick: (e) => { e.stopPropagation(); if (props.onBack) props.onBack(); },
+        }, 'ChevronLeft', P.back) : null,
         h('span', { 'data-mv2': 'pinpeek-status', role: 'status', 'aria-live': 'polite' },
           current ? h('span', { 'data-mv2': 'sr' }, current.title || '') : null),
         h('button', {
           type: 'button', 'data-mv2': 'handle',
-          'aria-label': raised ? (P.lower || P.back) : (P.raise || P.detailsCue || ''),
+          'aria-label': P.lower || P.back || '',
           onClick: () => {
             if (swallow.current) return;
-            if (raised) props.onBack();
-            else props.onRaise();
+            // Tap steps down one level (raised → cards → closed); pull-up still raises (founder option B).
+            if (props.onBack) props.onBack();
           },
         }, h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' })),
-        iconBtn({ 'data-mv2': 'pinpeek-close', 'aria-label': P.close, onClick: props.onClose }, 'X')),
+        iconBtn({
+          'data-mv2': 'pinpeek-close', 'aria-label': P.close,
+          onClick: (e) => { e.stopPropagation(); if (props.onClose) props.onClose(); },
+        }, 'X')),
       h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
         n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
         h('div', {
@@ -1112,17 +1151,22 @@
 
     if (tile || sec) {
       const list = tile ? tileItems : (rows[sec] || []);
-      const line = tile ? (P.matches ? P.matches(list.length, kindWord) : '') : rowHint(sec);
       return h('div', { 'data-mv2': 'peek-explore', 'data-focus': tile ? 'tile' : 'sec' },
         h('div', { 'data-mv2': 'xfocus', 'data-focus': tile ? 'tile' : 'sec' },
+          h('div', { 'data-mv2': 'xfocus-chrome' },
+            h('button', {
+              type: 'button', 'data-mv2': 'xfocus-back', 'aria-label': P.closeRow || P.allTypes,
+              onClick: () => setFocus(null),
+            }, Icon ? h(Icon, { name: 'ChevronLeft', size: 18 }) : null),
+            h('button', {
+              type: 'button', 'data-mv2': 'xfocus-close', 'aria-label': P.lower,
+              onClick: () => setFocus(null),
+            }, Icon ? h(Icon, { name: 'X', size: 18 }) : null)),
           tile
             ? h('div', { 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.where },
               TILES.map((t) => tab(t.id, t.word, t.icon, tile === t.id, () => chooseTile(t.id), { 'data-tile': t.id })))
             : h('div', { 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.rows },
               SECTIONS.filter((id) => rows[id].length || id === sec).map((id) => tab(id, rowTitle(id), null, sec === id, () => chooseRow(id), { 'data-sec': id }))),
-          h('div', { 'data-mv2': 'xfocus-bar' },
-            h('small', null, line),
-            h('button', { type: 'button', 'data-mv2': 'explore-reset', onClick: () => setFocus(null) }, tile ? (P.allTypes) : (P.closeRow))),
           list.length ? cards(tile ? 'tile' : sec, list)
             : h('p', { 'data-mv2': 'explore-empty' }, tile ? (P.emptyTile ? P.emptyTile(current ? current.word : '') : '') : (P.emptyRow || ''))));
     }

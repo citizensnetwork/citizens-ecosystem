@@ -3624,7 +3624,70 @@ a[data-mv2='card2'],
   font-size: var(--fs-2);
   color: var(--xp-muted);
 }
-/* the focus: tabs, one line, the cards. Its height is the panel's (--xp-focus), whatever the row holds. */
+/* Focus chrome: subtle Back / Close on the corners (no "Live and nearby" / "Close" labels). */
+[data-mv2='xfocus-chrome'] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--hit);
+  padding: 0 var(--space-2);
+}
+[data-mv2='xfocus-back'],
+[data-mv2='xfocus-close'] {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  opacity: 0.72;
+}
+[data-mv2='xfocus-back']:hover,
+[data-mv2='xfocus-close']:hover,
+[data-mv2='xfocus-back']:focus-visible,
+[data-mv2='xfocus-close']:focus-visible {
+  opacity: 1;
+  color: var(--text-1);
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='tiles-wrap'] {
+  position: relative;
+  min-width: 0;
+}
+[data-mv2='tiles-wrap'] > [data-mv2='xarrow'] {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-xp-layer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+[data-mv2='tiles-wrap'] > [data-mv2='xarrow'][data-dir='prev'] {
+  left: var(--space-1);
+}
+[data-mv2='tiles-wrap'] > [data-mv2='xarrow'][data-dir='next'] {
+  right: var(--space-1);
+}
+/* the focus: tabs and the cards. Its height is the panel's (--xp-focus). */
 [data-mv2='xfocus-bar'] {
   display: flex;
   align-items: center;
@@ -4354,6 +4417,15 @@ a[data-mv2='card2'],
   background: var(--surface-1);
   border-bottom: 1px solid var(--divider);
 }
+[data-mv2='pinpeek-back'],
+[data-mv2='pinpeek-close'] {
+  pointer-events: auto;
+  z-index: 2;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle'] {
+  pointer-events: auto;
+  z-index: 2;
+}
 [data-mv2='pinpeek-bar'] [data-mv2='handle'] {
   position: absolute;
   left: 50%;
@@ -4473,7 +4545,8 @@ a[data-mv2='card2'],
 [data-mv2='pinpeek-details'] {
   flex: none;
   padding: 0 var(--space-4) var(--space-6);
-  border-top: 1px solid var(--divider);
+  /* no hairline above the title — founder, 2026-11-22 */
+  border-top: 0;
 }
 /* "Connecting the Kingdom" interrupted hairline between profile and nested Explore */
 [data-mv2='slogan-rule'] {
@@ -4499,6 +4572,45 @@ a[data-mv2='card2'],
   max-width: 70%;
   text-align: center;
   white-space: nowrap;
+}
+[data-mv2='handle-row'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+[data-mv2='handle-chip'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  color: var(--accent);
+  text-decoration: none;
+}
+[data-mv2='handle-chip']:hover,
+[data-mv2='handle-chip']:focus-visible {
+  border-color: var(--accent);
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='profile-carousels'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+}
+[data-mv2='profile-row-title'] {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-body);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  color: var(--text-1);
 }
 [data-mv2='peek-explore'] {
   display: flex;

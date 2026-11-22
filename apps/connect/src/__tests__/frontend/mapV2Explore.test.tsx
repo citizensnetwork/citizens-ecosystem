@@ -264,9 +264,9 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     fireEvent.click(screen.getByRole("tab", { name: "Kids" }));
     expect(mode()).toBe("focus");
     expect(document.querySelector("[data-row='tile'] [data-explore-id='three']")).toBeTruthy();
-    const reset = screen.getByRole("button", { name: P().allTypes });
-    expect(reset.getAttribute("data-mv2")).toBe("explore-reset");
-    fireEvent.click(reset);
+    const back = screen.getByRole("button", { name: P().closeRow });
+    expect(back.getAttribute("data-mv2")).toBe("xfocus-back");
+    fireEvent.click(back);
     expect(mode()).toBe("strip");
     expect(screen.queryByRole("tab")).toBeNull();
   });
@@ -290,6 +290,7 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(screen.getByRole("tablist", { name: P().rows })).toBeTruthy();
     expect(screen.getByRole("tab", { name: P().more }).getAttribute("aria-selected")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: P().closeRow }));
+    expect(document.querySelector("[data-mv2='xfocus-back']")).toBeNull();
     expect(mode()).toBe("strip");
   });
 
@@ -502,14 +503,14 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261122c"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261122e"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122c");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122e");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");
@@ -665,11 +666,15 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(returnFocus).toHaveBeenCalledWith("a");
   });
 
-  it("a pull on the handle pill raises or steps back; a pull on a card does not (founder, 2026-11-22)", () => {
-    const { calls } = carousel();
+  it("a pull up on the handle raises; a tap or pull down steps back; a card pull does not (founder, 2026-11-22)", () => {
+    const { calls, unmount } = carousel();
     const panel = document.querySelector("[data-mv2='pinpeek']")!;
     const handle = document.querySelector("[data-mv2='handle']")!;
     const card = cardsIn()[0];
+    // a tap on the handle steps down (option B); it does not raise
+    fireEvent.click(handle);
+    expect(calls.onBack).toHaveBeenCalledTimes(1);
+    expect(calls.onRaise).not.toHaveBeenCalled();
     // card pull is ignored — only the handle (or crown) starts a snap pull
     fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
     fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 1, pointerType: "touch" });
@@ -679,11 +684,8 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(calls.onRaise).toHaveBeenCalledTimes(1);
     fireEvent.pointerDown(handle, { clientX: 100, clientY: 300, pointerId: 3, pointerType: "touch" });
     fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 3, pointerType: "touch" });
-    expect(calls.onBack).toHaveBeenCalledTimes(1);
-    // a short or sideways move on the handle is not a pull
-    fireEvent.pointerDown(handle, { clientX: 100, clientY: 300, pointerId: 4, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 220, clientY: 340, pointerId: 4, pointerType: "touch" });
-    expect(calls.onBack).toHaveBeenCalledTimes(1);
+    expect(calls.onBack).toHaveBeenCalledTimes(2);
+    unmount();
   });
 
   describe("the Explore panel under the carousel", () => {

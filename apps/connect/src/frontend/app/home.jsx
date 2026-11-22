@@ -136,8 +136,8 @@
       if (!focusTest && !group) return null;
       return (m) => (focusTest ? focusTest(m) : true) && (!group || (X.groupOf && X.groupOf(m) === group));
     }, [focusTest, group, X]);
-    // A Where to… block tap zooms to town level with the centre kept in the screen centre (no lift). Section focus
-    // only filters pins — no camera jump. One anchor per tile focus so switching tabs inside it does not creep the map.
+    // Where to… only: town zoom with the centre on the mid-band between search and the foot drawer (founder, 2026-11-22).
+    // Section focus only filters pins — no camera jump. One anchor per tile focus so switching tabs does not creep the map.
     const focusKey = focus ? focus.kind + ':' + focus.id : '';
     const focusRef = useRef(focus);
     focusRef.current = focus;
@@ -155,7 +155,14 @@
       const c = anchor.current;
       if (c) {
         skipFrame.current = true;   // skip the panel-height reframe that would fitBounds ("landing snap")
-        api.survey(c.lat, c.lng, TOWN_ZOOM, { lift: false });
+        const home = rootRef.current;
+        let foot = 0;
+        if (home && window.getComputedStyle) {
+          const vis = parseFloat(window.getComputedStyle(home).getPropertyValue('--xp-vis'));
+          const focusH = parseFloat(window.getComputedStyle(home).getPropertyValue('--xp-focus'));
+          foot = Number.isFinite(vis) && vis > 0 ? vis : (Number.isFinite(focusH) ? focusH : 0);
+        }
+        api.survey(c.lat, c.lng, TOWN_ZOOM, { band: true, foot: foot });
       }
     }, [focusKey]);
     // How much room the panel takes is the stylesheet's job (--explore-h follows the panel's look, map-v2.css Pack 08), so it is
@@ -211,25 +218,46 @@
       const foot = parseFloat(window.getComputedStyle(home).getPropertyValue('--pp-peek'));
       api.revealSelected(Number.isFinite(foot) ? foot : 0);
     };
-    // Level 2: a pin tapped. Its card centred among every listing in the province pool (the filter's, when one is on),
-    // nearest neighbours either side. A pin tapped while the carousel is up chooses its card there, or starts the row
-    // again from it: the same level, no new entry.
-    const openPeek = (id, t, byKey) => {
+    // Level 2 (or 3 when raised): pin or Explore 2nd tap. Carousel among province pool; pin snapped into the
+    // search↔drawer mid-band (revealChosen). Raised = same drawer chrome as pin 2nd tap (founder, 2026-11-22).
+    const openPeek = (id, t, byKey, opts) => {
       const m = byId.get(id);
       if (!m) return;
+      const raised = !!(opts && opts.raised);
       setSheet(null); choose(id);
       const cur = peekRef.current;
       const at = cur ? cur.ids.indexOf(id) : -1;
-      if (cur && at !== -1) { setPeek(Object.assign({}, cur, { index: at, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
+      if (cur && at !== -1) {
+        setPeek(Object.assign({}, cur, {
+          index: at, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard,
+          raised: raised || cur.raised,
+          raisedAt: raised ? { index: at, camera: camera() } : cur.raisedAt,
+        }));
+        if (!(raised || cur.raised)) revealChosen();
+        return;
+      }
       const api = mapApi.current;
-      // all province listings (Connect's loaded set), not only the pins in the current viewport
       const pool = pinFilter ? rowMarkers.filter((x) => x.id === id || pinFilter(x)) : rowMarkers;
       const ordered = X.peekOrder(m, pool, null, pool.length);
       const ids = ordered.map((x) => x.id);
       const index = Math.max(0, ids.indexOf(id));
-      if (cur) { setPeek(Object.assign({}, cur, { ids, index, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
-      setPeek({ ids, index, camera: camera(), view: api && api.view ? api.view() : null, raised: false, raisedAt: null, focusCard: byKey ? 1 : 0 });
-      revealChosen();
+      const cam = camera();
+      const view = (cur && cur.view) || (api && api.view ? api.view() : null);
+      const entryCam = cur ? cur.camera : cam;
+      if (cur) {
+        setPeek(Object.assign({}, cur, {
+          ids, index, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard,
+          raised: raised, raisedAt: raised ? { index: index, camera: cam } : null,
+        }));
+        if (!raised) revealChosen();
+        return;
+      }
+      setPeek({
+        ids, index, camera: entryCam, view: view,
+        raised: raised, raisedAt: raised ? { index: index, camera: cam } : null,
+        focusCard: byKey ? 1 : 0,
+      });
+      if (!raised) revealChosen();
     };
     const peekTo = (i) => {
       const cur = peekRef.current;
@@ -261,9 +289,14 @@
       putCamera(cur.camera);
     };
     const peekBack = () => { const cur = peekRef.current; if (cur && cur.raised) lowerPeek(); else closePeek(); };
-    // Level 0 from anywhere: the crown, the carousel's Close, a tap on empty map. The map stays where it is; a filter stays
-    // on (its chip shows it). The crown with a filter on clears that too (resetHome).
+    // Level 0 from anywhere: empty-map tap. Filter chip stays. Crown with a filter on clears via resetHome.
     const resetLevels = () => { setPeek(null); setSearchOpen(false); setSelected(null); setLitId(null); setSheet(null); };
+    // Handle / crown tap: step down one level (raised → cards → closed). Founder option B, 2026-11-22.
+    const stepLevels = () => {
+      if (peekRef.current) { peekBack(); return; }
+      if (searchOpen) { setSearchOpen(false); return; }
+      resetLevels();
+    };
     useBackGuard(searchOpen, () => setSearchOpen(false));
     useBackGuard(!!peek, closePeek);
     useBackGuard(!!(peek && peek.raised), lowerPeek);
@@ -295,12 +328,11 @@
     // eases to its pin, clear of the search bar above and the panel below. The second tap on the chosen card opens the
     // full listing; closing that returns to this very panel and map (the map never moved for it).
     chosen.current = { id: selected, type: selType };
-    // A card's first tap chooses it: its pin glows and the map brings it 25% above the middle, while the panel stays exactly
-    // as it is. The second tap on the chosen card opens its preview (founder, 2026-11-17).
-    const tapCard = (id, t, from) => {
+    // A card's first tap chooses it and lifts the pin; the second tap opens the shared raised pinpeek drawer
+    // (same chrome as a map-icon 2nd tap — founder, 2026-11-22). View Full still reaches the profile page.
+    const tapCard = (id, t) => {
       if (t === 'idea') { setSheet(null); setSelected(id); setSelType(t); return; }
-      // chosen already (by its own tap, or by its pin): the card says "Tap again to open", so this tap opens it
-      if (selected === id) { openSheet(id, t, from); return; }
+      if (selected === id) { openPeek(id, t, false, { raised: true }); return; }
       chosen.current = { id, type: t };
       setSelected(id); setSelType(t); setLitId(id);
       if (mapApi.current && mapApi.current.focusLifted) mapApi.current.focusLifted(CARD_ZOOM);
@@ -412,7 +444,7 @@
         hidden: !!sheet,
         markers: rowMarkers, ideas: ideaMarkers, sources, apiRef: mapApi, selectedId: selected, reveal,
         focus, filtered: !!group || !!q,
-        peek: !!peek, level: searchOpen || peek ? 1 : 0, onLevelReset: resetLevels, onMode: setExploreMode, restSignal,
+        peek: !!peek, level: searchOpen || peek ? 1 : 0, onLevelReset: stepLevels, onMode: setExploreMode, restSignal,
         onFocus: (next) => { setFocus(next); setLitId(null); },
         onSectionIds: setSecIds,
         onReset: resetHome,
@@ -430,7 +462,7 @@
         distWords: (XS.peek && XS.peek.dist) || { under: '< 100 m', metres: (n) => n + ' m', km: (n) => n + ' km' },
         sources,
         onIndex: (i) => { if (peekItems[i]) peekTo(peek.ids.indexOf(peekItems[i].id)); },
-        onRaise: raisePeek, onBack: peekBack, onClose: resetLevels, returnFocus: peekReturn,
+        onRaise: raisePeek, onBack: peekBack, onClose: closePeek, returnFocus: peekReturn,
         // the inline sheet only calls onClose right after it navigated away (a link to the full page): nothing to undo here
         details: (m) => React.createElement(window.MapV2Sheet, {
           id: m.id, type: m.type, inline: true, view: peek.view, nearby: markers,
