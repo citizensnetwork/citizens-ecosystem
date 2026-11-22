@@ -303,7 +303,9 @@ describe("where the reader is wired", () => {
     expect(sheet).toMatch(/inline \? h\(ProfileCarousels/);
     expect(sheet).toContain("org: isContributor ? item : org");
     // Deletion cleanup must consult newsPosts so a place peek does not wipe reading on mount
-    expect(sheet).toMatch(/Array\.isArray\(newsPosts\).*some\(\(p\) => p && p\.id === reading\.id\)/s);
+    expect(sheet).toMatch(
+      /Array\.isArray\(newsPosts\)[\s\S]*some\(\(p\) => p && p\.id === reading\.id\)/,
+    );
     expect(sheet).not.toMatch(/if \(reading && !posts\.some/);
   });
 });
