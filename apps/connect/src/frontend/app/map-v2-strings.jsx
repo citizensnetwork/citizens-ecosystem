@@ -342,6 +342,8 @@
       // Pack 08: the home sheet. Tiles and tabs stay frosted grey; gold is only the crown's ring.
       panel: {
         where: 'Where to…',
+        whereLead: 'Where Christians…',
+        brandMark: 'Citizens Connect',
         peek: 'Where to…',
         around: 'Near & now',
         aroundHint: 'Live and nearby',

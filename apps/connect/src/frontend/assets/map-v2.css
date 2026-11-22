@@ -170,7 +170,7 @@
   --explore-body-min: 160px;                /* the least the panel holds, so the category list always has room */
   --ctrl-btn: 36px;                         /* the map's own zoom and locate buttons */
   --crown: 52px;                            /* the home button: a glass circle on a 1px gold ring */
-  --xp-strip: 124px;                        /* the handle and the Where to… tiles, so the map stays in view */
+  --xp-strip: 152px;                        /* handle + Where Christians… lead + tiles (founder, 2026-11-22) */
   --xp-focus: 340px;                        /* one row in focus: tabs, a line, taller preview cards */
   --xp-card-w: 156px;                       /* the panel's preview cards */
   --xp-card-img: 88px;
@@ -3495,11 +3495,11 @@ a[data-mv2='card2'],
   width: min(var(--xp-max), calc(100% - var(--space-8)));
   transform: translateX(-50%) translateY(calc(100% - var(--xp-vis)));
 }
-/* the handle: the strip has no title any more (founder, 2026-11-17), only this bar to pull up or drop down */
+/* Drawer chrome: centred handle (+ up chevron when lowest) and muted brand mark at top-right */
 [data-mv2='explore-grab'] {
   position: relative;
   flex: 0 0 auto;
-  height: var(--space-5);
+  height: var(--space-6);
   border: 0;
   background: none;
   color: inherit;
@@ -3508,17 +3508,69 @@ a[data-mv2='card2'],
 }
 [data-mv2='explore-handle'] {
   position: absolute;
-  top: var(--space-2);
+  top: 50%;
   left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: calc(var(--hit) * 1.5);
+  min-height: var(--hit);
+  color: var(--text-1);
+  opacity: 0.4;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+[data-mv2='explore-handle'] [data-mv2='handle-bar'] {
   width: var(--handle-w);
   height: var(--handle-h);
   border-radius: var(--radius-full);
-  background: var(--text-1);
-  opacity: 0.28;
-  transform: translateX(-50%);
+  background: currentColor;
+  opacity: 0.7;
+}
+[data-mv2='explore-handle'] svg {
+  display: none;
+  margin-top: -2px;
+}
+[data-mv2='explore-grab'][data-hint='up'] [data-mv2='explore-handle'] svg {
+  display: block;
 }
 [data-mv2='explore'][data-open] [data-mv2='explore-handle'] {
-  opacity: 0.18;
+  opacity: 0.28;
+}
+[data-mv2='drawer-mark'] {
+  position: absolute;
+  top: 50%;
+  right: var(--space-4);
+  z-index: 1;
+  margin: 0;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: 10px;
+  line-height: 1;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  opacity: 0.55;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+[data-mv2='where-block'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+}
+[data-mv2='where-lead'] {
+  margin: 0;
+  padding: var(--space-1) var(--space-5) 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-1);
 }
 [data-mv2='explore-scroll'] {
   flex: 1 1 auto;
@@ -4429,14 +4481,17 @@ a[data-mv2='card2'],
   top: var(--space-1);
   z-index: var(--z-xp-layer);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1px;
   min-width: calc(var(--hit) * 2);
   min-height: var(--hit);
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
+  color: var(--text-2);
   transform: translateX(-50%);
   cursor: grab;
   touch-action: none;
@@ -4446,6 +4501,18 @@ a[data-mv2='card2'],
 }
 [data-mv2='pinpeek-bar'] [data-mv2='handle-bar'] {
   pointer-events: none;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle'] svg {
+  display: none;
+  margin-top: -2px;
+  opacity: 0.7;
+  pointer-events: none;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle'][data-hint='up'] svg {
+  display: block;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='drawer-mark'] {
+  right: calc(var(--hit) + var(--space-2));
 }
 [data-mv2='pinpeek-status'] {
   flex: 1 1 auto;

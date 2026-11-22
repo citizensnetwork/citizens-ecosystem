@@ -416,6 +416,8 @@
     const cover = window.UI && window.UI.safeUrl ? (window.UI.safeUrl(raw) || '') : (/^https?:\/\//i.test(raw) ? raw : '');
     const Icon = window.Icon;
     const cat = window.DATA && window.DATA.getItemCategory ? window.DATA.getItemCategory(m) : null;
+    const tile = tileFor(m);
+    const glyph = (tile && tile.icon) || (cat && cat.icon) || kindIcon || 'MapPin';
     const near = window.MapV2Nearby;
     const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
     const meta = cardMetaLine(m, rec);
@@ -431,7 +433,7 @@
       onClick: () => props.onOpen && props.onOpen(m.id, m.type),
     },
       h('span', { 'data-mv2': 'xcard-img' },
-        cover ? h('img', { src: cover, alt: '' }) : (Icon ? h(Icon, { name: (cat && cat.icon) || kindIcon || 'MapPin', size: 22 }) : null),
+        cover ? h('img', { src: cover, alt: '' }) : (Icon ? h(Icon, { name: glyph, size: 22 }) : null),
         m.isLive ? h('span', { 'data-mv2': 'xcard-live' }, h('i', { 'aria-hidden': 'true' }), 'Live') : null,
         props.selected && props.detailsCue ? h(DetailsCue) : null,
         props.selected && props.badge ? h('span', { 'data-mv2': 'xcard-badge' }, props.badge) : null,
@@ -584,7 +586,10 @@
     const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
     // The rows rank from where the map looks, but a focus holds its first origin until it ends: the map moves for the
     // focus itself (to the town, to a chosen card), and re-ranking then would reorder the cards under the person's finger.
-    const live = view.user || view.centre;
+    // Where-to tiles rank from the current town view (centre), not GPS — founder 2026-11-22.
+    const liveTile = view.centre || view.user;
+    const liveElse = view.user || view.centre;
+    const live = (focus && focus.kind === 'tile') ? liveTile : liveElse;
     const held = useRef(null);
     if (!focus) held.current = null;
     else if (!held.current && live) held.current = live;
@@ -752,12 +757,14 @@
         type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight,
         onClick: () => nudgeTiles(1),
       }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
-    const tilesBig = () => tilesShell(h('div', {
-      ref: tabsRef, 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where, onScroll: measureTiles,
-    }, TILES.map((t) => h('button', {
-      key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
-      onClick: () => chooseTile(t.id),
-    }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word)))));
+    const tilesBig = () => h('div', { 'data-mv2': 'where-block' },
+      h('h3', { 'data-mv2': 'where-lead' }, P.whereLead || P.where),
+      tilesShell(h('div', {
+        ref: tabsRef, 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where, onScroll: measureTiles,
+      }, TILES.map((t) => h('button', {
+        key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
+        onClick: () => chooseTile(t.id),
+      }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word))))));
     const tileTabs = () => tilesShell(h('div', {
       ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.where, onScroll: measureTiles,
     }, TILES.map((t) => tab(t.id, t.word, t.icon, tile === t.id, () => chooseTile(t.id), { 'data-tile': t.id }))));
@@ -846,10 +853,16 @@
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
           'aria-label': open ? (P.lower) : (P.raise),
+          // Lowest visible strip: flat bar + slight up chevron; focus/open: flat bar only (founder, 2026-11-22).
+          'data-hint': (mode === 'strip' || mode === 'rest') ? 'up' : undefined,
           onPointerDown: onGrabDown, onPointerUp: onGrabUp, onClick: onGrabClick,
           onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (open) lower(); else raise(); } },
         },
-          h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' })),
+          h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' },
+            h('span', { 'data-mv2': 'handle-bar' }),
+            (mode === 'strip' || mode === 'rest') && Icon
+              ? h(Icon, { name: 'ChevronUp', size: 12 }) : null),
+          h('span', { 'data-mv2': 'drawer-mark', 'aria-hidden': 'true' }, P.brandMark || '')),
         h('div', { 'data-mv2': 'explore-scroll', ref: scrollRef },
           mode === 'focus' ? focusView() : mode === 'open' ? openView() : tilesBig())),
       // The crown and the sticky nav swap outright (founder, 2026-11-17: the morph was slow on a phone).
@@ -1057,12 +1070,19 @@
         h('button', {
           type: 'button', 'data-mv2': 'handle',
           'aria-label': P.lower || P.back || '',
+          // Lowest (cards) shows flat bar + slight up chevron; raised is flat only (founder, 2026-11-22).
+          'data-hint': raised ? undefined : 'up',
           onClick: () => {
             if (swallow.current) return;
             // Tap steps down one level (raised → cards → closed); pull-up still raises (founder option B).
             if (props.onBack) props.onBack();
           },
-        }, h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' })),
+        },
+          h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }),
+          !raised && Icon ? h(Icon, { name: 'ChevronUp', size: 12 }) : null),
+        h('span', { 'data-mv2': 'drawer-mark', 'aria-hidden': 'true' },
+          (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.panel
+            && window.MapV2Strings.explore.panel.brandMark) || ''),
         iconBtn({
           'data-mv2': 'pinpeek-close', 'aria-label': P.close,
           onClick: (e) => { e.stopPropagation(); if (props.onClose) props.onClose(); },
@@ -1174,11 +1194,13 @@
     }
 
     return h('div', { 'data-mv2': 'peek-explore' },
-      h('div', { 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where },
-        TILES.map((t) => h('button', {
-          key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
-          onClick: () => chooseTile(t.id),
-        }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word)))),
+      h('div', { 'data-mv2': 'where-block' },
+        h('h3', { 'data-mv2': 'where-lead' }, P.whereLead || P.where),
+        h('div', { 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where },
+          TILES.map((t) => h('button', {
+            key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
+            onClick: () => chooseTile(t.id),
+          }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word))))),
       SECTIONS.map((id) => (rows[id].length ? h('section', { key: id, 'data-mv2': 'xsec', 'data-sec': id, 'aria-label': rowTitle(id) },
         h('div', { 'data-mv2': 'xsec-h' },
           h('h3', null, h('button', { type: 'button', 'data-mv2': 'xsec-go', onClick: () => chooseRow(id) }, rowTitle(id))),

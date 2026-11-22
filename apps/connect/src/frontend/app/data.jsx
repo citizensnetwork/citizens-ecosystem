@@ -11,12 +11,12 @@
   // eventCategoryGroups.test.ts. Cards read heading off getItemCategory.
   const EVENT_CATEGORIES = [
     { id: 'worship-prayer',      name: 'Worship & Prayer',      short: 'Worship',     hex: '#B8860B', icon: 'HeartHandshake', group: 'Worship & church', heading: 'Worship & church | Worship & Prayer' },
-    { id: 'church-services',     name: 'Church Services',       short: 'Church',      hex: '#F2BD22', icon: 'Building2',      group: 'Worship & church', heading: 'Worship & church | Church Services' },
+    { id: 'church-services',     name: 'Church Services',       short: 'Church',      hex: '#F2BD22', icon: 'Music',          group: 'Worship & church', heading: 'Worship & church | Church Services' },
     { id: 'outreach-missions',   name: 'Outreach & Missions',   short: 'Outreach',    hex: '#1ABC9C', icon: 'Globe',          group: 'Serve',             heading: 'Serve | Outreach & Missions' },
     { id: 'markets-expos',       name: 'Markets & Expos',       short: 'Markets',     hex: '#F39C12', icon: 'Store',          group: 'Culture & fun',     heading: 'Culture & fun | Markets & Expos' },
-    { id: 'sport-recreation',    name: 'Sport & Recreation',    short: 'Sport',       hex: '#2ECC71', icon: 'CircleDot',      group: 'Culture & fun',     heading: 'Culture & fun | Sport & Recreation' },
+    { id: 'sport-recreation',    name: 'Sport & Recreation',    short: 'Sport',       hex: '#2ECC71', icon: 'Footprints',     group: 'Culture & fun',     heading: 'Culture & fun | Sport & Recreation' },
     { id: 'arts-culture',        name: 'Arts & Culture',        short: 'Arts',        hex: '#FF6B35', icon: 'Palette',        group: 'Culture & fun',     heading: 'Culture & fun | Arts & Culture' },
-    { id: 'social-gatherings',   name: 'Social Gatherings',     short: 'Social',      hex: '#E91E63', icon: 'Wine',           group: 'Culture & fun',     heading: 'Culture & fun | Social Gatherings' },
+    { id: 'social-gatherings',   name: 'Social Gatherings',     short: 'Social',      hex: '#E91E63', icon: 'Users',          group: 'Culture & fun',     heading: 'Culture & fun | Social Gatherings' },
     { id: 'community-upliftment',name: 'Community Upliftment',  short: 'Upliftment',  hex: '#9B59B6', icon: 'HeartHandshake', group: 'Serve',             heading: 'Serve | Community Upliftment' },
     { id: 'education-equipping', name: 'Education & Equipping', short: 'Education',   hex: '#3498DB', icon: 'GraduationCap',  group: 'Learn & grow',      heading: 'Learn & grow | Education & Equipping' },
     { id: 'marriage-family',     name: 'Marriage & Family',     short: 'Family',      hex: '#E74C3C', icon: 'Users',          group: 'Learn & grow',      heading: 'Learn & grow | Marriage & Family' },
@@ -31,9 +31,9 @@
 
   // ── Place categories (10) ──
   const PLACE_CATEGORIES = [
-    { id: 'churches-ministries', name: 'Churches & Ministries', short: 'Churches',   hex: '#F2BD22', icon: 'Building2' },
+    { id: 'churches-ministries', name: 'Churches & Ministries', short: 'Churches',   hex: '#F2BD22', icon: 'Church' },
     { id: 'hospitality-cafes',   name: 'Hospitality & Cafés',   short: 'Cafés',      hex: '#8B4513', icon: 'Coffee' },
-    { id: 'recreation-sport',    name: 'Recreation & Sport',    short: 'Recreation', hex: '#2ECC71', icon: 'Dumbbell' },
+    { id: 'recreation-sport',    name: 'Recreation & Sport',    short: 'Recreation', hex: '#2ECC71', icon: 'Footprints' },
     { id: 'media-broadcasting',  name: 'Media & Broadcasting',  short: 'Media',      hex: '#9B59B6', icon: 'Radio' },
     { id: 'retail-shopping',     name: 'Retail & Shopping',     short: 'Retail',     hex: '#E91E63', icon: 'ShoppingBag' },
     { id: 'health-wellness',     name: 'Health & Wellness',     short: 'Health',     hex: '#E74C3C', icon: 'Stethoscope' },
@@ -53,8 +53,8 @@
     { id: 'outreach-missions',   name: 'Outreach / Mission',    short: 'Outreach',  hex: '#1ABC9C', icon: 'Globe' },
     { id: 'markets-expos',       name: 'Market / Expo',         short: 'Market',    hex: '#F39C12', icon: 'Store' },
     { id: 'christian-businesses',name: 'Business',              short: 'Business',  hex: '#A67C00', icon: 'Store' },
-    { id: 'sport-recreation',    name: 'Sport & Recreation',    short: 'Sport',     hex: '#2ECC71', icon: 'CircleDot' },
-    { id: 'social-gatherings',   name: 'Social Gathering',      short: 'Social',    hex: '#E91E63', icon: 'Wine' },
+    { id: 'sport-recreation',    name: 'Sport & Recreation',    short: 'Sport',     hex: '#2ECC71', icon: 'Footprints' },
+    { id: 'social-gatherings',   name: 'Social Gathering',      short: 'Social',    hex: '#E91E63', icon: 'Users' },
     { id: 'arts-culture',        name: 'Arts & Culture',        short: 'Arts',      hex: '#FF6B35', icon: 'Palette' },
     { id: 'media-broadcasting',  name: 'Media',                 short: 'Media',     hex: '#9B59B6', icon: 'Radio' },
     { id: 'retreat-healing',     name: 'Retreat / Healing',     short: 'Retreat',   hex: '#6FA89A', icon: 'Leaf' },

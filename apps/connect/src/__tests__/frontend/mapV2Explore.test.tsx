@@ -233,7 +233,7 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     };
   });
 
-  it("rests on the crown alone, and the crown shows and hides the Where to… tiles (no title text, only the handle)", () => {
+  it("rests on the crown alone, and the crown shows and hides the Where Christians… strip (handle + brand mark)", () => {
     render(React.createElement(Harness));
     expect(mode()).toBe("rest");
     expect(document.querySelector("[data-mv2='explore']")!.hasAttribute("inert")).toBe(true);
@@ -243,10 +243,12 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(screen.getByRole("button", { name: "Coffee" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Kids" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Contributors" })).toBeNull();
-    // the strip says nothing but its tiles: no "Explore", "Where to…", "Near you" or count line
-    expect(screen.queryByRole("heading")).toBeNull();
+    // strip lead above the tiles (founder, 2026-11-22); no old "Explore" / count line
+    expect(screen.getByRole("heading", { name: P().whereLead })).toBeTruthy();
     expect(document.querySelector("[data-mv2='explore-peek']")).toBeNull();
     expect(document.querySelector("[data-mv2='explore-handle']")).toBeTruthy();
+    expect(document.querySelector("[data-mv2='explore-grab']")!.getAttribute("data-hint")).toBe("up");
+    expect(document.querySelector("[data-mv2='drawer-mark']")!.textContent).toBe(P().brandMark);
     fireEvent.click(screen.getByRole("button", { name: P().close }));
     expect(mode()).toBe("rest");
   });

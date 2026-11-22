@@ -149,8 +149,14 @@
       const api = mapApi.current;
       if (!api || !api.survey) return;
       if (!anchor.current) {
-        const v = api.view ? api.view() : null;
-        anchor.current = v && (v.user || v.centre);
+        // Current town view (camera centre) — never jump to GPS/Pretoria. Rank from this point (founder, 2026-11-22).
+        const cam = api.camera ? api.camera() : null;
+        if (cam && Number.isFinite(cam.lat) && Number.isFinite(cam.lng)) {
+          anchor.current = { lat: cam.lat, lng: cam.lng };
+        } else {
+          const v = api.view ? api.view() : null;
+          anchor.current = v && v.centre;
+        }
       }
       const c = anchor.current;
       if (c) {
@@ -211,12 +217,13 @@
     };
     // How much of the map the lowered carousel covers (its token, map-v2.css: it may still be sliding in), so the chosen
     // card's pin is brought clear of it. Raised, the carousel covers the map: nothing to bring into view.
-    const revealChosen = () => {
+    const revealChosen = (id) => {
       const home = rootRef.current;
       const api = mapApi.current;
       if (!home || !api || !api.revealSelected || (peekRef.current && peekRef.current.raised)) return;
       const foot = parseFloat(window.getComputedStyle(home).getPropertyValue('--pp-peek'));
-      api.revealSelected(Number.isFinite(foot) ? foot : 0);
+      // Pass the pin id: selectedRef on the map may still be the previous selection on this frame.
+      api.revealSelected(Number.isFinite(foot) ? foot : 0, id);
     };
     // Level 2 (or 3 when raised): pin or Explore 2nd tap. Carousel among province pool; pin snapped into the
     // search↔drawer mid-band (revealChosen). Raised = same drawer chrome as pin 2nd tap (founder, 2026-11-22).
@@ -233,7 +240,7 @@
           raised: raised || cur.raised,
           raisedAt: raised ? { index: at, camera: camera() } : cur.raisedAt,
         }));
-        if (!(raised || cur.raised)) revealChosen();
+        if (!(raised || cur.raised)) revealChosen(id);
         return;
       }
       const api = mapApi.current;
@@ -249,7 +256,7 @@
           ids, index, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard,
           raised: raised, raisedAt: raised ? { index: index, camera: cam } : null,
         }));
-        if (!raised) revealChosen();
+        if (!raised) revealChosen(id);
         return;
       }
       setPeek({
@@ -257,14 +264,15 @@
         raised: raised, raisedAt: raised ? { index: index, camera: cam } : null,
         focusCard: byKey ? 1 : 0,
       });
-      if (!raised) revealChosen();
+      if (!raised) revealChosen(id);
     };
     const peekTo = (i) => {
       const cur = peekRef.current;
       if (!cur || !cur.ids[i]) return;
+      const nextId = cur.ids[i];
       setPeek(Object.assign({}, cur, { index: i }));
-      choose(cur.ids[i]);
-      revealChosen();
+      choose(nextId);
+      revealChosen(nextId);
     };
     // Level 3: the chosen card tapped again (or the carousel pulled up).
     const raisePeek = () => {

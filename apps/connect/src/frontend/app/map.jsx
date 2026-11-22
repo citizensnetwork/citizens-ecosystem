@@ -209,6 +209,10 @@
 
   function pinIcon(m, cat) {
     if (m.type === 'idea') return 'Lightbulb';
+    // Prefer the Where-to block glyph so map pins match the strip tiles (founder, 2026-11-22).
+    const X = window.MapV2Explore;
+    const tile = X && X.tileFor ? X.tileFor(m) : null;
+    if (tile && tile.icon) return tile.icon;
     if (cat && cat.icon) return cat.icon;
     if (m.type === 'contributor' && KIND_ICON[m.kind]) return KIND_ICON[m.kind];
     return FALLBACK_ICON[m.type] || 'MapPin';
@@ -705,23 +709,22 @@
           });
           return out;
         },
-        // The selected pin on the mid-band between search (home-top) and `bottom` px at the foot (pin carousel).
-        revealSelected(bottom) {
+        // Snap the chosen pin onto the mid-band centre between search (home-top) and `bottom` px at the foot.
+        // `id` is required on the first paint of a new selection: selectedRef may still hold the previous id (React).
+        // Founder 2026-11-22: always the mid-band centre (not “already somewhere in the band”).
+        revealSelected(bottom, id) {
           requestAnimationFrame(() => {
             const mp = mapRef.current;
             const el = containerRef.current;
-            const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
+            const targetId = id || selectedRef.current;
+            const mk = targetId ? markerObjs.current.get(targetId) : null;
             if (!mp || !el || !mk) return;
             const foot = Math.max(0, Number(bottom) || 0);
             const offset = bandOffset(el, foot);
-            const box = el.getBoundingClientRect();
-            const home = (el.closest && el.closest("[data-mv2='home']")) || el;
-            const topEl = home.querySelector && home.querySelector("[data-mv2='home-top']");
-            const bandTop = topEl ? Math.max(0, topEl.getBoundingClientRect().bottom - box.top) : 0;
-            const bandLow = el.clientHeight - foot;
             const p = mp.project(mk.getLngLat());
-            const edge = 24;
-            if (p.x > edge && p.x < el.clientWidth - edge && p.y > bandTop + edge && p.y < bandLow - edge) return;
+            const tx = el.clientWidth / 2 + offset[0];
+            const ty = el.clientHeight / 2 + offset[1];
+            if (Math.abs(p.x - tx) < 10 && Math.abs(p.y - ty) < 10) return;
             userMovedRef.current = true;
             mp.easeTo({ center: mk.getLngLat(), offset, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
           });
