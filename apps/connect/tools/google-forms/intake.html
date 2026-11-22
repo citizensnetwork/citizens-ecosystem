@@ -947,11 +947,34 @@
     else showProblem(result.error || "We could not save this. Please try again.");
   }
 
+  var previewUrl = { logo: "", cover: "" };
+
   function preview(input, img) {
-    var file = input.files && input.files[0];
-    if (!file) { img.hidden = true; img.removeAttribute("src"); return; }
-    img.src = URL.createObjectURL(file);
-    img.hidden = false;
+    if (!img || img.tagName !== "IMG") return;
+    var kind = input && input.getAttribute("data-image");
+    if (kind && previewUrl[kind]) {
+      URL.revokeObjectURL(previewUrl[kind]);
+      previewUrl[kind] = "";
+    }
+    var file = input && input.files && input.files[0];
+    // A thumbnail is only for a real photo. The address is always a blob URL
+    // from this page, shown on an image element, which does not run a script.
+    if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      img.hidden = true;
+      img.removeAttribute("src");
+      return;
+    }
+    var url = String(URL.createObjectURL(file));
+    if (url.indexOf("blob:") !== 0) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+    if (kind) previewUrl[kind] = url;
+    var shown = new Image();
+    shown.alt = "";
+    shown.id = img.id;
+    shown.src = url;
+    img.replaceWith(shown);
   }
 
   function init() {
