@@ -339,7 +339,7 @@
   }
 
   /** Gallery / Events / Posts sideways rows for the raised pinpeek (hidden when empty). */
-  function ProfileCarousels({ item, type, org, events, newsPosts, onPick }) {
+  function ProfileCarousels({ item, type, org, events, newsPosts, onPick, onReadPost }) {
     const Str = S();
     const time = T();
     const now = Date.now();
@@ -398,6 +398,10 @@
             return h(window.MapV2Card, {
               variant: img ? 'image' : 'text', title: p.title, excerpt: p.body,
               media: img ? { src: img } : null, idPrefix: 'mv2-ip-' + p.id,
+              onClick: (e) => { if (onReadPost) onReadPost(p, e && e.currentTarget); },
+              moreLabel: Str.news && Str.news.readMore,
+              'data-news': '',
+              'aria-haspopup': 'dialog',
             });
           },
         })));
@@ -992,9 +996,15 @@
     const facts = [];
     if (expanded || inline) {
       if (distance) facts.push(h('span', { key: 'd', 'data-mv2': 'distance' }, distance));
-      if (state) facts.push(h('span', { key: 's', 'data-mv2': 'state', 'data-status': state.status }, state.text));
+      // Expanded sheet keeps relative open/starts copy; raised cover uses calendar date·time tiles instead.
+      if (state && !inline) facts.push(h('span', { key: 's', 'data-mv2': 'state', 'data-status': state.status }, state.text));
       if (followers) facts.push(h('span', { key: 'f', 'data-mv2': 'followers' }, Str.followers(followers)));
     }
+    // Same calendar line as ListingBody lead (cut-and-paste for events on the cover) — founder, 2026-11-22.
+    const Ufmt = window.EntityCardUtils || {};
+    const eventWhen = type === 'event' && item.date && Ufmt.fmtDate
+      ? (Ufmt.fmtDate(item.date) + (item.time ? ' · ' + item.time : ''))
+      : '';
     const chipMeta = h('p', { 'data-mv2': 'xmeta' },
       h('span', { 'data-mv2': 'card-chip' },
         h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
@@ -1005,7 +1015,23 @@
       (expanded || inline) && collabChip,
       facts.length > 0 && h('span', { 'data-mv2': 'sub' },
         facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), [])));
-    // Raised pinpeek: 16:9 cover; avatar bottom-left overlapping; title/category/distance to its right (founder, 2026-11-22).
+    // Raised cover meta: soft theme tiles for distance + event calendar date·time (theme-inverted text).
+    const coverMeta = h('div', { 'data-mv2': 'cover-meta' },
+      h('span', { 'data-mv2': 'card-chip' },
+        h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
+        h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
+      distance
+        ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'distance' }, distance)
+        : null,
+      eventWhen
+        ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'when' },
+          Icon ? h(Icon, { name: 'Calendar', size: 12 }) : null,
+          h('span', null, eventWhen))
+        : null,
+      type === 'place' && state
+        ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'state', 'data-status': state.status }, state.text)
+        : null);
+    // Raised pinpeek: larger avatar, title/meta to its right and kept inside the 16:9 cover.
     const coverSrc = item.coverPhoto || (org && org.coverPhoto) || '';
     const faceSrc = avatarSrc || item.profilePhoto || (org && org.profilePhoto) || '';
     const xhead = (expanded || inline) && (inline
@@ -1017,11 +1043,11 @@
             h('div', { 'data-mv2': 'cover-avatar' },
               h(Avatar, {
                 src: faceSrc, name: avatarName || name, hex, size: 'half',
-                glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 22 }),
+                glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 30 }),
               })),
             h('div', { 'data-mv2': 'cover-copy' },
               h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
-              chipMeta))),
+              coverMeta))),
         h(HandleRow, { item: item }))
       : h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
         h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
@@ -1058,6 +1084,7 @@
         body,
         inline && !isContributor ? h(ProfileCarousels, {
           item: item, type: type, org: org, events: events, newsPosts: newsPosts, onPick: onPick,
+          onReadPost: (p, from) => setReading({ id: p.id, from: from || null }),
         }) : null,
         // Report (compact) + View Full sit above the slogan divider on raised pinpeek (founder, 2026-11-22).
         inline ? footLinks : null,
@@ -1083,9 +1110,10 @@
         images, index: viewer.index, strings: Str.gallery, returnFocus: viewer.from,
         onClose: () => setViewer(null), onIndex: (i) => setViewer((v) => ({ index: i, from: v && v.from })),
       }), document.body),
-      // the open news post: same centred dialog the profile page uses, over the whole viewport
-      reading && window.MapV2News && posts.some((p) => p.id === reading.id) && ReactDOM.createPortal(h(window.MapV2News.Reader, {
-        post: posts.find((p) => p.id === reading.id), sourceName: name, strings: Str.news,
+      // the open news post: soft blurred overlay with Back (place/event posts + contributor news)
+      reading && window.MapV2News && (newsPosts || posts || []).some((p) => p.id === reading.id) && ReactDOM.createPortal(h(window.MapV2News.Reader, {
+        post: (newsPosts || posts || []).find((p) => p.id === reading.id),
+        sourceName: (org && org.name) || name, strings: Str.news,
         returnFocus: reading.from, onClose: () => setReading(null),
       }), document.body));
   }

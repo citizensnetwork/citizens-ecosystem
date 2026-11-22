@@ -150,6 +150,13 @@
         ref: card, 'data-mv2': 'news-card', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'mv2-news-title',
       },
         h('div', { 'data-mv2': 'news-head' },
+          h('button', {
+            type: 'button', 'data-mv2': 'news-back',
+            'aria-label': strings.back || strings.close,
+            onClick: () => closeRef.current(),
+          },
+            window.Icon ? h(window.Icon, { name: 'ChevronLeft', size: 18 }) : null,
+            h('span', null, strings.back || strings.close)),
           h('p', { 'data-mv2': 'news-from' }, sourceName || ''),
           h('button', {
             type: 'button', 'data-mv2': 'icon-btn', 'aria-label': strings.close, onClick: () => closeRef.current(),

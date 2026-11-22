@@ -89,6 +89,7 @@
       news: {
         readMore: 'Read more',
         close: 'Close news post',
+        back: 'Back',
         // The row of the newest posts. "See all" turns it into the full list in place; "Show fewer" puts it back.
         row: {
           label: 'Latest news',
