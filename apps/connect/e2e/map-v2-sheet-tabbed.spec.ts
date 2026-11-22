@@ -268,6 +268,9 @@ test.describe("tabbed block sticks only while its scroller scrolls", () => {
       const block = sc.querySelector("[data-mv2='tabbed']") as HTMLElement;
       sc.scrollTop += block.getBoundingClientRect().top - sc.getBoundingClientRect().top + 140;
     });
+    // data-top follows the scroller's scroll EVENT, which the browser fires on the next frame, not when scrollTop is set
+    // (a loaded runner read it in between). A touch always starts after that frame, so the rule only needs it by then.
+    await expect.poll(() => scroller.evaluate((el) => el.hasAttribute("data-top")), { timeout: 3_000 }).toBe(false);
     const stuck = await scroller.evaluate((el) => {
       const sc = el as HTMLElement;
       const tabs = sc.querySelector("[data-mv2='tabs']") as HTMLElement;

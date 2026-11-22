@@ -85,12 +85,16 @@ export async function mockMapNetwork(
   });
 }
 
-/** Open the map screen and wait until the MapLibre instance and `min` markers exist. */
+/**
+ * Open the map screen and wait until the MapLibre instance and `min` markers exist, and map-v2.css has painted (the
+ * app turns motion on only then, data-mv2-motion: before it, panels still sit where an unstyled page puts them).
+ */
 export async function openMap(page: Page, path = "/", min = 1) {
   await page.goto(path);
   await page.waitForSelector('[data-screen="discover"]', { timeout: 20_000 });
   await page.waitForFunction(
-    (n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n,
+    (n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n
+      && document.documentElement.hasAttribute("data-mv2-motion"),
     min,
     { timeout: 20_000 },
   );

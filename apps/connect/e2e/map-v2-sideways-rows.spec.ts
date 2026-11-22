@@ -162,7 +162,14 @@ test.describe("a phone, 375 px, real touch", () => {
     await resetPointerCounts(page);
     await swipe(cdp, at, 0, { dx: -230, ms: 320, steps: 14 });
     await expect.poll(() => scrollLeftOf(page, newsRegion(page)), { timeout: 3000 }).toBeGreaterThan(200);
-    await page.waitForTimeout(500);
+    // wait for the snap to finish (a fixed 500 ms was not enough on a loaded runner: it read 12 px short of the card twice)
+    let last = -1;
+    await expect.poll(async () => {
+      const now = await scrollLeftOf(page, newsRegion(page));
+      const still = now === last;
+      last = now;
+      return still;
+    }, { timeout: 5_000, intervals: [150] }).toBe(true);
     // settled on a card: scrollLeft is a whole number of card steps (264 + 8)
     const sl = await scrollLeftOf(page, newsRegion(page));
     expect(Math.abs(sl / 272 - Math.round(sl / 272))).toBeLessThan(0.02);

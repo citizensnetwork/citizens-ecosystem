@@ -146,6 +146,9 @@ test.describe("P2-04 the saved list in Settings", () => {
     await expect(saveBtn(page)).toHaveText("Saved");
 
     await goTo(page, "settings");
+    // allInnerTexts does not wait: on a loaded runner it once read the map screen, before Settings had replaced it
+    await expect(page.locator("[data-screen='settings']")).toBeVisible();
+    await expect(page.locator("[data-saved='row']")).toHaveCount(2);
     const names = await page.locator("[data-saved='row'] [data-saved='name']").allInnerTexts();
     const want = [seed.places[0].name, seed.places[1].name].sort((a, b) => a.localeCompare(b));
     expect(names).toEqual(want);

@@ -35,7 +35,7 @@
   // Bump the ?v= whenever assets/map-v2.css changes: the service worker is
   // cache-first for same-origin static files. Root-absolute, plus the path prefix when the app is served under one
   // (/citizens/connect, C39): routes.jsx loads first and owns it.
-  const CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/map-v2.css?v=20261117a');
+  const CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/map-v2.css?v=20261119a');
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
@@ -204,6 +204,12 @@
     const done = () => {
       api.styleReady = true;
       try { window.dispatchEvent(new Event('cc-map-v2-style')); } catch { /* old webview */ }
+      // Motion only once the stylesheet has painted a frame (map-v2.css, "Motion waits for the stylesheet"). The screen
+      // mounts before this file arrives, so without the wait every panel animated from its unstyled place into its first
+      // styled one: the Explore panel slid down over the map on a slow load (and an e2e test measured it mid-slide).
+      const ready = () => doc.documentElement.setAttribute('data-mv2-motion', '');
+      if (typeof window.requestAnimationFrame === 'function') window.requestAnimationFrame(() => window.requestAnimationFrame(ready));
+      else ready();
     };
     const link = doc.createElement('link');
     link.rel = 'stylesheet';

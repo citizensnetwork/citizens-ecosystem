@@ -561,6 +561,17 @@
   transform: translate(-50%, -50%);
 }
 
+/* Motion waits for the stylesheet. This file arrives after the screen has mounted (map-v2-lib.jsx adds it), so the
+   first styled frame would otherwise ANIMATE every panel from its unstyled place: the Explore panel slid down over the
+   map on a slow load. map-v2-lib.jsx sets data-mv2-motion two frames after this file has loaded; until then nothing
+   here moves, and changing the transition itself starts none. */
+:root:not([data-mv2-motion]) [data-mv2],
+:root:not([data-mv2-motion]) [data-mv2]::before,
+:root:not([data-mv2-motion]) [data-mv2]::after {
+  transition: none !important;
+  animation: none !important;
+}
+
 /* ── 4b. Sheet (app/map-v2-sheet.jsx) ───────────────────────────────
    One box, always the full height; the three snap states are translateY
    values, so a drag and a snap animate nothing but transform. */
