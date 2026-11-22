@@ -1141,9 +1141,6 @@
       selected: props.selectedId === r.m.id,
       onOpen: (cid, ctype) => props.onOpen && props.onOpen(cid, ctype),
     })));
-    const kindOf = current ? pool.find((m) => tileMatches(current.id, m)) : null;
-    const kindPlural = (kindOf && P.kind && P.kind[kindOf.type]) || 'listings';
-    const kindWord = tileItems.length === 1 ? ({ events: 'event', places: 'place', contributors: 'contributor', ideas: 'idea', listings: 'listing' })[kindPlural] || kindPlural : kindPlural;
     const tab = (id, word, icon, on, onClick, extra) => h('button', Object.assign({
       key: id, type: 'button', 'data-mv2': 'explore-tile', 'data-tab': id,
       role: 'tab', 'aria-selected': on ? 'true' : 'false', onClick: onClick,
