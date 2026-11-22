@@ -253,12 +253,13 @@
     const tailRows = tailFacts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
     const bio = item.description ? h('p', { 'data-mv2': 'bio' }, item.description) : null;
     if (part === 'lead') {
+      // One data-entity-card hook for the listing (lead only): the tail is the rest of the same body.
       return h('div', { 'data-mv2': 'card', 'data-entity-card': type, 'data-part': 'lead' },
         bio,
         leadRows.length ? h('ul', { 'data-mv2': 'facts', role: 'list' }, leadRows) : null);
     }
     if (part === 'tail') {
-      return h('div', { 'data-mv2': 'card', 'data-entity-card': type, 'data-part': 'tail' },
+      return h('div', { 'data-mv2': 'card', 'data-part': 'tail' },
         (tailRows.length || organiser || coHostLine) ? h('ul', { 'data-mv2': 'facts', role: 'list' }, tailRows, organiser, coHostLine) : null,
         convince);
     }

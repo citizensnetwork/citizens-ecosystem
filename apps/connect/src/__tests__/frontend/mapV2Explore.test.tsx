@@ -503,14 +503,14 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261122e"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261122f"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122e");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122f");
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");
@@ -633,7 +633,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(calls.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("raised: the chosen card's details sit below the cards, with Back and Close in the bar; Escape steps back", () => {
+  it("raised: the chosen card's details sit below the cards, with Back and Close in the bar; Escape closes", () => {
     const { calls } = carousel({ index: 1, raised: true });
     expect(document.querySelector("[data-mv2='pinpeek']")!.hasAttribute("data-raised")).toBe(true);
     expect(screen.getByTestId("details").textContent).toBe("About Charlie");
@@ -647,8 +647,9 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(calls.onRaise).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: PK().back as string }));
     expect(calls.onBack).toHaveBeenCalledTimes(1);
+    // Escape matches Back from raised: close the whole drawer (handle tap still steps down)
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(calls.onBack).toHaveBeenCalledTimes(2);
+    expect(calls.onClose).toHaveBeenCalledTimes(1);
   });
 
   it("leaves Escape to a full sheet open over it (hidden), and gives focus back when it closes with focus inside", () => {
@@ -738,8 +739,8 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
   it("wires the levels into the map screen: one history entry per level, the chips row, and the inline details", () => {
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("useBackGuard(searchOpen,");
-    expect(home).toContain("useBackGuard(!!peek, closePeek)");
-    expect(home).toContain("useBackGuard(!!(peek && peek.raised), lowerPeek)");
+    expect(home).toContain("useBackGuard(!!peek && !peek.raised, closePeek)");
+    expect(home).toContain("useBackGuard(!!(peek && peek.raised), closePeek)");
     expect(home).toContain("React.createElement(X.PinCarousel");
     expect(home).toContain("inline: true");
     expect(home).toContain("'aria-label': XS.chipsLabel");

@@ -976,13 +976,18 @@
       const el = root.current;
       return () => { if (el && el.contains(document.activeElement) && giveBack.current) giveBack.current(lastId.current); };
     }, []);
-    // Escape steps back one level, like Back (not while a full sheet is open over the carousel: that one takes it)
+    // Escape matches Back: raised closes the whole drawer; lowered closes the cards (full sheet over the carousel takes the key).
     useEffect(() => {
       if (props.hidden) return undefined;
-      const onKey = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); if (back.current) back.current(); } };
+      const onKey = (e) => {
+        if (e.key !== 'Escape' || e.defaultPrevented) return;
+        e.preventDefault();
+        if (raised && props.onClose) props.onClose();
+        else if (back.current) back.current();
+      };
       document.addEventListener('keydown', onKey);
       return () => document.removeEventListener('keydown', onKey);
-    }, [props.hidden]);
+    }, [props.hidden, raised, props.onClose]);
 
     const onRowScroll = () => {
       if (!touched.current) return;

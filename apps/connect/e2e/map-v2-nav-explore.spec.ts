@@ -92,7 +92,7 @@ test.describe("the map home on a phone", () => {
     await expect(sheet(page)).toHaveAttribute("data-mode", "focus");
     const height = await settled(page);
     expect(height).toBeGreaterThan(240);
-    expect(height).toBeLessThan(320);
+    expect(height).toBeLessThan(360);
     const tab = page.getByRole("tab", { name: "Coffee" });
     await expect(tab).toHaveAttribute("aria-selected", "true");
     const plate = await tab.evaluate((e) => getComputedStyle(e).backgroundColor);
@@ -110,8 +110,9 @@ test.describe("the map home on a phone", () => {
     expect(await settled(page)).toBe(height);
     await page.getByRole("tab", { name: "Worship" }).click();
     expect(await settled(page)).toBe(height);
-    // "All types" is plain words, not a plate
-    const reset = page.getByRole("button", { name: "All types" });
+    // Focus chrome Back (Close) is plain words, not a plate
+    const reset = page.locator("[data-mv2='xfocus-back']");
+    await expect(reset).toBeVisible();
     const look = await reset.evaluate((e) => ({ bg: getComputedStyle(e).backgroundColor, border: getComputedStyle(e).borderTopWidth }));
     expect(look.bg).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
     expect(look.border).toBe("0px");

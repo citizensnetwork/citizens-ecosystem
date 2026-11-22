@@ -4420,17 +4420,14 @@ a[data-mv2='card2'],
 [data-mv2='pinpeek-back'],
 [data-mv2='pinpeek-close'] {
   pointer-events: auto;
-  z-index: 2;
+  z-index: var(--z-xp-crown);
 }
 [data-mv2='pinpeek-bar'] [data-mv2='handle'] {
   pointer-events: auto;
-  z-index: 2;
-}
-[data-mv2='pinpeek-bar'] [data-mv2='handle'] {
   position: absolute;
   left: 50%;
   top: var(--space-1);
-  z-index: 1;
+  z-index: var(--z-xp-layer);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4584,8 +4581,8 @@ a[data-mv2='card2'],
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: calc(var(--space-6) + var(--space-1));
+  height: calc(var(--space-6) + var(--space-1));
   border: 1px solid var(--divider);
   border-radius: var(--radius-full);
   background: var(--surface-0);

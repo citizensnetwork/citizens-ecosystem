@@ -137,6 +137,14 @@ export async function mapSettled(page: Page) {
  * OPEN panel lists every row and shows the sticky nav. The crown shows the strip; the handle opens the rest.
  */
 export async function openExploreAll(page: Page, how: "click" | "tap" = "click") {
+  // Raised pinpeek covers Explore; Close it before opening the panel (2nd-tap surface, 2026-11-22).
+  const peek = page.locator("[data-mv2='pinpeek']:not([hidden])");
+  if (await peek.count()) {
+    const close = page.locator("[data-mv2='pinpeek-close']");
+    if (how === "tap") await close.tap();
+    else await close.click();
+    await expect(peek).toHaveCount(0, { timeout: 5_000 });
+  }
   const explore = page.locator("[data-mv2='explore']");
   if ((await explore.getAttribute("data-open")) !== null) return;
   const press = (l: Locator) => (how === "tap" ? l.tap() : l.click());

@@ -298,8 +298,9 @@
       resetLevels();
     };
     useBackGuard(searchOpen, () => setSearchOpen(false));
-    useBackGuard(!!peek, closePeek);
-    useBackGuard(!!(peek && peek.raised), lowerPeek);
+    // Cards-only peek: Back closes it. Raised peek: Back closes the whole drawer (handle tap still steps down via peekBack).
+    useBackGuard(!!peek && !peek.raised, closePeek);
+    useBackGuard(!!(peek && peek.raised), closePeek);
     const peekItems = peek ? peek.ids.map((id) => byId.get(id)).filter(Boolean) : [];
     // Words typed into the search can take every card's listing off the map: the carousel then has nothing to show, so it
     // steps back as Back would.
@@ -321,6 +322,8 @@
       // A Contributor (reached by a place's or an event's owner line) has no pin and no card: the listing that led there
       // stays the chosen one, so closing the sheet comes back to that card, still outlined.
       if (t !== 'contributor') { setSelected(id); setSelType(t); }
+      // Full sheet replaces the raised pinpeek (do not leave a hidden inline sheet with the same hooks in the DOM).
+      setPeek(null);
       setSheet({ id, type: t, view }); if (t === 'event') trackImpression(id);
     };
     const closeSheet = () => setSheet(null);

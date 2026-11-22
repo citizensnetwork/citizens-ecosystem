@@ -255,9 +255,11 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await openCardOn(page, p.id, p.longitude, p.latitude);
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     await openCardOn(page, p.id, p.longitude, p.latitude);
     await page.getByRole("button", { name: "Close details" }).click();
     await expect(sheet(page)).toHaveCount(0);
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     // the guard's own entry is taken back off the stack once the sheet is gone: we are on the arrival entry again
     await expect.poll(() => page.evaluate(() => (history.state as { idx?: number } | null)?.idx)).toBe(0);
     expect(new URL(page.url()).pathname).toBe("/"); // never left the app

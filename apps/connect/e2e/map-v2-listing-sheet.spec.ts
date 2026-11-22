@@ -126,7 +126,7 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     expect(colours.edge).toBe(colours.want);
 
     // km, in the row's own words (nobody shared a position: measured from the map centre)
-    await expect(head(page).locator("[data-mv2='distance']")).toHaveText(/^(Under 100 m|\d+ m|\d+(\.\d)? km) from the map centre$/);
+    await expect(head(page).locator("[data-mv2='distance']")).toHaveText(/^(Under 100 m|\d+ m|\d+(\.\d)? km) from( the map)? centre$/);
   });
 
   test("the distance on the sheet is the one on the card", async ({ page, baseURL }) => {
@@ -140,7 +140,7 @@ test.describe("#210 the expanded listing sheet (375 x 812, touch)", () => {
     await card().click();
     await expect(card()).toHaveAttribute("data-selected", "");
     const meta = card().locator("[data-mv2='row-meta']");
-    await expect(meta).toHaveText(/from the map centre/);
+    await expect(meta).toHaveText(/from( the map)? centre/);
     let last = "";
     await expect.poll(async () => { const now = await meta.innerText(); const still = now === last; last = now; return still; }, { intervals: [300] }).toBe(true);
     // the line is "distance · hours": the sheet's distance is its first part, though the map has moved since

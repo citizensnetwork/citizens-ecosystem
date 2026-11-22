@@ -308,7 +308,7 @@
         prev: 'Previous',
         next: 'Next',
         back: 'Back',
-        close: 'Close cards',
+        close: 'Close details',
         raise: 'Show details',
         lower: 'Back to cards',
         details: (name) => 'Details · ' + name,
