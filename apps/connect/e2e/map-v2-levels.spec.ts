@@ -279,13 +279,13 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await expect(peek(page)).not.toHaveAttribute("data-raised", "");
       await expect(chosenCard(page)).toHaveAttribute("data-explore-id", pins[1]);
       await expect.poll(async () => (await depth(page)).idx).toBe(start.idx + 1);
-      // a pull down on the lowered carousel closes it
+      // a pull down on the handle closes the lowered carousel (card-row drag stays for sideways swipe)
       await still(page);
-      // pull down on the lowered carousel (use the card row; the counter is gone and Close floats)
-      const rowBox = (await page.locator("[data-row='peek']").boundingBox())!;
-      await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + 20);
+      const handle = page.locator("[data-mv2='pinpeek-bar'] [data-mv2='handle']");
+      const box = (await handle.boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.down();
-      await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + 110, { steps: 6 });
+      await page.mouse.move(box.x + box.width / 2, box.y + 110, { steps: 6 });
       await page.mouse.up();
       await expect(peek(page)).toHaveCount(0);
       await expect.poll(async () => (await depth(page)).idx).toBe(start.idx);

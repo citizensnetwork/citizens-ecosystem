@@ -179,7 +179,11 @@ test.describe("the map home on a phone", () => {
     await expect(page.getByRole("tab", { name: "Near & now" })).toHaveAttribute("aria-selected", "true");
     await expect(page.locator("[data-mv2='filter-chip']")).toContainText("Near & now");
 
+    // Clear the filter (grab would only minimize while a chip is on), then open every row again.
+    await page.locator("[data-mv2='filter-chip-x']").click();
+    await expect(page.locator("[data-mv2='filter-chip']")).toHaveCount(0);
     await page.getByRole("button", { name: "Show all rows" }).click();
+    await expect(sheet(page)).toHaveAttribute("data-open", "");
     await page.getByRole("button", { name: "Explore more" }).click();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page.locator("[data-screen='explore']")).toBeVisible();

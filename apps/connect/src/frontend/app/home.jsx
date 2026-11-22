@@ -294,7 +294,8 @@
     const closePeek = () => {
       const cur = peekRef.current;
       if (!cur) return;
-      setPeek(null); setSelected(null); setLitId(null);
+      // Close goes home: clear the drawer and any search chips under it (Back still steps one level).
+      setPeek(null); setSelected(null); setLitId(null); setSearchOpen(false);
       putCamera(cur.camera);
     };
     const peekBack = () => { const cur = peekRef.current; if (cur && cur.raised) lowerPeek(); else closePeek(); };

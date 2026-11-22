@@ -382,7 +382,7 @@ describe("the stylesheet and the wiring", () => {
   it("is registered before Nearby, after the card, in the page and in the build, with the new version", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    expect(html).toContain('src="app/map-v2-row.jsx?v=20261025b"');
+    expect(html).toContain('src="app/map-v2-row.jsx?v=20261122g"');
     expect(html.indexOf("app/map-v2-card.jsx")).toBeLessThan(html.indexOf("app/map-v2-row.jsx"));
     expect(html.indexOf("app/map-v2-row.jsx")).toBeLessThan(html.indexOf("app/map-v2-nearby.jsx"));
     expect(build.indexOf("'map-v2-card.jsx'")).toBeLessThan(build.indexOf("'map-v2-row.jsx'"));
