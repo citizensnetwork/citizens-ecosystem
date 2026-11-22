@@ -147,6 +147,10 @@
   --qr-size: 260px;
   --reader-w: 560px;             /* the news reader's reading width; UI.Overlay's default maxWidth */
   --scrim-blur: 14px;            /* soft blurred news-reader scrim (founder, 2026-11-22); Overlay still reads this token */
+  --reader-radius: calc(var(--radius-lg) + var(--space-3)); /* news card corners: lg + 12 */
+  --reader-elev: 0 12px 40px color-mix(in srgb, var(--scrim) 28%, transparent);
+  --reader-card-blur: 8px;       /* frosted news-card glass */
+  --cover-tile-blur: 6px;        /* soft cover meta chips */
   --dim-opacity: 0.35;              /* a pin set aside while one is highlighted, or outside a filter */
   --hrow-card-w: 264px;             /* one card width for every card in a sideways row, portrait or landscape (4i) */
   --hrow-peek: 48px;                /* a row's card is never wider than the row minus this, so the next card shows at the edge */
@@ -1518,12 +1522,12 @@
   max-height: 100%;
   min-height: 0;
   overflow: hidden;
-  border-radius: calc(var(--radius-lg) + var(--space-3));
+  border-radius: var(--reader-radius);
   background: color-mix(in srgb, var(--surface-1) 92%, transparent);
   color: var(--text-1);
-  box-shadow: 0 12px 40px color-mix(in srgb, var(--scrim) 28%, transparent);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  box-shadow: var(--reader-elev);
+  -webkit-backdrop-filter: blur(var(--reader-card-blur));
+  backdrop-filter: blur(var(--reader-card-blur));
   animation: mv2-news-in var(--dur-base) var(--ease-enter) both;
 }
 [data-mv2='news-head'] {
@@ -1538,7 +1542,7 @@
   flex: none;
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--gallery-gap);
   min-height: var(--hit);
   margin: 0;
   padding: 0 var(--space-2);
@@ -4908,8 +4912,8 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   font-size: var(--fs-1);
   line-height: var(--lh-1);
   font-weight: var(--fw-semibold);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(var(--cover-tile-blur));
+  backdrop-filter: blur(var(--cover-tile-blur));
   text-shadow: none;
 }
 [data-mv2='cover-tile'] svg {
