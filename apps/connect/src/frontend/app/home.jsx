@@ -204,8 +204,9 @@
       const foot = parseFloat(window.getComputedStyle(home).getPropertyValue('--pp-peek'));
       api.revealSelected(Number.isFinite(foot) ? foot : 0);
     };
-    // Level 2: a pin tapped. Its card first, then the other pins in view (the filter's, when one is on), nearest first. A pin
-    // tapped while the carousel is up chooses its card there, or starts the row again from it: the same level, no new entry.
+    // Level 2: a pin tapped. Its card centred among every listing in the province pool (the filter's, when one is on),
+    // nearest neighbours either side. A pin tapped while the carousel is up chooses its card there, or starts the row
+    // again from it: the same level, no new entry.
     const openPeek = (id, t, byKey) => {
       const m = byId.get(id);
       if (!m) return;
@@ -214,11 +215,13 @@
       const at = cur ? cur.ids.indexOf(id) : -1;
       if (cur && at !== -1) { setPeek(Object.assign({}, cur, { index: at, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
       const api = mapApi.current;
-      const visible = api && api.visibleIds ? api.visibleIds() : null;
+      // all province listings (Connect's loaded set), not only the pins in the current viewport
       const pool = pinFilter ? rowMarkers.filter((x) => x.id === id || pinFilter(x)) : rowMarkers;
-      const ids = X.peekOrder(m, pool, visible).map((x) => x.id);
-      if (cur) { setPeek(Object.assign({}, cur, { ids, index: 0, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
-      setPeek({ ids, index: 0, camera: camera(), view: api && api.view ? api.view() : null, raised: false, raisedAt: null, focusCard: byKey ? 1 : 0 });
+      const ordered = X.peekOrder(m, pool, null, pool.length);
+      const ids = ordered.map((x) => x.id);
+      const index = Math.max(0, ids.indexOf(id));
+      if (cur) { setPeek(Object.assign({}, cur, { ids, index, focusCard: byKey ? cur.focusCard + 1 : cur.focusCard })); revealChosen(); return; }
+      setPeek({ ids, index, camera: camera(), view: api && api.view ? api.view() : null, raised: false, raisedAt: null, focusCard: byKey ? 1 : 0 });
       revealChosen();
     };
     const peekTo = (i) => {
@@ -416,7 +419,8 @@
         items: peekItems, index: Math.max(0, peekItems.findIndex((m) => m.id === peek.ids[peek.index])), raised: peek.raised,
         hidden: !!sheet, focusCard: peek.focusCard,
         origin: peek.view ? (peek.view.user || peek.view.centre) : null,
-        distWords: peek.view && peek.view.user ? XS : (XS.centre || {}),
+        // km / m alone on the preview card (no "away" / "from the map centre")
+        distWords: (XS.peek && XS.peek.dist) || { under: '< 100 m', metres: (n) => n + ' m', km: (n) => n + ' km' },
         sources,
         onIndex: (i) => { if (peekItems[i]) peekTo(peek.ids.indexOf(peekItems[i].id)); },
         onRaise: raisePeek, onBack: peekBack, onClose: resetLevels, returnFocus: peekReturn,

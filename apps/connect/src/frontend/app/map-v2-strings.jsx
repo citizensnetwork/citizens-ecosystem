@@ -294,7 +294,13 @@
       peek: {
         label: 'On the map here',
         detailsBadge: 'Tap again for details',
-        count: (i, n) => i + ' of ' + n,
+        detailsCue: 'Tap again for details',
+        // compact distance on the preview card (no "away")
+        dist: {
+          under: '< 100 m',
+          metres: (n) => n + ' m',
+          km: (n) => n + ' km',
+        },
         prev: 'Previous on the map',
         next: 'Next on the map',
         back: 'Back',

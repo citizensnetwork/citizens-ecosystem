@@ -361,11 +361,19 @@
     return /online|zoom|livestream|live stream|meet\.google|teams\.microsoft/i.test(bits.filter(Boolean).join(' '));
   }
 
+  /** Light NE-arrow over the photo: a second tap opens details (founder, 2026-11-22). */
+  function DetailsCue() {
+    const Icon = window.Icon;
+    return h('span', { 'data-mv2': 'xcard-cue', 'aria-hidden': 'true' },
+      Icon ? h(Icon, { name: 'ArrowUpRight', size: 16 }) : null);
+  }
+
   function XCard(props) {
     const m = props.m;
     const rec = props.rec || {};
     const group = groupOf(m);
     const words = props.groupWords || {};
+    const peek = !!props.peek;
     const raw = rec.coverPhoto || m.coverPhoto || (m.type === 'contributor' ? m.profilePhoto : '') || '';
     const cover = window.UI && window.UI.safeUrl ? (window.UI.safeUrl(raw) || '') : (/^https?:\/\//i.test(raw) ? raw : '');
     const Icon = window.Icon;
@@ -373,10 +381,18 @@
     const near = window.MapV2Nearby;
     const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
     const when = whenLine(m, rec);
-    const meta = [dist, when].filter(Boolean).join(' · ');
-    const by = m.ownerName ? ((window.MapV2Strings && window.MapV2Strings.sheet && window.MapV2Strings.sheet.by) || 'by') + ' ' + m.ownerName : '';
+    const meta = peek ? '' : [dist, when].filter(Boolean).join(' · ');
+    const owner = m.ownerName ? String(m.ownerName).trim() : '';
+    const catLabel = (cat && cat.name) || (group && words[group]) || '';
+    const catLine = catLabel
+      ? h('span', { 'data-mv2': 'xcard-chip' },
+          peek ? null : h('i', { 'data-cat': group || undefined, 'aria-hidden': 'true' }),
+          h('span', { 'data-mv2': 'card-chip-label' }, catLabel))
+      : null;
     return h('button', {
       type: 'button', 'data-mv2': 'xcard', 'data-explore-id': m.id,
+      'data-peek': peek ? '' : undefined,
+      'data-cat': group || undefined,
       'data-selected': props.selected ? '' : undefined,
       'aria-current': props.selected ? 'true' : undefined,
       onClick: () => props.onOpen && props.onOpen(m.id, m.type),
@@ -384,13 +400,21 @@
       h('span', { 'data-mv2': 'xcard-img' },
         cover ? h('img', { src: cover, alt: '' }) : (Icon ? h(Icon, { name: (cat && cat.icon), size: 22 }) : null),
         m.isLive ? h('span', { 'data-mv2': 'xcard-live' }, h('i', { 'aria-hidden': 'true' }), 'Live') : null,
-        // what the next tap does, in words, over the picture (so choosing a card never changes its size)
-        props.selected && props.badge ? h('span', { 'data-mv2': 'xcard-badge' }, props.badge) : null),
+        // peek: light SVG cue (second tap); explore rows still use the word badge
+        props.selected && props.detailsCue ? h(DetailsCue) : null,
+        props.selected && props.badge ? h('span', { 'data-mv2': 'xcard-badge' }, props.badge) : null,
+        props.selected && props.detailsCue && props.cueLabel
+          ? h('span', { 'data-mv2': 'sr' }, props.cueLabel) : null),
       h('span', { 'data-mv2': 'xcard-body' },
-        (cat && cat.name) || (group && words[group]) ? h('span', { 'data-mv2': 'xcard-chip' }, h('i', { 'data-cat': group || undefined, 'aria-hidden': 'true' }), h('span', { 'data-mv2': 'card-chip-label' }, (cat && cat.name) || words[group])) : null,
+        peek ? null : catLine,
         h('b', null, m.title || ''),
+        peek ? catLine : null,
         meta ? h('small', { 'data-mv2': 'row-meta' }, meta) : null,
-        by ? h('small', { 'data-mv2': 'xcard-by' }, by) : null));
+        peek
+          ? h('span', { 'data-mv2': 'xcard-foot' },
+              owner ? h('small', { 'data-mv2': 'xcard-by' }, owner) : h('span'),
+              dist ? h('small', { 'data-mv2': 'xcard-dist' }, dist) : null)
+          : (owner ? h('small', { 'data-mv2': 'xcard-by' }, owner) : null)));
   }
 
   function XRow(props) {
@@ -757,16 +781,18 @@
         })) : null);
   }
 
-  // ── The pin carousel (founder, 2026-11-18) ───────────────────────────
-  // A pin tapped on the map home opens a row of cards at the foot of the map: that pin's card first, then the other pins
-  // in view, nearest to it first (so a swipe walks to the next pin along). The same cards as the Explore row (XCard).
-  // Swiping, the arrows or a tap on a neighbour choose a card, and its pin lights on the map. A second tap on the chosen
-  // card raises the panel, with that card's details (the listing sheet, inline) below the cards. The levels and their
-  // history entries belong to the map screen (home.jsx); this component only draws them and reports what was asked.
+  // ── The pin carousel (founder, 2026-11-18; polish 2026-11-22) ─────────
+  // A pin tapped on the map home opens a row of cards at the foot of the map: that pin centred among its province
+  // neighbours (nearest alternating left/right), with wrap so either swipe direction always has a card. The same cards
+  // as the Explore row (XCard). Swiping, the arrows or a tap on a neighbour choose a card, and its pin lights on the
+  // map. A second tap on the chosen card raises the panel, with that card's details (the listing sheet, inline) below
+  // the cards. The levels and their history entries belong to the map screen (home.jsx); this component only draws
+  // them and reports what was asked.
 
   /**
-   * The carousel's order: `target` first, then the other listings in `visible` (ids; null = every one), nearest to the
-   * target first (rank()'s order), at most `cap` cards in all. Ideas are not listings and never appear. Returns markers.
+   * The carousel's order for the province pool: the tapped pin in the middle, then its nearest neighbours alternating
+   * right then left (so a swipe either way has a card), at most `cap` cards in all. `visible` (ids; null = every one
+   * in `markers`) still scopes the pool when given. Ideas never appear. Returns markers.
    */
   function peekOrder(target, markers, visible, cap) {
     if (!target) return [];
@@ -774,7 +800,14 @@
     const vis = Array.isArray(visible) ? new Set(visible) : null;
     const pool = (Array.isArray(markers) ? markers : [])
       .filter((m) => m && m.id !== target.id && m.type !== 'idea' && (!vis || vis.has(m.id)));
-    return [target].concat(rank(target, pool, null, Math.max(0, max - 1)).slice(0, Math.max(0, max - 1)).map((r) => r.m));
+    const others = rank(target, pool, null, Math.max(0, max - 1)).slice(0, Math.max(0, max - 1)).map((r) => r.m);
+    // nearest alternate onto the right, then the left, so the target sits with neighbours either side
+    const out = [target];
+    for (let i = 0; i < others.length; i++) {
+      if (i % 2 === 0) out.push(others[i]);
+      else out.unshift(others[i]);
+    }
+    return out;
   }
 
   /** Which card's middle is closest to `mid` (the row's middle, in the row's scroll coordinates)? -1 for no cards. */
@@ -807,6 +840,7 @@
     const fromSwipe = useRef(false);
     const mounted = useRef(false);
     const pull = useRef(null);
+    const swipeStart = useRef(null);
     const swallow = useRef(false);
     const back = useRef(props.onBack);
     back.current = props.onBack;
@@ -894,7 +928,8 @@
       if (i !== index) { props.onIndex(i); return; }
       if (!raised) props.onRaise();
     };
-    const step = (d) => { const i = index + d; if (i >= 0 && i < n) props.onIndex(i); };
+    // wrap: province items loop, so either direction always has a neighbour when there is more than one
+    const step = (d) => { if (n > 1) props.onIndex((index + d + n) % n); };
     const meters = (m) => (props.origin && near ? near.metersBetween(props.origin, m) : NaN);
     const iconBtn = (attrs, icon, word) => h('button', Object.assign({ type: 'button' }, attrs),
       Icon ? h(Icon, { name: icon, size: 18 }) : null, word ? h('span', null, word) : null);
@@ -906,23 +941,35 @@
     },
       h('div', { 'data-mv2': 'pinpeek-bar' },
         raised ? iconBtn({ 'data-mv2': 'pinpeek-back', onClick: props.onBack }, 'ChevronLeft', P.back) : null,
-        h('span', { 'data-mv2': 'pinpeek-count', role: 'status', 'aria-live': 'polite' },
-          n > 1 && P.count ? P.count(index + 1, n) : '',
-          current ? h('span', { 'data-mv2': 'sr' }, ' ' + (current.title || '')) : null),
+        h('span', { 'data-mv2': 'pinpeek-status', role: 'status', 'aria-live': 'polite' },
+          current ? h('span', { 'data-mv2': 'sr' }, current.title || '') : null),
         raised ? h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }) : null,
         iconBtn({ 'data-mv2': 'pinpeek-close', 'aria-label': P.close, onClick: props.onClose }, 'X')),
       h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
-        n > 1 && index > 0 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
+        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
         h('div', {
           ref: row, 'data-mv2': 'xrow', 'data-row': 'peek', onScroll: onRowScroll,
-          onPointerDownCapture: touch, onTouchStart: touch, onWheel: touch,
+          onPointerDownCapture: touch, onTouchStart: (e) => {
+            touch();
+            if (e.touches && e.touches[0]) swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, index: indexRef.current };
+          }, onTouchEnd: (e) => {
+            const start = swipeStart.current;
+            swipeStart.current = null;
+            if (!start || !e.changedTouches || !e.changedTouches.length || n < 2) return;
+            const dx = e.changedTouches[0].clientX - start.x;
+            const dy = e.changedTouches[0].clientY - start.y;
+            if (Math.abs(dx) <= Math.abs(dy)) return;
+            if (start.index === 0 && dx > 40) { touched.current = false; props.onIndex(n - 1); }
+            else if (start.index === n - 1 && dx < -40) { touched.current = false; props.onIndex(0); }
+          }, onWheel: touch,
         }, items.map((m, i) => h(XCard, {
           key: 'peek:' + m.id, m: m, meters: meters(m), rec: byKey.get(m.type + ':' + m.id),
           groupWords: str.groups, distWords: props.distWords || {},
-          selected: i === index, badge: raised ? '' : P.detailsBadge,
+          peek: true, selected: i === index,
+          detailsCue: !raised, cueLabel: P.detailsCue || P.detailsBadge || '',
           onOpen: tap,
         }))),
-        n > 1 && index < n - 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
+        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
       raised && current && props.details ? h('div', {
         'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
       }, props.details(current)) : null);

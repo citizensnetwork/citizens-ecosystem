@@ -175,26 +175,30 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       expect(pins.length).toBeGreaterThanOrEqual(3);
       await tapPin(page, pins[0]);
       await expect(peek(page)).toBeVisible();
-      await expect(cards(page).first()).toHaveAttribute("data-explore-id", pins[0]);
+      // chosen card is the tapped pin (centred among neighbours); not necessarily the first DOM card
       await expect(chosenCard(page)).toHaveAttribute("data-explore-id", pins[0]);
       await expect(pinSelected(page, pins[0])).toBeAttached();
       expect(await cards(page).count()).toBeGreaterThanOrEqual(3);
+      const chosenIdx = await cards(page).evaluateAll((els) => els.findIndex((e) => e.hasAttribute("data-selected")));
+      expect(chosenIdx).toBeGreaterThan(0);
+      expect(chosenIdx).toBeLessThan((await cards(page).count()) - 1);
+      await expect(chosenCard(page).locator("[data-mv2='xcard-cue']")).toBeVisible();
+      await expect(page.locator("[data-mv2='pinpeek-count']")).toHaveCount(0);
       // one history entry for the level
       expect((await depth(page)).idx).toBe(before.idx + 1);
       await still(page);
       await shot(page, `${size.name}-2-carousel`);
 
-      // the arrow chooses the next card, and its pin lights instead
+      // both arrows stay available (wrap); next chooses a neighbour and its pin lights
+      await expect(page.getByRole("button", { name: "Previous on the map" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Next on the map" })).toBeVisible();
       await page.getByRole("button", { name: "Next on the map" }).click();
-      const second = await cards(page).nth(1).getAttribute("data-explore-id");
-      await expect(chosenCard(page)).toHaveAttribute("data-explore-id", second!);
-      await expect(pinSelected(page, second!)).toBeAttached();
+      await expect.poll(async () => (await chosenCard(page).getAttribute("data-explore-id")) !== pins[0], { timeout: 5_000 }).toBe(true);
+      const nextId = await chosenCard(page).getAttribute("data-explore-id");
+      await expect(pinSelected(page, nextId!)).toBeAttached();
       await expect(pinSelected(page, pins[0])).toHaveCount(0);
-      await expect(page.locator("[data-mv2='pinpeek-count']")).toContainText("2 of");
       await page.getByRole("button", { name: "Previous on the map" }).click();
       await expect(chosenCard(page)).toHaveAttribute("data-explore-id", pins[0]);
-      // no arrow points past either end
-      await expect(page.getByRole("button", { name: "Previous on the map" })).toHaveCount(0);
 
       // a sideways swipe (a trackpad's sideways wheel here) chooses the card it settles on
       const row = page.locator("[data-row='peek']");
@@ -239,7 +243,8 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
         m.on("moveend", () => log.push(stamp() + " moveend moving=" + m.isMoving()));
         m.on("resize", () => log.push(stamp() + " resize-event"));
       });
-      // the chosen card says what its next tap does; that tap raises the panel
+      // the chosen card shows the details cue (SVG + sr text); that tap raises the panel
+      await expect(chosenCard(page).locator("[data-mv2='xcard-cue']")).toBeVisible();
       await expect(chosenCard(page)).toContainText("Tap again for details");
       await chosenCard(page).click();
       await expect(peek(page)).toHaveAttribute("data-raised", "");
@@ -293,10 +298,11 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await expect.poll(async () => (await depth(page)).idx).toBe(start.idx + 1);
       // a pull down on the lowered carousel closes it
       await still(page);
-      const bar = (await page.locator("[data-mv2='pinpeek-count']").boundingBox())!;
-      await page.mouse.move(bar.x + 10, bar.y + bar.height / 2);
+      // pull down on the lowered carousel (use the card row; the counter is gone and Close floats)
+      const rowBox = (await page.locator("[data-row='peek']").boundingBox())!;
+      await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + 20);
       await page.mouse.down();
-      await page.mouse.move(bar.x + 10, bar.y + 90, { steps: 6 });
+      await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + 110, { steps: 6 });
       await page.mouse.up();
       await expect(peek(page)).toHaveCount(0);
       await expect.poll(async () => (await depth(page)).idx).toBe(start.idx);
