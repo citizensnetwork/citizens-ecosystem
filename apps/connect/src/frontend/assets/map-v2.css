@@ -4801,7 +4801,7 @@ a[data-mv2='card2'],
   color: var(--text-2);
   font-size: 11px;
   line-height: 1.2;
-  font-weight: var(--fw-medium);
+  font-weight: var(--fw-regular);
   opacity: 0.75;
 }
 [data-mv2='report-compact'] [data-mv2='action'] svg {
