@@ -29,6 +29,22 @@ type Script = {
   slugFromUrl_: (url: string) => string;
   setup: () => void;
   Q: Record<string, string>;
+  WEB_EXTRA: Record<string, string>;
+  WEB_KINDS: string[];
+  WEB_CATEGORIES: string[];
+  WEB_APPS: Record<string, boolean>;
+  parseWebIntake_: (body: Record<string, unknown>) => {
+    ok: boolean;
+    skip?: boolean;
+    error?: string;
+    app?: string;
+    nonce?: string;
+    answers?: Record<string, string>;
+    images?: { logo: { mime: string; base64: string } | null; cover: { mime: string; base64: string } | null };
+  };
+  appendWebRow_: (sheet: unknown, record: { app: string; answers: Record<string, string> }) => number;
+  checkWebImage_: (image: { mime: string; base64: string }) => { error?: boolean; mime?: string; bytes?: number[] };
+  doPost: (e: { parameter?: Record<string, string> }) => { html?: string; text?: string };
 };
 
 let fetchCalls: { url: string; opts: Record<string, unknown> }[];
@@ -43,17 +59,21 @@ let triggersDeleted: string[];
 let existingTriggers: string[];
 
 function load(): Script {
+  const cacheStore: Record<string, string> = {};
   const google = {
     Utilities: {
       // Apps Script returns Java-style SIGNED bytes.
       computeHmacSha256Signature: (value: string, key: string) =>
         Array.from(createHmac("sha256", key).update(value, "utf8").digest()).map((b) => (b > 127 ? b - 256 : b)),
       base64Encode: (bytes: number[]) => Buffer.from(bytes).toString("base64"),
+      base64Decode: (b64: string) => Array.from(Buffer.from(b64, "base64")),
+      newBlob: (bytes: number[], mime: string, name: string) => ({ bytes, mime, name, getId: () => name }),
     },
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (k: string) =>
           ({ INTAKE_URL: "https://www.citizenscentral.co.za/api/intake/google-form", INTAKE_SECRET: SECRET })[k] ?? null,
+        setProperty: () => {},
       }),
     },
     UrlFetchApp: {
@@ -71,6 +91,8 @@ function load(): Script {
         getSize: () => 4,
         getBlob: () => ({ getBytes: () => [0x89, 0x50, 0x4e, id.length], getContentType: () => "image/png" }),
       }),
+      getFolderById: () => ({ createFile: (blob: { name: string }) => ({ getId: () => "file-" + blob.name }) }),
+      createFolder: () => ({ getId: () => "folder-1", createFile: (blob: { name: string }) => ({ getId: () => "file-" + blob.name }) }),
     },
     Maps: {
       newGeocoder: () => ({
@@ -82,6 +104,7 @@ function load(): Script {
     MailApp: { sendEmail: (m: Record<string, string>) => sentMail.push(m) },
     ScriptApp: {
       getOAuthToken: () => "token",
+      getService: () => ({ getUrl: () => "https://script.google.com/macros/s/TESTKEY/exec" }),
       getProjectTriggers: () => existingTriggers.map((fn) => ({ getHandlerFunction: () => fn, id: fn })),
       deleteTrigger: (t: { id: string }) => triggersDeleted.push(t.id),
       newTrigger: (fn: string) => {
@@ -100,12 +123,27 @@ function load(): Script {
     LockService: {
       getScriptLock: () => ({ tryLock: () => lockTaken, releaseLock: () => { lockReleased = true; } }),
     },
+    CacheService: {
+      getScriptCache: () => ({
+        get: (k: string) => (k in cacheStore ? cacheStore[k] : null),
+        put: (k: string, v: string) => { cacheStore[k] = String(v); },
+      }),
+    },
+    HtmlService: {
+      createHtmlOutput: (html: string) => ({ html }),
+      createTemplateFromFile: () => ({ evaluate: () => ({ setTitle: () => ({ setXFrameOptionsMode: () => ({}) }) }) }),
+      XFrameOptionsMode: { ALLOWALL: "ALLOWALL" },
+    },
+    ContentService: {
+      createTextOutput: (text: string) => ({ text, setMimeType: () => ({ text }) }),
+      MimeType: { JSON: "application/json" },
+    },
     Logger: { log: vi.fn() },
   };
   const names = Object.keys(google);
   const factory = new Function(
     ...names,
-    `${SRC}\nreturn { post_, columns_, buildPayload_, autoUpdateLevel_, sendWelcome_, intakeOutcome_, pollOutcome_, refreshStatuses, processRow_, awaitingStatus_, isOpenStatus_, isFinishedStatus_, slugFromUrl_, setup, Q };`,
+    `${SRC}\nreturn { post_, columns_, buildPayload_, autoUpdateLevel_, sendWelcome_, intakeOutcome_, pollOutcome_, refreshStatuses, processRow_, awaitingStatus_, isOpenStatus_, isFinishedStatus_, slugFromUrl_, setup, Q, WEB_EXTRA, WEB_KINDS, WEB_CATEGORIES, WEB_APPS, parseWebIntake_, appendWebRow_, checkWebImage_, doPost };`,
   );
   return factory(...names.map((n) => google[n as keyof typeof google])) as Script;
 }
@@ -609,5 +647,180 @@ describe("intake.gs Status (C10)", () => {
       "https://www.citizenscentral.co.za/api/intake/google-form/status",
       "https://www.citizenscentral.co.za/api/intake/google-form/resend",
     ]);
+  });
+});
+
+describe("intake.gs join page", () => {
+  const NONCE = "abcdef0123456789abcdef0123456789";
+
+  function joinHeaders(script: Script) {
+    const questions = [
+      ...Object.values(script.Q),
+      ...Object.values(script.WEB_EXTRA).filter((phrase) => phrase !== script.WEB_EXTRA.delivery),
+    ];
+    return [
+      "Timestamp",
+      "Email Address",
+      ...questions.map((phrase, i) => `Question ${i + 1}.1: ${phrase}`),
+      "Approve",
+      "Status",
+      "Listing URL",
+      "Processed at",
+      "Notes",
+      "Source",
+      "App",
+      "Extra",
+    ];
+  }
+
+  function essentials(script: Script, extra: Record<string, string> = {}) {
+    return {
+      app: "connect",
+      nonce: NONCE,
+      company_url: "",
+      answers: {
+        [script.WEB_EXTRA.fullName]: "Amina Example",
+        [script.Q.ownerEmail]: "amina@example.com",
+        [script.Q.name]: "Example Fellowship",
+        [script.Q.type]: "Church",
+        [script.Q.category]: "Church",
+        [script.Q.faith]: "We affirm Citizens' Christian identity.",
+        [script.Q.permission]: "I consent to publish the listing details.",
+        ...extra,
+      } as Record<string, string>,
+    };
+  }
+
+  function posted(result: { html?: string }) {
+    const match = result.html?.match(/parent\.postMessage\((\{.*\}),"\*"\);/);
+    if (!match) throw new Error(result.html || "no html reply");
+    return JSON.parse(match[1]) as { source: string; nonce: string; result: { ok: boolean; error?: string; app?: string } };
+  }
+
+  it("accepts Connect and Wear, and refuses an app that is not open", () => {
+    const script = load();
+    const ok = script.parseWebIntake_(essentials(script));
+    expect(ok.ok).toBe(true);
+    expect(ok.app).toBe("connect");
+    expect(ok.answers?.[script.Q.type]).toBe("Church");
+    expect(script.WEB_APPS.vision).toBe(false);
+    expect(script.parseWebIntake_({ ...essentials(script), app: "vision" })).toMatchObject({ ok: false });
+    expect(script.parseWebIntake_({ ...essentials(script), app: "wear" }).app).toBe("wear");
+  });
+
+  it("requires the essentials, and will not store a refusal as consent", () => {
+    const script = load();
+    const missing = essentials(script);
+    delete missing.answers[script.Q.ownerEmail];
+    expect(script.parseWebIntake_(missing).ok).toBe(false);
+    expect(script.parseWebIntake_(essentials(script, { [script.Q.permission]: "No" })).ok).toBe(false);
+    expect(script.parseWebIntake_(essentials(script, { [script.Q.faith]: "No" })).ok).toBe(false);
+    const fixed = script.parseWebIntake_(essentials(script, { [script.Q.fixed]: "Yes, people can visit" }));
+    expect(fixed.answers?.[script.Q.fixed]).toBe("Yes");
+    expect(script.parseWebIntake_(essentials(script, { [script.Q.fixed]: "Sometimes" })).ok).toBe(false);
+    const site = script.parseWebIntake_(essentials(script, { [script.Q.website]: "example.com" }));
+    expect(site.answers?.[script.Q.website]).toBe("https://example.com");
+    const auto = script.parseWebIntake_(essentials(script, { [script.Q.autoUpdate]: "Yes, and publish events automatically" }));
+    expect(auto.answers?.[script.Q.autoUpdate]).toBe("Yes, and publish events automatically");
+    expect(script.parseWebIntake_(essentials(script, { [script.Q.autoUpdate]: "Perhaps later" })).ok).toBe(false);
+  });
+
+  it("drops a honeypot submission and checks a photo by its bytes", () => {
+    const script = load();
+    expect(script.parseWebIntake_({ company_url: "https://spam.example", nonce: NONCE })).toMatchObject({ ok: true, skip: true });
+    theSheet = makeSheet(joinHeaders(script), []);
+    const skipped = posted(script.doPost({
+      parameter: { payload: JSON.stringify({ company_url: "https://spam.example", nonce: NONCE }), reply: "html" },
+    }));
+    expect(skipped.result.ok).toBe(true);
+    expect(theSheet.grid).toHaveLength(1);
+    expect(fetchCalls).toHaveLength(0);
+
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xd9]).toString("base64");
+    expect(script.checkWebImage_({ mime: "image/jpeg", base64: jpeg }).mime).toBe("image/jpeg");
+    expect(script.checkWebImage_({ mime: "image/png", base64: jpeg }).error).toBe(true);
+    const huge = script.parseWebIntake_({
+      ...essentials(script),
+      images: { logo: { mime: "image/jpeg", base64: "A".repeat(2_100_000) } },
+    });
+    expect(huge.ok).toBe(false);
+  });
+
+  it("writes Approve unticked, leaves the Google email blank, and keeps a Wear-only answer", () => {
+    const script = load();
+    const headers = joinHeaders(script);
+    theSheet = makeSheet(headers, []);
+    const parsed = script.parseWebIntake_({
+      ...essentials(script),
+      app: "wear",
+      answers: { ...essentials(script).answers, [script.WEB_EXTRA.delivery]: "Collect in Pretoria" },
+    });
+    expect(parsed.ok).toBe(true);
+    script.appendWebRow_(theSheet, { app: parsed.app || "", answers: parsed.answers || {} });
+    const col = (name: string) => headers.indexOf(name) + 1;
+    expect(theSheet.writes.some((w) => w.col === col("Email Address"))).toBe(false);
+    expect(theSheet.writes.find((w) => w.col === col("Approve"))?.value).toBe(false);
+    expect(theSheet.writes.find((w) => w.col === col("Source"))?.value).toBe("web-form");
+    expect(theSheet.writes.find((w) => w.col === col("App"))?.value).toBe("wear");
+    expect(String(theSheet.writes.find((w) => w.col === col("Extra"))?.value)).toContain("Collect in Pretoria");
+    expect(fetchCalls).toHaveLength(0);
+    expect(sentMail).toHaveLength(0);
+  });
+
+  it("does not publish a Wear row, and still publishes a Connect row", () => {
+    const script = load();
+    const headers = joinHeaders(script);
+    const wear: unknown[] = headers.map(() => "");
+    wear[headers.indexOf("Approve")] = true;
+    wear[headers.indexOf("App")] = "wear";
+    theSheet = makeSheet(headers, [wear]);
+    script.processRow_(theSheet, script.columns_(theSheet), 2);
+    expect(fetchCalls).toHaveLength(0);
+    expect(sentMail).toHaveLength(0);
+    expect(theSheet.grid[1][headers.indexOf("Status")].v).toBe("Held");
+    expect(theSheet.grid[1][headers.indexOf("Approve")].v).toBe(false);
+
+    const connect: unknown[] = headers.map(() => "");
+    connect[headers.indexOf("Approve")] = true;
+    connect[headers.indexOf("App")] = "connect";
+    theSheet = makeSheet(headers, [connect]);
+    fetchCalls.length = 0;
+    script.processRow_(theSheet, script.columns_(theSheet), 2);
+    expect(fetchCalls).toHaveLength(1);
+    expect(fetchCalls[0].url).toBe("https://www.citizenscentral.co.za/api/intake/google-form");
+  });
+
+  it("doPost appends one row, echoes nothing private, and keeps a second tap as the same row", () => {
+    const script = load();
+    theSheet = makeSheet(joinHeaders(script), []);
+    const out = posted(script.doPost({
+      parameter: { payload: JSON.stringify(essentials(script)), reply: "html" },
+    }));
+    expect(out).toMatchObject({ source: "citizens-intake", nonce: NONCE, result: { ok: true, app: "connect" } });
+    expect(theSheet.grid).toHaveLength(2);
+    expect(fetchCalls).toHaveLength(0);
+    expect(sentMail).toHaveLength(0);
+
+    const again = posted(script.doPost({
+      parameter: { payload: JSON.stringify(essentials(script)), reply: "html" },
+    }));
+    expect(again.result.ok).toBe(true);
+    expect(theSheet.grid).toHaveLength(2);
+  });
+
+  it("stops accepting once this minute's submissions are in", () => {
+    const script = load();
+    theSheet = makeSheet(joinHeaders(script), []);
+    for (let i = 0; i < 30; i++) {
+      const body = essentials(script);
+      body.answers[script.Q.ownerEmail] = `person${i}@example.com`;
+      const out = posted(script.doPost({ parameter: { payload: JSON.stringify(body), reply: "html" } }));
+      expect(out.result.ok, String(i)).toBe(true);
+    }
+    const blocked = essentials(script);
+    blocked.answers[script.Q.ownerEmail] = "overflow@example.com";
+    const out = posted(script.doPost({ parameter: { payload: JSON.stringify(blocked), reply: "html" } }));
+    expect(out.result.ok).toBe(false);
+    expect(out.result.error).toMatch(/wait a minute/);
   });
 });

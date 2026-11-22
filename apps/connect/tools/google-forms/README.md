@@ -22,7 +22,8 @@ Owner signs in with that email (6-digit code, or Google) → Connect asks "Confi
 
 | File | What it is |
 |---|---|
-| `intake.gs` | The Apps Script bound to the responses Sheet (this pipeline). |
+| `intake.html` | The join page. People fill this instead of the Google Form. It writes the same sheet. |
+| `intake.gs` | The Apps Script bound to the responses Sheet (this pipeline, and the join page). |
 | `create-contributor-application-form.gs` | **Superseded.** The old form builder; the live Form was built by hand. |
 | `apps/connect/src/app/api/intake/google-form/route.ts` | The Connect endpoint it calls. |
 | `apps/connect/src/app/api/intake/google-form/status/route.ts` | The read-only status endpoint the 10-minute poll calls. |
@@ -56,9 +57,9 @@ Owner signs in with that email (6-digit code, or Google) → Connect asks "Confi
    work.
    - Click into the code area and select everything (Ctrl+A), including the placeholder
      `function myFunction() { … }`, then delete it.
-   - Paste the **entire contents** of `intake.gs`: all ~410 lines, from the opening `/**` comment to
-     the last `}`. `intake.gs` is the name of the file whose code you paste in. You don't type it
-     anywhere. The file's name in the left sidebar doesn't matter.
+   - Paste the **entire contents** of `intake.gs`, from the opening `/**` comment to the last `}`.
+     `intake.gs` is the name of the file whose code you paste in. You don't type it anywhere.
+     The file's name in the left sidebar doesn't matter.
    - Save with Ctrl+S or the disk icon.
 6. **Script properties.** In the Apps Script editor, go to Project Settings (gear) → Script
    properties → Add:
@@ -95,13 +96,46 @@ Owner signs in with that email (6-digit code, or Google) → Connect asks "Confi
 
 ---
 
+## The join page
+
+`intake.html` is the page people fill in. It is one file. The first section is enough to be added
+(name, sign-in email, the name people should see, how they're set up, what they do, and the two
+consents). Each later section has **Finish and submit** as well as Continue, so someone can stop
+when they've given enough. A line on every section asks them to share more if they can.
+
+The page posts to this script's web app. `doPost` appends one row on **Form Responses 1** and
+never ticks **Approve**. A Connect row is approved the same way as a Google Form row. A Wear row
+is stored with **App** = `wear`; ticking Approve sets **Held** and sends nothing to Connect.
+
+The Google account column (Email Address) is left blank on these rows, on purpose: the person did
+not sign in with Google, so that column is not a verified address. **Source** says `web-form`.
+Confirm the owner email before you approve a Connect row.
+
+Deploy it once, after the script above is pasted:
+
+1. In the Apps Script editor: **+** → **HTML** → name the file `intake` (no `.html`). Paste the
+   entire contents of `intake.html`.
+2. **Deploy** → **New deployment** → gear → **Web app**.
+   - Execute as: **Me**.
+   - Who has access: **Anyone** (the choice that includes people without a Google account).
+3. Authorise it. Copy the URL that ends in `/exec`.
+4. In the editor, pick **`webAppUrl`** and Run. The sheet toasts that same URL.
+5. Share that URL. Add `?app=wear` or `?app=connect` when a button on that app should open the
+   matching form. `?app=vision` (and Learn, Play, Move, Impact) stays on Connect and says that app
+   isn't open yet. The page is white, black and gold; Wear shifts the gold to Wear's own accent.
+
+Until this deployment exists, opening the file from the repo shows the form but cannot write to the
+sheet. Re-paste `intake.html` when the page changes, and deploy a new version (Manage deployments →
+pencil → New version). The `/exec` URL stays the same.
+
 ## Approving a Contributor (every time)
 
 Before you tick **Approve**, check:
 
 - **Column B = column E?** B is the Google account that actually submitted the Form; E is the
   owner's email the listing will belong to. If they differ, the submitter may not control that inbox.
-  Confirm with them first: anyone can fill in a public Form.
+  Confirm with them first: anyone can fill in a public Form. A row from the join page leaves B blank
+  on purpose (**Source** is `web-form`); confirm E with the person, then approve.
 - The name and category look right. (If the owner's email already has a plain citizen account, nothing
   goes live yet: they get a confirmation link and the row waits on **Awaiting confirmation**. An
   administrator or someone with an application in progress is refused. Admin → Create still uses the
@@ -254,7 +288,8 @@ The account menu's **Claim a Contributor listing** reopens the same screen by ha
 
 > **After you change `intake.gs` in the repo, re-paste it into the Sheet's Apps Script** (one-time
 > setup, step 5), then run `setup` once more so the 10-minute status trigger exists. The welcome email
-> and the Status lines only change once the Sheet's copy of the script does. (C10 changed the script:
+> and the Status lines only change once the Sheet's copy of the script does. Re-paste `intake.html`
+> too when the join page changes, and deploy a new web-app version. (C10 changed the script:
 > new Status values, the `refreshStatuses` poll, and a welcome that says "confirm the listing is yours".)
 
 > **The 6-digit email must carry the code.** In Supabase → Authentication → Email Templates, both the

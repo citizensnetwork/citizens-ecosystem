@@ -20,9 +20,13 @@
  * server sends the welcome only after they confirm — this script must not
  * send a second one. Tick Resend to email the confirm link again (same expiry).
  *
- * Setup: see README.md in this folder (run setup() once).
+ * The join page (intake.html) is a second way into the SAME sheet. doGet serves
+ * that page; doPost appends one row and never ticks Approve. A Wear row is
+ * stored and then refused here, so Approve cannot publish it on Connect.
+ * Setup: see README.md in this folder (run setup() once, then deploy the web app).
  * Server side: apps/connect/src/app/api/intake/google-form/route.ts.
- * Secrets live in Script properties (INTAKE_URL, INTAKE_SECRET) — never here.
+ * Secrets live in Script properties (INTAKE_URL, INTAKE_SECRET) — never here,
+ * and never in intake.html.
  */
 
 var SHEET_NAME = 'Form Responses 1';
@@ -41,6 +45,7 @@ var STATUS_ERROR = 'Error';
 var STATUS_AWAITING_CONFIRMATION = 'Awaiting confirmation';
 var STATUS_DECLINED = 'Declined';
 var STATUS_EXPIRED = 'Expired';
+var STATUS_HELD = 'Held'; // web-form row for an app Approve must not publish (Wear)
 
 // Connect answers for at most this many listings per call (MAX_SLUGS in the status route).
 var STATUS_BATCH = 200;
@@ -49,7 +54,49 @@ var STATUS_BATCH = 200;
 // Request id and Resend are optional so a sheet that has not been updated
 // still approves new accounts. setup() and onEdit append them.
 var MANUAL_HEADERS = ['Approve', 'Status', 'Listing URL', 'Processed at', 'Notes'];
-var OPTIONAL_HEADERS = ['Request id', 'Resend'];
+var OPTIONAL_HEADERS = ['Request id', 'Resend', 'Source', 'App', 'Extra'];
+
+// Join-page answers that are NOT sent to Connect (vetting, or a later app).
+// A missing column is not an error: the answer is kept in Extra instead.
+var WEB_EXTRA = {
+  fullName: 'applicant full name',
+  role: 'your role in the organisation',
+  phone: 'applicant phone number',
+  areas: 'which area',
+  team: 'team members to invite',
+  events: 'regular events or have venues',
+  heard: 'how did you hear',
+  delivery: 'delivery options',
+};
+
+// Labels Connect already accepts (googleForm.ts). The join page must send these.
+var WEB_KINDS = ['Church', 'Christian Nonprofit / Ministry', 'Christian Business', 'Individual'];
+var WEB_CATEGORIES = [
+  'Church', 'Outreach / Mission', 'Market / Expo', 'Business', 'Sport & Recreation',
+  'Social Gathering', 'Arts & Culture', 'Media', 'Retreat / Healing', 'Clinic',
+  'Education / Equipping', 'Rehab / Development',
+];
+var WEB_FIXED_YES = 'Yes';
+var WEB_FIXED_NO = "No, we're online, mobile or have no permanent office";
+var WEB_AUTO = [
+  'No thanks',
+  'Yes, suggest updates for my approval',
+  'Yes, and publish events automatically',
+];
+
+// Open for the join page. Locked apps stay in the list so the page can show them,
+// but doPost refuses them. A later app is one line here plus a theme in intake.html.
+var WEB_APPS = {
+  connect: true,
+  wear: true,
+  vision: false,
+  learn: false,
+  play: false,
+  move: false,
+  impact: false,
+};
+var WEB_PER_MINUTE = 30;
+var WEB_MAX_BODY = 4000000;
 
 // Form columns are found by the WORDING of each question (the text after
 // "Question N.N:"), never by position or number — Google inserts columns
@@ -184,6 +231,17 @@ function processRow_(sheet, cols, row) {
   if (val('Approve') !== true) return;
   var status = str('Status');
   if (isFinishedStatus_(status)) return; // already done / waiting for its owner / in flight
+
+  // Blank App is a Google Form row (Connect). Anything else is queued, not published.
+  var appName = str('App').toLowerCase();
+  if (appName && appName !== 'connect') {
+    sheet.getRange(row, cols.Status).setValue(STATUS_HELD);
+    sheet.getRange(row, cols.Approve).setValue(false);
+    sheet.getRange(row, cols.Notes).setValue(
+      'This row is a ' + appName + ' application. Approve publishes a Connect listing only, so nothing was sent.'
+    );
+    return;
+  }
 
   var cell = function (header, value) { sheet.getRange(row, cols[header]).setValue(value); };
   cell('Status', STATUS_PROCESSING);
@@ -683,4 +741,399 @@ function columns_(sheet) {
   });
   if (problems.length) throw new Error('Sheet columns: ' + problems.join('; '));
   return cols;
+}
+
+// ── Join page (intake.html) ──────────────────────────────────────────────
+// Public doGet / doPost. The page never sees INTAKE_SECRET. Approve stays false.
+
+function normWeb_(s) {
+  return String(s == null ? '' : s).replace(/[\u2018\u2019]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function cleanLine_(value, max) {
+  return String(value == null ? '' : value).replace(/[\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function cleanBlock_(value, max) {
+  return String(value == null ? '' : value)
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, max);
+}
+
+function canonical_(list, raw) {
+  var want = normWeb_(raw);
+  if (!want) return '';
+  for (var i = 0; i < list.length; i++) {
+    if (normWeb_(list[i]) === want) return list[i];
+  }
+  return '';
+}
+
+function safeNonce_(value) {
+  var s = String(value || '');
+  if (!s) return '';
+  return /^[A-Za-z0-9_-]{8,80}$/.test(s) ? s : '';
+}
+
+var WEB_EMAIL = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,189}\.[A-Za-z]{2,24}$/;
+
+function knownWebPhrases_() {
+  var known = {};
+  Object.keys(Q).forEach(function (k) { known[Q[k]] = true; });
+  Object.keys(WEB_EXTRA).forEach(function (k) { known[WEB_EXTRA[k]] = true; });
+  return known;
+}
+
+function takeWeb_(raw, known, phrase) {
+  if (!known[phrase] || !raw || !Object.prototype.hasOwnProperty.call(raw, phrase)) return '';
+  return raw[phrase];
+}
+
+/** Shape and consent checks for one join-page submission. Does not touch the sheet. */
+function parseWebIntake_(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'This form could not be read. Please try again.' };
+  }
+  if (cleanLine_(body.company_url, 200)) return { ok: true, skip: true, nonce: safeNonce_(body.nonce) };
+  if (body.nonce && !safeNonce_(body.nonce)) {
+    return { ok: false, error: 'This form could not be read. Please try again.' };
+  }
+  var nonce = safeNonce_(body.nonce);
+  var app = normWeb_(body.app);
+  if (!Object.prototype.hasOwnProperty.call(WEB_APPS, app)) {
+    return { ok: false, error: 'Tell us which Citizens app you are joining.' };
+  }
+  if (!WEB_APPS[app]) return { ok: false, error: 'That Citizens app is not open for applications yet.' };
+
+  var raw = body.answers;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: 'This form could not be read. Please try again.' };
+  }
+  if (Object.keys(raw).length > 40) return { ok: false, error: 'This form could not be read. Please try again.' };
+  var known = knownWebPhrases_();
+  var answers = {};
+
+  var fullName = cleanLine_(takeWeb_(raw, known, WEB_EXTRA.fullName), 120);
+  if (fullName.length < 2) return { ok: false, error: 'Add your name.' };
+  answers[WEB_EXTRA.fullName] = fullName;
+
+  var email = cleanLine_(takeWeb_(raw, known, Q.ownerEmail), 254).toLowerCase();
+  if (!WEB_EMAIL.test(email)) return { ok: false, error: 'Add the email you will sign in with.' };
+  answers[Q.ownerEmail] = email;
+
+  var listing = cleanLine_(takeWeb_(raw, known, Q.name), 120);
+  if (listing.length < 2) return { ok: false, error: 'Add the name people should see.' };
+  answers[Q.name] = listing;
+
+  var kind = canonical_(WEB_KINDS, takeWeb_(raw, known, Q.type));
+  if (!kind) return { ok: false, error: 'Choose how you are set up.' };
+  answers[Q.type] = kind;
+
+  var category = canonical_(WEB_CATEGORIES, takeWeb_(raw, known, Q.category));
+  if (!category) return { ok: false, error: 'Choose what you do.' };
+  answers[Q.category] = category;
+
+  var faith = cleanLine_(takeWeb_(raw, known, Q.faith), 500);
+  if (!faith || /^no\b/i.test(faith)) {
+    return { ok: false, error: 'Faith alignment is needed before this can be saved.' };
+  }
+  answers[Q.faith] = faith;
+
+  var permission = cleanLine_(takeWeb_(raw, known, Q.permission), 500);
+  if (!permission || /^no\b/i.test(permission)) {
+    return { ok: false, error: 'Permission to publish is needed before this can be saved.' };
+  }
+  answers[Q.permission] = permission;
+
+  var lines = [
+    [WEB_EXTRA.role, 120], [WEB_EXTRA.phone, 40], [WEB_EXTRA.areas, 300], [Q.website, 500],
+    [Q.contactEmail, 254], [Q.instagram, 500], [Q.facebook, 500], [Q.tiktok, 500], [Q.youtube, 500],
+    [Q.x, 500], [Q.linkedin, 500], [Q.whatsapp, 500], [Q.maps, 500], [WEB_EXTRA.heard, 200],
+    [WEB_EXTRA.delivery, 500],
+  ];
+  for (var i = 0; i < lines.length; i++) {
+    var line = cleanLine_(takeWeb_(raw, known, lines[i][0]), lines[i][1]);
+    if (line) answers[lines[i][0]] = line;
+  }
+  var blocks = [[Q.bio, 1000], [Q.address, 300], [WEB_EXTRA.team, 2000], [WEB_EXTRA.events, 500]];
+  for (var b = 0; b < blocks.length; b++) {
+    var block = cleanBlock_(takeWeb_(raw, known, blocks[b][0]), blocks[b][1]);
+    if (block) answers[blocks[b][0]] = block;
+  }
+
+  if (answers[Q.contactEmail]) {
+    answers[Q.contactEmail] = answers[Q.contactEmail].toLowerCase();
+    if (!WEB_EMAIL.test(answers[Q.contactEmail])) {
+      return { ok: false, error: 'The public contact email does not look right.' };
+    }
+  }
+  if (answers[Q.website] && !/^https?:\/\//i.test(answers[Q.website])) {
+    var site = answers[Q.website];
+    if (site.indexOf(' ') === -1 && site.indexOf('.') > 0) answers[Q.website] = ('https://' + site).slice(0, 500);
+    else return { ok: false, error: 'The website should start with https://.' };
+  }
+
+  var fixedRaw = cleanLine_(takeWeb_(raw, known, Q.fixed), 200);
+  if (fixedRaw) {
+    var fixedNorm = normWeb_(fixedRaw);
+    if (/^yes\b/.test(fixedNorm)) answers[Q.fixed] = WEB_FIXED_YES;
+    else if (/^no\b/.test(fixedNorm)) answers[Q.fixed] = WEB_FIXED_NO;
+    else return { ok: false, error: 'Choose yes or no for a fixed location.' };
+  }
+
+  var autoRaw = cleanLine_(takeWeb_(raw, known, Q.autoUpdate), 200);
+  if (autoRaw) {
+    var auto = canonical_(WEB_AUTO, autoRaw);
+    if (!auto) return { ok: false, error: 'Choose one of the listing-update options, or leave it blank.' };
+    answers[Q.autoUpdate] = auto;
+  }
+
+  var images = { logo: null, cover: null };
+  var imageError = readWebImages_(body.images, images);
+  if (imageError) return { ok: false, error: imageError };
+  return { ok: true, app: app, answers: answers, images: images, nonce: nonce };
+}
+
+function readWebImages_(images, out) {
+  if (images == null) return '';
+  if (typeof images !== 'object' || Array.isArray(images)) return 'A photo could not be read. Please use a JPEG or PNG.';
+  var maxB64 = Math.ceil(MAX_IMAGE_BYTES / 3) * 4 + 4;
+  var roles = ['logo', 'cover'];
+  for (var i = 0; i < roles.length; i++) {
+    var item = images[roles[i]];
+    if (item == null || item === '') continue;
+    if (typeof item !== 'object') return 'A photo could not be read. Please use a JPEG or PNG.';
+    var mime = String(item.mime || '').toLowerCase();
+    var b64 = String(item.base64 || '');
+    if (!b64) continue;
+    if (mime !== 'image/jpeg' && mime !== 'image/png' && mime !== 'image/webp') {
+      return 'Photos need to be JPEG, PNG or WebP.';
+    }
+    if (b64.length > maxB64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) {
+      return 'That photo is too large. Please choose a smaller one.';
+    }
+    out[roles[i]] = { mime: mime, base64: b64 };
+  }
+  return '';
+}
+
+function sniffWebImage_(bytes) {
+  if (!bytes || bytes.length < 3) return '';
+  var b = function (i) { return bytes[i] & 0xff; };
+  if (b(0) === 0xff && b(1) === 0xd8 && b(2) === 0xff) return 'image/jpeg';
+  if (bytes.length >= 8 && b(0) === 0x89 && b(1) === 0x50 && b(2) === 0x4e && b(3) === 0x47) return 'image/png';
+  if (
+    bytes.length >= 12 && b(0) === 0x52 && b(1) === 0x49 && b(2) === 0x46 && b(3) === 0x46 &&
+    b(8) === 0x57 && b(9) === 0x45 && b(10) === 0x42 && b(11) === 0x50
+  ) return 'image/webp';
+  return '';
+}
+
+/** Magic bytes, not the claimed type. {error:true} or {mime, bytes}. */
+function checkWebImage_(image) {
+  var bytes;
+  try { bytes = Utilities.base64Decode(image.base64); } catch (err) { return { error: true }; }
+  if (!bytes || bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) return { error: true };
+  var mime = sniffWebImage_(bytes);
+  if (!mime || mime !== image.mime) return { error: true };
+  return { mime: mime, bytes: bytes };
+}
+
+function uploadFolder_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('INTAKE_UPLOAD_FOLDER');
+  if (id) {
+    try { return DriveApp.getFolderById(id); } catch (err) { /* the folder was deleted; make another */ }
+  }
+  var folder = DriveApp.createFolder('Citizens intake uploads');
+  if (props.setProperty) props.setProperty('INTAKE_UPLOAD_FOLDER', folder.getId());
+  return folder;
+}
+
+function saveWebImage_(checked, role) {
+  var ext = checked.mime === 'image/png' ? 'png' : checked.mime === 'image/webp' ? 'webp' : 'jpg';
+  var blob = Utilities.newBlob(checked.bytes, checked.mime, role + '-' + new Date().getTime() + '.' + ext);
+  var file = uploadFolder_().createFile(blob);
+  return 'https://drive.google.com/open?id=' + file.getId();
+}
+
+function headerColumn_(sheet, name) {
+  var want = normWeb_(name);
+  var headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  for (var i = 0; i < headers.length; i++) {
+    if (normWeb_(headers[i]) === want) return i + 1;
+  }
+  return 0;
+}
+
+function findQuestionColumn_(sheet, phrase) {
+  var want = normWeb_(phrase);
+  var headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0];
+  var hits = [];
+  for (var i = 0; i < headers.length; i++) {
+    var m = normWeb_(headers[i]).match(/^question\s+\d+(\.\d+)*\s*:\s*(.*)$/);
+    if (m && m[2].indexOf(want) !== -1) hits.push(i + 1);
+  }
+  return hits.length === 1 ? hits[0] : 0;
+}
+
+/** Append one join-page row. Approve is false. Email Address is left blank. */
+function appendWebRow_(sheet, record) {
+  ensureManualHeaders_(sheet);
+  SpreadsheetApp.flush();
+  var cols = columns_(sheet);
+  var row = sheet.getLastRow() + 1;
+  var timestamp = headerColumn_(sheet, 'timestamp');
+  if (timestamp) sheet.getRange(row, timestamp).setValue(new Date());
+
+  var leftover = [];
+  Object.keys(record.answers).forEach(function (phrase) {
+    var value = record.answers[phrase];
+    if (!value) return;
+    var col = cols[phrase] || findQuestionColumn_(sheet, phrase);
+    if (col) sheet.getRange(row, col).setValue(value);
+    else leftover.push(phrase + ': ' + value);
+  });
+  if (leftover.length) {
+    if (!cols.Extra) throw new Error('Sheet columns: missing "Extra"');
+    sheet.getRange(row, cols.Extra).setValue(leftover.join('\n'));
+  }
+  if (!cols.App || !cols.Source || !cols.Approve) throw new Error('Sheet columns: missing web-form headers');
+  sheet.getRange(row, cols.App).setValue(record.app);
+  sheet.getRange(row, cols.Source).setValue('web-form');
+  sheet.getRange(row, cols.Approve).setValue(false);
+  return row;
+}
+
+function cacheKey_(prefix, text) {
+  var h = 5381;
+  var s = String(text);
+  for (var i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return prefix + '-' + h.toString(16);
+}
+
+function webIntakeAllowed_() {
+  var cache = CacheService.getScriptCache();
+  var key = 'web-intake-n';
+  var n = Number(cache.get(key) || '0');
+  if (n >= WEB_PER_MINUTE) return false;
+  cache.put(key, String(n + 1), 60);
+  return true;
+}
+
+function webBody_(e) {
+  if (!e) return null;
+  var fromField = e.parameter && e.parameter.payload;
+  if (fromField) {
+    if (String(fromField).length > WEB_MAX_BODY) return { tooLarge: true };
+    try { return JSON.parse(fromField); } catch (err) { return null; }
+  }
+  var contents = e.postData && e.postData.contents;
+  if (!contents) return null;
+  if (String(contents).length > WEB_MAX_BODY) return { tooLarge: true };
+  try { return JSON.parse(contents); } catch (err) { return null; }
+}
+
+function wantsHtml_(e) {
+  return !!(e && e.parameter && e.parameter.reply === 'html');
+}
+
+function htmlReply_(nonce, result) {
+  var payload = JSON.stringify({ source: 'citizens-intake', nonce: nonce || '', result: result }).replace(/</g, '\\u003c');
+  return HtmlService.createHtmlOutput(
+    '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>parent.postMessage(' +
+      payload + ',"*");</script></body></html>'
+  );
+}
+
+function respond_(e, nonce, result) {
+  if (wantsHtml_(e)) return htmlReply_(nonce, result);
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function receiveWebIntake_(e) {
+  var parsedBody = webBody_(e);
+  if (parsedBody && parsedBody.tooLarge) {
+    return { nonce: '', body: { ok: false, error: 'That is too large to send. Please use smaller photos.' } };
+  }
+  if (!parsedBody) return { nonce: '', body: { ok: false, error: 'This form could not be read. Please try again.' } };
+
+  var parsed = parseWebIntake_(parsedBody);
+  var nonce = parsed.nonce || '';
+  if (!parsed.ok) return { nonce: nonce, body: { ok: false, error: parsed.error } };
+  if (!webIntakeAllowed_()) {
+    return {
+      nonce: nonce,
+      body: { ok: false, error: 'Too many people are joining at once. Please wait a minute and try again.' },
+    };
+  }
+  if (parsed.skip) return { nonce: nonce, body: { ok: true } };
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) {
+    return { nonce: nonce, body: { ok: false, error: 'We could not save this just now. Please try again in a minute.' } };
+  }
+  try {
+    var cache = CacheService.getScriptCache();
+    var seenKey = cacheKey_('seen', parsed.app + '\n' + parsed.answers[Q.ownerEmail]);
+    if (cache.get(seenKey)) return { nonce: nonce, body: { ok: true, app: parsed.app } };
+
+    var photosSkipped = [];
+    var roles = ['logo', 'cover'];
+    for (var i = 0; i < roles.length; i++) {
+      var role = roles[i];
+      if (!parsed.images[role]) continue;
+      var checked = checkWebImage_(parsed.images[role]);
+      if (checked.error) {
+        photosSkipped.push(role === 'logo' ? 'Logo' : 'Cover photo');
+        continue;
+      }
+      try {
+        parsed.answers[role === 'logo' ? Q.logo : Q.cover] = saveWebImage_(checked, role);
+      } catch (err) {
+        Logger.log('web intake image: ' + (err && err.message ? err.message : role));
+        photosSkipped.push(role === 'logo' ? 'Logo' : 'Cover photo');
+      }
+    }
+    appendWebRow_(getSheet_(), parsed);
+    cache.put(seenKey, '1', 120);
+    return { nonce: nonce, body: { ok: true, app: parsed.app, photosSkipped: photosSkipped } };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Web app: the join page. The HTML file in the Apps Script project is named intake. */
+function doGet() {
+  var tpl = HtmlService.createTemplateFromFile('intake');
+  var url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (err) { url = ''; }
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/(exec|dev)$/.test(url)) url = '';
+  tpl.execUrl = url;
+  return tpl.evaluate().setTitle('Join Citizens').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/** Web app: append one sheet row. Deploy as "execute as me", anyone even anonymous. */
+function doPost(e) {
+  var nonce = '';
+  try {
+    var out = receiveWebIntake_(e);
+    nonce = out.nonce || '';
+    return respond_(e, nonce, out.body);
+  } catch (err) {
+    Logger.log('web intake: ' + (err && err.message ? err.message : 'failed'));
+    return respond_(e, nonce, { ok: false, error: 'We could not save this just now. Please try again in a minute.' });
+  }
+}
+
+/** Run from the editor after deploying, to show the public link. */
+function webAppUrl() {
+  var url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (err) { url = ''; }
+  var message = url || 'Deploy as a web app first (see the README).';
+  Logger.log(message);
+  try { SpreadsheetApp.getActive().toast(message, 'Citizens intake', 15); } catch (err) { /* no sheet UI */ }
+  return url;
 }
