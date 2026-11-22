@@ -171,9 +171,9 @@
   --ctrl-btn: 36px;                         /* the map's own zoom and locate buttons */
   --crown: 52px;                            /* the home button: a glass circle on a 1px gold ring */
   --xp-strip: 124px;                        /* the handle and the Where to… tiles, so the map stays in view */
-  --xp-focus: 284px;                        /* one row in focus: tabs, a line, the cards; never another height */
-  --xp-card-w: 148px;                       /* the panel's cards (founder, 2026-11-17: smaller) */
-  --xp-card-img: 64px;
+  --xp-focus: 340px;                        /* one row in focus: tabs, a line, taller preview cards */
+  --xp-card-w: 156px;                       /* the panel's preview cards */
+  --xp-card-img: 88px;
   --z-xp-layer: 1;                          /* inside the Explore host: the panel, a row's arrows */
   --z-xp-crown: 2;                          /* the crown and the sticky nav, above the panel */
   --z-xp-rail: 3;                           /* the desktop nav, above both */
@@ -187,9 +187,10 @@
   --xp-max: 720px;                          /* the desktop Explore sheet */
   --xp-tile-size: 84px;                     /* a Where to… tile */
   --xp-dock-h: 64px;                        /* the sticky nav the crown becomes */
-  --pp-peek: 308px;                         /* the pin carousel lowered: larger card + image, less empty chrome (Pack 09) */
-  --pp-card-w: 168px;                       /* preview card width in the pin carousel */
-  --pp-card-img: 112px;                     /* preview photo height: more image, less empty body */
+  --pp-peek: 392px;                         /* pin carousel lowered: cards fill the strip (Pack 09) */
+  --pp-card-w: 180px;                       /* preview card width in the pin carousel */
+  --pp-card-img: 136px;                     /* preview photo height */
+  --pp-card-body: 148px;                    /* body fills remaining strip under the photo */
   --xp-sheet: rgba(249, 248, 243, 0.95);
   --xp-tile: rgba(236, 238, 240, 0.72);     /* frosted grey glass: tiles and tabs, including the selected one */
   --xp-tile-line: rgba(39, 42, 37, 0.1);
@@ -2501,7 +2502,7 @@ a[data-mv2='card2'],
 [data-mv2='explore-title'] {
   flex: none;
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: var(--fs-3);
   line-height: var(--lh-3);
   font-weight: var(--fw-semibold);
@@ -3520,6 +3521,7 @@ a[data-mv2='card2'],
 }
 [data-mv2='xsec-h'] small,
 [data-mv2='xfocus-bar'] small {
+  font-family: var(--font-body);
   font-size: var(--fs-1);
   color: var(--xp-muted);
 }
@@ -3568,7 +3570,9 @@ a[data-mv2='card2'],
   border-radius: var(--radius-lg);
   background: var(--xp-tile);
   color: var(--text-1);
+  font-family: var(--font-body);
   font-size: var(--fs-1);
+  line-height: var(--lh-1);
   font-weight: var(--fw-semibold);
   white-space: nowrap;
   cursor: pointer;
@@ -3633,9 +3637,11 @@ a[data-mv2='card2'],
 [data-mv2='xsec-h'] h3 {
   flex: none;
   margin: 0;
+  font-family: var(--font-body);
   font-size: var(--fs-3);
   line-height: var(--lh-3);
   font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
 }
 /* a row's title takes the row over (its focus): it reads as the title it is, with a chevron-free plain button */
 [data-mv2='xsec-go'] {
@@ -3649,6 +3655,7 @@ a[data-mv2='card2'],
 }
 [data-mv2='xrow'] {
   display: flex;
+  align-items: stretch;
   gap: var(--space-3);
   overflow-x: auto;
   padding: var(--space-1) var(--space-5) var(--space-3);
@@ -3741,16 +3748,47 @@ a[data-mv2='card2'],
 [data-mv2='xcard-body'] {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: var(--space-2);
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
   min-width: 0;
+  padding: var(--space-2) var(--space-2) var(--space-3);
   font-family: var(--font-body);
+}
+[data-mv2='xcard-top'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+[data-mv2='xcard-kind'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  color: var(--cat-c, var(--text-2));
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+[data-mv2='xcard-kind'] svg {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+[data-mv2='xcard'][data-kind='event'] {
+  border-color: color-mix(in srgb, var(--cat-c, var(--xp-tile-line)) 35%, var(--xp-tile-line));
+}
+[data-mv2='xcard'][data-kind='event'] [data-mv2='xcard-img'] {
+  background: color-mix(in srgb, var(--cat-c, var(--surface-2)) 12%, var(--surface-2));
 }
 [data-mv2='xcard-body'] b {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  min-height: calc(var(--lh-2) * 2);
   overflow: hidden;
   font-family: var(--font-body);
   font-size: var(--fs-2);
@@ -3758,14 +3796,15 @@ a[data-mv2='card2'],
   line-height: var(--lh-2);
 }
 [data-mv2='xcard-body'] small,
-[data-mv2='xcard-chip'] {
+[data-mv2='xcard-chip'],
+[data-mv2='xcard-fact'] {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
   font-family: var(--font-body);
   font-size: var(--fs-1);
   line-height: var(--lh-1);
-  font-weight: var(--fw-semibold);
+  font-weight: var(--fw-regular);
   color: var(--xp-muted);
 }
 [data-mv2='xcard-chip'] {
@@ -3773,22 +3812,23 @@ a[data-mv2='card2'],
   align-items: center;
   gap: var(--space-1);
   max-width: 100%;
-  color: var(--text-2);
-}
-[data-mv2='xcard'][data-peek] [data-mv2='xcard-chip'] {
-  font-weight: var(--fw-regular);
-  color: var(--xp-muted);
 }
 [data-mv2='xcard-chip'] > span {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-[data-mv2='xcard-chip'] i {
+[data-mv2='xcard-fact'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  color: var(--text-2);
+}
+[data-mv2='xcard-fact'] svg {
   flex: none;
-  width: var(--space-2);
-  height: var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--cat-c, var(--text-2));
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--cat-c, var(--text-2));
 }
 [data-mv2='xcard-foot'] {
   display: flex;
@@ -3796,15 +3836,20 @@ a[data-mv2='card2'],
   justify-content: space-between;
   gap: var(--space-2);
   min-width: 0;
-  margin-top: var(--space-1);
+  margin-top: auto;
+  padding-top: var(--space-1);
 }
 [data-mv2='xcard-foot'] > :first-child {
   min-width: 0;
   flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 [data-mv2='xcard-dist'] {
   flex: none;
   color: var(--xp-muted);
+  font-weight: var(--fw-semibold);
 }
 /* The crown: a glass circle on a gold ring, riding just above the panel (or the foot of the screen at rest). */
 [data-mv2='explore-crown'] {
@@ -4357,6 +4402,7 @@ a[data-mv2='card2'],
 [data-mv2='xrow'][data-row='peek'] {
   position: relative;
   padding-inline: calc(50% - var(--pp-card-w) / 2);
+  padding-bottom: var(--space-4);
   scroll-padding-inline: calc(50% - var(--pp-card-w) / 2);
   touch-action: pan-x;
 }
@@ -4365,13 +4411,16 @@ a[data-mv2='card2'],
 }
 [data-mv2='xrow'][data-row='peek'] [data-mv2='xcard'] {
   width: var(--pp-card-w);
+  min-height: calc(var(--pp-card-img) + var(--pp-card-body));
   scroll-snap-align: center;
 }
 [data-mv2='xrow'][data-row='peek'] [data-mv2='xcard-img'] {
   height: var(--pp-card-img);
 }
+[data-mv2='xrow'][data-row='peek'] [data-mv2='xcard-body'] {
+  min-height: var(--pp-card-body);
+}
 [data-mv2='xrow'][data-row='peek'] [data-mv2='xcard-body'] b {
-  min-height: calc(var(--lh-3) * 2);
   font-size: var(--fs-3);
   line-height: var(--lh-3);
 }
