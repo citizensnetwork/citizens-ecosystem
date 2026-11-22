@@ -8,6 +8,7 @@ import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { citizensWorld } from "./support/loadFrontend";
 
 const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
 const load = (file: string) => new Function("window", "React", "document", read("src/frontend/app/" + file))(window, React, document);
@@ -153,9 +154,11 @@ describe("what the explainer says is what the database does", () => {
   });
 
   it("has the tiers the hub's explanation quotes (a small volunteer group up to 20 votes, a provincial vision of 10,000)", () => {
-    const source = read("src/frontend/app/pages.jsx");
-    expect(source).toContain("{ id: 'small_volunteer', label: 'Small Volunteer', min: 1, max: 20 }");
-    expect(source).toContain("{ id: 'provincial_vision', label: 'Provincial Vision', min: 10000, max: 10000, fixed: true }");
+    // The screen reads its ladder from the world (engine step E7 part 2).
+    expect(read("src/frontend/app/pages.jsx")).toContain("W.configuration.ideas ? W.configuration.ideas.tiers : []");
+    const tiers = citizensWorld.configuration.ideas?.tiers ?? [];
+    expect(tiers).toContainEqual({ id: "small_volunteer", label: "Small Volunteer", min: 1, max: 20, fixed: false });
+    expect(tiers).toContainEqual({ id: "provincial_vision", label: "Provincial Vision", min: 10000, max: 10000, fixed: true });
     expect(voting).toContain("'small_volunteer'");
     expect(voting).toContain("'provincial_vision'");
   });

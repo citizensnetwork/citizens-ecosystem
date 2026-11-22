@@ -21,6 +21,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { cx, safeUrl, Avatar, logoFit, SmartImage, SocialLinks } = window.UI;
   const Icon = window.Icon;
@@ -153,7 +154,7 @@
       photo
         ? h(F, null,
             h(SmartImage, {
-              src: photo, cat, label: isEvent ? 'Event' : isPlace ? 'Place' : 'Contributor',
+              src: photo, cat, label: isEvent ? 'Event' : isPlace ? 'Place' : W.t('screen.map.type.partner'),
               alt: title, className: 'w-full h-full',
             }),
             h('div', { className: 'absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/40 to-transparent' }))

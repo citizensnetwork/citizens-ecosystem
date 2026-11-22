@@ -110,6 +110,25 @@
       ],
       "outputs": ["coverage/**"]
     },
+    "citizens-hub#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
+        "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
+        "$TURBO_ROOT$/packages/engine-config/src/configs/**"
+      ]
+    },
+    "citizens-hub#test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
+        "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
+        "$TURBO_ROOT$/packages/engine-config/src/configs/**"
+      ],
+      "outputs": ["coverage/**"]
+    },
     "@engine/config#test": {
       "dependsOn": ["^build"],
       "inputs": [

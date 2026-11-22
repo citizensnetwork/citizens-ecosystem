@@ -5,6 +5,7 @@
 //  the category/tier constants that are safe to ship as code.
 // ════════════════════════════════════════════════════════════════════
 (function () {
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   // ── Event categories (17) ──
   // `group` and `heading` mirror EVENT_GROUPS / eventGroupHeading in
   // src/lib/categories.ts (founder, 2026-10-21). One mapping, checked by
@@ -79,7 +80,7 @@
   // Same rule as hasMapPin in src/lib/contributorFields.ts, which the server's emails and admin toasts use.
   const hasMapPin = (row) => !!row && !row.noFixedLocation
     && typeof row.lat === 'number' && Number.isFinite(row.lat) && typeof row.lng === 'number' && Number.isFinite(row.lng);
-  const listedWhere = (onMap) => (onMap ? 'on the map and in Kingdom Discovery' : 'in Kingdom Discovery');
+  const listedWhere = (onMap) => (onMap ? W.t('screen.listing.whereMapAndDirectory') : W.t('screen.listing.whereDirectory'));
   // The map's single category pill row: events + places + the contributor
   // types no event/place already covers (reused slugs would duplicate a pill).
   const FILTER_CATEGORIES = EVENT_CATEGORIES.concat(

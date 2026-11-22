@@ -39,6 +39,7 @@
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
     "@citizens/utils": "workspace:*",
+    "@engine/config": "workspace:*",
     "@radix-ui/react-checkbox": "1.1.2",
     "@radix-ui/react-dialog": "1.1.2",
     "@radix-ui/react-label": "2.1.0",
@@ -62,7 +63,6 @@
   "devDependencies": {
     "@citizens/ecosystem": "workspace:*",
     "@citizens/frontend-build": "workspace:*",
-    "@engine/config": "workspace:*",
     "@eslint/compat": "^2.1.1",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",

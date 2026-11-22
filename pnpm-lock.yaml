@@ -108,6 +108,9 @@ importers:
       '@citizens/utils':
         specifier: workspace:*
         version: link:../../packages/utils
+      '@engine/config':
+        specifier: workspace:*
+        version: link:../../packages/engine-config
       '@radix-ui/react-checkbox':
         specifier: 1.1.2
         version: 1.1.2(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -172,9 +175,6 @@ importers:
       '@citizens/frontend-build':
         specifier: workspace:*
         version: link:../../packages/frontend-build
-      '@engine/config':
-        specifier: workspace:*
-        version: link:../../packages/engine-config
       '@eslint/compat':
         specifier: ^2.1.1
         version: 2.1.1(eslint@10.12.0(jiti@2.7.0))

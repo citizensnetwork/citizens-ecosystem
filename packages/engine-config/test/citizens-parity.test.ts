@@ -36,6 +36,17 @@ function js(path: string): string {
   return raw(path).split(`${BACKSLASH}'`).join("'").split(`${BACKSLASH}n`).join('\n');
 }
 
+/**
+ * A source without its comments: lines that are a comment, and a comment at the end of a line
+ * ("// " with a space after it, so a web address stays).
+ */
+const withoutComments = (source: string) =>
+  source
+    .split('\n')
+    .filter((line) => !/^\s*(?:\/\/|\/\*|\*|\{\/\*|<!--)/.test(line))
+    .map((line) => line.replace(/\s\/\/\s.*$/, ''))
+    .join('\n');
+
 /** An SQL source with doubled quotes undone. */
 const sql = (path: string) => raw(path).split("''").join("'");
 
@@ -324,35 +335,13 @@ describe('vocabulary', () => {
    */
   const SOURCES: Partial<Record<MessageKey, { file: string; wrap?: (text: string) => string }>> = {
     'screen.map.navLabel': { file: shell, wrap: (text) => `{ page: 'home', label: '${text}'` },
-    'screen.ideas.subtitle': { file: pages },
-    'screen.ideas.confirmed': { file: pages },
     'screen.ideas.mapType': { file: strings, wrap: (text) => `idea: '${text}'` },
-    'screen.apply.pendingTitle': { file: pages },
-    'screen.apply.invite': { file: pages, wrap: (text) => `: '${text}')` },
-    'screen.communityEvents.rule': { file: pages },
     'screen.portal.title': { file: shell, wrap: (text) => `label: '${text}'` },
     'screen.claim.action': { file: shell },
     'screen.role.partner': { file: shell, wrap: (text) => `{ label: '${text}', color:` },
-    'screen.loading': { file: `${APP}/auth.jsx`, wrap: (text) => `'aria-label': '${text}'` },
     'screen.wordmark.primary': { file: shell, wrap: (text) => `font-display' }, '${text}')` },
     'screen.wordmark.secondary': { file: shell, wrap: (text) => `uppercase mt-0.5' }, '${text}')` },
     'screen.map.type.partner': { file: strings, wrap: (text) => `contributor: '${text}'` },
-    'screen.listing.whereDirectory': { file: `${APP}/data.jsx`, wrap: (text) => `: '${text}')` },
-    'screen.listing.whereMapAndDirectory': {
-      file: `${APP}/data.jsx`,
-      wrap: (text) => `? '${text}'`,
-    },
-    'screen.settings.weeklyDigest': { file: pages },
-    'email.senderName': {
-      file: `${CONNECT}/src/lib/email/send.ts`,
-      wrap: (text) => `EMAIL_FROM = "${text} <`,
-    },
-    'email.signOff': { file: email, wrap: (text) => `SIGN_OFF_TEXT = "${text}"` },
-    'email.openApp': { file: email, wrap: (text) => `"${text}")` },
-    'email.partnerApplication.adminSubject': { file: email },
-    'email.partnerApproved.subject': { file: email },
-    'email.partnerDeclined.subject': { file: email, wrap: (text) => `subject: "${text}"` },
-    'email.listingInvite.subject': { file: email },
     'notification.nearbyRsvp': { file: 'supabase/functions/notify-nearby-rsvp/index.ts' },
     'notification.partnerApproved.title': {
       file: migration('180_contributor_applications_need_admin_approval'),
@@ -397,10 +386,6 @@ describe('vocabulary', () => {
       file: `${CONNECT}/src/frontend/index.html`,
       wrap: (text) => `<title>${text}</title>`,
     },
-    'meta.calendarProducer': {
-      file: `${CONNECT}/src/lib/calendar.ts`,
-      wrap: (text) => `PRODID:-//${text}//EN`,
-    },
     'manifest.name': {
       file: `${CONNECT}/public/manifest.json`,
       wrap: (text) => `"name": "${text}"`,
@@ -424,7 +409,42 @@ describe('vocabulary', () => {
     'meta.title': { files: [routes], text: 'Citizens Connect' },
     'screen.discover.title': { files: [routes], text: 'Kingdom Exploration' },
     'screen.gatherings.title': { files: [routes], text: "Let's…" },
-    'screen.ideas.title': { files: [routes], text: 'Kingdom Projects' },
+    'screen.ideas.title': { files: [routes, pages], text: 'Kingdom Projects' },
+    'screen.ideas.subtitle': {
+      files: [pages],
+      text: 'Suggest a need. Rally people. Launch it together.',
+    },
+    'screen.ideas.confirmed': { files: [pages], text: 'Confirmed Kingdom Project' },
+    'screen.apply.pendingTitle': {
+      files: [pages],
+      text: 'Your Contributor application is being reviewed',
+    },
+    'screen.apply.invite': { files: [pages], text: 'Apply to become a Contributor' },
+    'screen.communityEvents.rule': {
+      files: [pages],
+      text: 'Citizens can post one community-organised event each week.',
+    },
+    'screen.settings.weeklyDigest': {
+      files: [pages],
+      text: 'A weekly summary of Kingdom activity',
+    },
+    'screen.loading': { files: [`${APP}/auth.jsx`], text: 'Loading Citizens Connect' },
+    'screen.wordmark.primary': { files: [`${APP}/auth.jsx`], text: 'Citizens' },
+    'screen.signIn.epigraph': {
+      files: [`${APP}/auth.jsx`],
+      text: '"Now, therefore, you are no longer strangers and foreigners, but fellow —"',
+    },
+    'screen.signIn.epigraphNumber': { files: [`${APP}/auth.jsx`], text: '19' },
+    'screen.listing.whereDirectory': {
+      files: [`${APP}/data.jsx`, email],
+      text: 'in Kingdom Discovery',
+    },
+    'screen.listing.whereMapAndDirectory': {
+      files: [`${APP}/data.jsx`, email],
+      text: 'on the map and in Kingdom Discovery',
+    },
+    'screen.role.partner': { files: [pages], text: 'Contributor' },
+    'screen.map.type.partner': { files: [`${APP}/entity-card.jsx`], text: 'Contributor' },
     'screen.apply.title': {
       files: [routes, `${APP}/apply.jsx`, store],
       text: 'Become a Contributor',
@@ -452,12 +472,40 @@ describe('vocabulary', () => {
     'screen.fallback.partnerName': { files: [store], text: 'Unnamed Ministry' },
     'screen.fallback.ownPartnerName': { files: [store], text: 'My Ministry' },
     'screen.portal.title': {
-      files: [`${APP}/listing-claim.jsx`, `${APP}/admin.jsx`],
+      files: [`${APP}/listing-claim.jsx`, `${APP}/admin.jsx`, email],
       text: 'Contributor Portal',
     },
     'screen.admin.tab.partners': { files: [`${APP}/admin.jsx`], text: 'Contributors' },
     'screen.admin.tab.users': { files: [`${APP}/admin.jsx`], text: 'Citizens' },
     'screen.cohost.invite': { files: [`${APP}/cohosts.jsx`], text: 'Invite another Contributor.' },
+    // Connect's own emails and calendar file, read from the world since step E7 part 2.
+    'email.senderName': { files: [`${CONNECT}/src/lib/email/send.ts`], text: 'Citizens Connect' },
+    'email.signOff': {
+      files: [email],
+      text: 'Connecting the Kingdom — one citizen, one contributor, one need at a time.\nThe Citizens Connect team',
+    },
+    'email.openApp': {
+      files: [email, `${CONNECT}/src/lib/email/listingClaimTemplates.ts`],
+      text: 'Open Citizens Connect',
+    },
+    'email.welcomeThanks': {
+      files: [email],
+      text: 'Thank you for joining the Body on Citizens Connect.',
+    },
+    'email.partnerApplication.adminSubject': {
+      files: [email],
+      text: 'New Contributor application: {$name}',
+    },
+    'email.partnerApproved.subject': {
+      files: [email],
+      text: "You're live on Citizens Connect: {$name}",
+    },
+    'email.partnerDeclined.subject': { files: [email], text: 'About your Contributor application' },
+    'email.listingInvite.subject': { files: [email], text: 'Is {$name} your organisation?' },
+    'meta.calendarProducer': {
+      files: [`${CONNECT}/src/lib/calendar.ts`],
+      text: 'Citizens Connect',
+    },
   };
 
   /** Messages with nothing to compare: the text is empty in Connect today. */
@@ -511,13 +559,25 @@ describe('vocabulary', () => {
   });
 
   it.each(Object.entries(WIRED))('%s is read from the world and reads as before', (key, wired) => {
-    expect(world.t(key as MessageKey)).toBe(wired.text);
+    // With its {$name} values left in place, as the catalogue writes them.
+    const text = world.wording(messageDefinition(key as MessageKey).renderedBy)[key];
+    expect(text).toBe(wired.text);
+    // The screens quote keys with ' and the server code with ".
+    const asks = [`t('${key}'`, `t("${key}"`];
     for (const file of wired.files) {
       const contents = js(file);
-      expect(contents, `${file} asks for ${key}`).toContain(`t('${key}')`);
-      expect(contents, `${file} still holds its own copy of ${key}`).not.toContain(
-        quoted(wired.text),
-      );
+      expect(
+        asks.some((ask) => contents.includes(ask)),
+        `${file} asks for ${key}`,
+      ).toBe(true);
+      // A text with a value in it was a template in the code, never one string to look for.
+      // Comments may quote the old words; only code counts as a copy.
+      if (!/\{\$/.test(wired.text)) {
+        const code = withoutComments(contents);
+        for (const copy of [`'${wired.text}'`, `"${wired.text}"`]) {
+          expect(code, `${file} still holds its own copy of ${key}`).not.toContain(copy);
+        }
+      }
     }
   });
 
@@ -525,15 +585,25 @@ describe('vocabulary', () => {
     expect(js(routes)).toContain(`BASE_TITLE = window.WORLD.t('meta.title')`);
   });
 
-  it('the rotating slogan has Connect’s nine phrases, in order', () => {
+  it('the rotating slogan has Connect’s nine phrases, in order, and the sign-in screen reads it', () => {
+    // What the sign-in screen showed before step E7 part 2 read it from the world.
+    expect(config.vocabulary.slogan).toEqual({
+      lead: 'Connecting',
+      phrases: [
+        'Non-Profits to People',
+        'Events to Interests',
+        'Volunteers to Vacancies',
+        'Leaders to Projects',
+        'Ideas to Communities',
+        'Churches to Numbers',
+        'Limbs to Members',
+        'Pretoria to Purpose',
+        'the Kingdom',
+      ],
+    });
     const auth = js(`${APP}/auth.jsx`);
-    const block = auth.slice(
-      auth.indexOf('const PHRASES = ['),
-      auth.indexOf('];', auth.indexOf('const PHRASES = [')),
-    );
-    const phrases = [...block.matchAll(/^\s+'([^']+)',/gm)].map((match) => match[1]);
-    expect(config.vocabulary.slogan?.phrases).toEqual(phrases);
-    expect(auth).toContain(`"${config.vocabulary.slogan?.lead} ___" rotating slogan`);
+    expect(auth).toContain('const SLOGAN = W.configuration.vocabulary.slogan || null;');
+    expect(auth).not.toContain("'Non-Profits to People'");
   });
 
   it('the terms are the words Connect uses', () => {
@@ -642,15 +712,18 @@ describe('layout, map and the rest', () => {
     );
   });
 
-  it('the ideas ladder is the one the ideas screen offers', () => {
+  it('the ideas ladder is the one the ideas screen offered, and the screen reads it', () => {
+    // What the ideas screen offered before step E7 part 2 read the ladder from the world.
+    expect(config.ideas?.tiers.map((t) => [t.id, t.label, t.min, t.max, t.fixed])).toEqual([
+      ['small_volunteer', 'Small Volunteer', 1, 20, false],
+      ['community', 'Community', 20, 100, false],
+      ['town', 'Town', 100, 1000, false],
+      ['funders_challenge', 'Funders Challenge', 5000, 5000, true],
+      ['provincial_vision', 'Provincial Vision', 10000, 10000, true],
+    ]);
     const pages = raw(`${APP}/pages.jsx`);
-    const tiers = config.ideas?.tiers ?? [];
-    for (const tier of tiers) {
-      expect(pages).toContain(
-        `{ id: '${tier.id}', label: '${tier.label}', min: ${tier.min}, max: ${tier.max}${tier.fixed ? ', fixed: true' : ''} }`,
-      );
-    }
-    expect(tiers).toHaveLength(5);
+    expect(pages).toContain('W.configuration.ideas ? W.configuration.ideas.tiers : []');
+    expect(pages).not.toContain("label: 'Provincial Vision'");
   });
 
   it('Connect has no partner level ladder (founder, 2026-11-16)', () => {

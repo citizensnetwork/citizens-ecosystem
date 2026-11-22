@@ -413,6 +413,10 @@ export const MESSAGES = {
   'screen.loading': { channel: 'screen', renderedBy: 'app', default: 'Loading {world}' },
   'screen.wordmark.primary': { channel: 'screen', renderedBy: 'app', default: '{worldShort}' },
   'screen.wordmark.secondary': { channel: 'screen', renderedBy: 'app', default: '' },
+  // A short line above the world's name on the sign-in screen, with an optional reference
+  // mark before it (a verse number, a footnote sign). Empty by default: a world shows none.
+  'screen.signIn.epigraph': { channel: 'screen', renderedBy: 'app', default: '' },
+  'screen.signIn.epigraphNumber': { channel: 'screen', renderedBy: 'app', default: '' },
   'screen.offline.body': {
     channel: 'screen',
     renderedBy: 'app',
@@ -450,6 +454,12 @@ export const MESSAGES = {
     singleLine: true,
   },
   'email.signOff': { channel: 'email', renderedBy: 'server', default: 'The {world} team' },
+  // The first line of a welcome email, before what happened to the listing.
+  'email.welcomeThanks': {
+    channel: 'email',
+    renderedBy: 'server',
+    default: 'Thank you for joining {world}.',
+  },
   'email.openApp': {
     channel: 'email',
     renderedBy: 'server',

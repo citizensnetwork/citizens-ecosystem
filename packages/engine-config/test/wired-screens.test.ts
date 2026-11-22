@@ -23,15 +23,22 @@ const WIRED_SCREENS: readonly string[] = [
   'auth-client.js',
   'app/admin.jsx',
   'app/apply.jsx',
+  'app/auth.jsx',
   'app/automation.jsx',
   'app/cohost-lib.jsx',
   'app/cohosts.jsx',
+  'app/dashboard.jsx',
+  'app/data.jsx',
+  'app/entity-card.jsx',
+  'app/insights.jsx',
   'app/intake-upgrade.jsx',
   'app/kingdom-discovery.jsx',
   'app/listing-claim.jsx',
+  'app/map-v2-sheet.jsx',
   'app/messages.jsx',
   'app/moments.jsx',
   'app/onboarding-presets-lib.jsx',
+  'app/pages.jsx',
   'app/pending-application.jsx',
   'app/profiles.jsx',
   'app/routes.jsx',
@@ -58,8 +65,27 @@ describe('screens wired to the world', () => {
     expect(framingLines(source)).toEqual([]);
   });
 
-  it.each(WIRED_SCREENS.filter((file) => file.endsWith('.jsx')))('%s reads the world', (file) => {
-    expect(readFileSync(resolve(ROOT, FRONTEND, file), 'utf8')).toMatch(/window\.WORLD\b/);
+  // A screen whose only hit was a code comment has no word to read from the world.
+  const NO_WORDS = new Set(['app/map-v2-sheet.jsx']);
+
+  it.each(WIRED_SCREENS.filter((file) => file.endsWith('.jsx') && !NO_WORDS.has(file)))(
+    '%s reads the world',
+    (file) => {
+      expect(readFileSync(resolve(ROOT, FRONTEND, file), 'utf8')).toMatch(/window\.WORLD\b/);
+    },
+  );
+
+  // Server code that writes words a person reads, wired through apps/connect/src/lib/world.ts.
+  it.each([
+    'lib/email/templates.ts',
+    'lib/email/listingClaimTemplates.ts',
+    'lib/email/automationTemplates.ts',
+    'lib/email/send.ts',
+    'lib/calendar.ts',
+  ])('apps/connect/src/%s writes no framing word of its own', (file) => {
+    const source = readFileSync(resolve(ROOT, 'apps/connect/src', file), 'utf8');
+    expect(framingLines(source)).toEqual([]);
+    expect(source).toContain('from "@/lib/world"');
   });
 
   it('the count ignores comments and web addresses, and finds a word in a string', () => {
