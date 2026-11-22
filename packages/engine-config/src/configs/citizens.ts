@@ -93,9 +93,14 @@ export const citizensConfiguration: Configuration = {
       'screen.fallback.partnerName': 'Unnamed Ministry',
       'screen.fallback.ownPartnerName': 'My Ministry',
       'screen.wordmark.secondary': 'Connect',
+      // Ephesians 2:19, the verse the sign-in screen opens with; the world's name completes it.
+      'screen.signIn.epigraph':
+        '"Now, therefore, you are no longer strangers and foreigners, but fellow —"',
+      'screen.signIn.epigraphNumber': '19',
       'screen.settings.weeklyDigest': 'A weekly summary of Kingdom activity',
       'email.signOff':
         'Connecting the Kingdom — one citizen, one contributor, one need at a time.\nThe Citizens Connect team',
+      'email.welcomeThanks': 'Thank you for joining the Body on Citizens Connect.',
       'notification.ideaScheduled.body':
         '"{$title}" has a kickoff date — you\'re connected automatically.',
       'manifest.description':

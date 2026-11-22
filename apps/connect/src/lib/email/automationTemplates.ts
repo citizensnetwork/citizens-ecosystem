@@ -9,12 +9,13 @@
  */
 
 import { escapeHtml } from "@/lib/email/send";
-import { button, layout, subjectSafe, type Email } from "@/lib/email/templates";
+import { button, layout, SIGN_OFF_TEXT, subjectSafe, type Email } from "@/lib/email/templates";
+import { world } from "@/lib/world";
 
 export function suggestionsDigestEmail(input: { name: string; count: number; url: string }): Email {
   const n = Math.max(1, Math.floor(input.count));
   const noun = n === 1 ? "suggested update" : "suggested updates";
-  const lead = `${input.name} has ${n} new ${noun} on Citizens Connect.`;
+  const lead = `${input.name} has ${n} new ${noun} on ${world.term("world")}.`;
   const found =
     "We found them on the public website, YouTube channel or calendar you shared with us. " +
     "Nothing is published until you say so (unless you chose to have your events published for you), " +
@@ -24,11 +25,11 @@ export function suggestionsDigestEmail(input: { name: string; count: number; url
     subject: subjectSafe(lead.replace(/\.$/, "")),
     html: layout(
       "New suggestions are waiting",
-      `<p><strong>${escapeHtml(input.name)}</strong> has ${n} new ${noun} on Citizens Connect.</p>` +
+      `<p><strong>${escapeHtml(input.name)}</strong> has ${n} new ${noun} on ${escapeHtml(world.term("world"))}.</p>` +
         `<p>${escapeHtml(found)}</p>` +
         button(input.url, "Review suggestions") +
         `<p style="color:#555;font-size:13px">${escapeHtml(control)}</p>`,
     ),
-    text: `${lead}\n\n${found}\n\nReview them here: ${input.url}\n\n${control}\n\nConnecting the Kingdom — one citizen, one contributor, one need at a time.\nThe Citizens Connect team`,
+    text: `${lead}\n\n${found}\n\nReview them here: ${input.url}\n\n${control}\n\n${SIGN_OFF_TEXT}`,
   };
 }

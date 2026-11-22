@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { useState, useEffect } = React;
   const { cx, Avatar, logoFit, SmartImage, Button, Segmented, Empty, MediaPicker, Field, Input, Textarea, Toggle } = window.UI;
@@ -234,13 +235,13 @@
             : h(MediaPicker, { value: f.profilePhoto, onChange: (v) => up('profilePhoto', v), aspect: '1/1', label: 'logo', scope: 'event-cover' }))),
           h('div', { className: 'flex-1 space-y-1' },
             h(Field, { label: 'Bio' }, h(Textarea, { value: f.bio, rows: 3, readOnly: locked, onChange: (e) => up('bio', e.target.value), placeholder: 'Tell citizens who you are…' })))),
-        mode === 'owner' && h(Field, { label: 'Cover photos', hint: 'Shown at the top of your public listing and on Kingdom Discovery cards.' },
+        mode === 'owner' && h(Field, { label: 'Cover photos', hint: 'Shown at the top of your public listing and on ' + W.term('discovery') + ' cards.' },
           h(CoverPhotoManager, { photos: contributor.coverPhotos })),
         mode === 'editor' && h(Field, { label: 'Category', hint: 'Shown on the public listing.' },
           h(Input, { value: f.category, onChange: (e) => up('category', e.target.value), placeholder: 'e.g. Church' })),
         h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
           h(Field, { label: 'Website' }, h(Input, { value: f.website, readOnly: locked, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' })),
-          h(Field, { label: 'Public contact email', hint: 'Shown to citizens — different from your sign-in email.' }, h(Input, { type: 'email', value: f.contactEmail, readOnly: locked, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@yourministry.org' }))),
+          h(Field, { label: 'Public contact email', hint: 'Shown to ' + W.term('user', 'many').toLocaleLowerCase('en') + ' — different from your sign-in email.' }, h(Input, { type: 'email', value: f.contactEmail, readOnly: locked, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@yourministry.org' }))),
         h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
           !f.noFixedLocation && h(Field, { label: 'Physical address' }, h(Input, { value: f.location, readOnly: locked, onChange: (e) => up('location', e.target.value), placeholder: 'Street, suburb, city' }))),
         h(Toggle, {
