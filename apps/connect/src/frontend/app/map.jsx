@@ -657,7 +657,7 @@
             mp.easeTo(to, { originalEvent: {} });
           });
         },
-        // Where to…: opts.band centres the town between search and the foot drawer (founder, 2026-11-22).
+        // Where to… uses lift: false (same centre, zoom only — no band pan). opts.band is for pin soft-centre.
         // opts.lift === false keeps true screen centre; default still uses FOCUS_LIFT.
         survey(lat, lng, zoom, opts) {
           const mp = mapRef.current;

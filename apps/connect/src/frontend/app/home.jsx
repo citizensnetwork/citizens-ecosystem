@@ -172,8 +172,9 @@
         && (!townScoped || inTown(m))
         && (!group || (X.groupOf && X.groupOf(m) === group));
     }, [focusTest, group, X, focus, town]);
-    // Where to… / section: town zoom if below town; KEEP zoom if already above; mid-band centre on the
-    // camera's town (never GPS / Pretoria / fitBounds of filtered pins) — founder, 2026-11-23.
+    // Where to… / section: if below town zoom, zoom OUT to town on the same centre (tilt makes that look like
+    // a move). If already at/above town, leave the camera alone — another tile must not keep shifting the map
+    // (no band/lift pan). Never GPS / Pretoria / fitBounds — founder, 2026-11-23.
     useEffect(() => {
       setShowIdeas(!!(tileRec && tileRec.ideas));
       if (!focusKey || !town) return;
@@ -181,25 +182,11 @@
       const api = mapApi.current;
       if (!api || !api.survey) return;
       skipFrame.current = true;
-      const home = rootRef.current;
-      let foot = 0;
-      if (home) {
-        // --xp-vis / --xp-focus may be calc()/% tokens; measure the open Explore panel instead.
-        const xp = home.querySelector && home.querySelector("[data-mv2='explore']:not([hidden])");
-        if (xp) {
-          const box = home.getBoundingClientRect();
-          foot = Math.max(0, box.bottom - xp.getBoundingClientRect().top);
-        }
-        if (!(foot > 0) && window.getComputedStyle) {
-          const focusH = parseFloat(window.getComputedStyle(home).getPropertyValue('--xp-focus'));
-          foot = Number.isFinite(focusH) && focusH > 0 ? focusH : 340;
-        }
-      }
       const camNow = api.camera ? api.camera() : null;
       const zNow = camNow && Number.isFinite(camNow.zoom) ? camNow.zoom
         : (Number.isFinite(town.zoom) ? town.zoom : TOWN_ZOOM);
-      const zoom = zNow >= TOWN_ZOOM ? zNow : TOWN_ZOOM;
-      api.survey(town.lat, town.lng, zoom, { band: true, foot: foot });
+      if (zNow >= TOWN_ZOOM) return;
+      api.survey(town.lat, town.lng, TOWN_ZOOM, { lift: false });
     }, [focusKey, town]);
     // How much room the panel takes is the stylesheet's job (--explore-h follows the panel's look, map-v2.css Pack 08), so it is
     // right even when the CSS arrives after the first render. This only frames the data again as the panel takes room, but

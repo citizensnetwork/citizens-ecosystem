@@ -505,16 +505,23 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261123f"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261123g"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123d");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123e");
     const sheetCss = read("src/frontend/assets/map-v2.css");
     expect(sheetCss).toMatch(/\[data-mv2='explore'\] \{[\s\S]*?touch-action: none;/);
+    // Where-to category tiles swipe sideways in focus and in the open preview (founder, 2026-11-23)
+    expect(sheetCss).toMatch(
+      /\[data-mv2='explore'\]:not\(\[data-open\]\) \[data-mv2='explore-tiles'\][\s\S]*?touch-action: pan-x;/,
+    );
+    expect(sheetCss).toMatch(
+      /\[data-mv2='explore'\]\[data-open\] \[data-mv2='explore-tiles'\][\s\S]*?touch-action: pan-x pan-y;/,
+    );
     // raised: body scrolls; every child restates pan-y (overflow ends the chain)
     expect(sheetCss).toMatch(
       /\[data-mv2='pinpeek'\]\[data-raised\] \[data-mv2='pinpeek-body'\] \{[\s\S]*?overflow-y: auto;[\s\S]*?touch-action: pan-y;/,
@@ -859,6 +866,9 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(home).toContain("'aria-label': XS.chipsLabel");
     expect(home).toContain("centreOnScreen");
     expect(home).not.toContain("zoomCloser");
+    expect(home).toContain("lift: false");
+    expect(home).toMatch(/if \(zNow >= TOWN_ZOOM\) return;/);
+    expect(home).not.toMatch(/survey\([^)]*band:\s*true/);
     expect(read("src/frontend/app/map.jsx")).toContain("centreOnScreen(id)");
     const css = read("src/frontend/assets/map-v2.css");
     // the chips: one row that scrolls sideways (no column), and the carousel moves by transform only

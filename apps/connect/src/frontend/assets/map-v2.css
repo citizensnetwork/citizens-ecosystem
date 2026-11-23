@@ -3536,9 +3536,11 @@ a[data-mv2='card2'],
 [data-mv2='explore']:not([data-open]) *::after {
   touch-action: none;
 }
-/* Focus rows still scroll sideways; vertical stays the panel's. */
+/* Focus / strip: category tiles and card rows scroll sideways; vertical stays the panel's. */
 [data-mv2='explore']:not([data-open]) [data-mv2='xrow'],
-[data-mv2='explore']:not([data-open]) [data-mv2='xrow'] * {
+[data-mv2='explore']:not([data-open]) [data-mv2='xrow'] *,
+[data-mv2='explore']:not([data-open]) [data-mv2='explore-tiles'],
+[data-mv2='explore']:not([data-open]) [data-mv2='explore-tiles'] * {
   touch-action: pan-x;
 }
 /* At rest the panel is off screen: out of reach of a tap (and, through `inert`, of the keyboard) once it has slid away. */
@@ -3649,7 +3651,9 @@ a[data-mv2='card2'],
   touch-action: pan-y;
 }
 [data-mv2='explore'][data-open] [data-mv2='xrow'],
-[data-mv2='explore'][data-open] [data-mv2='xrow'] * {
+[data-mv2='explore'][data-open] [data-mv2='xrow'] *,
+[data-mv2='explore'][data-open] [data-mv2='explore-tiles'],
+[data-mv2='explore'][data-open] [data-mv2='explore-tiles'] * {
   touch-action: pan-x pan-y;
 }
 [data-mv2='xsec-h'] small,

@@ -742,6 +742,7 @@
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (mode === 'rest') return;
       if (e.target.closest && e.target.closest("[data-mv2='explore-grab']")) return;
+      // Where-to tiles own horizontal pan-x; only start a panel pull once the move is clearly vertical.
       if (mode === 'open') {
         const sc = scrollRef.current;
         // Fresh gesture only: must already be at top when the finger goes down (founder, 2026-11-23).
