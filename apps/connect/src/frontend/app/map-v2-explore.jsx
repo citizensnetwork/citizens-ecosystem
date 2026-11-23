@@ -726,6 +726,10 @@
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       dragged.current = false;
       startPanelPull(e, { fromGrab: true });
+      // Capture now: otherwise a drag that leaves the thin grab never gets pointermove (e2e + phones).
+      if (e.currentTarget && e.currentTarget.setPointerCapture) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
+      }
     };
     const onGrabClick = () => {
       if (dragged.current) { dragged.current = false; return; }
@@ -1153,9 +1157,18 @@
     };
     const peekPx = () => {
       const el = root.current;
-      if (!el || !window.getComputedStyle) return 320;
-      const v = parseFloat(window.getComputedStyle(el).getPropertyValue('--pp-peek'));
-      return Number.isFinite(v) && v > 0 ? v : 320;
+      if (!el) return 320;
+      // --pp-peek is a calc() token (parseFloat → NaN). Prefer the on-screen lowered height.
+      if (!raised && typeof window !== 'undefined') {
+        const box = el.getBoundingClientRect();
+        const vis = Math.max(0, (window.innerHeight || 0) - box.top);
+        if (vis > 80) return vis;
+      }
+      if (window.getComputedStyle) {
+        const v = parseFloat(window.getComputedStyle(el).getPropertyValue('--pp-peek'));
+        if (Number.isFinite(v) && v > 0) return v;
+      }
+      return Math.round((el.offsetHeight || 600) * 0.45) || 320;
     };
     const clearPeekDrag = () => {
       const el = root.current;
@@ -1194,6 +1207,11 @@
         x: e.clientX, y: e.clientY, id: e.pointerId, captured: false,
         fromHandle: onBar, onlyDown: false, baseY: baseY, H: H, lastY: baseY,
       };
+      // Handle/bar: capture immediately so a drag off the bar still gets moves (founder follow-finger).
+      // Cards still wait for a clear vertical before capture (sideways swipe keeps the row).
+      if (onBar && e.currentTarget && e.currentTarget.setPointerCapture) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
+      }
     };
     const onPullMove = (e) => {
       const p = pull.current;

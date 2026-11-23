@@ -294,9 +294,11 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await still(page);
       const handle = page.locator("[data-mv2='pinpeek-bar'] [data-mv2='handle']");
       const box = (await handle.boundingBox())!;
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      const hx = box.x + box.width / 2;
+      const hy = box.y + box.height / 2;
+      await page.mouse.move(hx, hy);
       await page.mouse.down();
-      await page.mouse.move(box.x + box.width / 2, box.y + 110, { steps: 6 });
+      await page.mouse.move(hx, hy + 180, { steps: 12 });
       await page.mouse.up();
       await expect(peek(page)).toHaveCount(0);
       await expect.poll(async () => (await depth(page)).idx).toBe(start.idx);
@@ -366,9 +368,19 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
         await expect(page.locator("[data-mv2='explore-host']")).toHaveAttribute("data-mode", "rest");
       }
       // a pan is not a tap: it leaves the carousel where it is
+      // Re-check pins after the long climb (camera may have drifted; soft-centre / dive centre).
       const panPins = await visiblePins(page);
-      expect(panPins.length).toBeGreaterThan(0);
-      await tapPin(page, panPins[0]);
+      if (panPins.length === 0) {
+        await page.evaluate(() => {
+          const m = (window as unknown as { __ccMap: MapLike }).__ccMap;
+          const c = m.getCenter();
+          m.jumpTo({ center: [c.lng, c.lat], zoom: Math.max(m.getZoom(), 13.6) }, { originalEvent: {} });
+        });
+        await idle(page);
+      }
+      const panPins2 = panPins.length > 0 ? panPins : await visiblePins(page);
+      expect(panPins2.length).toBeGreaterThan(0);
+      await tapPin(page, panPins2[0]);
       await expect(peek(page)).toBeVisible();
       const spot2 = (await bareMap(page))!;
       await page.mouse.move(spot2.x, spot2.y);

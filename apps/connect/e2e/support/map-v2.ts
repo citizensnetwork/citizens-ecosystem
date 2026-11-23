@@ -88,18 +88,11 @@ export async function mockMapNetwork(
 /** Hermetic map centre: fixtures live around Pretoria; guest landing is country-wide (pins gated). */
 const E2E_TOWN = { lng: 28.2293, lat: -25.7479, zoom: 12.5 };
 
-/**
- * Open the map screen and wait until the MapLibre instance and `min` markers exist, and map-v2.css has painted (the
- * app turns motion on only then, data-mv2-motion: before it, panels still sit where an unstyled page puts them).
- * Then jump to the fixture town so pins are drawn and hittable (production guests land on the country overview).
- */
-export async function openMap(page: Page, path = "/", min = 1) {
-  await page.goto(path);
-  await page.waitForSelector('[data-screen="discover"]', { timeout: 20_000 });
+/** Jump to the fixture town so pins are drawn (call after remounts that re-land on country overview). */
+export async function centreOnE2eTown(page: Page) {
   await page.waitForFunction(
-    (n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n
-      && document.documentElement.hasAttribute("data-mv2-motion"),
-    min,
+    () => !!(window as unknown as { __ccMap?: unknown }).__ccMap,
+    undefined,
     { timeout: 20_000 },
   );
   await page.evaluate((to) => {
@@ -114,6 +107,23 @@ export async function openMap(page: Page, path = "/", min = 1) {
     undefined,
     { timeout: 10_000 },
   );
+}
+
+/**
+ * Open the map screen and wait until the MapLibre instance and `min` markers exist, and map-v2.css has painted (the
+ * app turns motion on only then, data-mv2-motion: before it, panels still sit where an unstyled page puts them).
+ * Then jump to the fixture town so pins are drawn and hittable (production guests land on the country overview).
+ */
+export async function openMap(page: Page, path = "/", min = 1) {
+  await page.goto(path);
+  await page.waitForSelector('[data-screen="discover"]', { timeout: 20_000 });
+  await page.waitForFunction(
+    (n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n
+      && document.documentElement.hasAttribute("data-mv2-motion"),
+    min,
+    { timeout: 20_000 },
+  );
+  await centreOnE2eTown(page);
 }
 
 /**
