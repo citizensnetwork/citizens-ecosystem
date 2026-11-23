@@ -212,9 +212,21 @@ export async function openListing(page: Page, id: string, how: "click" | "tap" =
  * the nav beside the search bar; on a phone it is in the sticky nav of the open Explore panel. This opens that menu.
  */
 export async function openMe(page: Page) {
-  // Me is the full profile page, opened from the rail.
+  // Me is the full profile page. On a wide screen it is in the rail. On a phone the rail
+  // leaves the map, and Me is a gold icon in the preview panel's bar.
   if (await page.locator(".me-page").isVisible()) return;
-  await page.locator("[data-rail-item='me']").click();
+  const railMe = page.locator("[data-rail-item='me']");
+  if (await railMe.isVisible()) {
+    await railMe.click();
+  } else {
+    const dockMe = page.locator("[data-mv2='explore-nav'][data-nav='me']");
+    if (!(await dockMe.isVisible())) {
+      await page.locator("[data-mv2='explore-crown']").click();
+      const all = page.getByRole("button", { name: "Show all rows" });
+      if (await all.count()) await all.click();
+    }
+    await dockMe.click();
+  }
   await expect(page.locator(".me-page")).toBeVisible();
 }
 

@@ -163,9 +163,9 @@ test.describe("the map home on a phone", () => {
     await crown(page).click();
     await page.getByRole("button", { name: "Show all rows" }).click();
     await expect(sheet(page)).toHaveAttribute("data-open", "");
-    await expect(page.locator("[data-mv2='explore-dock']")).toBeHidden();
-    await expect(page.locator("[data-rail-item='me']")).toBeVisible();
-    await page.locator("[data-rail-item='me']").click();
+    await expect(page.locator("[data-mv2='explore-dock']")).toBeVisible();
+    await expect(page.locator(".cn-rail")).toHaveCSS("width", "0px");
+    await page.locator("[data-mv2='explore-nav'][data-nav='me']").click();
     await expect(page.locator(".me-page")).toBeVisible();
     await expect(page.getByRole("button", { name: "Messages" })).toBeVisible();
     await page.locator("[data-rail-item='map']").click();
@@ -193,7 +193,7 @@ test.describe("the map home on a phone", () => {
     await open(page);
     await crown(page).click();
     await page.getByRole("button", { name: "Show all rows" }).click();
-    await page.locator("[data-rail-item='map']").click();
+    await page.locator("[data-mv2='explore-nav'][data-nav='map']").click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
     await expect(crown(page)).toBeVisible();
   });

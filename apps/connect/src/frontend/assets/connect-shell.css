@@ -1284,7 +1284,7 @@
 /* The one rail. Closed on the map; open beside Me, Explore, Let's and the dashboards. */
 .connect-app{display:flex;height:100%;width:100%;min-height:0;background:#f7f6f1;color:#272a25}
 .connect-app-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
-.cn-rail{position:relative;z-index:40;flex:0 0 64px;width:64px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:8px;padding:16px 8px 18px;box-sizing:border-box;background:#f7f6f1;border-right:1px solid #24262414;color:#f2bd22;pointer-events:none;font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;transition:width .16s ease,flex-basis .16s ease}
+.cn-rail{position:relative;z-index:40;flex:0 0 64px;width:64px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:8px;padding:16px 8px 18px;box-sizing:border-box;background:#f7f6f1;border-right:1px solid #24262414;color:#f2bd22;pointer-events:none;font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;transition:width .22s ease,flex-basis .22s ease,opacity .22s ease,padding .22s ease}
 .cn-rail button,.cn-rail-door{pointer-events:auto}
 .cn-rail[data-open='true']{flex-basis:220px;width:220px}
 .cn-rail-brand,.cn-rail-btn,.cn-rail-do{display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;justify-items:center;width:100%;min-height:48px;margin:0;padding:0;gap:0;border:0;border-radius:16px;background:transparent;color:#f2bd22;cursor:pointer;text-align:left;overflow:hidden}
@@ -1303,7 +1303,8 @@
 .cn-rail-door button{border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:600;color:#272a25;font-family:'Plus Jakarta Sans',ui-sans-serif,sans-serif}
 .cn-rail-door button:hover{background:#f2bd2218}
 .connect-app .connect-placed.connect-shell,.connect-app .phone-review .connect-frame,.connect-app .desktop-review .connect-frame{max-width:none;height:100%;box-shadow:none}
-.connect-app [data-mv2='desktop-nav'],.connect-app [data-mv2='explore-dock']{display:none !important}
+.connect-app [data-mv2='desktop-nav']{display:none !important}
+@media(min-width:768px){.connect-app [data-mv2='explore-dock']{display:none !important}}
 .connect-placed .connect-frame,.connect-placed .connect-frame h1,.connect-placed .connect-frame h2,.connect-placed .connect-frame h3,.connect-placed .connect-frame button,.connect-placed .connect-frame small,.connect-placed .connect-frame p,.connect-placed .connect-frame b{font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif}
 .connect-placed .me-identity h1,.connect-placed.desktop-review .me-identity h1,.connect-placed .explore-hero h1{font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;font-weight:600;font-size:18px;line-height:24px;letter-spacing:-.01em}
 .connect-placed .me-left h2,.connect-placed .me-calendar h2,.connect-placed .explore-content h2,.connect-placed .activity-call h2,.connect-placed .photo-title h3,.connect-placed.desktop-review .me-left h2,.connect-placed.desktop-review .me-calendar h2{font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;font-weight:600;font-size:18px;line-height:24px;letter-spacing:-.01em}
@@ -1392,9 +1393,27 @@
   -webkit-mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent);
   mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent);
 }
+/* The rail is outside the map, so the old in-map crown inset is gone. Chips sit in the search field's width and centre when they fit. */
+[data-mv2='home'] [data-mv2='home-bar']{padding-left:var(--space-3)}
+[data-mv2='home'] [data-mv2='home-filters']{
+  justify-content:safe center;
+  padding-left:var(--space-3);
+  padding-right:calc(var(--space-3) + var(--hit) + var(--space-2));
+  scroll-padding-inline:var(--space-3);
+}
+[data-mv2='home'] [data-mv2='home-filters-wrap']::before{left:0}
+[data-mv2='home'] [data-mv2='home-filters-arrow'][data-dir='prev']{left:var(--space-2)}
+/* On a phone the map's rail slides away. The crown stays at the foot, and the preview's own bar carries the gold icons. */
 @media(max-width:767px){
   .cn-rail,.cn-rail[data-open='true']{flex-basis:64px;width:64px;align-items:center;padding:16px 8px 18px}
   .cn-rail[data-open='true'] .cn-rail-stack{align-items:center}
   .cn-rail[data-open='true'] .cn-rail-btn,.cn-rail[data-open='true'] .cn-rail-do,.cn-rail[data-open='true'] .cn-rail-brand{grid-template-columns:48px 0fr}
   .cn-rail-word,.cn-rail-label{display:none !important}
+  .connect-app[data-rail='closed'] .cn-rail{flex-basis:0;width:0;min-width:0;padding:0;border-width:0;opacity:0;overflow:hidden}
+  [data-mv2='explore-nav'],[data-mv2='explore-nav'] svg,[data-mv2='explore-dock'] .inline-icon{color:#f2bd22}
+  [data-mv2='explore-nav'] .inline-icon{inline-size:22px;width:22px;height:22px;display:grid;place-items:center}
+  [data-mv2='explore-nav'] .inline-icon svg{width:22px;height:22px}
+  [data-mv2='dock-door']{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);display:grid;gap:4px;min-width:180px;padding:8px;border-radius:18px;z-index:2}
+  [data-mv2='dock-door'] button{border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:600;color:#272a25}
 }
+[data-theme='dark'] [data-mv2='dock-door'] button{color:#f7f6f1}

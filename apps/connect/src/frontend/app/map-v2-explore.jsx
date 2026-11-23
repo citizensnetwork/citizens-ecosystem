@@ -313,9 +313,10 @@
   // sticky nav keeps Map in the middle (Explore, Map, Me). Me opens the account menu (the top-right person button is a
   // Search button now), so everything that button held is one tap from the nav.
   const DOCK = [
+    { id: 'me', icon: 'User', page: 'profile' },
     { id: 'explore', icon: 'Compass', page: 'explore' },
     { id: 'map', icon: 'Map', close: true, emphasis: true },
-    { id: 'me', icon: 'User', me: true },
+    { id: 'do', icon: 'LayoutGrid', door: true },
   ];
   const RAIL = [
     { id: 'map', icon: 'Map', act: 'map', emphasis: true },
@@ -520,6 +521,7 @@
     const [stage, setStage] = useState(() => (matches(DESK_MQ) ? 'strip' : 'rest'));
     const [rail, setRail] = useState(true);
     const [me, setMe] = useState('');          // '' | 'rail' | 'dock': where the account menu is open
+    const [door, setDoor] = useState(false);
     const [view, setView] = useState(() => (api && api.current ? api.current.view() : { centre: null, user: null }));
     const host = useRef(null);
     const root = useRef(null);
@@ -858,7 +860,12 @@
         onClick: () => setMe((v) => (v === where ? '' : where)),
       }, attrs), lead, h('small', null, (P.nav && P.nav[item.id]) || item.id)),
       me === where && window.ProfilePanel ? h(window.ProfilePanel, { anchor: where, extras: ME_EXTRAS, onClose: () => setMe('') }) : null);
-    const navIcon = (item) => (Icon ? h(Icon, { name: item.icon, size: 20 }) : null);
+    const navIcon = (item) => {
+      const chrome = window.ConnectChrome;
+      const kind = item.id === 'me' ? 'Me' : item.id === 'explore' ? 'Explore' : item.id === 'map' ? 'Map' : item.id === 'do' ? 'Do' : '';
+      if (chrome && kind) return h('span', { className: 'inline-icon' }, h(chrome.Icon, { kind: kind }));
+      return Icon ? h(Icon, { name: item.icon, size: 20 }) : null;
+    };
     const railGo = (item) => {
       setMe('');
       if (item.act === 'map') { setStage('strip'); return; }
@@ -916,15 +923,21 @@
         onPointerCancel: () => { crownPull.current = null; },
       }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)) : null,
       open ? h('nav', { 'data-mv2': 'explore-dock', 'aria-label': P.dock },
+        door && h('div', { 'data-mv2': 'dock-door', className: 'cn-glass', role: 'menu', 'aria-label': 'Do' },
+          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('lets', {}); } }, 'Let\u2019s\u2026'),
+          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('community', {}); } }, 'Kingdom Projects')),
         DOCK.map((item) => {
           const lead = navIcon(item);
           if (item.me) return meItem('dock', item, { 'data-mv2': 'explore-nav' }, lead);
           return h('button', {
             key: item.id, type: 'button', 'data-mv2': 'explore-nav', 'data-nav': item.id,
             'data-emphasis': item.emphasis ? '' : undefined,
-            'aria-current': item.id === 'explore' ? 'page' : undefined,
+            'aria-current': item.id === 'map' ? 'page' : undefined,
+            'aria-expanded': item.door ? (door ? 'true' : 'false') : undefined,
             onClick: () => {
               setMe('');
+              if (item.door) { setDoor((v) => !v); return; }
+              setDoor(false);
               if (item.close) { setStage(desk ? 'strip' : 'rest'); return; }
               if (item.page && props.onGo) props.onGo(item.page, {});
             },
