@@ -505,14 +505,21 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261123a"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261123b"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261122n");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123a");
+    const sheetCss = read("src/frontend/assets/map-v2.css");
+    expect(sheetCss).toMatch(/\[data-mv2='explore'\] \{[\s\S]*?touch-action: none;/);
+    expect(sheetCss).toMatch(/\[data-mv2='pinpeek'\]\[data-raised\]\[data-top\] \{\s*touch-action: pan-down;/);
+    // inline raised profile: never lock --mv2-ta to pan-down (scrollTop is always 0 with overflow visible)
+    expect(sheetCss).toMatch(
+      /\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\],\s*\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\]\[data-top\] \{[\s\S]*?--mv2-ta: pan-y;/,
+    );
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
     expect(home).toContain("onSeeAll: () => app.go('explore')");
@@ -703,7 +710,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     unmount();
   });
 
-  it("raised: only the sticky bar pulls down; details content does not (so it can scroll)", () => {
+  it("raised: the profile body does not start a snap pull (it must keep pan-y); the bar still steps back", () => {
     const { calls, unmount } = carousel({ raised: true });
     const panel = document.querySelector("[data-mv2='pinpeek']")!;
     const details = screen.getByTestId("details");

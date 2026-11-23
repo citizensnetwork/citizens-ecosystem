@@ -1061,6 +1061,19 @@
       if (card && card.focus) card.focus({ preventScroll: true });
     }, [props.focusCard]);
     useEffect(() => () => clearTimeout(settle.current), []);
+    // Raised scroll hand-off: data-top while scrolled to the top, so CSS can let a downward swipe through to us
+    // (same pattern as the listing sheet). Set by hand — a scroll event must not re-render.
+    useEffect(() => {
+      const el = root.current;
+      if (!el || !raised) {
+        if (el) el.removeAttribute('data-top');
+        return undefined;
+      }
+      const sync = () => { if (el.scrollTop < 6) el.setAttribute('data-top', ''); else el.removeAttribute('data-top'); };
+      sync();
+      el.addEventListener('scroll', sync, { passive: true });
+      return () => { el.removeEventListener('scroll', sync); el.removeAttribute('data-top'); };
+    }, [raised]);
     // A layout effect: its clean-up runs while the carousel is still in the page, so focus can still be found inside it
     // (by the time a plain effect's clean-up runs, the removed cards have already dropped focus to the page).
     useLayoutEffect(() => {
@@ -1089,22 +1102,23 @@
     };
     const touch = () => { touched.current = true; };
 
-    // Vertical pull on the panel: lowered = bar or cards (raise / step back); raised = sticky bar only so
-    // details can scroll (founder, 2026-11-23: restore surface swipes after handle-only was too tight).
+    // Vertical pull: lowered = bar or cards (raise / step back). Raised = sticky bar only — the profile body
+    // must keep pan-y so Gallery / Events / Posts and nested Explore can be swiped (founder, 2026-11-23).
     // Sideways card swipes stay with the row: we only capture once the gesture is clearly vertical.
     // Do not setPointerCapture on pointerdown: that steals the click from Back / handle / Close.
     const onPullDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      // Back / Close / arrows / social chips own their clicks.
+      // Back / Close / arrows / social chips / focus chrome own their clicks.
       if (e.target.closest && e.target.closest(
-        "[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close'], [data-mv2='xarrow'], [data-mv2='handle-chip']",
+        "[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close'], [data-mv2='xarrow'], [data-mv2='handle-chip'], [data-mv2='xfocus-back'], [data-mv2='xfocus-close']",
       )) return;
       const onBar = !!(e.target.closest && (
         e.target.closest("[data-mv2='pinpeek-bar']") ||
         e.target.closest("[data-mv2='handle']") ||
         e.target.closest("[data-mv2='handle-bar']")
       ));
-      // Raised details scroll with pan-y; only the sticky chrome starts a pull there.
+      // Raised profile body scrolls; only the sticky chrome starts a snap pull there.
+      // (pinpeek[data-top] + pan-down still lets a downward swipe at the top reach the bar/handle.)
       if (raised && !onBar) return;
       pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId, captured: false, fromHandle: onBar };
     };
