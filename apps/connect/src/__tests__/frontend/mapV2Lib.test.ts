@@ -170,10 +170,19 @@ describe("the map look follows the phone (founder, D1 as revised 2026-10-12)", (
     expect(boot({ storage: memoryStorage({ "citizens-theme": "system" }), dark: true }).api.resolvedTheme()).toBe("dark");
   });
 
-  it("offers no way to set a look in-app", () => {
-    const api = boot().api as Record<string, unknown>;
+  it("Settings stores Light or Dark, and System follows the phone again", () => {
+    const storage = memoryStorage();
+    const api = boot({ storage, dark: true }).api as MapV2 & { setThemePref: (p: string) => void; themePref: () => string; setTheme?: unknown; themeSetting?: unknown };
     expect(api.setTheme).toBeUndefined();
     expect(api.themeSetting).toBeUndefined();
+    api.setThemePref("Light");
+    expect(storage.dump()["citizens-theme"]).toBe("light");
+    expect(api.resolvedTheme()).toBe("light");
+    expect(api.themePref()).toBe("Light");
+    api.setThemePref("System");
+    expect(storage.dump()["citizens-theme"]).toBeUndefined();
+    expect(api.resolvedTheme()).toBe("dark");
+    expect(api.themePref()).toBe("System");
   });
 });
 

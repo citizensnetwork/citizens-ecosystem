@@ -469,9 +469,8 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
 
     // the map home's menu is the open Explore panel's nav (founder, 2026-11-17: Central is hidden for now; opening the
     // panel itself pushes nothing), and its Explore opens the Explore page
-    await openExploreAll(page);
     expect(await pushes(page)).toEqual([]);
-    await page.locator("[data-mv2='explore-dock']").getByRole("button", { name: "Explore" }).click();
+    await page.locator("[data-rail-item='explore']").click();
     await expect(page.locator('[data-screen="explore"]')).toBeVisible();
     expect(path(page)).toBe("/explore");
     expect(await pushes(page)).toEqual([{ active: true, guard: false, url: "/explore" }]);
@@ -505,21 +504,16 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await openDemo(page);
     await page.goto("/settings");
     await expect(page.locator('[data-screen="settings"]')).toBeVisible({ timeout: 15_000 });
-    const scrolled = () => page.evaluate(() => document.getElementById("main-scroll")?.scrollTop ?? -1);
-    await page.evaluate(() => {
-      const main = document.getElementById("main-scroll") as HTMLElement;
-      const pad = document.createElement("div"); // make the screen tall enough to scroll
+    const scroller = page.locator("[data-screen='settings']");
+    const scrolled = () => scroller.evaluate((e) => e.scrollTop);
+    await scroller.evaluate((e) => {
+      const pad = document.createElement("div");
       pad.style.height = "4000px";
-      main.appendChild(pad);
-      main.scrollTop = 600;
+      e.appendChild(pad);
+      e.scrollTop = 600;
     });
     expect(await scrolled()).toBeGreaterThan(500);
-
-    await page.getByRole("button", { name: "Your account" }).click();
-    await expect(page.getByRole("button", { name: /View Profile/ })).toBeVisible();
-    await page.evaluate(() => document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))); // a tap outside
-    await expect(page.getByRole("button", { name: /View Profile/ })).toBeHidden();
-    await page.waitForTimeout(400); // the panel's own history.back() settles
+    await page.getByRole("radio", { name: "Dark" }).click();
     expect(await scrolled()).toBeGreaterThan(500);
     expect(path(page)).toBe("/settings");
   });

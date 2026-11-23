@@ -195,13 +195,13 @@ test.describe("the note under Consider and the switch in Settings", () => {
 
     await page.locator("[data-consider-note-link]").click();
     await expect(page.locator('[data-screen="settings"]')).toBeVisible();
-    const toggle = page.locator('[data-setting="share-considering"] button');
-    await expect(toggle).toContainText("Friends can see what I’m considering");
-    const knob = toggle.locator("span > span").first();
-    await expect(knob).toHaveCSS("transform", /matrix\(1, 0, 0, 1, 20, 0\)/);          // on by default
+    const row = page.locator('[data-setting="share-considering"]');
+    await expect(row).toContainText("Friends can see what I’m considering");
+    const toggle = row.getByRole("switch");
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
     await toggle.click();
     await expect.poll(() => db.prefs).toEqual([{ notification_prefs: { share_considering: false } }]);
-    await expect(knob).not.toHaveCSS("transform", /matrix\(1, 0, 0, 1, 20, 0\)/);
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
 
     await page.goBack();                                                               // the event again: the note has gone quiet
     await expect(page.locator('[data-screen="event"]')).toBeVisible();
@@ -218,8 +218,7 @@ test.describe("the note under Consider and the switch in Settings", () => {
 
     await goTo(page, "settings");
     await expect(page.locator('[data-screen="settings"]')).toBeVisible();
-    const knob = page.locator('[data-setting="share-considering"] button span > span').first();
-    await expect(knob).not.toHaveCSS("transform", /matrix(1, 0, 0, 1, 20, 0)/);                 // the switch shows OFF
+    await expect(page.locator('[data-setting="share-considering"] [role="switch"]')).toHaveAttribute("aria-checked", "false");
   });
 });
 

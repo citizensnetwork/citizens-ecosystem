@@ -293,21 +293,29 @@
   }
 
   // ── Page router ──
+  // Me and Explore sit in the live shell. The class gives them the pack layout
+  // without the pack dock's top and bottom clearance.
+  function placed(wide, node) {
+    return React.createElement('div', { className: 'connect-shell connect-placed ' + (wide ? 'desktop-review' : 'phone-review') },
+      React.createElement('div', { className: 'connect-frame' }, node));
+  }
+
   function CurrentPage() {
     const { nav, isPendingApplicant, listingRole } = window.useApp();
+    const wide = window.ConnectChrome && window.ConnectChrome.useWide ? window.ConnectChrome.useWide() : false;
     const p = nav.page;
     switch (p) {
       case 'home': return React.createElement(window.HomePage);
       case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
-      // #210: Map v2's Discover page.
-      case 'explore': return React.createElement(window.MapV2Discover.Discover);
+      // Explore is the image-first page. Kingdom Exploration stays at /discover.
+      case 'explore': return placed(wide, React.createElement(window.ConnectExplore.Page));
       case 'lets': return React.createElement(window.LetsPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);
       case 'dashboard': return React.createElement((listingRole === 'editor' || listingRole === 'viewer') ? window.DashboardPage : (isPendingApplicant ? window.PendingApplicationPage : window.DashboardPage));
       case 'admin': return React.createElement(window.AdminPage);
-      case 'settings': return React.createElement(window.SettingsPage);
+      case 'settings': return placed(wide, React.createElement(window.ConnectMe.Page, { space: 'Settings' }));
       case 'intake-upgrade': return React.createElement(window.IntakeUpgradePage);
       case 'apply': return React.createElement(window.ApplyPage);
       case 'onboarding': return React.createElement(window.OnboardingPage);
@@ -315,7 +323,7 @@
       case 'place': return React.createElement(window.PlaceProfilePage, { id: nav.params.id });
       case 'profile': return nav.params.id
         ? React.createElement(window.ContributorProfilePage, { id: nav.params.id })
-        : React.createElement(window.CitizenProfilePage);
+        : placed(wide, React.createElement(window.ConnectMe.Page));
       default: return React.createElement(window.HomePage);
     }
   }
@@ -335,21 +343,74 @@
         React.createElement(Icon, { name: 'LogOut', size: 12 }), 'Exit'));
   }
 
+  // One rail. The crown stays at the top; the words beside it hide when the rail
+  // is closed. Me, Explore, Map keep that order, and Do sits under them.
+  const RAIL_DO = [
+    { page: 'lets', label: 'Let\u2019s\u2026' },
+    { page: 'community', label: 'Kingdom Projects' },
+  ];
+  function AppRail() {
+    const app = window.useApp();
+    const nav = app.nav || { page: 'home', params: {} };
+    const page = nav.page || 'home';
+    const wide = window.ConnectChrome && window.ConnectChrome.useWide ? window.ConnectChrome.useWide() : false;
+    const onMap = page === 'home';
+    const open = !onMap;
+    const [door, setDoor] = useState(false);
+    useEffect(() => { setDoor(false); }, [page]);
+    const chrome = window.ConnectChrome;
+    const icon = (kind) => chrome ? React.createElement('span', { className: 'inline-icon' }, React.createElement(chrome.Icon, { kind: kind })) : null;
+    const goMap = () => {
+      app.go('home', {});
+      window.dispatchEvent(new Event('cc-rail-map'));
+    };
+    const goItem = (id) => {
+      setDoor(false);
+      if (id === 'map') { goMap(); return; }
+      if (id === 'explore') { app.go('explore'); return; }
+      if (id === 'me') { app.go('profile', {}); return; }
+    };
+    const current = page === 'explore' ? 'explore' : (page === 'profile' && !(nav.params && nav.params.id) ? 'me' : (onMap ? 'map' : ''));
+    const item = (id, label) => React.createElement('button', {
+      key: id, type: 'button', className: 'cn-rail-btn' + (current === id ? ' on' : ''),
+      'data-rail-item': id, 'aria-label': label, 'aria-current': current === id ? 'page' : undefined,
+      onClick: () => goItem(id),
+    }, icon(id === 'me' ? 'Me' : id === 'explore' ? 'Explore' : 'Map'),
+      React.createElement('small', { className: 'cn-rail-label' }, label));
+    const showLabels = open && wide;
+    return React.createElement('nav', {
+      className: 'cn-rail', 'data-open': showLabels ? 'true' : 'false', 'aria-label': 'Connect',
+    },
+      React.createElement('button', {
+        type: 'button', className: 'cn-rail-brand', 'aria-label': 'Citizens Connect', onClick: goMap,
+      },
+        window.CrownMark ? React.createElement(window.CrownMark, { size: 36 }) : null,
+        React.createElement('span', { className: 'cn-rail-word' }, React.createElement('b', null, 'Citizens'), React.createElement('small', null, 'Connect'))),
+      React.createElement('div', { className: 'cn-rail-stack' },
+        item('me', 'Me'), item('explore', 'Explore'), item('map', 'Map'),
+        React.createElement('div', { className: 'cn-rail-do-wrap' },
+          React.createElement('button', {
+            type: 'button', className: 'cn-rail-do' + (door || page === 'lets' || page === 'community' ? ' on' : ''),
+            'aria-label': 'Do', 'aria-expanded': door ? 'true' : 'false',
+            onClick: () => setDoor((v) => !v),
+          }, icon('Do'), React.createElement('small', { className: 'cn-rail-label' }, 'Do')),
+          door && React.createElement('div', { className: 'cn-rail-door cn-glass', role: 'menu', 'aria-label': 'Do' },
+            RAIL_DO.map((row) => React.createElement('button', {
+              key: row.page, type: 'button', role: 'menuitem', onClick: () => { setDoor(false); app.go(row.page); },
+            }, row.label))))));
+  }
+
   function Shell() {
     const { createKind, createEditing, authed, guestMode, authResolved, nav } = window.useApp();
-    // On the map home the crown is the home button. The folding nav stays for every other screen,
-    // and for the clean map (view=map), which has no crown.
-    const onMapHome = nav && nav.page === 'home' && !(nav.params && nav.params.view === 'map');
+    const onMap = nav && nav.page === 'home';
     // Signed out: the landing — but while a probable session is still resolving,
     // the loading splash instead, so a returning member sees no "sign in" flash.
     if (!authed && !guestMode) return React.createElement(authResolved ? window.AuthScreen : window.LoadingSplash);
-    return React.createElement('div', { className: 'flex h-full w-full overflow-hidden bg-background' },
-      !onMapHome && React.createElement(Sidebar),
-      React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },
+    return React.createElement('div', { className: 'connect-app', 'data-rail': onMap ? 'closed' : 'open' },
+      React.createElement(AppRail),
+      React.createElement('main', { className: 'connect-app-main' },
         React.createElement(AssistBanner),
         React.createElement(CurrentPage)),
-      // Map v2 (#210): one folding round button instead of a bottom bar. The map home uses the crown instead.
-      !onMapHome && React.createElement(window.MapV2Nav),
       React.createElement(CreateFab),
       createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),

@@ -164,16 +164,16 @@ test.describe("the map home on a phone", () => {
     await crown(page).click();
     await page.getByRole("button", { name: "Show all rows" }).click();
     await expect(sheet(page)).toHaveAttribute("data-open", "");
-    await expect(crown(page)).toHaveCount(0);
-    const dock = page.locator("[data-mv2='explore-dock']");
-    await expect(dock.locator("[data-nav]")).toHaveText(["Explore", "Map", "Me"]);
-    await expect(page.locator("[data-nav='do'], [data-nav='central']")).toHaveCount(0);
-
-    await dock.locator("[data-nav='me']").click();
-    await expect(page.getByRole("button", { name: "View Profile" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Settings" })).toBeVisible();
-    await dock.locator("[data-nav='me']").click();
-    await expect(page.getByRole("button", { name: "View Profile" })).toHaveCount(0);
+    await expect(page.locator("[data-mv2='explore-dock']")).toBeVisible();
+    await expect(page.locator(".cn-rail")).toHaveCSS("width", "0px");
+    await page.locator("[data-mv2='explore-nav'][data-nav='me']").click();
+    await expect(page.locator(".me-page")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Messages" })).toBeVisible();
+    await page.locator("[data-rail-item='map']").click();
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible();
+    await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
+    await crown(page).click();
+    await page.getByRole("button", { name: "Show all rows" }).click();
 
     await page.getByRole("button", { name: "Near & now" }).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "focus");
@@ -194,7 +194,7 @@ test.describe("the map home on a phone", () => {
     await open(page);
     await crown(page).click();
     await page.getByRole("button", { name: "Show all rows" }).click();
-    await page.locator("[data-mv2='explore-dock'] [data-nav='map']").click();
+    await page.locator("[data-mv2='explore-nav'][data-nav='map']").click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
     await expect(crown(page)).toBeVisible();
   });
@@ -205,34 +205,30 @@ test.describe("desktop", () => {
 
   test("the nav sits beside the search bar, the crown's width, with no Do or Central; the sheet stays centred", async ({ page }) => {
     await open(page);
-    await expect(page.locator("[data-mv2='desktop-nav']")).toBeVisible();
+    await expect(page.locator(".cn-rail")).toHaveAttribute("data-open", "false");
     await expect(page.locator("aside")).toHaveCount(0);
     await expect(page.locator("[data-mv2='nav-toggle']")).toHaveCount(0);
     await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
-    const crownBox = (await page.locator("[data-mv2='desktop-crown']").boundingBox())!;
-    const items = (await page.locator("[data-mv2='desktop-items']").boundingBox())!;
-    const search = (await page.locator("[data-mv2='home-search']").boundingBox())!;
-    expect(Math.round(items.width)).toBe(Math.round(crownBox.width));
-    expect(crownBox.y).toBeLessThan(20);
-    expect(search.x).toBeGreaterThan(crownBox.x + crownBox.width);
-    // the bar's middle is level with the crown's
-    expect(Math.abs(search.y + search.height / 2 - (crownBox.y + crownBox.height / 2))).toBeLessThan(4);
-    const radius = await page.locator("[data-mv2='desktop-items']").evaluate((e) => parseFloat(getComputedStyle(e).borderTopLeftRadius));
-    expect(radius).toBeGreaterThanOrEqual(crownBox.width / 2);
-    await expect(page.locator("[data-mv2='desktop-item']")).toHaveText(["Map", "Explore", "Me"]);
+    const rail = (await page.locator(".cn-rail").boundingBox())!;
+    const mark = (await page.locator(".cn-rail-brand").boundingBox())!;
+    expect(rail.width).toBeLessThan(80);
+    expect(mark.x).toBeGreaterThanOrEqual(rail.x - 2);
+    expect(mark.x + mark.width).toBeLessThanOrEqual(rail.x + rail.width + 8);
+    await expect(page.locator("[data-rail-item]")).toHaveCount(3);
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(0);
 
-    await page.locator("[data-mv2='desktop-item'][data-nav='me']").click();
-    await expect(page.getByRole("button", { name: "View Profile" })).toBeVisible();
-    await page.locator("[data-mv2='desktop-item'][data-nav='me']").click();
+    await page.locator("[data-rail-item='me']").click();
+    await expect(page.locator(".me-page")).toBeVisible();
+    await expect(page.locator(".cn-rail")).toHaveAttribute("data-open", "true");
 
+    await page.locator("[data-rail-item='map']").click();
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible();
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await expect(page.getByRole("textbox", { name: "Search events, places, people…" })).toBeFocused();
 
-    await page.locator("[data-mv2='desktop-item'][data-nav='explore']").click();
-    const box = (await sheet(page).boundingBox())!;
-    expect(box.width).toBeLessThanOrEqual(724);
-    expect(box.width).toBeGreaterThan(480);
+    await page.locator("[data-rail-item='explore']").click();
+    await expect(page).toHaveURL(/\/explore$/);
+    await expect(page.locator("[data-screen='explore']")).toBeVisible();
   });
 });
 
