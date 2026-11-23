@@ -113,9 +113,12 @@ Confirm the owner email before you approve a Connect row.
 
 Deploy it once, after the script above is pasted:
 
-1. In the Apps Script editor: **+** → **HTML** → name the file `intakepage` (no `.html`). The script
-   file is already called `intake`, and Apps Script will not give the HTML file the same name. Paste the
-   entire contents of `intake.html`.
+1. In the Apps Script editor: **+** → **HTML** → name the file `intakepage`. Do not type `.html`.
+   Apps Script adds that itself, and the script file is already called `intake`, so the page cannot
+   share that name. The sidebar should show `intakepage.html` once. `intakepage.html.html` means the
+   extension was typed into the name; rename it to `intakepage`. Paste the entire contents of `intake.html`.
+   The public URL serves the last deployment, not the latest save: after this file exists, deploy a
+   **new version** or the URL reports that no HTML file named intakepage was found.
 2. **Deploy** → **New deployment** → gear → **Web app**.
    - Execute as: **Me**.
    - Who has access: **Anyone** (the choice that includes people without a Google account).

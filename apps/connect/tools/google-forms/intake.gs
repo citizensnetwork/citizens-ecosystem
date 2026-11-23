@@ -1105,9 +1105,28 @@ function receiveWebIntake_(e) {
   }
 }
 
-/** Web app: the join page. The HTML file is intakepage, because the script file is already named intake. */
+/**
+ * The join page. Apps Script adds ".html" itself, so the file is created as intakepage
+ * and the sidebar shows intakepage.html. A rename that types the extension again stores
+ * intakepage.html.html, which this also accepts. The web app serves the last deployment,
+ * not the latest save, so a new version is required after the file exists.
+ */
+function joinPageTemplate_() {
+  var names = ['intakepage', 'intakepage.html'];
+  var last = null;
+  for (var i = 0; i < names.length; i++) {
+    try {
+      return HtmlService.createTemplateFromFile(names[i]);
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last || new Error('No HTML file named intakepage was found.');
+}
+
+/** Web app: the join page. */
 function doGet() {
-  var tpl = HtmlService.createTemplateFromFile('intakepage');
+  var tpl = joinPageTemplate_();
   var url = '';
   try { url = ScriptApp.getService().getUrl() || ''; } catch (err) { url = ''; }
   if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/(exec|dev)$/.test(url)) url = '';
