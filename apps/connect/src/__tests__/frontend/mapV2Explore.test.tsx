@@ -505,7 +505,7 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261122m"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261123a"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
@@ -668,7 +668,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(returnFocus).toHaveBeenCalledWith("a");
   });
 
-  it("a pull up on the handle raises; a tap or pull down steps back; a card pull does not (founder, 2026-11-22)", () => {
+  it("a pull up on the handle or a card raises; a handle tap or pull down steps back (founder, 2026-11-23)", () => {
     const { calls, unmount } = carousel();
     const panel = document.querySelector("[data-mv2='pinpeek']")!;
     const handle = document.querySelector("[data-mv2='handle']")!;
@@ -678,18 +678,44 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     fireEvent.pointerUp(panel, { clientX: 100, clientY: 402, pointerId: 1, pointerType: "touch" });
     expect(calls.onBack).toHaveBeenCalledTimes(1);
     expect(calls.onRaise).not.toHaveBeenCalled();
-    // card pull is ignored — only the handle (or crown) starts a snap pull
+    // a short press on a card is not a step-down (cards keep their tap-to-raise)
     fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 2, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 2, pointerType: "touch" });
-    expect(calls.onRaise).not.toHaveBeenCalled();
-    fireEvent.pointerDown(handle, { clientX: 100, clientY: 400, pointerId: 3, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 402, pointerId: 2, pointerType: "touch" });
+    expect(calls.onBack).toHaveBeenCalledTimes(1);
+    // a vertical card pull raises (restored after handle-only was too tight)
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 3, pointerType: "touch" });
     fireEvent.pointerMove(panel, { clientX: 104, clientY: 360, pointerId: 3, pointerType: "touch" });
     fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 3, pointerType: "touch" });
     expect(calls.onRaise).toHaveBeenCalledTimes(1);
-    fireEvent.pointerDown(handle, { clientX: 100, clientY: 300, pointerId: 4, pointerType: "touch" });
-    fireEvent.pointerMove(panel, { clientX: 100, clientY: 340, pointerId: 4, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 4, pointerType: "touch" });
+    // a sideways move on a card does not raise (the row keeps pan-x)
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 4, pointerType: "touch" });
+    fireEvent.pointerMove(panel, { clientX: 160, clientY: 404, pointerId: 4, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 220, clientY: 408, pointerId: 4, pointerType: "touch" });
+    expect(calls.onRaise).toHaveBeenCalledTimes(1);
+    fireEvent.pointerDown(handle, { clientX: 100, clientY: 400, pointerId: 5, pointerType: "touch" });
+    fireEvent.pointerMove(panel, { clientX: 104, clientY: 360, pointerId: 5, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 5, pointerType: "touch" });
+    expect(calls.onRaise).toHaveBeenCalledTimes(2);
+    fireEvent.pointerDown(handle, { clientX: 100, clientY: 300, pointerId: 6, pointerType: "touch" });
+    fireEvent.pointerMove(panel, { clientX: 100, clientY: 340, pointerId: 6, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 6, pointerType: "touch" });
     expect(calls.onBack).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it("raised: only the sticky bar pulls down; details content does not (so it can scroll)", () => {
+    const { calls, unmount } = carousel({ raised: true });
+    const panel = document.querySelector("[data-mv2='pinpeek']")!;
+    const details = screen.getByTestId("details");
+    const bar = document.querySelector("[data-mv2='pinpeek-bar']")!;
+    fireEvent.pointerDown(details, { clientX: 100, clientY: 300, pointerId: 1, pointerType: "touch" });
+    fireEvent.pointerMove(panel, { clientX: 100, clientY: 360, pointerId: 1, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
+    expect(calls.onBack).not.toHaveBeenCalled();
+    fireEvent.pointerDown(bar, { clientX: 100, clientY: 80, pointerId: 2, pointerType: "touch" });
+    fireEvent.pointerMove(panel, { clientX: 100, clientY: 140, pointerId: 2, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 180, pointerId: 2, pointerType: "touch" });
+    expect(calls.onBack).toHaveBeenCalledTimes(1);
     unmount();
   });
 
@@ -723,6 +749,23 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
       expect(mode()).toBe("strip");
       rerender(React.createElement(X.Explore, { ...base, restSignal: 1 }));
       expect(mode()).toBe("rest");
+    });
+
+    it("a vertical swipe on the strip content raises the panel; a short tap on a tile does not", () => {
+      render(React.createElement(X.Explore, { ...base }));
+      fireEvent.click(screen.getByRole("button", { name: P().open }));
+      expect(mode()).toBe("strip");
+      const panel = document.querySelector("[data-mv2='explore']")!;
+      const tile = document.querySelector("[data-mv2='explore-tile']")!;
+      // short press: not a raise
+      fireEvent.pointerDown(tile, { clientX: 120, clientY: 500, pointerId: 1, pointerType: "touch" });
+      fireEvent.pointerUp(panel, { clientX: 120, clientY: 502, pointerId: 1, pointerType: "touch" });
+      expect(mode()).toBe("strip");
+      // vertical swipe up on the tiles raises
+      fireEvent.pointerDown(tile, { clientX: 120, clientY: 520, pointerId: 2, pointerType: "touch" });
+      fireEvent.pointerMove(panel, { clientX: 122, clientY: 480, pointerId: 2, pointerType: "touch" });
+      fireEvent.pointerUp(panel, { clientX: 122, clientY: 440, pointerId: 2, pointerType: "touch" });
+      expect(mode()).toBe("open");
     });
 
     it("the desktop crown resets the levels too, and only folds the nav at the map's rest", () => {
