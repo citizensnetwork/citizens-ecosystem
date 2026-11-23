@@ -1105,9 +1105,9 @@ function receiveWebIntake_(e) {
   }
 }
 
-/** Web app: the join page. The HTML file in the Apps Script project is named intake. */
+/** Web app: the join page. The HTML file is intakepage, because the script file is already named intake. */
 function doGet() {
-  var tpl = HtmlService.createTemplateFromFile('intake');
+  var tpl = HtmlService.createTemplateFromFile('intakepage');
   var url = '';
   try { url = ScriptApp.getService().getUrl() || ''; } catch (err) { url = ''; }
   if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/(exec|dev)$/.test(url)) url = '';

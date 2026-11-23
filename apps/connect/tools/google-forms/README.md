@@ -113,7 +113,8 @@ Confirm the owner email before you approve a Connect row.
 
 Deploy it once, after the script above is pasted:
 
-1. In the Apps Script editor: **+** → **HTML** → name the file `intake` (no `.html`). Paste the
+1. In the Apps Script editor: **+** → **HTML** → name the file `intakepage` (no `.html`). The script
+   file is already called `intake`, and Apps Script will not give the HTML file the same name. Paste the
    entire contents of `intake.html`.
 2. **Deploy** → **New deployment** → gear → **Web app**.
    - Execute as: **Me**.
@@ -125,8 +126,8 @@ Deploy it once, after the script above is pasted:
    isn't open yet. The page is white, black and gold; Wear shifts the gold to Wear's own accent.
 
 Until this deployment exists, opening the file from the repo shows the form but cannot write to the
-sheet. Re-paste `intake.html` when the page changes, and deploy a new version (Manage deployments →
-pencil → New version). The `/exec` URL stays the same.
+sheet. Re-paste `intake.html` into the Apps Script file `intakepage` when the page changes, and deploy
+a new version (Manage deployments → pencil → New version). The `/exec` URL stays the same.
 
 ## Approving a Contributor (every time)
 
