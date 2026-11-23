@@ -388,15 +388,16 @@
         React.createElement('span', { className: 'cn-rail-word' }, React.createElement('b', null, 'Citizens'), React.createElement('small', null, 'Connect'))),
       React.createElement('div', { className: 'cn-rail-stack' },
         item('me', 'Me'), item('explore', 'Explore'), item('map', 'Map'),
-        React.createElement('button', {
-          type: 'button', className: 'cn-rail-do' + (door || page === 'lets' || page === 'community' ? ' on' : ''),
-          'aria-label': 'Do', 'aria-expanded': door ? 'true' : 'false',
-          onClick: () => setDoor((v) => !v),
-        }, icon('Do'), React.createElement('small', { className: 'cn-rail-label' }, 'Do'))),
-      door && React.createElement('div', { className: 'cn-rail-door cn-glass', role: 'menu', 'aria-label': 'Do' },
-        RAIL_DO.map((row) => React.createElement('button', {
-          key: row.page, type: 'button', role: 'menuitem', onClick: () => { setDoor(false); app.go(row.page); },
-        }, row.label))));
+        React.createElement('div', { className: 'cn-rail-do-wrap' },
+          React.createElement('button', {
+            type: 'button', className: 'cn-rail-do' + (door || page === 'lets' || page === 'community' ? ' on' : ''),
+            'aria-label': 'Do', 'aria-expanded': door ? 'true' : 'false',
+            onClick: () => setDoor((v) => !v),
+          }, icon('Do'), React.createElement('small', { className: 'cn-rail-label' }, 'Do')),
+          door && React.createElement('div', { className: 'cn-rail-door cn-glass', role: 'menu', 'aria-label': 'Do' },
+            RAIL_DO.map((row) => React.createElement('button', {
+              key: row.page, type: 'button', role: 'menuitem', onClick: () => { setDoor(false); app.go(row.page); },
+            }, row.label))))));
   }
 
   function Shell() {
