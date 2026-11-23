@@ -237,3 +237,18 @@ describe("count buckets (tracker P2-08): shown only from 100, rounded down, neve
     expect(bucket().countBucket("1234")).toBe("1,000+");
   });
 });
+
+describe("motion waits for the stylesheet (map-v2.css is added after the screen mounts)", () => {
+  const lib = readFileSync(join(process.cwd(), "src/frontend/app/map-v2-lib.jsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "src/frontend/assets/map-v2.css"), "utf8");
+
+  it("turns motion on only once the stylesheet has loaded and painted, so nothing animates from its unstyled place", () => {
+    // set inside the load (and error) handler, two frames later
+    const done = lib.slice(lib.indexOf("const done = () => {"), lib.indexOf("link.onload = done;"));
+    expect(done).toContain("setAttribute('data-mv2-motion', '')");
+    expect(done).toContain("requestAnimationFrame(() => window.requestAnimationFrame(ready))");
+    expect(lib).toContain("link.onerror = done;");
+    // until then no Map v2 element (or its pseudo-elements) transitions or animates
+    expect(css).toMatch(/:root:not\(\[data-mv2-motion\]\) \[data-mv2\],\s*:root:not\(\[data-mv2-motion\]\) \[data-mv2\]::before,\s*:root:not\(\[data-mv2-motion\]\) \[data-mv2\]::after \{\s*transition: none !important;\s*animation: none !important;\s*\}/);
+  });
+});

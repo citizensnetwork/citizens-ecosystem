@@ -55,7 +55,7 @@ beforeAll(() => {
   api = (window as unknown as { MapV2News: Api }).MapV2News;
 });
 
-const strings = { readMore: "Read more", close: "Close news post" };
+const strings = { readMore: "Read more", close: "Close news post", back: "Back" };
 const post = {
   id: "n1",
   title: "Sunday line-up",
@@ -198,19 +198,21 @@ describe("the reader dialog", () => {
   it("keeps Tab and Shift+Tab inside the card, starting from the title", () => {
     render(React.createElement(Host));
     const title = document.getElementById("mv2-news-title") as HTMLElement;
+    const back = screen.getByRole("button", { name: "Back" });
     const close = screen.getByRole("button", { name: "Close news post" });
     const link = screen.getByRole("link");
     expect(title).toHaveFocus();
     fireEvent.keyDown(title, { key: "Tab" });
-    expect(close).toHaveFocus();
+    // Back is the first tabbable (then close, then body links).
+    expect(back).toHaveFocus();
     close.focus();
     fireEvent.keyDown(close, { key: "Tab" });
-    // The close button is not the last stop, so Tab is left to the browser. jsdom does not move focus;
-    // the wrap itself is what this dialog adds, and that is the last stop and Shift+Tab from the first.
+    // Close is not the last stop, so Tab is left to the browser. jsdom does not move focus;
+    // the wrap itself is what this dialog adds: last → first, and Shift+Tab from first → last.
     link.focus();
     fireEvent.keyDown(link, { key: "Tab" });
-    expect(close).toHaveFocus();
-    fireEvent.keyDown(close, { key: "Tab", shiftKey: true });
+    expect(back).toHaveFocus();
+    fireEvent.keyDown(back, { key: "Tab", shiftKey: true });
     expect(link).toHaveFocus();
     expect(root.contains(document.activeElement)).toBe(false);
   });
@@ -262,14 +264,14 @@ describe("where the reader is wired", () => {
     expect(html.indexOf("app/map-v2-news.jsx")).toBeLessThan(html.indexOf("app/map-v2-sheet.jsx"));
     expect(build.indexOf("'map-v2-gallery.jsx'")).toBeLessThan(build.indexOf("'map-v2-news.jsx'"));
     expect(build.indexOf("'map-v2-news.jsx'")).toBeLessThan(build.indexOf("'map-v2-sheet.jsx'"));
-    expect(html).toContain("app/map-v2-news.jsx?v=20261019a");
+    expect(html).toContain("app/map-v2-news.jsx?v=20261122m");
     expect(html).toContain("app/profiles.jsx?v=20261101b");
-    expect(html).toContain("app/map-v2-strings.jsx?v=20261117a");
+    expect(html).toContain("app/map-v2-strings.jsx?v=20261122m");
   });
 
   it("adds only the scrim blur and the reading width, and the card motion follows the duration token", () => {
     const css = read("src/frontend/assets/map-v2.css");
-    expect(css).toMatch(/--scrim-blur:\s*4px;/);
+    expect(css).toMatch(/--scrim-blur:\s*14px;/);
     expect(css).toMatch(/--reader-w:\s*560px;/);
     const components = css.slice(css.indexOf("/* ── 4. Components"));
     expect(components).not.toMatch(/--scrim-blur:\s*4px/);
@@ -293,5 +295,17 @@ describe("where the reader is wired", () => {
     expect(sheet).toContain("aria-haspopup");
     expect(sheet).toContain("Str.news.readMore");
     expect(sheet).not.toMatch(/history\.pushState\(/);
+  });
+
+  it("raised pinpeek keeps the reader open for place/event posts (newsPosts, not only contributor posts)", () => {
+    const sheet = read("src/frontend/app/map-v2-sheet.jsx");
+    // ProfileCarousels on every inline sheet (places, events, and contributors)
+    expect(sheet).toMatch(/inline \? h\(ProfileCarousels/);
+    expect(sheet).toContain("org: isContributor ? item : org");
+    // Deletion cleanup must consult newsPosts so a place peek does not wipe reading on mount
+    expect(sheet).toMatch(
+      /Array\.isArray\(newsPosts\)[\s\S]*some\(\(p\) => p && p\.id === reading\.id\)/,
+    );
+    expect(sheet).not.toMatch(/if \(reading && !posts\.some/);
   });
 });

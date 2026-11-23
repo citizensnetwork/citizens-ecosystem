@@ -268,12 +268,12 @@ test.describe("One card, both surfaces", () => {
     const panel = page.locator('[data-entity-card="event"]');
     await expect(panel).toBeVisible({ timeout: 15_000 });
 
-    // Everything the founder asked to see on a listing, on the MAP side too:
-    // the socials (which the preview never had) and the route to the profile.
-    await expect(panel.getByRole("link", { name: "Instagram" })).toHaveAttribute(
+    // Raised profile: circular handles live in handle-row under the category (not inside the lead card body).
+    const handles = page.locator("[data-mv2='handle-row']");
+    await expect(handles.getByRole("link", { name: "Instagram" })).toHaveAttribute(
       "href", "https://instagram.com/hatfieldsunday",
     );
-    await expect(panel.getByRole("link", { name: "YouTube" })).toBeVisible();
+    await expect(handles.getByRole("link", { name: "YouTube" })).toBeVisible();
     await expect(page.locator("[data-mv2='view-full']")).toBeVisible();
     await expect(page.locator("[data-map-sheet-header]")).toContainText("Hatfield Sunday Celebration");
 

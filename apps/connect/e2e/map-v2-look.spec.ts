@@ -95,8 +95,12 @@ test.describe("P1-12 the map look follows the phone", () => {
     const pin = page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"]`);
     await expect(pin.locator("[data-mv2='label-text']")).toHaveCSS("color", "rgb(247, 244, 238)"); // --pin-label (dark)
     await openListing(page, ev.id);
+    // 2nd tap opens the raised pinpeek (inline sheet is transparent; the peek uses --xp-sheet)
+    const peek = page.locator("[data-mv2='pinpeek']");
+    // dark --xp-sheet / --surface-1 (browsers may resolve the glass sheet to either)
+    const bg = await peek.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(bg === "rgba(27, 28, 24, 0.95)" || bg === "rgb(26, 23, 20)").toBe(true);
     const sheet = page.locator("[data-mv2='sheet']");
-    await expect(sheet).toHaveCSS("background-color", "rgb(26, 23, 20)");
     await expect(sheet.locator("[data-mv2='name']")).toHaveCSS("color", "rgb(247, 244, 238)");
     await expect(pin.locator("[data-mv2='logo-wrap']")).toHaveCSS("background-color", "rgb(255, 255, 255)");
     // the gold action keeps its near-black label

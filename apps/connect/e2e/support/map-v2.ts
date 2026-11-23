@@ -85,12 +85,16 @@ export async function mockMapNetwork(
   });
 }
 
-/** Open the map screen and wait until the MapLibre instance and `min` markers exist. */
+/**
+ * Open the map screen and wait until the MapLibre instance and `min` markers exist, and map-v2.css has painted (the
+ * app turns motion on only then, data-mv2-motion: before it, panels still sit where an unstyled page puts them).
+ */
 export async function openMap(page: Page, path = "/", min = 1) {
   await page.goto(path);
   await page.waitForSelector('[data-screen="discover"]', { timeout: 20_000 });
   await page.waitForFunction(
-    (n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n,
+    (n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n
+      && document.documentElement.hasAttribute("data-mv2-motion"),
     min,
     { timeout: 20_000 },
   );
@@ -133,10 +137,30 @@ export async function mapSettled(page: Page) {
  * OPEN panel lists every row and shows the sticky nav. The crown shows the strip; the handle opens the rest.
  */
 export async function openExploreAll(page: Page, how: "click" | "tap" = "click") {
+  // Raised pinpeek covers Explore; Close it before opening the panel (2nd-tap surface, 2026-11-22).
+  const peek = page.locator("[data-mv2='pinpeek']:not([hidden])");
+  if (await peek.count()) {
+    // Prefer the X (full dismiss). Force: the centred handle used to paint over it (width:100%).
+    const close = page.locator("[data-mv2='pinpeek-close']");
+    if (how === "tap") await close.tap({ force: true });
+    else await close.click({ force: true });
+    await expect(peek).toHaveCount(0, { timeout: 5_000 });
+  }
   const explore = page.locator("[data-mv2='explore']");
   if ((await explore.getAttribute("data-open")) !== null) return;
   const press = (l: Locator) => (how === "tap" ? l.tap() : l.click());
-  if ((await explore.getAttribute("data-mode")) === "rest") await press(page.locator("[data-mv2='explore-crown']"));
+  // Minimize-with-filter (founder, 2026-11-22): grab only toggles rest↔focus while a chip is on.
+  // Clear it so the handle can raise the full open panel again.
+  const chipX = page.locator("[data-mv2='filter-chip-x']");
+  if (await chipX.count()) {
+    if (how === "tap") await chipX.tap();
+    else await chipX.click();
+    await expect(page.locator("[data-mv2='filter-chip']")).toHaveCount(0, { timeout: 5_000 });
+  }
+  if ((await explore.getAttribute("data-mode")) === "rest") {
+    await press(page.locator("[data-mv2='explore-crown']"));
+    await expect(explore).not.toHaveAttribute("data-mode", "rest", { timeout: 5_000 });
+  }
   await press(page.locator("[data-mv2='explore-grab']"));
   await expect(explore).toHaveAttribute("data-open", "", { timeout: 5_000 });
 }

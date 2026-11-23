@@ -222,23 +222,32 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
 
     const p = seed.places[0] as PlacePin;
     await openCardOn(page, p.id, p.longitude, p.latitude);
-    expect(await pushes()).toEqual([{ active: true, guard: true, url: expect.any(String) }]);
+    // Raised pinpeek registers two levels (cards + raised)
+    expect(await pushes()).toEqual([
+      { active: true, guard: true, url: expect.any(String) },
+      { active: true, guard: true, url: expect.any(String) },
+    ]);
 
-    // closed by its own button, reopened, closed by Back, reopened, closed by Back
+    // closed by its own button, reopened, closed by Back (two steps), reopened, closed by Back
     await page.getByRole("button", { name: "Close details" }).click();
     await expect(sheet(page)).toHaveCount(0);
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     await page.waitForTimeout(300); // the guard's own entry is taken back off the stack (async)
     await openCardOn(page, p.id, p.longitude, p.latitude);
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);
+    await page.goBack();
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     await openCardOn(page, p.id, p.longitude, p.latitude);
     await page.goBack();
     await expect(sheet(page)).toHaveCount(0);
+    await page.goBack();
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     expect(new URL(page.url()).pathname).toBe("/");
 
-    // three openings = three pushes, every one inside a tap and none a screen change
+    // three openings × two levels = six pushes, every one inside a tap and none a screen change
     const all = await pushes();
-    expect(all).toHaveLength(3);
+    expect(all).toHaveLength(6);
     expect(all.every((p) => p.active && p.guard)).toBe(true);
 
     // nothing stacked under the map: the next Back leaves Connect
@@ -253,11 +262,15 @@ test.describe("P1-06 bottom sheet (phone width)", () => {
     await openMap(page, "/?map=v2", 5);
     const p = seed.places[0] as PlacePin;
     await openCardOn(page, p.id, p.longitude, p.latitude);
+    // Raised pinpeek: Escape steps down (details off); a second Escape closes the cards.
     await page.keyboard.press("Escape");
     await expect(sheet(page)).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     await openCardOn(page, p.id, p.longitude, p.latitude);
     await page.getByRole("button", { name: "Close details" }).click();
     await expect(sheet(page)).toHaveCount(0);
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     // the guard's own entry is taken back off the stack once the sheet is gone: we are on the arrival entry again
     await expect.poll(() => page.evaluate(() => (history.state as { idx?: number } | null)?.idx)).toBe(0);
     expect(new URL(page.url()).pathname).toBe("/"); // never left the app

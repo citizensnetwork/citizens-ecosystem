@@ -33,19 +33,28 @@ async function open(page: Page) {
   await idle(page);
 }
 /**
- * The map has settled: not moving, and its camera unchanged for 300 ms. A carousel choice eases the map one frame later
- * (requestAnimationFrame), so "not moving" alone can be read in the frame before an ease begins (CI saw that).
+ * The map has settled: not moving, and its camera unchanged for 300 ms AND across at least three painted frames. A
+ * carousel choice starts its ease in the next animation frame (requestAnimationFrame). CI draws the map in software, so
+ * frames can be held back for longer than 300 ms while this check's timers keep running: a camera diagnostic showed the
+ * time alone passing before the ease had even begun, so the "settled" camera was read just before it moved.
  */
 async function idle(page: Page) {
   await page.waitForFunction(() => {
-    const w = window as unknown as { __ccMap: MapLike; __idle?: { sig: string; at: number } };
+    type W = { __ccMap: MapLike; __idle?: { sig: string; at: number; frame: number }; __frames?: number };
+    const w = window as unknown as W;
+    // one painted-frame counter per page (a requestAnimationFrame loop, like the app's own eases)
+    if (w.__frames === undefined) {
+      w.__frames = 0;
+      const tick = () => { w.__frames = (w.__frames || 0) + 1; requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    }
     const m = w.__ccMap;
     if (m.isMoving()) { w.__idle = undefined; return false; }
     const c = m.getCenter();
     const sig = `${c.lng.toFixed(9)},${c.lat.toFixed(9)},${m.getZoom().toFixed(6)}`;
     const now = performance.now();
-    if (!w.__idle || w.__idle.sig !== sig) { w.__idle = { sig, at: now }; return false; }
-    return now - w.__idle.at > 300;
+    if (!w.__idle || w.__idle.sig !== sig) { w.__idle = { sig, at: now, frame: w.__frames }; return false; }
+    return now - w.__idle.at > 300 && w.__frames - w.__idle.frame >= 3;
   }, undefined, { polling: 50, timeout: 15_000 });
 }
 const cam = (page: Page) => page.evaluate(() => {
@@ -175,26 +184,30 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       expect(pins.length).toBeGreaterThanOrEqual(3);
       await tapPin(page, pins[0]);
       await expect(peek(page)).toBeVisible();
-      await expect(cards(page).first()).toHaveAttribute("data-explore-id", pins[0]);
+      // chosen card is the tapped pin (centred among neighbours); not necessarily the first DOM card
       await expect(chosenCard(page)).toHaveAttribute("data-explore-id", pins[0]);
       await expect(pinSelected(page, pins[0])).toBeAttached();
       expect(await cards(page).count()).toBeGreaterThanOrEqual(3);
+      const chosenIdx = await cards(page).evaluateAll((els) => els.findIndex((e) => e.hasAttribute("data-selected")));
+      expect(chosenIdx).toBeGreaterThan(0);
+      expect(chosenIdx).toBeLessThan((await cards(page).count()) - 1);
+      await expect(chosenCard(page).locator("[data-mv2='xcard-cue']")).toBeVisible();
+      await expect(page.locator("[data-mv2='pinpeek-count']")).toHaveCount(0);
       // one history entry for the level
       expect((await depth(page)).idx).toBe(before.idx + 1);
       await still(page);
       await shot(page, `${size.name}-2-carousel`);
 
-      // the arrow chooses the next card, and its pin lights instead
-      await page.getByRole("button", { name: "Next on the map" }).click();
-      const second = await cards(page).nth(1).getAttribute("data-explore-id");
-      await expect(chosenCard(page)).toHaveAttribute("data-explore-id", second!);
-      await expect(pinSelected(page, second!)).toBeAttached();
+      // both arrows stay available (wrap); next chooses a neighbour and its pin lights
+      await expect(page.getByRole("button", { name: "Previous" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Next" })).toBeVisible();
+      await page.getByRole("button", { name: "Next" }).click();
+      await expect.poll(async () => (await chosenCard(page).getAttribute("data-explore-id")) !== pins[0], { timeout: 5_000 }).toBe(true);
+      const nextId = await chosenCard(page).getAttribute("data-explore-id");
+      await expect(pinSelected(page, nextId!)).toBeAttached();
       await expect(pinSelected(page, pins[0])).toHaveCount(0);
-      await expect(page.locator("[data-mv2='pinpeek-count']")).toContainText("2 of");
-      await page.getByRole("button", { name: "Previous on the map" }).click();
+      await page.getByRole("button", { name: "Previous" }).click();
       await expect(chosenCard(page)).toHaveAttribute("data-explore-id", pins[0]);
-      // no arrow points past either end
-      await expect(page.getByRole("button", { name: "Previous on the map" })).toHaveCount(0);
 
       // a sideways swipe (a trackpad's sideways wheel here) chooses the card it settles on
       const row = page.locator("[data-row='peek']");
@@ -215,12 +228,13 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       const atTap = await cam(page);
       await tapPin(page, pins[0]);
       await expect(peek(page)).toBeVisible();
-      await page.getByRole("button", { name: "Next on the map" }).click();
+      await page.getByRole("button", { name: "Next" }).click();
       const second = (await chosenCard(page).getAttribute("data-explore-id"))!;
       await idle(page);
       const atRaise = await cam(page);
-      // the chosen card says what its next tap does; that tap raises the panel
-      await expect(chosenCard(page)).toContainText("Tap again for details");
+      // the chosen card shows the details cue (SVG + sr text); that tap raises the panel
+      await expect(chosenCard(page).locator("[data-mv2='xcard-cue']")).toBeVisible();
+      await expect(chosenCard(page)).toContainText("Open details");
       await chosenCard(page).click();
       await expect(peek(page)).toHaveAttribute("data-raised", "");
       const details = page.locator("[data-mv2='pinpeek-details'] [data-mv2='sheet'][data-inline]");
@@ -265,18 +279,21 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await expect(peek(page)).not.toHaveAttribute("data-raised", "");
       await expect(chosenCard(page)).toHaveAttribute("data-explore-id", pins[1]);
       await expect.poll(async () => (await depth(page)).idx).toBe(start.idx + 1);
-      // a pull down on the lowered carousel closes it
+      // a pull down on the handle closes the lowered carousel (card-row drag stays for sideways swipe)
       await still(page);
-      const bar = (await page.locator("[data-mv2='pinpeek-count']").boundingBox())!;
-      await page.mouse.move(bar.x + 10, bar.y + bar.height / 2);
+      const handle = page.locator("[data-mv2='pinpeek-bar'] [data-mv2='handle']");
+      const box = (await handle.boundingBox())!;
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
       await page.mouse.down();
-      await page.mouse.move(bar.x + 10, bar.y + 90, { steps: 6 });
+      await page.mouse.move(box.x + box.width / 2, box.y + 110, { steps: 6 });
       await page.mouse.up();
       await expect(peek(page)).toHaveCount(0);
       await expect.poll(async () => (await depth(page)).idx).toBe(start.idx);
     });
 
     test("the crown and a tap on empty map go straight back to the crown alone, leaving no history behind", async ({ page }) => {
+      // a long journey (two full climbs, the strip, bare-map taps and a pan): close to the 30 s default on a busy machine
+      test.slow();
       await open(page);
       const start = await depth(page);
       const pins = await visiblePins(page);
@@ -301,7 +318,7 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
 
       await climb();
       // raised, the crown is out of the way: the bar's Close goes home
-      await peek(page).getByRole("button", { name: "Close and go back to the map" }).click();
+      await peek(page).locator("[data-mv2='pinpeek-close']").click();
       await reset();
 
       await climb();
@@ -320,8 +337,10 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await crown.click();
       await reset();
 
-      // a tap on bare map, from the carousel
-      await tapPin(page, pins[0]);
+      // a tap on bare map, from the carousel (re-measure pins: the climb may have moved the camera)
+      const openPins = await visiblePins(page);
+      expect(openPins.length).toBeGreaterThan(0);
+      await tapPin(page, openPins[0]);
       await expect(peek(page)).toBeVisible();
       const spot = await bareMap(page);
       expect(spot).not.toBeNull();
@@ -336,7 +355,9 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
         await expect(page.locator("[data-mv2='explore-host']")).toHaveAttribute("data-mode", "rest");
       }
       // a pan is not a tap: it leaves the carousel where it is
-      await tapPin(page, pins[0]);
+      const panPins = await visiblePins(page);
+      expect(panPins.length).toBeGreaterThan(0);
+      await tapPin(page, panPins[0]);
       await expect(peek(page)).toBeVisible();
       const spot2 = (await bareMap(page))!;
       await page.mouse.move(spot2.x, spot2.y);

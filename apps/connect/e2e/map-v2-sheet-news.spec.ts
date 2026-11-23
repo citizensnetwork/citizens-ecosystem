@@ -195,13 +195,16 @@ test("tapping a news card opens the reader, and every close leaves the sheet whe
   expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe("hidden");
   expect(await page.evaluate(() => document.getElementById("root")?.inert)).toBe(true);
 
-  // Tab starts at the title, then the close button, then the link, then wraps.
+  // Tab starts at the title, then Back, Close, then the link; trap wraps link → Back.
+  const newsBack = page.locator("[data-mv2='news-back']");
+  await page.keyboard.press("Tab");
+  await expect(newsBack).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Close news post" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(link).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Close news post" })).toBeFocused();
+  await expect(newsBack).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(link).toBeFocused();
 

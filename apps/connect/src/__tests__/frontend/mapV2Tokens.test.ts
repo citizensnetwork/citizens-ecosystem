@@ -31,7 +31,7 @@ describe("Map v2 visual consistency (tracker section 12.3)", () => {
     const radii = [...css.matchAll(/--radius-(sm|md|lg|full):\s*(\d+)px;/g)].map((m) => Number(m[2])).sort((a, b) => a - b);
     expect(radii).toEqual([8, 12, 20, 999]);
     for (const v of valuesOf("border-radius")) {
-      for (const part of v.split(/\s+/)) expect(part).toMatch(/^(var\(--(radius-(sm|md|lg|full)|sheet-radius)\)|0)$/);
+      for (const part of v.split(/\s+/)) expect(part).toMatch(/^(var\(--(radius-(sm|md|lg|full)|sheet-radius|reader-radius)\)|0)$/);
     }
   });
 

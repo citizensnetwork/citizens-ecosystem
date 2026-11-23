@@ -72,15 +72,15 @@ test.describe("the map home on a phone", () => {
     await open(page);
     await crown(page).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
-    expect(await settled(page)).toBe(124);
+    expect(await settled(page)).toBe(152);
     await expect(page.getByRole("button", { name: "Coffee", exact: true })).toBeVisible();
-    // no "Explore", "Where to…", "Near you" or count line: only the handle above the tiles
-    await expect(sheet(page).getByRole("heading")).toHaveCount(0);
+    // strip lead above the tiles (founder, 2026-11-22); no old "Explore" / count / "Near you" line
+    await expect(sheet(page).getByRole("heading", { name: "Where Christians…" })).toBeVisible();
     await expect(sheet(page).getByText(/near you/i)).toHaveCount(0);
     await expect(page.locator("[data-mv2='explore-handle']")).toBeVisible();
     // the crown rides just above the strip
     const c = (await crown(page).boundingBox())!;
-    expect(844 - (c.y + c.height)).toBeGreaterThan(124);
+    expect(844 - (c.y + c.height)).toBeGreaterThan(152);
     await crown(page).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
   });
@@ -92,7 +92,7 @@ test.describe("the map home on a phone", () => {
     await expect(sheet(page)).toHaveAttribute("data-mode", "focus");
     const height = await settled(page);
     expect(height).toBeGreaterThan(240);
-    expect(height).toBeLessThan(320);
+    expect(height).toBeLessThan(360);
     const tab = page.getByRole("tab", { name: "Coffee" });
     await expect(tab).toHaveAttribute("aria-selected", "true");
     const plate = await tab.evaluate((e) => getComputedStyle(e).backgroundColor);
@@ -110,8 +110,9 @@ test.describe("the map home on a phone", () => {
     expect(await settled(page)).toBe(height);
     await page.getByRole("tab", { name: "Worship" }).click();
     expect(await settled(page)).toBe(height);
-    // "All types" is plain words, not a plate
-    const reset = page.getByRole("button", { name: "All types" });
+    // Focus chrome Back (Close) is plain words, not a plate
+    const reset = page.locator("[data-mv2='xfocus-back']");
+    await expect(reset).toBeVisible();
     const look = await reset.evaluate((e) => ({ bg: getComputedStyle(e).backgroundColor, border: getComputedStyle(e).borderTopWidth }));
     expect(look.bg).toMatch(/rgba\(0, 0, 0, 0\)|transparent/);
     expect(look.border).toBe("0px");
@@ -151,7 +152,7 @@ test.describe("the map home on a phone", () => {
     await crown(page).click();
     await page.getByRole("button", { name: "Coffee", exact: true }).click();
     await expect(page.locator("[data-mv2='filter-chip']")).toBeVisible();
-    await page.getByRole("button", { name: "Clear filters and go back to the map" }).click();
+    await page.getByRole("button", { name: "Clear filters" }).click();
     await expect(page.locator("[data-mv2='filter-chip']")).toHaveCount(0);
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
     await expect(page.locator(".mv2-pin[data-match]")).toHaveCount(0);
@@ -160,7 +161,7 @@ test.describe("the map home on a phone", () => {
   test("the handle opens every row; a row's title takes it over; the sticky nav is Explore, Map, Me", async ({ page }) => {
     await open(page);
     await crown(page).click();
-    await page.getByRole("button", { name: "Show every row" }).click();
+    await page.getByRole("button", { name: "Show all rows" }).click();
     await expect(sheet(page)).toHaveAttribute("data-open", "");
     await expect(crown(page)).toHaveCount(0);
     const dock = page.locator("[data-mv2='explore-dock']");
@@ -173,12 +174,16 @@ test.describe("the map home on a phone", () => {
     await dock.locator("[data-nav='me']").click();
     await expect(page.getByRole("button", { name: "View Profile" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Near and Now…" }).click();
+    await page.getByRole("button", { name: "Near & now" }).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "focus");
-    await expect(page.getByRole("tab", { name: "Near and Now…" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.locator("[data-mv2='filter-chip']")).toContainText("Near and Now…");
+    await expect(page.getByRole("tab", { name: "Near & now" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("[data-mv2='filter-chip']")).toContainText("Near & now");
 
-    await page.getByRole("button", { name: "Show every row" }).click();
+    // Clear the filter (grab would only minimize while a chip is on), then open every row again.
+    await page.locator("[data-mv2='filter-chip-x']").click();
+    await expect(page.locator("[data-mv2='filter-chip']")).toHaveCount(0);
+    await page.getByRole("button", { name: "Show all rows" }).click();
+    await expect(sheet(page)).toHaveAttribute("data-open", "");
     await page.getByRole("button", { name: "Explore more" }).click();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page.locator("[data-screen='explore']")).toBeVisible();
@@ -187,7 +192,7 @@ test.describe("the map home on a phone", () => {
   test("Map in the sticky nav goes back to the crown", async ({ page }) => {
     await open(page);
     await crown(page).click();
-    await page.getByRole("button", { name: "Show every row" }).click();
+    await page.getByRole("button", { name: "Show all rows" }).click();
     await page.locator("[data-mv2='explore-dock'] [data-nav='map']").click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
     await expect(crown(page)).toBeVisible();
