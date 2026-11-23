@@ -1274,30 +1274,30 @@
 /* The one rail. Closed on the map; open beside Me, Explore, Let's and the dashboards. */
 .connect-app{display:flex;height:100%;width:100%;min-height:0;background:#f7f6f1;color:#272a25}
 .connect-app-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
-.cn-rail{position:relative;z-index:40;flex:0 0 64px;width:64px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;padding:16px 8px 18px;background:linear-gradient(180deg,#f7f6f1ee,#f7f6f1c4);backdrop-filter:blur(24px);border-right:1px solid #ffffffd9;color:#f2bd22;pointer-events:none;font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif}
+.cn-rail{position:relative;z-index:40;flex:0 0 64px;width:64px;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:8px;padding:16px 8px 18px;box-sizing:border-box;background:linear-gradient(180deg,#f7f6f1ee,#f7f6f1c4);backdrop-filter:blur(24px);border-right:1px solid #ffffffd9;color:#f2bd22;pointer-events:none;font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif}
 .cn-rail button,.cn-rail-door{pointer-events:auto}
-.cn-rail[data-open='true']{flex-basis:228px;width:228px;align-items:stretch;padding:18px 12px}
-.cn-rail-brand{display:flex;align-items:center;gap:10px;border:0;background:transparent;padding:4px 6px 8px;text-align:left;color:inherit;min-height:44px}
-.cn-rail[data-open='false'] .cn-rail-brand{justify-content:center;padding:4px 0 8px}
-.cn-rail[data-open='false'] .cn-rail-word{display:none}
-.cn-rail-brand b{display:block;font-size:15px;font-weight:600;letter-spacing:-.03em;color:#272a25;font-family:'Plus Jakarta Sans',ui-sans-serif,sans-serif}
+.cn-rail[data-open='true']{flex-basis:228px;width:228px}
+.cn-rail-brand,.cn-rail-btn,.cn-rail-do{display:grid;grid-template-columns:48px minmax(0,1fr);align-items:center;justify-items:center;width:100%;min-height:48px;margin:0;padding:0;gap:0;border:0;border-radius:16px;background:transparent;color:#f2bd22;cursor:pointer;text-align:left}
+.cn-rail-brand>:first-child{width:36px;height:36px;justify-self:center}
+.cn-rail-btn .inline-icon,.cn-rail-do .inline-icon{inline-size:48px;width:48px;height:48px;display:grid;place-items:center;color:#f2bd22}
+.cn-rail-btn .inline-icon svg,.cn-rail-do .inline-icon svg{width:22px;height:22px}
+.cn-rail-word,.cn-rail-label{min-width:0;overflow:hidden;white-space:nowrap}
+.cn-rail[data-open='false'] .cn-rail-word,.cn-rail[data-open='false'] .cn-rail-label{display:none}
+.cn-rail-brand b{display:block;font-size:15px;font-weight:600;letter-spacing:-.01em;color:#272a25;font-family:'Plus Jakarta Sans',ui-sans-serif,sans-serif}
 .cn-rail-brand small{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#f2bd22}
-.cn-rail-stack{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%}
-.cn-rail[data-open='true'] .cn-rail-stack{align-items:stretch}
-.cn-rail-btn,.cn-rail-do{display:grid;justify-items:center;align-items:center;gap:4px;width:48px;min-height:48px;padding:8px 4px;border:0;border-radius:16px;background:transparent;color:#f2bd22;cursor:pointer}
-.cn-rail[data-open='true'] .cn-rail-btn,.cn-rail[data-open='true'] .cn-rail-do{width:100%;grid-template-columns:28px 1fr;justify-items:start;padding:8px 12px}
-.cn-rail-btn .inline-icon,.cn-rail-do .inline-icon{inline-size:22px;color:#f2bd22}
-.cn-rail-btn small,.cn-rail-do small,.cn-rail-label{font-size:13px;font-weight:500;letter-spacing:.01em;color:#272a25;font-family:'Plus Jakarta Sans',ui-sans-serif,sans-serif}
-.cn-rail[data-open='false'] .cn-rail-label{display:none}
+.cn-rail-stack{display:flex;flex-direction:column;align-items:stretch;gap:8px;width:100%}
+.cn-rail-btn small,.cn-rail-do small,.cn-rail-label{font-size:14px;font-weight:600;line-height:20px;letter-spacing:-.01em;color:#272a25;font-family:'Plus Jakarta Sans',ui-sans-serif,sans-serif}
 .cn-rail-btn.on,.cn-rail-do.on{background:#f2bd2224;color:#f2bd22;box-shadow:inset 0 0 0 1px #f2bd2255}
 .cn-rail-door{position:absolute;left:calc(100% + 8px);bottom:18px;z-index:50;display:grid;gap:4px;min-width:180px;padding:8px;border-radius:18px}
-.cn-rail-door button{border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:12px;font-size:13px;color:#272a25}
+.cn-rail-door button{border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:600;color:#272a25;font-family:'Plus Jakarta Sans',ui-sans-serif,sans-serif}
 .cn-rail-door button:hover{background:#f2bd2218}
 .connect-app .connect-placed.connect-shell,.connect-app .phone-review .connect-frame,.connect-app .desktop-review .connect-frame{max-width:none;height:100%;box-shadow:none}
 .connect-app [data-mv2='desktop-nav'],.connect-app [data-mv2='explore-dock']{display:none !important}
-.connect-placed .connect-frame{font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif}
-.connect-placed .connect-frame h1,.connect-placed .me-identity h1,.connect-placed .explore-hero h1,.connect-placed .me-calendar h2,.connect-placed .me-left h2,.connect-placed .explore-content h2,.connect-placed .photo-title h3,.connect-placed .activity-call h2{font-family:'Playfair Display',serif;font-weight:500;letter-spacing:-.03em}
-.connect-placed .cn-eyebrow,.connect-placed .me-identity small,.connect-placed .explore-hero p,.connect-placed .photo-title small{font-family:'Plus Jakarta Sans',ui-sans-serif,sans-serif;letter-spacing:.08em}
+.connect-placed .connect-frame,.connect-placed .connect-frame h1,.connect-placed .connect-frame h2,.connect-placed .connect-frame h3,.connect-placed .connect-frame button,.connect-placed .connect-frame small,.connect-placed .connect-frame p,.connect-placed .connect-frame b{font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif}
+.connect-placed .me-identity h1,.connect-placed.desktop-review .me-identity h1,.connect-placed .explore-hero h1{font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;font-weight:600;font-size:18px;line-height:24px;letter-spacing:-.01em}
+.connect-placed .me-left h2,.connect-placed .me-calendar h2,.connect-placed .explore-content h2,.connect-placed .activity-call h2,.connect-placed .photo-title h3,.connect-placed.desktop-review .me-left h2,.connect-placed.desktop-review .me-calendar h2{font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif;font-weight:600;font-size:18px;line-height:24px;letter-spacing:-.01em}
+.connect-placed .cn-eyebrow,.connect-placed .me-identity small,.connect-placed .explore-hero p,.connect-placed .photo-title small,.connect-placed .me-space-links small,.connect-placed .me-space-links b{font-family:'Plus Jakarta Sans',ui-sans-serif,sans-serif}
+.connect-placed .me-space-links b,.connect-placed .photo-title h3{font-weight:600;font-size:14px;line-height:20px;letter-spacing:-.01em}
 [data-theme='dark'] .connect-app{background:#1b1c18;color:#f7f6f1}
 [data-theme='dark'] .cn-rail{background:linear-gradient(180deg,#23251ff2,#1b1c18e6);border-right-color:#ffffff1a}
 [data-theme='dark'] .cn-rail-btn small,[data-theme='dark'] .cn-rail-do small,[data-theme='dark'] .cn-rail-label,[data-theme='dark'] .cn-rail-brand b,[data-theme='dark'] .cn-rail-door button{color:#f7f6f1}
@@ -1306,6 +1306,6 @@
 @media(max-width:767px){
   .cn-rail,.cn-rail[data-open='true']{flex-basis:64px;width:64px;align-items:center;padding:16px 8px 18px}
   .cn-rail[data-open='true'] .cn-rail-stack{align-items:center}
-  .cn-rail[data-open='true'] .cn-rail-btn,.cn-rail[data-open='true'] .cn-rail-do{width:48px;grid-template-columns:none;justify-items:center;padding:8px 4px}
+  .cn-rail[data-open='true'] .cn-rail-btn,.cn-rail[data-open='true'] .cn-rail-do,.cn-rail[data-open='true'] .cn-rail-brand{grid-template-columns:48px 0fr}
   .cn-rail-word,.cn-rail-label{display:none !important}
 }
