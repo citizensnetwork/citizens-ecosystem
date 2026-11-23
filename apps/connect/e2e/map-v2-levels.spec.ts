@@ -245,6 +245,17 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       // the raised panel is most of the screen, the cards above the details
       const raisedTop = await still(page);
       expect(raisedTop).toBeLessThan(size.height * 0.2);
+      // the body (not the section) is the vertical scroller — tall enough to swipe through the profile
+      const body = page.locator("[data-mv2='pinpeek-body']");
+      await expect(body).toBeVisible();
+      const scrollable = await body.evaluate((el) => ({
+        overflowY: getComputedStyle(el).overflowY,
+        canScroll: el.scrollHeight > el.clientHeight + 24,
+      }));
+      expect(scrollable.overflowY).toMatch(/auto|scroll/);
+      expect(scrollable.canScroll).toBe(true);
+      await body.evaluate((el) => { el.scrollTop = Math.min(180, el.scrollHeight - el.clientHeight); });
+      await expect.poll(async () => body.evaluate((el) => el.scrollTop)).toBeGreaterThan(40);
       await shot(page, `${size.name}-3-details`);
 
       // the person moves the map while reading; Back puts it, the card and the pin back as they were when it rose

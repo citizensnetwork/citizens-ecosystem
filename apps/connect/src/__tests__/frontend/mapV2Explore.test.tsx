@@ -505,20 +505,23 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261123b"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261123c"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123a");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123b");
     const sheetCss = read("src/frontend/assets/map-v2.css");
     expect(sheetCss).toMatch(/\[data-mv2='explore'\] \{[\s\S]*?touch-action: none;/);
-    expect(sheetCss).toMatch(/\[data-mv2='pinpeek'\]\[data-raised\]\[data-top\] \{\s*touch-action: pan-down;/);
-    // inline raised profile: never lock --mv2-ta to pan-down (scrollTop is always 0 with overflow visible)
+    // raised: body scrolls; section does not
     expect(sheetCss).toMatch(
-      /\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\],\s*\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\]\[data-top\] \{[\s\S]*?--mv2-ta: pan-y;/,
+      /\[data-mv2='pinpeek'\]\[data-raised\] \[data-mv2='pinpeek-body'\] \{[\s\S]*?overflow-y: auto;[\s\S]*?touch-action: pan-y;/,
+    );
+    // inline rows must stay pan-x only (not pan-x pan-y) or they steal vertical pans from the body
+    expect(sheetCss).toMatch(
+      /\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\],\s*\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\]\[data-top\] \{[\s\S]*?--mv2-ta-row: pan-x;/,
     );
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
@@ -595,6 +598,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
 
   it("draws the Explore row's own cards, the chosen one with a details cue, and no counter", () => {
     carousel();
+    expect(document.querySelector("[data-mv2='pinpeek-body']")).toBeTruthy();
     const cards = cardsIn();
     expect(cards.map((c) => c.getAttribute("data-explore-id"))).toEqual(["a", "c", "b"]);
     expect(cards[0].hasAttribute("data-selected")).toBe(true);

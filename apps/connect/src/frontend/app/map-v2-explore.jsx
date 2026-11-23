@@ -1018,6 +1018,7 @@
     const index = Math.max(0, Math.min(n - 1, props.index || 0));
     const raised = !!props.raised;
     const root = useRef(null);
+    const body = useRef(null);         // raised: the only vertical scroller (bar stays put)
     const row = useRef(null);
     const indexRef = useRef(index);
     indexRef.current = index;
@@ -1061,19 +1062,10 @@
       if (card && card.focus) card.focus({ preventScroll: true });
     }, [props.focusCard]);
     useEffect(() => () => clearTimeout(settle.current), []);
-    // Raised scroll hand-off: data-top while scrolled to the top, so CSS can let a downward swipe through to us
-    // (same pattern as the listing sheet). Set by hand — a scroll event must not re-render.
+    // Raised: reset the body scroller when the panel rises or the chosen card changes.
     useEffect(() => {
-      const el = root.current;
-      if (!el || !raised) {
-        if (el) el.removeAttribute('data-top');
-        return undefined;
-      }
-      const sync = () => { if (el.scrollTop < 6) el.setAttribute('data-top', ''); else el.removeAttribute('data-top'); };
-      sync();
-      el.addEventListener('scroll', sync, { passive: true });
-      return () => { el.removeEventListener('scroll', sync); el.removeAttribute('data-top'); };
-    }, [raised]);
+      if (raised && body.current) body.current.scrollTop = 0;
+    }, [raised, index, order]);
     // A layout effect: its clean-up runs while the carousel is still in the page, so focus can still be found inside it
     // (by the time a plain effect's clean-up runs, the removed cards have already dropped focus to the page).
     useLayoutEffect(() => {
@@ -1102,8 +1094,8 @@
     };
     const touch = () => { touched.current = true; };
 
-    // Vertical pull: lowered = bar or cards (raise / step back). Raised = sticky bar only — the profile body
-    // must keep pan-y so Gallery / Events / Posts and nested Explore can be swiped (founder, 2026-11-23).
+    // Vertical pull: lowered = bar or cards (raise / step back). Raised = bar only — pinpeek-body owns
+    // vertical pan-y so Gallery / Events / Posts and nested Explore can scroll (founder, 2026-11-23).
     // Sideways card swipes stay with the row: we only capture once the gesture is clearly vertical.
     // Do not setPointerCapture on pointerdown: that steals the click from Back / handle / Close.
     const onPullDown = (e) => {
@@ -1112,13 +1104,13 @@
       if (e.target.closest && e.target.closest(
         "[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close'], [data-mv2='xarrow'], [data-mv2='handle-chip'], [data-mv2='xfocus-back'], [data-mv2='xfocus-close']",
       )) return;
+      // Raised body is a native scroller: never start a snap pull from it (capture would steal the scroll).
+      if (raised && e.target.closest && e.target.closest("[data-mv2='pinpeek-body']")) return;
       const onBar = !!(e.target.closest && (
         e.target.closest("[data-mv2='pinpeek-bar']") ||
         e.target.closest("[data-mv2='handle']") ||
         e.target.closest("[data-mv2='handle-bar']")
       ));
-      // Raised profile body scrolls; only the sticky chrome starts a snap pull there.
-      // (pinpeek[data-top] + pan-down still lets a downward swipe at the top reach the bar/handle.)
       if (raised && !onBar) return;
       pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId, captured: false, fromHandle: onBar };
     };
@@ -1212,34 +1204,36 @@
             if (props.onClose) props.onClose();
           },
         }, 'X')),
-      h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
-        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
-        h('div', {
-          ref: row, 'data-mv2': 'xrow', 'data-row': 'peek', onScroll: onRowScroll,
-          onPointerDownCapture: touch, onTouchStart: (e) => {
-            touch();
-            if (e.touches && e.touches[0]) swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, index: indexRef.current };
-          }, onTouchEnd: (e) => {
-            const start = swipeStart.current;
-            swipeStart.current = null;
-            if (!start || !e.changedTouches || !e.changedTouches.length || n < 2) return;
-            const dx = e.changedTouches[0].clientX - start.x;
-            const dy = e.changedTouches[0].clientY - start.y;
-            if (Math.abs(dx) <= Math.abs(dy)) return;
-            if (start.index === 0 && dx > 40) { touched.current = false; props.onIndex(n - 1); }
-            else if (start.index === n - 1 && dx < -40) { touched.current = false; props.onIndex(0); }
-          }, onWheel: touch,
-        }, items.map((m, i) => h(XCard, {
-          key: 'peek:' + m.id, m: m, meters: meters(m), rec: byKey.get(m.type + ':' + m.id),
-          groupWords: str.groups, distWords: props.distWords || {},
-          peek: true, selected: i === index,
-          detailsCue: !raised, cueLabel: P.detailsCue || P.detailsBadge || '',
-          onOpen: tap,
-        }))),
-        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
-      raised && current && props.details ? h('div', {
-        'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
-      }, props.details(current)) : null);
+      // Body owns vertical scroll when raised (bar stays fixed). Lowered: no independent scroll.
+      h('div', { ref: body, 'data-mv2': 'pinpeek-body' },
+        h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
+          n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
+          h('div', {
+            ref: row, 'data-mv2': 'xrow', 'data-row': 'peek', onScroll: onRowScroll,
+            onPointerDownCapture: touch, onTouchStart: (e) => {
+              touch();
+              if (e.touches && e.touches[0]) swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, index: indexRef.current };
+            }, onTouchEnd: (e) => {
+              const start = swipeStart.current;
+              swipeStart.current = null;
+              if (!start || !e.changedTouches || !e.changedTouches.length || n < 2) return;
+              const dx = e.changedTouches[0].clientX - start.x;
+              const dy = e.changedTouches[0].clientY - start.y;
+              if (Math.abs(dx) <= Math.abs(dy)) return;
+              if (start.index === 0 && dx > 40) { touched.current = false; props.onIndex(n - 1); }
+              else if (start.index === n - 1 && dx < -40) { touched.current = false; props.onIndex(0); }
+            }, onWheel: touch,
+          }, items.map((m, i) => h(XCard, {
+            key: 'peek:' + m.id, m: m, meters: meters(m), rec: byKey.get(m.type + ':' + m.id),
+            groupWords: str.groups, distWords: props.distWords || {},
+            peek: true, selected: i === index,
+            detailsCue: !raised, cueLabel: P.detailsCue || P.detailsBadge || '',
+            onOpen: tap,
+          }))),
+          n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
+        raised && current && props.details ? h('div', {
+          'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
+        }, props.details(current)) : null));
   }
 
   // An id inside an attribute selector: listing ids are uuids or slugs, but never trust that.

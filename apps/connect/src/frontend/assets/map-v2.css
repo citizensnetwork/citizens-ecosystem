@@ -4550,18 +4550,23 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
 }
 [data-mv2='pinpeek'][data-raised] {
   background: var(--surface-1);
-  overflow-y: auto;
-  touch-action: pan-y;
+  /* Section itself does not scroll — pinpeek-body does (bar stays fixed). */
+  overflow: hidden;
+  touch-action: auto;
   transform: translateY(0);
 }
-/* At the top of the raised panel, a downward swipe is the panel's (step back); upward still scrolls. */
-[data-mv2='pinpeek'][data-raised][data-top] {
-  touch-action: pan-down;
+/* Raised body: the only vertical scroller. Horizontal rows stay pan-x so vertical pans reach this box. */
+[data-mv2='pinpeek-body'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
-@supports not (touch-action: pan-down) {
-  [data-mv2='pinpeek'][data-raised][data-top] {
-    touch-action: pan-y;
-  }
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
 }
 [data-mv2='home']:not([data-narrow]) [data-mv2='pinpeek'] {
   left: 50%;
@@ -4573,12 +4578,12 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
 [data-mv2='home']:not([data-narrow]) [data-mv2='pinpeek'][data-raised] {
   transform: translateX(-50%);
 }
-[data-mv2='pinpeek-bar'] {
-  position: sticky;
-  top: 0;
+[data-mv2='pinpeek'] > [data-mv2='pinpeek-bar'] {
+  position: relative;
+  top: auto;
   /* above cover-foot / details so the handle stays tappable (founder, 2026-11-22) */
   z-index: var(--z-xp-rail);
-  flex: none;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -4718,8 +4723,11 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   scroll-padding-inline: calc(50% - var(--pp-card-w) / 2);
   touch-action: pan-x;
 }
-[data-mv2='pinpeek'][data-raised] [data-mv2='xrow'][data-row='peek'] {
-  touch-action: pan-x pan-y;
+/* Raised: keep pan-x only on the card row — pan-x pan-y on a horizontal scroller steals vertical pans
+   from pinpeek-body (the browser claims them for the row, which cannot scroll vertically). */
+[data-mv2='pinpeek'][data-raised] [data-mv2='xrow'][data-row='peek'],
+[data-mv2='pinpeek'][data-raised] [data-mv2='xrow'][data-row='peek'] * {
+  touch-action: pan-x;
 }
 [data-mv2='xrow'][data-row='peek'] [data-mv2='xcard'] {
   width: var(--pp-card-w);
@@ -5113,22 +5121,30 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   animation: none;
   touch-action: pan-y;
 }
-/* Inline scroller's scrollTop is always 0 (overflow visible), so the sheet's data-top listener would leave
-   --mv2-ta at pan-down forever and block bidirectional swipe through the raised pinpeek. Force pan-y. */
+/* Inline lives inside pinpeek-body (the vertical scroller). Override the sheet's default
+   --mv2-ta:none (and never pan-down): content may pan-y so the body can scroll; rows are pan-x
+   only so they do not steal vertical pans from the body. */
 [data-mv2='sheet'][data-inline] [data-mv2='scroller'],
 [data-mv2='sheet'][data-inline] [data-mv2='scroller'][data-top] {
   overflow: visible;
   padding-inline: 0;
   --mv2-ta: pan-y;
-  --mv2-ta-row: pan-x pan-y;
+  --mv2-ta-row: pan-x;
 }
 [data-mv2='sheet'][data-inline] [data-mv2='scroller'],
 [data-mv2='sheet'][data-inline] [data-mv2='scroller'] * {
   touch-action: var(--mv2-ta, pan-y);
 }
 [data-mv2='sheet'][data-inline] [data-mv2='scroller'] [data-mv2='hrow'] [data-layout='row'],
-[data-mv2='sheet'][data-inline] [data-mv2='scroller'] [data-mv2='hrow'] [data-layout='row'] * {
-  touch-action: var(--mv2-ta-row, pan-x pan-y);
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] [data-mv2='hrow'] [data-layout='row'] *,
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] [data-mv2='xrow'],
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] [data-mv2='xrow'] * {
+  touch-action: pan-x;
+}
+/* Nested Explore rows under the raised profile: same rule. */
+[data-mv2='pinpeek'][data-raised] [data-mv2='peek-explore'] [data-mv2='xrow'],
+[data-mv2='pinpeek'][data-raised] [data-mv2='peek-explore'] [data-mv2='xrow'] * {
+  touch-action: pan-x;
 }
 /* the crown on the carousel's top edge (lowered); raised, the bar's Close does its job and the crown waits there hidden,
    so lowering the carousel never sends it gliding up from the foot */
