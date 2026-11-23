@@ -98,7 +98,8 @@ test.describe("the map home on a phone", () => {
     const plate = await tab.evaluate((e) => getComputedStyle(e).backgroundColor);
     expect(plate).not.toMatch(/212,\s*175,\s*55|242,\s*189,\s*34/);
     await mapIdle(page);
-    expect(Math.round(await zoom(page))).toBe(11);
+    // openMap leaves us at suburb zoom; Where-to keeps zoom when already ≥ town (founder, 2026-11-23).
+    expect(Math.round(await zoom(page))).toBeGreaterThanOrEqual(11);
     // the chip at the top says what is on, in the filter's colour, and clears it
     const chip = page.locator("[data-mv2='filter-chip']");
     await expect(chip).toContainText("Coffee");

@@ -245,6 +245,17 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       // the raised panel is most of the screen, the cards above the details
       const raisedTop = await still(page);
       expect(raisedTop).toBeLessThan(size.height * 0.2);
+      // the body (not the section) is the vertical scroller — tall enough to swipe through the profile
+      const body = page.locator("[data-mv2='pinpeek-body']");
+      await expect(body).toBeVisible();
+      const scrollable = await body.evaluate((el) => ({
+        overflowY: getComputedStyle(el).overflowY,
+        canScroll: el.scrollHeight > el.clientHeight + 24,
+      }));
+      expect(scrollable.overflowY).toMatch(/auto|scroll/);
+      expect(scrollable.canScroll).toBe(true);
+      await body.evaluate((el) => { el.scrollTop = Math.min(180, el.scrollHeight - el.clientHeight); });
+      await expect.poll(async () => body.evaluate((el) => el.scrollTop)).toBeGreaterThan(40);
       await shot(page, `${size.name}-3-details`);
 
       // the person moves the map while reading; Back puts it, the card and the pin back as they were when it rose
@@ -283,9 +294,11 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await still(page);
       const handle = page.locator("[data-mv2='pinpeek-bar'] [data-mv2='handle']");
       const box = (await handle.boundingBox())!;
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+      const hx = box.x + box.width / 2;
+      const hy = box.y + box.height / 2;
+      await page.mouse.move(hx, hy);
       await page.mouse.down();
-      await page.mouse.move(box.x + box.width / 2, box.y + 110, { steps: 6 });
+      await page.mouse.move(hx, hy + 180, { steps: 12 });
       await page.mouse.up();
       await expect(peek(page)).toHaveCount(0);
       await expect.poll(async () => (await depth(page)).idx).toBe(start.idx);
@@ -355,9 +368,19 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
         await expect(page.locator("[data-mv2='explore-host']")).toHaveAttribute("data-mode", "rest");
       }
       // a pan is not a tap: it leaves the carousel where it is
+      // Re-check pins after the long climb (camera may have drifted; soft-centre / dive centre).
       const panPins = await visiblePins(page);
-      expect(panPins.length).toBeGreaterThan(0);
-      await tapPin(page, panPins[0]);
+      if (panPins.length === 0) {
+        await page.evaluate(() => {
+          const m = (window as unknown as { __ccMap: MapLike }).__ccMap;
+          const c = m.getCenter();
+          m.jumpTo({ center: [c.lng, c.lat], zoom: Math.max(m.getZoom(), 13.6) }, { originalEvent: {} });
+        });
+        await idle(page);
+      }
+      const panPins2 = panPins.length > 0 ? panPins : await visiblePins(page);
+      expect(panPins2.length).toBeGreaterThan(0);
+      await tapPin(page, panPins2[0]);
       await expect(peek(page)).toBeVisible();
       const spot2 = (await bareMap(page))!;
       await page.mouse.move(spot2.x, spot2.y);

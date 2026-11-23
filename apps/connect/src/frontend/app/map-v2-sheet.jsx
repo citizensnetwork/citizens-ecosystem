@@ -555,14 +555,19 @@
 
     // The scroll hand-off (see the header): data-top is on the scroller while its content is at the top, so the
     // stylesheet can let a downward swipe through to us. Set by hand, not through React: a scroll event must not re-render.
+    // Inline (raised pinpeek) never: its scroller does not scroll (overflow visible), so scrollTop stays 0 and a
+    // sticky data-top would lock --mv2-ta to pan-down and block swiping the profile body (founder, 2026-11-23).
     useEffect(() => {
       const sc = scroller.current;
-      if (!sc) return undefined;
+      if (!sc || inline) {
+        if (sc) sc.removeAttribute('data-top');
+        return undefined;
+      }
       const sync = () => { if (sc.scrollTop < TOP_PX) sc.setAttribute('data-top', ''); else sc.removeAttribute('data-top'); };
       sync();
       sc.addEventListener('scroll', sync, { passive: true });
       return () => sc.removeEventListener('scroll', sync);
-    }, [item ? 1 : 0]);
+    }, [item ? 1 : 0, inline]);
     // Leaving full: the content cannot scroll any more, so show it from the top again.
     useEffect(() => {
       if (snap !== 'full' && scroller.current && scroller.current.scrollTop) scroller.current.scrollTop = 0;

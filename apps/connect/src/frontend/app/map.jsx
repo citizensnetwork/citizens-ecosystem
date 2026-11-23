@@ -28,7 +28,12 @@
   const env = window.__CC_ENV || {};
 
   // ── Geo frame ──────────────────────────────────────────────────────
-  const PRETORIA = [28.2293, -25.7479];           // [lng, lat] — Church Square
+  const PRETORIA = [28.2293, -25.7479];           // [lng, lat] — Church Square (legacy % proj + tests)
+  // Country overview when the guest has no location (founder, 2026-11-23): never fitBounds to a
+  // southern outlier (e.g. a worship event above Durban) on first paint.
+  const SOUTH_AFRICA = [24.7, -28.5];             // [lng, lat] — roughly the Republic's centre
+  const COUNTRY_ZOOM = 5.5;
+  const SUBURB_ZOOM = 12.5;                       // guest with a location: suburb, not metro
   // Greater-Pretoria bbox used only to project legacy % coords (mock items).
   const BBOX = { west: 28.10, east: 28.36, south: -25.86, north: -25.66 };
 
@@ -274,6 +279,15 @@
     return [0, Math.round(mid - h / 2)];
   }
 
+  /** Country overview (no fitBounds): guest landing and crown restore without a location. */
+  function frameCountry(mp, el) {
+    if (!mp) return;
+    const pad = framePadding(el);
+    const dy = typeof pad === 'object' ? (pad.top - pad.bottom) / 2 : 0;
+    mp.jumpTo({ center: SOUTH_AFRICA, zoom: COUNTRY_ZOOM }, { originalEvent: {} });
+    if (dy) mp.easeTo({ center: SOUTH_AFRICA, zoom: COUNTRY_ZOOM, offset: [0, dy], duration: 0 }, { originalEvent: {} });
+  }
+
   // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
   function frameData(mp, items, el) {
     const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
@@ -392,8 +406,8 @@
         const map = new window.maplibregl.Map({
           container: containerRef.current,
           style,
-          center: PRETORIA,
-          zoom: 11,
+          center: SOUTH_AFRICA,
+          zoom: COUNTRY_ZOOM,
           attributionControl: { compact: true },
           ...(tilt ? { pitch: tilt, minPitch: tilt, maxPitch: tilt, touchPitch: false, pitchWithRotate: false } : {}),
         });
@@ -461,7 +475,7 @@
           if (mapRef.current === map) onLocatedV2({ coords });
           if (mapRef.current !== map || userMovedRef.current) return;
           userMovedRef.current = true;
-          map.flyTo({ center: [coords.longitude, coords.latitude], zoom: 12, duration: 0 });
+          map.flyTo({ center: [coords.longitude, coords.latitude], zoom: SUBURB_ZOOM, duration: 0 });
         };
         if (isNativeMap && window.CapGeolocation) {
           window.CapGeolocation.getCurrentPosition(positionOpts)
@@ -572,9 +586,13 @@
         if (!seenPins.has(id)) { mk.remove(); markerObjs.current.delete(id); }
       });
 
-      // National fit-to-data — the FALLBACK when geolocation is denied/unavailable.
+      // Keep country / suburb landing. Never fitBounds-to-data here: a southern outlier
+      // (e.g. worship above Durban) used to steal the first paint (founder, 2026-11-23).
+      // A Where-to filter must also never re-frame (race before survey sets userMoved).
       framedItemsRef.current = items;
-      if (!userMovedRef.current && items.length) frameData(mp, items, containerRef.current);
+      if (!userMovedRef.current && items.length && !filterCategory) {
+        frameCountry(mp, containerRef.current);
+      }
       // New/rebuilt markers start un-gated; bring them in line with the zoom
       // they were actually added at.
       applyZoomGates();
@@ -619,13 +637,11 @@
           viewSubs.current.add(fn);
           return () => viewSubs.current.delete(fn);
         },
-        // #210: the Explore row measured itself after the first framing; frame again so no pin starts behind it.
-        // Only while the person has not taken the map, and never past their own position (that wins).
+        // Explore row measured itself: keep country landing clear of the foot (never fitBounds-to-data).
         reframe() {
           const mp = mapRef.current;
-          const items = framedItemsRef.current;
-          if (!mp || userMovedRef.current || !items || !items.length) return;
-          frameData(mp, items, containerRef.current);
+          if (!mp || userMovedRef.current) return;
+          frameCountry(mp, containerRef.current);
         },
         // Founder, 2026-11-17: whatever the map brings into focus (an area, a card's pin) sits FOCUS_LIFT of the map's height
         // above the middle, so it stays clear of the Explore panel at the foot. `offset` moves the point, not the camera's
@@ -641,7 +657,7 @@
             mp.easeTo(to, { originalEvent: {} });
           });
         },
-        // Where to…: opts.band centres the town between search and the foot drawer (founder, 2026-11-22).
+        // Where to… uses lift: false (same centre, zoom only — no band pan). opts.band is for pin soft-centre.
         // opts.lift === false keeps true screen centre; default still uses FOCUS_LIFT.
         survey(lat, lng, zoom, opts) {
           const mp = mapRef.current;
@@ -657,9 +673,22 @@
         },
         restore() {
           const mp = mapRef.current;
-          const items = framedItemsRef.current;
           userMovedRef.current = false;
-          if (mp && items && items.length) frameData(mp, items, containerRef.current);
+          if (mp) frameCountry(mp, containerRef.current);
+        },
+        // Card tap 3: preview is closed — centre the pin on the screen, keep zoom (founder, 2026-11-23).
+        centreOnScreen(id) {
+          requestAnimationFrame(() => {
+            const mp = mapRef.current;
+            const targetId = id || selectedRef.current;
+            const mk = targetId ? markerObjs.current.get(targetId) : null;
+            if (!mp || !mk) return;
+            userMovedRef.current = true;
+            mp.easeTo({
+              center: mk.getLngLat(), offset: [0, 0],
+              duration: window.MapV2.dur('slow'), essential: true,
+            }, { originalEvent: {} });
+          });
         },
         // The map home's levels (founder, 2026-11-18): each level keeps the camera it was entered with, so Back puts the
         // map exactly where the person left it. A plain copy (no MapLibre objects), safe to keep in React state. The tilt is

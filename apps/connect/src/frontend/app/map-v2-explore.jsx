@@ -686,28 +686,121 @@
       if (focus || mode === 'focus') { setStage('rest'); return; }
       if (!desk) setStage('rest');
     };
-    // A drag on the handle raises or lowers the panel; a tap (or a screen reader's activation, which sends a click and
-    // no pointer events) toggles it. A drag swallows the click that follows it, so it never toggles twice.
+    // Drag follows the finger, then snaps on release (founder, 2026-11-23). Grab and panel share one pull.
+    // Open: only a FRESH downward swipe that starts at scroll-top can lower (lift after scrolling to top first).
     const dragged = useRef(false);
-    const onGrabDown = (e) => { drag.current = { y: e.clientY }; dragged.current = false; };
-    const onGrabUp = (e) => {
-      const d = drag.current;
-      drag.current = null;
-      if (!d) return;
-      const dy = e.clientY - d.y;
-      if (Math.abs(dy) < 24) return;
-      dragged.current = true;
-      if (dy < 0) raise();
-      else lower();
+    const panelPull = useRef(null);
+    const xpVis = (kind) => {
+      const el = host.current;
+      if (!el || !window.getComputedStyle) return kind === 'open' ? 600 : (kind === 'focus' ? 340 : 152);
+      const cs = window.getComputedStyle(el);
+      if (kind === 'open') return (root.current && root.current.offsetHeight) || 600;
+      if (kind === 'focus') {
+        const v = parseFloat(cs.getPropertyValue('--xp-focus'));
+        return Number.isFinite(v) ? v : 340;
+      }
+      const v = parseFloat(cs.getPropertyValue('--xp-strip'));
+      return Number.isFinite(v) ? v : 152;
+    };
+    // data-narrow is set as '' when narrow — check attribute presence.
+    const panelX = () => {
+      const home = host.current && host.current.closest && host.current.closest("[data-mv2='home']");
+      return (home && !home.hasAttribute('data-narrow')) ? 'translateX(-50%) ' : '';
+    };
+    const clearPanelDrag = () => {
+      const el = root.current;
+      if (!el) return;
+      el.style.transition = '';
+      el.style.transform = '';
+    };
+    const startPanelPull = (e, opts) => {
+      const o = opts || {};
+      const el = root.current;
+      if (!el) return;
+      const H = el.offsetHeight;
+      let vis = 0;
+      if (mode === 'open') vis = H;
+      else if (mode === 'focus') vis = xpVis('focus');
+      else if (mode === 'strip') vis = xpVis('strip');
+      // rest: panel fully off-screen (vis 0) — grab can still pull it up.
+      panelPull.current = {
+        x: e.clientX, y: e.clientY, id: e.pointerId, captured: false,
+        open: mode === 'open', onlyDown: !!o.onlyDown, fromGrab: !!o.fromGrab,
+        fromRest: mode === 'rest',
+        baseY: Math.max(0, H - vis), H: H, lastY: Math.max(0, H - vis),
+      };
+    };
+    const onGrabDown = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      dragged.current = false;
+      startPanelPull(e, { fromGrab: true });
+      // Capture now: otherwise a drag that leaves the thin grab never gets pointermove (e2e + phones).
+      if (e.currentTarget && e.currentTarget.setPointerCapture) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
+      }
     };
     const onGrabClick = () => {
       if (dragged.current) { dragged.current = false; return; }
-      // Filter / Where-to focus: tap collapses to crown-only rest and keeps the filter on.
       if (mode === 'focus' || (focus && mode === 'open')) { setStage('rest'); return; }
       if (open) lower();
       else if (focus && mode === 'rest') { setStage('strip'); }
       else raise();
     };
+    const onPanelDown = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (mode === 'rest') return;
+      if (e.target.closest && e.target.closest("[data-mv2='explore-grab']")) return;
+      // Where-to tiles own horizontal pan-x; only start a panel pull once the move is clearly vertical.
+      if (mode === 'open') {
+        const sc = scrollRef.current;
+        // Fresh gesture only: must already be at top when the finger goes down (founder, 2026-11-23).
+        if (sc && sc.scrollTop >= 6) return;
+        startPanelPull(e, { onlyDown: true });
+        return;
+      }
+      startPanelPull(e, {});
+    };
+    const onPanelMove = (e) => {
+      const p = panelPull.current;
+      if (!p || p.id !== e.pointerId) return;
+      const dx = e.clientX - p.x;
+      const dy = e.clientY - p.y;
+      if (!p.captured) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        if (p.onlyDown && dy < 0) { panelPull.current = null; return; }
+        if (Math.abs(dy) <= Math.abs(dx)) { panelPull.current = null; return; }
+        p.captured = true;
+        dragged.current = true;
+        if (e.currentTarget && e.currentTarget.setPointerCapture) {
+          try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
+        }
+      }
+      if (e.cancelable && (p.onlyDown || p.fromGrab)) e.preventDefault();
+      const el = root.current;
+      if (!el) return;
+      const y = Math.max(0, Math.min(p.H, p.baseY + dy));
+      p.lastY = y;
+      el.style.transition = 'none';
+      el.style.transform = panelX() + 'translateY(' + y + 'px)';
+    };
+    const finishPanelPull = (e) => {
+      const p = panelPull.current;
+      panelPull.current = null;
+      clearPanelDrag();
+      if (!p || (e && p.id !== e.pointerId)) return;
+      if (!p.captured) return;
+      const dy = (e ? e.clientY : p.y) - p.y;
+      const y = p.lastY;
+      // Snap by how far the panel travelled (and a short flick).
+      if (Math.abs(dy) < 24 && Math.abs(y - p.baseY) < 24) return;
+      if (p.open || p.onlyDown) { if (dy > 0 || y > p.baseY + 40) lower(); return; }
+      if (p.fromRest) { if (dy < 0 || y < p.baseY - 40) raise(); return; }
+      if (dy < 0 || y < p.baseY - 40) raise();
+      else lower();
+    };
+    const onPanelUp = (e) => { finishPanelPull(e); };
+    const onGrabUp = (e) => { finishPanelPull(e); };
+    const onPanelCancel = () => { panelPull.current = null; clearPanelDrag(); };
     // The crown: with any filter on, it clears them all and goes home (the map screen snaps to the person's place);
     // otherwise it shows or hides the Where to… strip.
     const filtered = !!focus || !!props.filtered;
@@ -899,13 +992,16 @@
       h('section', {
         ref: root, 'data-mv2': 'explore', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
         'aria-label': str.title,
+        onPointerDown: onPanelDown, onPointerMove: onPanelMove, onPointerUp: onPanelUp,
+        onPointerCancel: onPanelCancel,
       },
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
           'aria-label': open ? (P.lower) : (P.raise),
-          // Lowest visible strip: flat bar + slight up chevron; focus/open: flat bar only (founder, 2026-11-22).
-          'data-hint': (mode === 'strip' || mode === 'rest') ? 'up' : undefined,
-          onPointerDown: onGrabDown, onPointerUp: onGrabUp, onClick: onGrabClick,
+          // Strip / focus: up chevron — swipe or tap to see the rest (founder, 2026-11-23). Open: flat only.
+          'data-hint': (mode === 'strip' || mode === 'rest' || mode === 'focus') ? 'up' : undefined,
+          onPointerDown: onGrabDown, onPointerMove: onPanelMove, onPointerUp: onGrabUp,
+          onPointerCancel: onPanelCancel, onClick: onGrabClick,
           onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (open) lower(); else raise(); } },
         },
           h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' },
@@ -996,6 +1092,7 @@
     const index = Math.max(0, Math.min(n - 1, props.index || 0));
     const raised = !!props.raised;
     const root = useRef(null);
+    const body = useRef(null);         // raised: the only vertical scroller (bar stays put)
     const row = useRef(null);
     const indexRef = useRef(index);
     indexRef.current = index;
@@ -1039,6 +1136,10 @@
       if (card && card.focus) card.focus({ preventScroll: true });
     }, [props.focusCard]);
     useEffect(() => () => clearTimeout(settle.current), []);
+    // Raised: reset the body scroller when the panel rises or the chosen card changes.
+    useEffect(() => {
+      if (raised && body.current) body.current.scrollTop = 0;
+    }, [raised, index, order]);
     // A layout effect: its clean-up runs while the carousel is still in the page, so focus can still be found inside it
     // (by the time a plain effect's clean-up runs, the removed cards have already dropped focus to the page).
     useLayoutEffect(() => {
@@ -1067,57 +1168,140 @@
     };
     const touch = () => { touched.current = true; };
 
-    // Snap stages stay; only the handle pill (and the crown on the phone) starts a vertical pull (founder, 2026-11-22).
-    // Do not setPointerCapture on pointerdown: capture on the section steals the click from Back / handle / Close.
+    // Follow-finger vertical drag, snap on release (founder, 2026-11-23).
+    // Whole preview (bar + body/cards): swipe down closes / steps back — not handle-only.
+    // Raised body: only a FRESH downward swipe that starts at scroll-top can lower
+    // (finger must lift after scrolling to the top, then swipe down again).
+    const peekX = () => {
+      const home = root.current && root.current.closest && root.current.closest("[data-mv2='home']");
+      return (home && !home.hasAttribute('data-narrow')) ? 'translateX(-50%) ' : '';
+    };
+    const peekPx = () => {
+      const el = root.current;
+      if (!el) return 320;
+      // --pp-peek is a calc() token (parseFloat → NaN). Prefer the on-screen lowered height.
+      if (!raised && typeof window !== 'undefined') {
+        const box = el.getBoundingClientRect();
+        const vis = Math.max(0, (window.innerHeight || 0) - box.top);
+        if (vis > 80) return vis;
+      }
+      if (window.getComputedStyle) {
+        const v = parseFloat(window.getComputedStyle(el).getPropertyValue('--pp-peek'));
+        if (Number.isFinite(v) && v > 0) return v;
+      }
+      return Math.round((el.offsetHeight || 600) * 0.45) || 320;
+    };
+    const clearPeekDrag = () => {
+      const el = root.current;
+      if (!el) return;
+      el.style.transition = '';
+      el.style.transform = '';
+    };
     const onPullDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      const fromHandle = e.target.closest && (
-        e.target.closest("[data-mv2='handle']") ||
-        e.target.closest("[data-mv2='handle-bar']") ||
+      // Back / Close / arrows / social chips / focus chrome own their clicks.
+      if (e.target.closest && e.target.closest(
+        "[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close'], [data-mv2='xarrow'], [data-mv2='handle-chip'], [data-mv2='xfocus-back'], [data-mv2='xfocus-close']",
+      )) return;
+      const onBar = !!(e.target.closest && (
         e.target.closest("[data-mv2='pinpeek-bar']") ||
-        e.target.closest("[data-mv2='explore-crown']")
-      );
-      if (!fromHandle) return;
-      // Back / Close own their clicks — do not start a pull from them.
-      if (e.target.closest && e.target.closest("[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close']")) return;
-      pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId, captured: false };
+        e.target.closest("[data-mv2='handle']") ||
+        e.target.closest("[data-mv2='handle-bar']")
+      ));
+      const inBody = !!(e.target.closest && e.target.closest("[data-mv2='pinpeek-body']"));
+      const el = root.current;
+      if (!el) return;
+      const H = el.offsetHeight;
+      const baseY = raised ? 0 : Math.max(0, H - peekPx());
+      if (raised && inBody) {
+        const sc = body.current;
+        // Fresh gesture only: must already be at top when the finger goes down.
+        if (sc && sc.scrollTop >= 6) return;
+        pull.current = {
+          x: e.clientX, y: e.clientY, id: e.pointerId, captured: false,
+          fromHandle: false, onlyDown: true, baseY: baseY, H: H, lastY: baseY,
+        };
+        return;
+      }
+      if (raised && !onBar) return;
+      // Lowered: bar or the preview body/cards — vertical down closes (sideways stays with the row).
+      pull.current = {
+        x: e.clientX, y: e.clientY, id: e.pointerId, captured: false,
+        fromHandle: onBar, onlyDown: false, baseY: baseY, H: H, lastY: baseY,
+      };
+      // Handle/bar: capture immediately so a drag off the bar still gets moves (founder follow-finger).
+      // Cards wait for a clear vertical before capture (sideways swipe keeps the row).
+      if (onBar && e.currentTarget && e.currentTarget.setPointerCapture) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
+      }
     };
     const onPullMove = (e) => {
       const p = pull.current;
-      if (!p || p.id !== e.pointerId || p.captured) return;
-      const dx = e.clientX - p.x;
-      const dy = e.clientY - p.y;
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      p.captured = true;
-      if (e.currentTarget && e.currentTarget.setPointerCapture) {
-        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture is optional */ }
-      }
-    };
-    const onPullUp = (e) => {
-      const p = pull.current;
-      pull.current = null;
       if (!p || p.id !== e.pointerId) return;
       const dx = e.clientX - p.x;
       const dy = e.clientY - p.y;
-      // Short press on the handle / sticky bar = tap → step down (founder, 2026-11-22).
-      if (Math.hypot(dx, dy) < 24) {
+      if (!p.captured) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        // Raised body at top: upward belongs to the scroller; only a clear downward pull lowers.
+        if (p.onlyDown && dy < 0) { pull.current = null; return; }
+        // Sideways: drop the panel pull so the card row keeps its pan-x scroll.
+        if (Math.abs(dy) <= Math.abs(dx)) { pull.current = null; return; }
+        p.captured = true;
+        if (e.currentTarget && e.currentTarget.setPointerCapture) {
+          try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture is optional */ }
+        }
+      }
+      // Keep the finger glued while dragging the sheet (body or bar).
+      if (e.cancelable) e.preventDefault();
+      const el = root.current;
+      if (!el) return;
+      const y = Math.max(0, Math.min(p.H, p.baseY + dy));
+      p.lastY = y;
+      el.style.transition = 'none';
+      el.style.transform = peekX() + 'translateY(' + y + 'px)';
+    };
+    const finishPeekPull = (e) => {
+      const p = pull.current;
+      pull.current = null;
+      clearPeekDrag();
+      if (!p || (e && p.id !== e.pointerId)) return;
+      const dx = e ? e.clientX - p.x : 0;
+      const dy = e ? e.clientY - p.y : 0;
+      // Short press on the handle / sticky bar = tap → step down (founder, 2026-11-22). Cards keep their tap.
+      if (!p.captured && Math.hypot(dx, dy) < 24) {
+        if (!p.fromHandle) return;
         swallow.current = true;
         setTimeout(() => { swallow.current = false; }, 50);
         if (props.onBack) props.onBack();
         return;
       }
-      if (Math.abs(dy) < PULL_PX || Math.abs(dy) < 1.5 * Math.abs(dx)) return;
+      if (!p.captured) return;
+      const y = p.lastY;
+      const midPeek = Math.max(0, p.H - peekPx());
+      const traveled = Math.abs(y - p.baseY);
+      if (traveled < PULL_PX && Math.abs(dy) < PULL_PX) return;
       swallow.current = true;
       setTimeout(() => { swallow.current = false; }, 0);
-      if (dy < 0) { if (!raised) props.onRaise(); } else props.onBack();
+      if (raised) {
+        // Dragged past halfway toward the lowered peek (or a clear flick down) → step back.
+        if (y > midPeek / 2 || dy > PULL_PX) { if (props.onBack) props.onBack(); }
+        return;
+      }
+      // Lowered: up past mid → raise; down past a bit → close.
+      if (y < midPeek / 2 || dy < -PULL_PX) { if (props.onRaise) props.onRaise(); }
+      else if (y > midPeek + 48 || dy > PULL_PX) { if (props.onBack) props.onBack(); }
     };
+    const onPullUp = (e) => { finishPeekPull(e); };
+    const onPullCancel = () => { pull.current = null; clearPeekDrag(); };
 
     const tap = (id) => {
       if (swallow.current) return;
       const i = items.findIndex((m) => m.id === id);
       if (i === -1) return;
       if (i !== index) { props.onIndex(i); return; }
-      if (!raised) props.onRaise();
+      // Tap 1 (neighbour) / tap 2 raises / tap 3 closes preview + centres pin on screen (no zoom).
+      if (!raised) { props.onRaise(); return; }
+      if (props.onDive) props.onDive(id);
     };
     // wrap: province items loop, so either direction always has a neighbour when there is more than one
     const step = (d) => { if (n > 1) props.onIndex((index + d + n) % n); };
@@ -1129,7 +1313,7 @@
       ref: root, 'data-mv2': 'pinpeek', 'data-raised': raised ? '' : undefined, hidden: props.hidden || undefined,
       'aria-label': P.label,
       onPointerDown: onPullDown, onPointerMove: onPullMove, onPointerUp: onPullUp,
-      onPointerCancel: () => { pull.current = null; },
+      onPointerCancel: onPullCancel,
     },
       h('div', { 'data-mv2': 'pinpeek-bar' },
         raised ? iconBtn({
@@ -1169,34 +1353,36 @@
             if (props.onClose) props.onClose();
           },
         }, 'X')),
-      h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
-        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
-        h('div', {
-          ref: row, 'data-mv2': 'xrow', 'data-row': 'peek', onScroll: onRowScroll,
-          onPointerDownCapture: touch, onTouchStart: (e) => {
-            touch();
-            if (e.touches && e.touches[0]) swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, index: indexRef.current };
-          }, onTouchEnd: (e) => {
-            const start = swipeStart.current;
-            swipeStart.current = null;
-            if (!start || !e.changedTouches || !e.changedTouches.length || n < 2) return;
-            const dx = e.changedTouches[0].clientX - start.x;
-            const dy = e.changedTouches[0].clientY - start.y;
-            if (Math.abs(dx) <= Math.abs(dy)) return;
-            if (start.index === 0 && dx > 40) { touched.current = false; props.onIndex(n - 1); }
-            else if (start.index === n - 1 && dx < -40) { touched.current = false; props.onIndex(0); }
-          }, onWheel: touch,
-        }, items.map((m, i) => h(XCard, {
-          key: 'peek:' + m.id, m: m, meters: meters(m), rec: byKey.get(m.type + ':' + m.id),
-          groupWords: str.groups, distWords: props.distWords || {},
-          peek: true, selected: i === index,
-          detailsCue: !raised, cueLabel: P.detailsCue || P.detailsBadge || '',
-          onOpen: tap,
-        }))),
-        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
-      raised && current && props.details ? h('div', {
-        'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
-      }, props.details(current)) : null);
+      // Body owns vertical scroll when raised (bar stays fixed). Lowered: no independent scroll.
+      h('div', { ref: body, 'data-mv2': 'pinpeek-body' },
+        h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
+          n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
+          h('div', {
+            ref: row, 'data-mv2': 'xrow', 'data-row': 'peek', onScroll: onRowScroll,
+            onPointerDownCapture: touch, onTouchStart: (e) => {
+              touch();
+              if (e.touches && e.touches[0]) swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, index: indexRef.current };
+            }, onTouchEnd: (e) => {
+              const start = swipeStart.current;
+              swipeStart.current = null;
+              if (!start || !e.changedTouches || !e.changedTouches.length || n < 2) return;
+              const dx = e.changedTouches[0].clientX - start.x;
+              const dy = e.changedTouches[0].clientY - start.y;
+              if (Math.abs(dx) <= Math.abs(dy)) return;
+              if (start.index === 0 && dx > 40) { touched.current = false; props.onIndex(n - 1); }
+              else if (start.index === n - 1 && dx < -40) { touched.current = false; props.onIndex(0); }
+            }, onWheel: touch,
+          }, items.map((m, i) => h(XCard, {
+            key: 'peek:' + m.id, m: m, meters: meters(m), rec: byKey.get(m.type + ':' + m.id),
+            groupWords: str.groups, distWords: props.distWords || {},
+            peek: true, selected: i === index,
+            detailsCue: !raised, cueLabel: P.detailsCue || P.detailsBadge || '',
+            onOpen: tap,
+          }))),
+          n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
+        raised && current && props.details ? h('div', {
+          'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
+        }, props.details(current)) : null));
   }
 
   // An id inside an attribute selector: listing ids are uuids or slugs, but never trust that.
