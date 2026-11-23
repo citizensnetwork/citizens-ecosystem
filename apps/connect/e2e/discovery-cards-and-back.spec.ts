@@ -405,20 +405,25 @@ test.describe("Map density gates and pin labels", () => {
     await expect(pin("event")).toBeVisible();
   });
 
-  test("data spread across the whole country never opens on an empty map", async ({ page }) => {
-    // Pretoria event, but a place in Cape Town: framing ALL the data lands
-    // below the event gate (zoom 7.5), where every pin would be hidden. The
-    // first screen must stop at that gate and centre on the event.
+  test("guest landing is the country overview; pins appear once the person zooms into a town", async ({ page }) => {
+    // Founder 2026-11-23: no fitBounds-to-data (a Cape Town outlier must not steal the first paint).
+    // Country zoom gates every pin out; zooming into Pretoria reveals the local event, then places.
     const capeTownPlace = { ...PLACE, id: "e2e-place-ct", name: "Table Bay Chapel", latitude: -33.92, longitude: 18.42 };
     await mockNetwork(page, { places: [capeTownPlace] });
-    // A phone: at zoom 6 its screen spans ~800 km, so a view centred on the
-    // middle of the data (Northern Cape) would crop the Gauteng pin off the edge.
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await expect(page.locator(".maplibregl-marker")).toHaveCount(2, { timeout: 15_000 });
     await expect.poll(() => page.evaluate(() => !!window.__ccMap)).toBe(true);
 
     const event = page.locator('.maplibregl-marker:has([data-cc-pin="event"])');
+    const place = page.locator('.maplibregl-marker:has([data-cc-pin="place"])');
+    await expect(page.locator("[data-zoom-hint]")).toHaveAttribute("data-zoom-hint", "none");
+    await expect(event).toBeHidden();
+    await expect(place).toBeHidden();
+
+    await page.evaluate(() => {
+      window.__ccMap.jumpTo({ center: [28.2293, -25.7479], zoom: 8 }, { originalEvent: {} });
+    });
     await expect(event).toBeVisible();
     await expect(event).toBeInViewport({ ratio: 1 });
     await expect(page.locator("[data-zoom-hint]")).toHaveAttribute("data-zoom-hint", "places");

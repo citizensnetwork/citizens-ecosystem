@@ -70,8 +70,10 @@
   const CARD_ZOOM = 14;     // a card never lands on a map zoomed out further than this: the pin has to be seen
   // A Where to… tile or a row in focus shows its town, not its province (founder, 2026-11-17): every pin is drawn from 9.5.
   const TOWN_ZOOM = 11;
-  // The crown's reset lands on the person's own place at the zoom the map first opens on.
-  const HOME_ZOOM = 12;
+  // Pins kept for a Where-to / section focus: metro-scale around the camera town (founder, 2026-11-23).
+  const TOWN_RADIUS_M = 40000;
+  // The crown's reset lands on the person's own place at suburb zoom.
+  const HOME_ZOOM = 12.5;
 
   // ── Home / Discover ──
   function HomePage() {
@@ -128,6 +130,28 @@
     const tile = focus && focus.kind === 'tile' ? focus.id : null;
     const tileRec = tile && X.tileOf ? X.tileOf(tile) : null;
     const secKey = focus && focus.kind === 'sec' ? secIds.join('|') : '';
+    const focusKey = focus ? focus.kind + ':' + focus.id : '';
+    const focusRef = useRef(focus);
+    focusRef.current = focus;
+    // Camera town for the active Where-to / section focus. Captured synchronously on focusKey change
+    // so the pin filter and the survey share the same town on the first paint (founder, 2026-11-23).
+    const townHold = useRef({ key: '', town: null });
+    if (townHold.current.key !== focusKey) {
+      townHold.current.key = focusKey;
+      if (!focusKey || !(focus && (focus.kind === 'tile' || focus.kind === 'sec'))) {
+        townHold.current.town = null;
+      } else {
+        const api = mapApi.current;
+        const cam = api && api.camera ? api.camera() : null;
+        if (cam && Number.isFinite(cam.lat) && Number.isFinite(cam.lng)) {
+          townHold.current.town = { lat: cam.lat, lng: cam.lng, zoom: cam.zoom };
+        } else {
+          const v = api && api.view ? api.view() : null;
+          townHold.current.town = v && v.centre ? { lat: v.centre.lat, lng: v.centre.lng } : null;
+        }
+      }
+    }
+    const town = townHold.current.town;
     const focusTest = useMemo(() => {
       if (tileRec && !tileRec.ideas && X.tileMatches) return (m) => X.tileMatches(tile, m);
       if (secKey) { const set = new Set(secKey.split('|')); return (m) => set.has(m.id); }
@@ -135,44 +159,42 @@
     }, [X, tile, tileRec, secKey]);
     const pinFilter = useMemo(() => {
       if (!focusTest && !group) return null;
-      return (m) => (focusTest ? focusTest(m) : true) && (!group || (X.groupOf && X.groupOf(m) === group));
-    }, [focusTest, group, X]);
-    // Where to… only: town zoom with the centre on the mid-band between search and the foot drawer (founder, 2026-11-22).
-    // Where-to tiles and Explore section filters share town zoom on the current camera centre (founder, 2026-11-22).
-    // One anchor per focus so switching tabs does not creep the map.
-    const focusKey = focus ? focus.kind + ':' + focus.id : '';
-    const focusRef = useRef(focus);
-    focusRef.current = focus;
-    const anchor = useRef(null);
+      const near = window.MapV2Nearby;
+      const inTown = (m) => {
+        if (!town || !near || !near.metersBetween) return true;
+        if (typeof m.lat !== 'number' || typeof m.lng !== 'number') return false;
+        return near.metersBetween(town, m) <= TOWN_RADIUS_M;
+      };
+      // Town radius only while the live camera is at/above town scale — zooming out to find more
+      // matches must not keep the 40 km clamp (founder, 2026-11-23).
+      const focusTown = !!(focus && (focus.kind === 'tile' || focus.kind === 'sec') && town);
+      return (m) => {
+        if (focusTest && !focusTest(m)) return false;
+        if (group && !(X.groupOf && X.groupOf(m) === group)) return false;
+        if (!focusTown) return true;
+        const cam = mapApi.current && mapApi.current.camera ? mapApi.current.camera() : null;
+        const z = cam && Number.isFinite(cam.zoom) ? cam.zoom
+          : (Number.isFinite(town.zoom) ? town.zoom : TOWN_ZOOM);
+        if (z < TOWN_ZOOM) return true;
+        return inTown(m);
+      };
+    }, [focusTest, group, X, focus, town]);
+    // Where to… / section: if zoomed IN closer than town, zoom OUT to town (same centre, no pan).
+    // At town or further out: leave the camera alone so the person can zoom out to find matches
+    // without every tile tap yanking them back (founder, 2026-11-23).
     useEffect(() => {
       setShowIdeas(!!(tileRec && tileRec.ideas));
-      if (!focusKey) { anchor.current = null; return; }
+      if (!focusKey || !town) return;
       if (!(focus && (focus.kind === 'tile' || focus.kind === 'sec'))) return;
       const api = mapApi.current;
       if (!api || !api.survey) return;
-      if (!anchor.current) {
-        // Current town view (camera centre) — never jump to GPS/Pretoria. Rank from this point.
-        const cam = api.camera ? api.camera() : null;
-        if (cam && Number.isFinite(cam.lat) && Number.isFinite(cam.lng)) {
-          anchor.current = { lat: cam.lat, lng: cam.lng };
-        } else {
-          const v = api.view ? api.view() : null;
-          anchor.current = v && v.centre;
-        }
-      }
-      const c = anchor.current;
-      if (c) {
-        skipFrame.current = true;   // skip the panel-height reframe that would fitBounds ("landing snap")
-        const home = rootRef.current;
-        let foot = 0;
-        if (home && window.getComputedStyle) {
-          const vis = parseFloat(window.getComputedStyle(home).getPropertyValue('--xp-vis'));
-          const focusH = parseFloat(window.getComputedStyle(home).getPropertyValue('--xp-focus'));
-          foot = Number.isFinite(vis) && vis > 0 ? vis : (Number.isFinite(focusH) ? focusH : 0);
-        }
-        api.survey(c.lat, c.lng, TOWN_ZOOM, { band: true, foot: foot });
-      }
-    }, [focusKey]);
+      skipFrame.current = true;
+      const camNow = api.camera ? api.camera() : null;
+      const zNow = camNow && Number.isFinite(camNow.zoom) ? camNow.zoom
+        : (Number.isFinite(town.zoom) ? town.zoom : TOWN_ZOOM);
+      if (zNow <= TOWN_ZOOM) return;
+      api.survey(town.lat, town.lng, TOWN_ZOOM, { lift: false });
+    }, [focusKey, town]);
     // How much room the panel takes is the stylesheet's job (--explore-h follows the panel's look, map-v2.css Pack 08), so it is
     // right even when the CSS arrives after the first render. This only frames the data again as the panel takes room, but
     // never because the person lowered or raised it (the map would jump), and never under an active Where to… focus.
@@ -217,15 +239,29 @@
       const m = byId.get(id);
       setSelected(m ? id : null); if (m) setSelType(m.type); setLitId(null);
     };
-    // How much of the map the lowered carousel covers (its token, map-v2.css: it may still be sliding in), so the chosen
-    // card's pin is brought clear of it. Raised, the carousel covers the map: nothing to bring into view.
+    // Soft-centre between search and the RAISED peek top (pinpeek's full height), not the lowered
+    // peek/crown — so from crown-only the pin sits clear of the crown (founder, 2026-11-23).
+    // --pp-full / --pp-peek are calc() tokens: parseFloat is NaN; measure the element instead.
+    // Raised, the carousel covers the map: nothing to bring into view.
     const revealChosen = (id) => {
       const home = rootRef.current;
       const api = mapApi.current;
       if (!home || !api || !api.revealSelected || (peekRef.current && peekRef.current.raised)) return;
-      const foot = parseFloat(window.getComputedStyle(home).getPropertyValue('--pp-peek'));
-      // Pass the pin id: selectedRef on the map may still be the previous selection on this frame.
-      api.revealSelected(Number.isFinite(foot) ? foot : 0, id);
+      // Double rAF: peek may still be mounting when openPeek runs from crown-only rest.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        if (!mapApi.current || !mapApi.current.revealSelected) return;
+        if (peekRef.current && peekRef.current.raised) return;
+        const peekEl = home.querySelector && home.querySelector("[data-mv2='pinpeek']:not([hidden])");
+        // pinpeek's layout height is always --pp-full; translateY only slides the lowered peek.
+        let foot = peekEl ? (peekEl.offsetHeight || 0) : 0;
+        if (!(foot > 0)) {
+          const cs = window.getComputedStyle(home);
+          const hit = parseFloat(cs.getPropertyValue('--hit')) || 48;
+          const gap = parseFloat(cs.getPropertyValue('--space-7')) || 28;
+          foot = Math.max(0, (home.clientHeight || 0) - hit - gap);
+        }
+        mapApi.current.revealSelected(foot, id);
+      }));
     };
     // Level 2 (or 3 when raised): pin or Explore 2nd tap. Carousel among province pool; pin snapped into the
     // search↔drawer mid-band (revealChosen). Raised = same drawer chrome as pin 2nd tap (founder, 2026-11-22).
@@ -281,6 +317,17 @@
       const cur = peekRef.current;
       if (!cur || cur.raised) return;
       setPeek(Object.assign({}, cur, { raised: true, raisedAt: { index: cur.index, camera: camera() } }));
+    };
+    // Card tap 3: close the preview (no zoom change) and centre the pin on screen — panel is gone (founder, 2026-11-23).
+    const divePeek = (id) => {
+      const cur = peekRef.current;
+      if (!cur) return;
+      const target = id || (cur.ids && cur.ids[cur.index]);
+      setPeek(null);
+      if (target) choose(target);
+      if (target && mapApi.current && mapApi.current.centreOnScreen) {
+        mapApi.current.centreOnScreen(target);
+      }
     };
     // Back from level 3: the cards again, on the card and the map the details were opened from.
     const lowerPeek = () => {
@@ -514,7 +561,7 @@
         distWords: (XS.peek && XS.peek.dist) || { under: '< 100 m', metres: (n) => n + ' m', km: (n) => n + ' km' },
         sources,
         onIndex: (i) => { if (peekItems[i]) peekTo(peek.ids.indexOf(peekItems[i].id)); },
-        onRaise: raisePeek, onBack: peekBack, onClose: closePeek, returnFocus: peekReturn,
+        onRaise: raisePeek, onDive: divePeek, onBack: peekBack, onClose: closePeek, returnFocus: peekReturn,
         // the inline sheet only calls onClose right after it navigated away (a link to the full page): nothing to undo here
         details: (m) => React.createElement(window.MapV2Sheet, {
           id: m.id, type: m.type, inline: true, view: peek.view, nearby: markers,

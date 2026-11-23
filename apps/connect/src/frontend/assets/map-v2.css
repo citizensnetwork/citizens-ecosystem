@@ -3525,8 +3525,23 @@ a[data-mv2='card2'],
   font-family: var(--font-body);
   pointer-events: auto;
   overflow: hidden;
+  /* Strip/focus: the panel owns vertical swipes (raise/lower). Open scrolls below. */
+  touch-action: none;
   transform: translateY(calc(100% - var(--xp-vis)));
   transition: transform var(--dur-slow) var(--ease-enter), visibility 0s;
+}
+/* Overflow ends the touch-action chain: every child must restate the value (same as the listing sheet). */
+[data-mv2='explore']:not([data-open]) *,
+[data-mv2='explore']:not([data-open]) *::before,
+[data-mv2='explore']:not([data-open]) *::after {
+  touch-action: none;
+}
+/* Focus / strip: category tiles and card rows scroll sideways; vertical stays the panel's. */
+[data-mv2='explore']:not([data-open]) [data-mv2='xrow'],
+[data-mv2='explore']:not([data-open]) [data-mv2='xrow'] *,
+[data-mv2='explore']:not([data-open]) [data-mv2='explore-tiles'],
+[data-mv2='explore']:not([data-open]) [data-mv2='explore-tiles'] * {
+  touch-action: pan-x;
 }
 /* At rest the panel is off screen: out of reach of a tap (and, through `inert`, of the keyboard) once it has slid away. */
 [data-mv2='explore'][data-mode='rest'] {
@@ -3625,7 +3640,21 @@ a[data-mv2='card2'],
 [data-mv2='explore'][data-open] [data-mv2='explore-scroll'] {
   overflow-x: hidden;
   overflow-y: auto;
+  /* none (not contain): at scroll-top a downward swipe must not chain to the page / reload */
+  overscroll-behavior: none;
+  touch-action: pan-y;
   padding-bottom: calc(var(--xp-dock-h) + var(--space-8));
+}
+[data-mv2='explore'][data-open] [data-mv2='explore-scroll'] *,
+[data-mv2='explore'][data-open] [data-mv2='explore-scroll'] *::before,
+[data-mv2='explore'][data-open] [data-mv2='explore-scroll'] *::after {
+  touch-action: pan-y;
+}
+[data-mv2='explore'][data-open] [data-mv2='xrow'],
+[data-mv2='explore'][data-open] [data-mv2='xrow'] *,
+[data-mv2='explore'][data-open] [data-mv2='explore-tiles'],
+[data-mv2='explore'][data-open] [data-mv2='explore-tiles'] * {
+  touch-action: pan-x pan-y;
 }
 [data-mv2='xsec-h'] small,
 [data-mv2='xfocus-bar'] small {
@@ -4526,9 +4555,37 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
 }
 [data-mv2='pinpeek'][data-raised] {
   background: var(--surface-1);
-  overflow-y: auto;
-  touch-action: pan-y;
+  /* Section itself does not scroll — pinpeek-body does (bar stays fixed). */
+  overflow: hidden;
+  touch-action: auto;
   transform: translateY(0);
+}
+/* Raised body: the only vertical scroller. Overflow ends the touch-action chain — every child must restate. */
+[data-mv2='pinpeek-body'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] {
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* none: at scroll-top a continued downward swipe lowers the drawer (JS), not the page */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+/* Descendants: pan-y so a vertical swipe anywhere in the body scrolls it. Horizontal rows add pan-x
+   (pan-x pan-y). pan-x alone intersects the body's pan-y to none and kills vertical swipe on cards/rows. */
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] *,
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] *::before,
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] *::after {
+  touch-action: pan-y;
+}
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] [data-mv2='xrow'],
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] [data-mv2='xrow'] *,
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] [data-mv2='hrow'] [data-layout='row'],
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] [data-mv2='hrow'] [data-layout='row'] * {
+  touch-action: pan-x pan-y;
 }
 [data-mv2='home']:not([data-narrow]) [data-mv2='pinpeek'] {
   left: 50%;
@@ -4540,12 +4597,12 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
 [data-mv2='home']:not([data-narrow]) [data-mv2='pinpeek'][data-raised] {
   transform: translateX(-50%);
 }
-[data-mv2='pinpeek-bar'] {
-  position: sticky;
-  top: 0;
+[data-mv2='pinpeek'] > [data-mv2='pinpeek-bar'] {
+  position: relative;
+  top: auto;
   /* above cover-foot / details so the handle stays tappable (founder, 2026-11-22) */
   z-index: var(--z-xp-rail);
-  flex: none;
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -4684,9 +4741,6 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   padding-bottom: var(--space-4);
   scroll-padding-inline: calc(50% - var(--pp-card-w) / 2);
   touch-action: pan-x;
-}
-[data-mv2='pinpeek'][data-raised] [data-mv2='xrow'][data-row='peek'] {
-  touch-action: pan-x pan-y;
 }
 [data-mv2='xrow'][data-row='peek'] [data-mv2='xcard'] {
   width: var(--pp-card-w);
@@ -5080,9 +5134,25 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   animation: none;
   touch-action: pan-y;
 }
-[data-mv2='sheet'][data-inline] [data-mv2='scroller'] {
+/* Inline lives inside pinpeek-body (the vertical scroller). Override the sheet default of
+   none (and never pan-down). Same touch model as a full listing sheet: content pan-y,
+   rows pan-x pan-y so vertical pans chain to pinpeek-body. */
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'],
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'][data-top] {
   overflow: visible;
   padding-inline: 0;
+  --mv2-ta: pan-y;
+  --mv2-ta-row: pan-x pan-y;
+}
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'],
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] * {
+  touch-action: var(--mv2-ta, pan-y);
+}
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] [data-mv2='hrow'] [data-layout='row'],
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] [data-mv2='hrow'] [data-layout='row'] *,
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] [data-mv2='xrow'],
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] [data-mv2='xrow'] * {
+  touch-action: var(--mv2-ta-row, pan-x pan-y);
 }
 /* the crown on the carousel's top edge (lowered); raised, the bar's Close does its job and the crown waits there hidden,
    so lowering the carousel never sends it gliding up from the foot */

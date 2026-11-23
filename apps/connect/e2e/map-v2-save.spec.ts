@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, stillBox, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
+import { mockMapNetwork, mockContributorDetail, openMap, centreOnE2eTown, smallSeed, stillBox, FIXED_NOW, type MapSeed, openPinSheet } from "./support/map-v2";
 import { touchSession, tapTouch, throttleCpu } from "./support/touch";
 
 // ════════════════════════════════════════════════════════════════════
@@ -137,6 +137,8 @@ test.describe("P2-04 the saved list in Settings", () => {
     await expect(page.getByText("Only you can see this list. A listing is never told you saved it.")).toBeVisible();
 
     await goTo(page, "home");
+    // Remount re-lands on country overview (pins gated); jump back to the fixture town.
+    await centreOnE2eTown(page);
     await expect(page.locator(".maplibregl-marker").first()).toBeVisible();
     await pick(page, seed, "place", 1);
     await saveBtn(page).click();
