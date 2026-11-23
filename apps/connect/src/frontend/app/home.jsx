@@ -165,16 +165,23 @@
         if (typeof m.lat !== 'number' || typeof m.lng !== 'number') return false;
         return near.metersBetween(town, m) <= TOWN_RADIUS_M;
       };
-      // Town radius only once the camera is already at town scale (country overview has no town yet).
-      const townScoped = !!(focus && (focus.kind === 'tile' || focus.kind === 'sec')
-        && town && Number.isFinite(town.zoom) && town.zoom >= TOWN_ZOOM);
-      return (m) => (focusTest ? focusTest(m) : true)
-        && (!townScoped || inTown(m))
-        && (!group || (X.groupOf && X.groupOf(m) === group));
+      // Town radius only while the live camera is at/above town scale — zooming out to find more
+      // matches must not keep the 40 km clamp (founder, 2026-11-23).
+      const focusTown = !!(focus && (focus.kind === 'tile' || focus.kind === 'sec') && town);
+      return (m) => {
+        if (focusTest && !focusTest(m)) return false;
+        if (group && !(X.groupOf && X.groupOf(m) === group)) return false;
+        if (!focusTown) return true;
+        const cam = mapApi.current && mapApi.current.camera ? mapApi.current.camera() : null;
+        const z = cam && Number.isFinite(cam.zoom) ? cam.zoom
+          : (Number.isFinite(town.zoom) ? town.zoom : TOWN_ZOOM);
+        if (z < TOWN_ZOOM) return true;
+        return inTown(m);
+      };
     }, [focusTest, group, X, focus, town]);
-    // Where to… / section: if below town zoom, zoom OUT to town on the same centre (tilt makes that look like
-    // a move). If already at/above town, leave the camera alone — another tile must not keep shifting the map
-    // (no band/lift pan). Never GPS / Pretoria / fitBounds — founder, 2026-11-23.
+    // Where to… / section: if zoomed IN closer than town, zoom OUT to town (same centre, no pan).
+    // At town or further out: leave the camera alone so the person can zoom out to find matches
+    // without every tile tap yanking them back (founder, 2026-11-23).
     useEffect(() => {
       setShowIdeas(!!(tileRec && tileRec.ideas));
       if (!focusKey || !town) return;
@@ -185,7 +192,7 @@
       const camNow = api.camera ? api.camera() : null;
       const zNow = camNow && Number.isFinite(camNow.zoom) ? camNow.zoom
         : (Number.isFinite(town.zoom) ? town.zoom : TOWN_ZOOM);
-      if (zNow >= TOWN_ZOOM) return;
+      if (zNow <= TOWN_ZOOM) return;
       api.survey(town.lat, town.lng, TOWN_ZOOM, { lift: false });
     }, [focusKey, town]);
     // How much room the panel takes is the stylesheet's job (--explore-h follows the panel's look, map-v2.css Pack 08), so it is

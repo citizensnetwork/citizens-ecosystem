@@ -505,7 +505,7 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261123g"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261123h"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
@@ -724,6 +724,11 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     fireEvent.pointerMove(panel, { clientX: 100, clientY: 340, pointerId: 6, pointerType: "touch" });
     fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 6, pointerType: "touch" });
     expect(calls.onBack).toHaveBeenCalledTimes(2);
+    // Preview body/cards: swipe down also closes (not handle-only) — founder, 2026-11-23.
+    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 7, pointerType: "touch" });
+    fireEvent.pointerMove(panel, { clientX: 100, clientY: 360, pointerId: 7, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 420, pointerId: 7, pointerType: "touch" });
+    expect(calls.onBack).toHaveBeenCalledTimes(3);
     unmount();
   });
 
@@ -867,7 +872,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(home).toContain("centreOnScreen");
     expect(home).not.toContain("zoomCloser");
     expect(home).toContain("lift: false");
-    expect(home).toMatch(/if \(zNow >= TOWN_ZOOM\) return;/);
+    expect(home).toMatch(/if \(zNow <= TOWN_ZOOM\) return;/);
     expect(home).not.toMatch(/survey\([^)]*band:\s*true/);
     expect(read("src/frontend/app/map.jsx")).toContain("centreOnScreen(id)");
     const css = read("src/frontend/assets/map-v2.css");

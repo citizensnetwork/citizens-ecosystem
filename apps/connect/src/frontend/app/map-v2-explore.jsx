@@ -1150,6 +1150,7 @@
     const touch = () => { touched.current = true; };
 
     // Follow-finger vertical drag, snap on release (founder, 2026-11-23).
+    // Whole preview (bar + body/cards): swipe down closes / steps back — not handle-only.
     // Raised body: only a FRESH downward swipe that starts at scroll-top can lower
     // (finger must lift after scrolling to the top, then swipe down again).
     const peekX = () => {
@@ -1188,12 +1189,12 @@
         e.target.closest("[data-mv2='handle']") ||
         e.target.closest("[data-mv2='handle-bar']")
       ));
-      const onBody = !!(raised && e.target.closest && e.target.closest("[data-mv2='pinpeek-body']"));
+      const inBody = !!(e.target.closest && e.target.closest("[data-mv2='pinpeek-body']"));
       const el = root.current;
       if (!el) return;
       const H = el.offsetHeight;
       const baseY = raised ? 0 : Math.max(0, H - peekPx());
-      if (onBody) {
+      if (raised && inBody) {
         const sc = body.current;
         // Fresh gesture only: must already be at top when the finger goes down.
         if (sc && sc.scrollTop >= 6) return;
@@ -1204,12 +1205,13 @@
         return;
       }
       if (raised && !onBar) return;
+      // Lowered: bar or the preview body/cards — vertical down closes (sideways stays with the row).
       pull.current = {
         x: e.clientX, y: e.clientY, id: e.pointerId, captured: false,
         fromHandle: onBar, onlyDown: false, baseY: baseY, H: H, lastY: baseY,
       };
       // Handle/bar: capture immediately so a drag off the bar still gets moves (founder follow-finger).
-      // Cards still wait for a clear vertical before capture (sideways swipe keeps the row).
+      // Cards wait for a clear vertical before capture (sideways swipe keeps the row).
       if (onBar && e.currentTarget && e.currentTarget.setPointerCapture) {
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
       }
@@ -1230,7 +1232,8 @@
           try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture is optional */ }
         }
       }
-      if (e.cancelable && (p.onlyDown || p.fromHandle)) e.preventDefault();
+      // Keep the finger glued while dragging the sheet (body or bar).
+      if (e.cancelable) e.preventDefault();
       const el = root.current;
       if (!el) return;
       const y = Math.max(0, Math.min(p.H, p.baseY + dy));
