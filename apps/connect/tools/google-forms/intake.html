@@ -673,7 +673,7 @@
 
   var EMAIL_RE = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,189}\.[A-Za-z]{2,24}$/;
   var DRAFT_KEY = "citizens-intake-v1";
-  var EXEC_RE = /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/(exec|dev)$/;
+  var EXEC_RE = /^https:\/\/script\.google\.com\/(?:macros\/s\/|a\/macros\/[a-z0-9.-]+\/s\/)[A-Za-z0-9_-]+\/(?:exec|dev)$/i;
 
   // Gold is the warm glow in the page, the same one Central uses. Wear keeps its own gold.
   var THEMES = {
@@ -718,12 +718,14 @@
   }
 
   function submitUrl() {
+    // Post back to the address in the bar. /dev then runs the latest saved code,
+    // and /exec runs the deployed version. A Workspace address includes /a/macros/.
+    var own = String(location.href || "").split("#")[0].split("?")[0];
+    if (allowedExec(own)) return own;
     var meta = document.querySelector('meta[name="citizens-intake-submit"]');
     var fromMeta = meta ? meta.getAttribute("content") : "";
     if (allowedExec(fromMeta)) return fromMeta;
     if (allowedExec(INTAKE_EXEC)) return INTAKE_EXEC;
-    var own = String(location.href || "").split("#")[0].split("?")[0];
-    if (allowedExec(own)) return own;
     return "";
   }
 
@@ -984,7 +986,7 @@
     timer = window.setTimeout(function () {
       sending = false;
       setBusy(false);
-      showProblem("We could not confirm that this was saved. Please try once more. If it already went through, we keep one.");
+      showProblem("We could not confirm that this was saved. Please try once more. If Form Responses 1 already has a row with Source web-form, leave it.");
     }, 25000);
     form.submit();
   }

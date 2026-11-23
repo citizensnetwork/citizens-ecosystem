@@ -130,7 +130,10 @@ function load(): Script {
       }),
     },
     HtmlService: {
-      createHtmlOutput: (html: string) => ({ html }),
+      createHtmlOutput: (html: string) => {
+        const page = { html, setXFrameOptionsMode: () => page };
+        return page;
+      },
       createTemplateFromFile: () => ({ evaluate: () => ({ setTitle: () => ({ setXFrameOptionsMode: () => ({}) }) }) }),
       XFrameOptionsMode: { ALLOWALL: "ALLOWALL" },
     },
@@ -692,7 +695,7 @@ describe("intake.gs join page", () => {
   }
 
   function posted(result: { html?: string }) {
-    const match = result.html?.match(/parent\.postMessage\((\{.*\}),"\*"\);/);
+    const match = result.html?.match(/var m=([\s\S]*?);function up/);
     if (!match) throw new Error(result.html || "no html reply");
     return JSON.parse(match[1]) as { source: string; nonce: string; result: { ok: boolean; error?: string; app?: string } };
   }

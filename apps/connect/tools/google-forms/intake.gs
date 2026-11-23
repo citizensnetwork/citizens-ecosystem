@@ -1023,9 +1023,23 @@ function webIntakeAllowed_() {
   return true;
 }
 
+function formField_(body, name) {
+  var parts = String(body).split('&');
+  for (var i = 0; i < parts.length; i++) {
+    var eq = parts[i].indexOf('=');
+    var key = decodeURIComponent(String(eq < 0 ? parts[i] : parts[i].slice(0, eq)).replace(/\+/g, ' '));
+    if (key !== name) continue;
+    return decodeURIComponent(String(eq < 0 ? '' : parts[i].slice(eq + 1)).replace(/\+/g, ' '));
+  }
+  return '';
+}
+
 function webBody_(e) {
   if (!e) return null;
   var fromField = e.parameter && e.parameter.payload;
+  if (!fromField && e.postData && e.postData.contents && e.postData.contents.charAt(0) !== '{') {
+    fromField = formField_(e.postData.contents, 'payload');
+  }
   if (fromField) {
     if (String(fromField).length > WEB_MAX_BODY) return { tooLarge: true };
     try { return JSON.parse(fromField); } catch (err) { return null; }
@@ -1042,10 +1056,15 @@ function wantsHtml_(e) {
 
 function htmlReply_(nonce, result) {
   var payload = JSON.stringify({ source: 'citizens-intake', nonce: nonce || '', result: result }).replace(/</g, '\\u003c');
-  return HtmlService.createHtmlOutput(
-    '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>parent.postMessage(' +
-      payload + ',"*");</script></body></html>'
+  // Google nests this page inside its own frame, so tell every parent. The join page
+  // then replaces the form with "You're on the list."
+  var page = HtmlService.createHtmlOutput(
+    '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>' +
+      '(function(){var m=' + payload + ';function up(w){try{w.postMessage(m,"*");}catch(e){}' +
+      'if(w.parent&&w.parent!==w)up(w.parent);}if(window.parent&&window.parent!==window)up(window.parent);})();' +
+    '</script></body></html>'
   );
+  return page.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function respond_(e, nonce, result) {
@@ -1125,11 +1144,15 @@ function joinPageTemplate_() {
 }
 
 /** Web app: the join page. */
+function webAppUrlOk_(url) {
+  return /^https:\/\/script\.google\.com\/(?:macros\/s\/|a\/macros\/[a-z0-9.-]+\/s\/)[A-Za-z0-9_-]+\/(?:exec|dev)$/i.test(String(url || ''));
+}
+
 function doGet() {
   var tpl = joinPageTemplate_();
   var url = '';
   try { url = ScriptApp.getService().getUrl() || ''; } catch (err) { url = ''; }
-  if (!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/(exec|dev)$/.test(url)) url = '';
+  if (!webAppUrlOk_(url)) url = '';
   tpl.execUrl = url;
   return tpl.evaluate().setTitle('Join Citizens').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -1142,8 +1165,12 @@ function doPost(e) {
     nonce = out.nonce || '';
     return respond_(e, nonce, out.body);
   } catch (err) {
-    Logger.log('web intake: ' + (err && err.message ? err.message : 'failed'));
-    return respond_(e, nonce, { ok: false, error: 'We could not save this just now. Please try again in a minute.' });
+    var detail = err && err.message ? String(err.message).replace(/\s+/g, ' ').slice(0, 240) : '';
+    Logger.log('web intake: ' + (detail || 'failed'));
+    return respond_(e, nonce, {
+      ok: false,
+      error: detail ? 'We could not save this. ' + detail : 'We could not save this just now. Please try again in a minute.',
+    });
   }
 }
 

@@ -20,13 +20,13 @@ const HTML_PATH = join(process.cwd(), "tools/google-forms/intake.html");
 const GS_PATH = join(process.cwd(), "tools/google-forms/intake.gs");
 const EXEC = "https://script.google.com/macros/s/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij/exec";
 
-function page(search = "", connected = false) {
+function page(search = "", connected = false, url = "") {
   let html = readFileSync(HTML_PATH, "utf8");
   if (connected) {
     html = html.replace('name="citizens-intake-submit" content=""', `name="citizens-intake-submit" content="${EXEC}"`);
   }
   return new JSDOM(html, {
-    url: `https://219.co.za/join${search}`,
+    url: url || `https://219.co.za/join${search}`,
     runScripts: "dangerously",
     pretendToBeVisual: true,
   });
@@ -119,6 +119,17 @@ describe("intake.html join page", () => {
 
     expect(posts).toHaveLength(1);
     expect(posts[0].getAttribute("action")).toBe(EXEC);
+
+    const devUrl = "https://script.google.com/a/macros/219.co.za/s/ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghij/dev";
+    const opened = page("", true, devUrl);
+    const devPosts: HTMLFormElement[] = [];
+    opened.window.HTMLFormElement.prototype.submit = function submit(this: HTMLFormElement) {
+      devPosts.push(this);
+    };
+    fill(opened.window.document);
+    (opened.window.document.querySelector("[data-finish]") as HTMLButtonElement).click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(devPosts[0]?.getAttribute("action")).toBe(devUrl);
     expect(posts[0].querySelector<HTMLInputElement>('input[name="reply"]')?.value).toBe("html");
     const body = JSON.parse(posts[0].querySelector<HTMLInputElement>('input[name="payload"]')?.value || "{}");
     expect(body.app).toBe("connect");
