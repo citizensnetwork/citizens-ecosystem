@@ -268,6 +268,44 @@
       });
       if (!raised) revealChosen(id);
     };
+    // Explore's location menu and a tile. The map may be unmounted when the
+    // person chooses them, so each one is stored and applied once home is back.
+    useEffect(() => {
+      const fly = (city) => {
+        const api = mapApi.current;
+        if (!city || !Number.isFinite(city.lat) || !Number.isFinite(city.lng) || !api || !api.survey) return false;
+        api.survey(city.lat, city.lng, 11, { lift: false });
+        return true;
+      };
+      const openStored = (id, type) => {
+        if (!id || !byId.get(id)) return false;
+        openPeek(id, type || byId.get(id).type, false, null);
+        return true;
+      };
+      const takeArea = () => {
+        let city = null;
+        try { city = JSON.parse(sessionStorage.getItem('cc_area_pending') || 'null'); } catch (e) { city = null; }
+        if (!city || !fly(city)) return;
+        try { sessionStorage.removeItem('cc_area_pending'); } catch (e) { /* private mode */ }
+      };
+      const takePick = (id) => {
+        const itemId = id || '';
+        let stored = itemId;
+        if (!stored) { try { stored = sessionStorage.getItem('cc_explore_pick') || ''; } catch (e) { stored = ''; } }
+        if (!stored || !openStored(stored)) return;
+        try { sessionStorage.removeItem('cc_explore_pick'); } catch (e) { /* private mode */ }
+      };
+      const onArea = (e) => { if (fly(e.detail)) { try { sessionStorage.removeItem('cc_area_pending'); } catch (err) { /* private mode */ } } };
+      const onPick = (e) => takePick(e.detail && e.detail.id);
+      takeArea();
+      takePick('');
+      window.addEventListener('cc-set-area', onArea);
+      window.addEventListener('cc-explore-pick', onPick);
+      return () => {
+        window.removeEventListener('cc-set-area', onArea);
+        window.removeEventListener('cc-explore-pick', onPick);
+      };
+    });
     const peekTo = (i) => {
       const cur = peekRef.current;
       if (!cur || !cur.ids[i]) return;

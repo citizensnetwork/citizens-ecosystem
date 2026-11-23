@@ -9,8 +9,8 @@
 //
 //  Also here: the motion constants (mirrored by assets/map-v2.css, a unit test
 //  keeps the two equal), prefersReducedMotion(), and the map look, which
-//  simply follows the phone's own light/dark setting, live (founder, D1 as
-//  revised 2026-10-12: no in-app control).
+//  simply follows the phone's own light/dark setting, unless Settings has
+//  stored citizens-theme. System clears that store and the phone wins again.
 //
 //  The tilt (tracker R8, founder decision D17): Map v2's main map is drawn at ONE fixed
 //  oblique angle, PITCH degrees, whatever a person does with two fingers or a right-drag
@@ -36,6 +36,7 @@
   // cache-first for same-origin static files. Root-absolute, plus the path prefix when the app is served under one
   // (/citizens/connect, C39): routes.jsx loads first and owns it.
   const CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/map-v2.css?v=20261122n');
+  const SHELL_CSS_HREF = (window.CC_ROUTES ? window.CC_ROUTES.appUrl : (p) => p)('/assets/connect-shell.css?v=20261123a');
 
   // Motion tokens (ms). assets/map-v2.css carries the same numbers as
   // --dur-fast / --dur-base / --dur-slow and the two easings.
@@ -154,9 +155,8 @@
   const dur = (name) => (prefersReducedMotion() ? 0 : MOTION[name]);
 
   // ── Map look: follows the phone, unless Settings stored citizens-theme ──
-  // citizens-theme is the Settings override ('light' or 'dark'). Nothing in
-  // Settings writes it yet; when it does, this wins over the device. The
-  // retired cc_map_theme key is still cleared and still ignored.
+  // citizens-theme is the Settings override ('light' or 'dark'). System removes
+  // it, and the phone wins again. The retired cc_map_theme key is still cleared.
   const THEME_KEY = 'citizens-theme';
   function systemPrefersDark() {
     try { return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches); } catch { return false; }
@@ -171,6 +171,15 @@
   }
   // 'light' or 'dark': what is actually drawn.
   const resolvedTheme = () => themeOverride() || (systemPrefersDark() ? 'dark' : 'light');
+  function namedTheme() {
+    const v = themeOverride();
+    return v === 'dark' ? 'Dark' : v === 'light' ? 'Light' : 'System';
+  }
+  function setThemePref(p) {
+    write(THEME_KEY, p === 'Dark' ? 'dark' : p === 'Light' ? 'light' : null);
+    applyTheme();
+    try { window.dispatchEvent(new Event('citizens-theme')); } catch { /* old webview */ }
+  }
   function applyTheme() {
     if (!doc || !doc.documentElement) return;
     doc.documentElement.setAttribute('data-theme', resolvedTheme());
@@ -179,7 +188,8 @@
 
   // ── Stylesheet ───────────────────────────────────────────────────────────────────────────────────────
   const api = {
-    motion: MOTION, dur, prefersReducedMotion, resolvedTheme, PITCH, countBucket,
+    motion: MOTION, dur, prefersReducedMotion, resolvedTheme, setThemePref, PITCH, countBucket,
+    themePref() { return namedTheme(); },
     trapFocus, lockBehind,
     // the globe is on only while the constant says so (read when this file loads)
     get onlineGlobe() { return ONLINE_GLOBE_ON; },
@@ -217,6 +227,10 @@
     link.onload = done;
     link.onerror = done;
     doc.head.appendChild(link);
+    const shellCss = doc.createElement('link');
+    shellCss.rel = 'stylesheet';
+    shellCss.href = SHELL_CSS_HREF;
+    doc.head.appendChild(shellCss);
   }
   if (doc) {
     if (doc.readyState === 'loading') doc.addEventListener('DOMContentLoaded', mount);

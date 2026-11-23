@@ -293,21 +293,29 @@
   }
 
   // ── Page router ──
+  // Me and Explore sit in the live shell. The class gives them the pack layout
+  // without the pack dock's top and bottom clearance.
+  function placed(wide, node) {
+    return React.createElement('div', { className: 'connect-shell connect-placed ' + (wide ? 'desktop-review' : 'phone-review') },
+      React.createElement('div', { className: 'connect-frame' }, node));
+  }
+
   function CurrentPage() {
     const { nav, isPendingApplicant, listingRole } = window.useApp();
+    const wide = window.ConnectChrome && window.ConnectChrome.useWide ? window.ConnectChrome.useWide() : false;
     const p = nav.page;
     switch (p) {
       case 'home': return React.createElement(window.HomePage);
       case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
-      // #210: Map v2's Discover page.
-      case 'explore': return React.createElement(window.MapV2Discover.Discover);
+      // Explore is the image-first page. Kingdom Exploration stays at /discover.
+      case 'explore': return placed(wide, React.createElement(window.ConnectExplore.Page));
       case 'lets': return React.createElement(window.LetsPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);
       case 'dashboard': return React.createElement((listingRole === 'editor' || listingRole === 'viewer') ? window.DashboardPage : (isPendingApplicant ? window.PendingApplicationPage : window.DashboardPage));
       case 'admin': return React.createElement(window.AdminPage);
-      case 'settings': return React.createElement(window.SettingsPage);
+      case 'settings': return placed(wide, React.createElement(window.ConnectMe.Page, { space: 'Settings' }));
       case 'intake-upgrade': return React.createElement(window.IntakeUpgradePage);
       case 'apply': return React.createElement(window.ApplyPage);
       case 'onboarding': return React.createElement(window.OnboardingPage);
@@ -315,7 +323,7 @@
       case 'place': return React.createElement(window.PlaceProfilePage, { id: nav.params.id });
       case 'profile': return nav.params.id
         ? React.createElement(window.ContributorProfilePage, { id: nav.params.id })
-        : React.createElement(window.CitizenProfilePage);
+        : placed(wide, React.createElement(window.ConnectMe.Page));
       default: return React.createElement(window.HomePage);
     }
   }
