@@ -700,8 +700,8 @@
       else if (focus && mode === 'rest') { setStage('strip'); }
       else raise();
     };
-    // Panel-wide vertical swipe (strip / focus / open-at-top): same snap stages as the grab, without fighting
-    // tile taps or the open scroller (founder, 2026-11-23). Grab keeps its own handlers.
+    // Panel-wide vertical swipe at every visible level (strip / focus / open-at-top): same snap stages as
+    // the grab. Open at scroll-top + continue down → lower (never rubber-band / reload) — founder, 2026-11-23.
     const panelPull = useRef(null);
     const onPanelDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -712,7 +712,10 @@
         // Content owns the swipe once it has scrolled; at the top a downward pull can still lower.
         if (sc && sc.scrollTop >= 6) return;
       }
-      panelPull.current = { x: e.clientX, y: e.clientY, id: e.pointerId, captured: false, open: mode === 'open' };
+      panelPull.current = {
+        x: e.clientX, y: e.clientY, id: e.pointerId, captured: false,
+        open: mode === 'open', onlyDown: mode === 'open',
+      };
     };
     const onPanelMove = (e) => {
       const p = panelPull.current;
@@ -721,9 +724,11 @@
       const dy = e.clientY - p.y;
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
       // Open at top: an upward move belongs to the scroller.
-      if (p.open && dy < 0) { panelPull.current = null; return; }
+      if (p.onlyDown && dy < 0) { panelPull.current = null; return; }
       if (Math.abs(dy) <= Math.abs(dx)) { panelPull.current = null; return; }
       p.captured = true;
+      // Kill pull-to-refresh / overscroll chain once we own a downward lower gesture.
+      if (e.cancelable && p.onlyDown && dy > 0) e.preventDefault();
       if (e.currentTarget && e.currentTarget.setPointerCapture) {
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* optional */ }
       }
@@ -931,8 +936,8 @@
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
           'aria-label': open ? (P.lower) : (P.raise),
-          // Lowest visible strip: flat bar + slight up chevron; focus/open: flat bar only (founder, 2026-11-22).
-          'data-hint': (mode === 'strip' || mode === 'rest') ? 'up' : undefined,
+          // Strip / focus: up chevron — swipe or tap to see the rest (founder, 2026-11-23). Open: flat only.
+          'data-hint': (mode === 'strip' || mode === 'rest' || mode === 'focus') ? 'up' : undefined,
           onPointerDown: onGrabDown, onPointerUp: onGrabUp, onClick: onGrabClick,
           onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (open) lower(); else raise(); } },
         },
@@ -1094,8 +1099,8 @@
     };
     const touch = () => { touched.current = true; };
 
-    // Vertical pull: lowered = bar or cards (raise / step back). Raised = bar only — pinpeek-body owns
-    // vertical pan-y so Gallery / Events / Posts and nested Explore can scroll (founder, 2026-11-23).
+    // Vertical pull: lowered = bar or cards (raise / step back). Raised = bar, or body at scroll-top
+    // continuing downward (lower one step) — otherwise pinpeek-body owns pan-y (founder, 2026-11-23).
     // Sideways card swipes stay with the row: we only capture once the gesture is clearly vertical.
     // Do not setPointerCapture on pointerdown: that steals the click from Back / handle / Close.
     const onPullDown = (e) => {
@@ -1104,15 +1109,21 @@
       if (e.target.closest && e.target.closest(
         "[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close'], [data-mv2='xarrow'], [data-mv2='handle-chip'], [data-mv2='xfocus-back'], [data-mv2='xfocus-close']",
       )) return;
-      // Raised body is a native scroller: never start a snap pull from it (capture would steal the scroll).
-      if (raised && e.target.closest && e.target.closest("[data-mv2='pinpeek-body']")) return;
       const onBar = !!(e.target.closest && (
         e.target.closest("[data-mv2='pinpeek-bar']") ||
         e.target.closest("[data-mv2='handle']") ||
         e.target.closest("[data-mv2='handle-bar']")
       ));
+      const onBody = !!(raised && e.target.closest && e.target.closest("[data-mv2='pinpeek-body']"));
+      if (onBody) {
+        const sc = body.current;
+        // Content owns the swipe once it has scrolled; at the top a downward pull can still lower.
+        if (sc && sc.scrollTop >= 6) return;
+        pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId, captured: false, fromHandle: false, onlyDown: true };
+        return;
+      }
       if (raised && !onBar) return;
-      pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId, captured: false, fromHandle: onBar };
+      pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId, captured: false, fromHandle: onBar, onlyDown: false };
     };
     const onPullMove = (e) => {
       const p = pull.current;
@@ -1120,9 +1131,12 @@
       const dx = e.clientX - p.x;
       const dy = e.clientY - p.y;
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      // Raised body at top: upward belongs to the scroller; only a clear downward pull lowers.
+      if (p.onlyDown && dy < 0) { pull.current = null; return; }
       // Sideways: drop the panel pull so the card row keeps its pan-x scroll.
       if (Math.abs(dy) <= Math.abs(dx)) { pull.current = null; return; }
       p.captured = true;
+      if (e.cancelable && p.onlyDown && dy > 0) e.preventDefault();
       if (e.currentTarget && e.currentTarget.setPointerCapture) {
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture is optional */ }
       }
@@ -1152,7 +1166,9 @@
       const i = items.findIndex((m) => m.id === id);
       if (i === -1) return;
       if (i !== index) { props.onIndex(i); return; }
-      if (!raised) props.onRaise();
+      // Tap 1 (neighbour already handled) / tap 2 raises / tap 3 closes + zooms closer (founder, 2026-11-23).
+      if (!raised) { props.onRaise(); return; }
+      if (props.onDive) props.onDive(id);
     };
     // wrap: province items loop, so either direction always has a neighbour when there is more than one
     const step = (d) => { if (n > 1) props.onIndex((index + d + n) % n); };

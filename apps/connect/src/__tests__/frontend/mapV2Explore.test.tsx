@@ -505,14 +505,14 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261123c"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261123d"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123c");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123d");
     const sheetCss = read("src/frontend/assets/map-v2.css");
     expect(sheetCss).toMatch(/\[data-mv2='explore'\] \{[\s\S]*?touch-action: none;/);
     // raised: body scrolls; every child restates pan-y (overflow ends the chain)
@@ -591,7 +591,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
   });
 
   function carousel(props: Record<string, unknown> = {}) {
-    const calls = { onIndex: vi.fn(), onRaise: vi.fn(), onBack: vi.fn(), onClose: vi.fn() };
+    const calls = { onIndex: vi.fn(), onRaise: vi.fn(), onDive: vi.fn(), onBack: vi.fn(), onClose: vi.fn() };
     const items = [pins[0], pins[2], pins[1]];
     const r = render(React.createElement(Y().PinCarousel, {
       items, index: 0, raised: false, origin: ORIGIN, distWords: S.explore, sources: { places: [], events: [], contributors: [] },
@@ -720,19 +720,36 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     unmount();
   });
 
-  it("raised: the profile body does not start a snap pull (it must keep pan-y); the bar still steps back", () => {
+  it("raised: body at scroll-top downward lowers; scrolled body keeps pan-y; bar still steps back", () => {
     const { calls, unmount } = carousel({ raised: true });
     const panel = document.querySelector("[data-mv2='pinpeek']")!;
+    const bodyEl = document.querySelector("[data-mv2='pinpeek-body']") as HTMLElement;
     const details = screen.getByTestId("details");
     const bar = document.querySelector("[data-mv2='pinpeek-bar']")!;
+    // scrolled: content owns the swipe
+    Object.defineProperty(bodyEl, "scrollTop", { configurable: true, get: () => 40 });
     fireEvent.pointerDown(details, { clientX: 100, clientY: 300, pointerId: 1, pointerType: "touch" });
     fireEvent.pointerMove(panel, { clientX: 100, clientY: 360, pointerId: 1, pointerType: "touch" });
     fireEvent.pointerUp(panel, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
     expect(calls.onBack).not.toHaveBeenCalled();
-    fireEvent.pointerDown(bar, { clientX: 100, clientY: 80, pointerId: 2, pointerType: "touch" });
-    fireEvent.pointerMove(panel, { clientX: 100, clientY: 140, pointerId: 2, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 100, clientY: 180, pointerId: 2, pointerType: "touch" });
+    // at top + continue down → lower (founder, 2026-11-23)
+    Object.defineProperty(bodyEl, "scrollTop", { configurable: true, get: () => 0 });
+    fireEvent.pointerDown(details, { clientX: 100, clientY: 300, pointerId: 2, pointerType: "touch" });
+    fireEvent.pointerMove(panel, { clientX: 100, clientY: 360, pointerId: 2, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 400, pointerId: 2, pointerType: "touch" });
     expect(calls.onBack).toHaveBeenCalledTimes(1);
+    fireEvent.pointerDown(bar, { clientX: 100, clientY: 80, pointerId: 3, pointerType: "touch" });
+    fireEvent.pointerMove(panel, { clientX: 100, clientY: 140, pointerId: 3, pointerType: "touch" });
+    fireEvent.pointerUp(panel, { clientX: 100, clientY: 180, pointerId: 3, pointerType: "touch" });
+    expect(calls.onBack).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it("raised: a third tap on the chosen card dives (close + zoom closer)", () => {
+    const { calls, unmount } = carousel({ raised: true });
+    fireEvent.click(cardsIn()[0]);
+    expect(calls.onDive).toHaveBeenCalledWith("a");
+    expect(calls.onRaise).not.toHaveBeenCalled();
     unmount();
   });
 
@@ -782,6 +799,36 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
       fireEvent.pointerDown(tile, { clientX: 120, clientY: 520, pointerId: 2, pointerType: "touch" });
       fireEvent.pointerMove(panel, { clientX: 122, clientY: 480, pointerId: 2, pointerType: "touch" });
       fireEvent.pointerUp(panel, { clientX: 122, clientY: 440, pointerId: 2, pointerType: "touch" });
+      expect(mode()).toBe("open");
+    });
+
+    it("open at scroll-top: a continued downward swipe lowers (does not stick / reload)", () => {
+      render(React.createElement(X.Explore, { ...base }));
+      fireEvent.click(screen.getByRole("button", { name: P().open }));
+      const panel = document.querySelector("[data-mv2='explore']")!;
+      const tile = document.querySelector("[data-mv2='explore-tile']")!;
+      fireEvent.pointerDown(tile, { clientX: 120, clientY: 520, pointerId: 1, pointerType: "touch" });
+      fireEvent.pointerMove(panel, { clientX: 122, clientY: 480, pointerId: 1, pointerType: "touch" });
+      fireEvent.pointerUp(panel, { clientX: 122, clientY: 440, pointerId: 1, pointerType: "touch" });
+      expect(mode()).toBe("open");
+      const scroller = document.querySelector("[data-mv2='explore-scroll']") as HTMLElement;
+      Object.defineProperty(scroller, "scrollTop", { configurable: true, get: () => 0 });
+      fireEvent.pointerDown(scroller, { clientX: 120, clientY: 200, pointerId: 2, pointerType: "touch" });
+      fireEvent.pointerMove(panel, { clientX: 120, clientY: 260, pointerId: 2, pointerType: "touch" });
+      fireEvent.pointerUp(panel, { clientX: 120, clientY: 320, pointerId: 2, pointerType: "touch" });
+      expect(mode()).toBe("strip");
+    });
+
+    it("focus (Where-to): a vertical swipe up still raises to see the rest", () => {
+      const { rerender } = render(React.createElement(X.Explore, { ...base }));
+      fireEvent.click(screen.getByRole("button", { name: P().open }));
+      expect(mode()).toBe("strip");
+      rerender(React.createElement(X.Explore, { ...base, focus: { kind: "tile", id: "coffee" } }));
+      expect(mode()).toBe("focus");
+      const panel = document.querySelector("[data-mv2='explore']")!;
+      fireEvent.pointerDown(panel, { clientX: 120, clientY: 520, pointerId: 3, pointerType: "touch" });
+      fireEvent.pointerMove(panel, { clientX: 122, clientY: 480, pointerId: 3, pointerType: "touch" });
+      fireEvent.pointerUp(panel, { clientX: 122, clientY: 440, pointerId: 3, pointerType: "touch" });
       expect(mode()).toBe("open");
     });
 

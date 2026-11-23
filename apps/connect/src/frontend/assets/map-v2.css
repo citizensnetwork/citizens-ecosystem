@@ -3638,7 +3638,8 @@ a[data-mv2='card2'],
 [data-mv2='explore'][data-open] [data-mv2='explore-scroll'] {
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* none (not contain): at scroll-top a downward swipe must not chain to the page / reload */
+  overscroll-behavior: none;
   touch-action: pan-y;
   padding-bottom: calc(var(--xp-dock-h) + var(--space-8));
 }
@@ -4564,7 +4565,8 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
 [data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-body'] {
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* none: at scroll-top a continued downward swipe lowers the drawer (JS), not the page */
+  overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
 }
