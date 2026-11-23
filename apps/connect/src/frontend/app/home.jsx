@@ -501,7 +501,11 @@
             'aria-label': searchOpen ? XS.closeSearch : XS.searchButton,
             'aria-expanded': searchOpen ? 'true' : 'false',
           }, React.createElement(Icon, { name: searchOpen ? 'X' : 'Search', size: 20 }))),
-        searchOpen && React.createElement('div', { 'data-mv2': 'home-filters-wrap' },
+        searchOpen && React.createElement('div', {
+          'data-mv2': 'home-filters-wrap',
+          'data-fade-left': filterEdges.l ? '' : undefined,
+          'data-fade-right': filterEdges.r ? '' : undefined,
+        },
           filterEdges.l ? React.createElement('button', {
             type: 'button', 'data-mv2': 'home-filters-arrow', 'data-dir': 'prev',
             'aria-label': (XS.panel && XS.panel.scrollLeft) || '',

@@ -1314,6 +1314,45 @@
 [data-theme='dark'] .cn-rail-btn small,[data-theme='dark'] .cn-rail-do small,[data-theme='dark'] .cn-rail-label,[data-theme='dark'] .cn-rail-brand b,[data-theme='dark'] .cn-rail-door button{color:#f7f6f1}
 [data-theme='dark'] .cn-rail-btn.on,[data-theme='dark'] .cn-rail-do.on{background:#f2bd222e;box-shadow:inset 0 0 0 1px #f2bd2266}
 [data-theme='dark'] .cn-rail-door{background:#23251ff2;border:1px solid #ffffff1a}
+/* The map search keeps main's frosted gloss: a light sheen over the glass, in both themes. */
+[data-mv2='home-search']{
+  background:
+    linear-gradient(180deg,color-mix(in srgb,#fff 28%,transparent),transparent 46%),
+    var(--glass-bg);
+  -webkit-backdrop-filter:blur(22px) saturate(1.35);
+  backdrop-filter:blur(22px) saturate(1.35);
+  border:1px solid color-mix(in srgb,#fff 34%,var(--divider));
+  box-shadow:inset 0 1px 0 color-mix(in srgb,#fff 42%,transparent),var(--elev-1);
+}
+[data-theme='dark'] [data-mv2='home-search']{
+  background:
+    linear-gradient(180deg,color-mix(in srgb,#fff 16%,transparent),transparent 48%),
+    var(--glass-bg);
+  border-color:color-mix(in srgb,#fff 20%,var(--divider));
+  box-shadow:inset 0 1px 0 color-mix(in srgb,#fff 22%,transparent),var(--elev-1);
+}
+[data-mv2='home-search'] input{background:transparent;border:0;box-shadow:none;border-radius:0;padding:0}
+[data-mv2='home-find']{
+  background:
+    linear-gradient(180deg,color-mix(in srgb,#fff 24%,transparent),transparent 50%),
+    var(--glass-bg);
+  -webkit-backdrop-filter:blur(22px) saturate(1.35);
+  backdrop-filter:blur(22px) saturate(1.35);
+}
+/* Edge fades are a transparency mask, only on a narrow map, and only on a side that has scrolled away. */
+[data-mv2='home-filters-wrap']::before,[data-mv2='home-filters-wrap']::after{background:none}
+[data-mv2='home'][data-narrow] [data-mv2='home-filters-wrap'][data-fade-left] [data-mv2='home-filters']{
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 28px);
+  mask-image:linear-gradient(90deg,transparent,#000 28px);
+}
+[data-mv2='home'][data-narrow] [data-mv2='home-filters-wrap'][data-fade-right] [data-mv2='home-filters']{
+  -webkit-mask-image:linear-gradient(270deg,transparent,#000 28px);
+  mask-image:linear-gradient(270deg,transparent,#000 28px);
+}
+[data-mv2='home'][data-narrow] [data-mv2='home-filters-wrap'][data-fade-left][data-fade-right] [data-mv2='home-filters']{
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 28px,#000 calc(100% - 28px),transparent);
+}
 @media(max-width:767px){
   .cn-rail,.cn-rail[data-open='true']{flex-basis:64px;width:64px;align-items:center;padding:16px 8px 18px}
   .cn-rail[data-open='true'] .cn-rail-stack{align-items:center}
