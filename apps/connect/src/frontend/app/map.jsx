@@ -275,13 +275,6 @@
       const footEl = peek || xp;
       if (footEl) bottom = Math.max(0, box.bottom - footEl.getBoundingClientRect().top);
     }
-    // Crown rides the peek's top edge: include it so the pin is not soft-centred under the crown
-    // (works from crown-only open and when peek is already up — founder, 2026-11-23).
-    const crown = home.querySelector && home.querySelector("[data-mv2='explore-crown']");
-    if (crown && !crown.hidden) {
-      const cr = crown.getBoundingClientRect();
-      if (cr.height > 0) bottom = Math.max(bottom, Math.max(0, box.bottom - cr.top));
-    }
     const mid = (top + (h - bottom)) / 2;
     return [0, Math.round(mid - h / 2)];
   }
@@ -683,18 +676,16 @@
           userMovedRef.current = false;
           if (mp) frameCountry(mp, containerRef.current);
         },
-        // Card tap 3 in pinpeek: close the preview and step the camera ~levels closer on the pin (founder, 2026-11-23).
-        zoomCloser(levels, id) {
+        // Card tap 3: preview is closed — centre the pin on the screen, keep zoom (founder, 2026-11-23).
+        centreOnScreen(id) {
           requestAnimationFrame(() => {
             const mp = mapRef.current;
             const targetId = id || selectedRef.current;
             const mk = targetId ? markerObjs.current.get(targetId) : null;
             if (!mp || !mk) return;
             userMovedRef.current = true;
-            const step = Number.isFinite(levels) ? levels : 3;
-            const z = Math.min(mp.getMaxZoom ? mp.getMaxZoom() : 22, mp.getZoom() + step);
             mp.easeTo({
-              center: mk.getLngLat(), zoom: z, offset: liftOffset(containerRef.current),
+              center: mk.getLngLat(), offset: [0, 0],
               duration: window.MapV2.dur('slow'), essential: true,
             }, { originalEvent: {} });
           });

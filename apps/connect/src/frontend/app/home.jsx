@@ -74,7 +74,6 @@
   const TOWN_RADIUS_M = 40000;
   // The crown's reset lands on the person's own place at suburb zoom.
   const HOME_ZOOM = 12.5;
-  const DIVE_ZOOM_STEPS = 3; // card tap 3 in pinpeek: close preview and zoom this many levels closer
 
   // ── Home / Discover ──
   function HomePage() {
@@ -166,7 +165,9 @@
         if (typeof m.lat !== 'number' || typeof m.lng !== 'number') return false;
         return near.metersBetween(town, m) <= TOWN_RADIUS_M;
       };
-      const townScoped = !!(focus && (focus.kind === 'tile' || focus.kind === 'sec'));
+      // Town radius only once the camera is already at town scale (country overview has no town yet).
+      const townScoped = !!(focus && (focus.kind === 'tile' || focus.kind === 'sec')
+        && town && Number.isFinite(town.zoom) && town.zoom >= TOWN_ZOOM);
       return (m) => (focusTest ? focusTest(m) : true)
         && (!townScoped || inTown(m))
         && (!group || (X.groupOf && X.groupOf(m) === group));
@@ -182,10 +183,17 @@
       skipFrame.current = true;
       const home = rootRef.current;
       let foot = 0;
-      if (home && window.getComputedStyle) {
-        const vis = parseFloat(window.getComputedStyle(home).getPropertyValue('--xp-vis'));
-        const focusH = parseFloat(window.getComputedStyle(home).getPropertyValue('--xp-focus'));
-        foot = Number.isFinite(vis) && vis > 0 ? vis : (Number.isFinite(focusH) ? focusH : 0);
+      if (home) {
+        // --xp-vis / --xp-focus may be calc()/% tokens; measure the open Explore panel instead.
+        const xp = home.querySelector && home.querySelector("[data-mv2='explore']:not([hidden])");
+        if (xp) {
+          const box = home.getBoundingClientRect();
+          foot = Math.max(0, box.bottom - xp.getBoundingClientRect().top);
+        }
+        if (!(foot > 0) && window.getComputedStyle) {
+          const focusH = parseFloat(window.getComputedStyle(home).getPropertyValue('--xp-focus'));
+          foot = Number.isFinite(focusH) && focusH > 0 ? focusH : 340;
+        }
       }
       const camNow = api.camera ? api.camera() : null;
       const zNow = camNow && Number.isFinite(camNow.zoom) ? camNow.zoom
@@ -237,27 +245,26 @@
       const m = byId.get(id);
       setSelected(m ? id : null); if (m) setSelType(m.type); setLitId(null);
     };
-    // How much of the map the lowered carousel covers (its token, map-v2.css: it may still be sliding in), so the chosen
-    // card's pin is brought clear of it — including the crown that rides the peek's top edge (founder, 2026-11-23).
+    // Soft-centre between search and the RAISED peek top (pinpeek's full height), not the lowered
+    // peek/crown — so from crown-only the pin sits clear of the crown (founder, 2026-11-23).
+    // --pp-full / --pp-peek are calc() tokens: parseFloat is NaN; measure the element instead.
     // Raised, the carousel covers the map: nothing to bring into view.
     const revealChosen = (id) => {
       const home = rootRef.current;
       const api = mapApi.current;
       if (!home || !api || !api.revealSelected || (peekRef.current && peekRef.current.raised)) return;
-      const cs = window.getComputedStyle(home);
-      const peekH = parseFloat(cs.getPropertyValue('--pp-peek'));
-      const crownH = parseFloat(cs.getPropertyValue('--crown'));
-      // Crown sits on the peek top: foot = peek + crown so soft-centre clears both (crown-only open too).
-      let foot = (Number.isFinite(peekH) ? peekH : 0) + (Number.isFinite(crownH) ? crownH : 0);
       // Double rAF: peek may still be mounting when openPeek runs from crown-only rest.
       requestAnimationFrame(() => requestAnimationFrame(() => {
         if (!mapApi.current || !mapApi.current.revealSelected) return;
         if (peekRef.current && peekRef.current.raised) return;
-        const box = home.getBoundingClientRect();
-        const crown = home.querySelector("[data-mv2='explore-crown']");
-        if (crown && !crown.hidden) {
-          const cr = crown.getBoundingClientRect();
-          if (cr.height > 0) foot = Math.max(foot, Math.max(0, box.bottom - cr.top));
+        const peekEl = home.querySelector && home.querySelector("[data-mv2='pinpeek']:not([hidden])");
+        // pinpeek's layout height is always --pp-full; translateY only slides the lowered peek.
+        let foot = peekEl ? (peekEl.offsetHeight || 0) : 0;
+        if (!(foot > 0)) {
+          const cs = window.getComputedStyle(home);
+          const hit = parseFloat(cs.getPropertyValue('--hit')) || 48;
+          const gap = parseFloat(cs.getPropertyValue('--space-7')) || 28;
+          foot = Math.max(0, (home.clientHeight || 0) - hit - gap);
         }
         mapApi.current.revealSelected(foot, id);
       }));
@@ -317,15 +324,15 @@
       if (!cur || cur.raised) return;
       setPeek(Object.assign({}, cur, { raised: true, raisedAt: { index: cur.index, camera: camera() } }));
     };
-    // Card tap 3 in the preview: close the carousel and zoom ~3 levels closer to the pin (founder, 2026-11-23).
+    // Card tap 3: close the preview (no zoom change) and centre the pin on screen — panel is gone (founder, 2026-11-23).
     const divePeek = (id) => {
       const cur = peekRef.current;
       if (!cur) return;
       const target = id || (cur.ids && cur.ids[cur.index]);
       setPeek(null);
       if (target) choose(target);
-      if (target && mapApi.current && mapApi.current.zoomCloser) {
-        mapApi.current.zoomCloser(DIVE_ZOOM_STEPS, target);
+      if (target && mapApi.current && mapApi.current.centreOnScreen) {
+        mapApi.current.centreOnScreen(target);
       }
     };
     // Back from level 3: the cards again, on the card and the map the details were opened from.

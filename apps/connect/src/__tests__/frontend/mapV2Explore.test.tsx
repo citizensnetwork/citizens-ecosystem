@@ -505,7 +505,7 @@ describe("the stylesheet and the wiring", () => {
   it("registers both modules after the sheet and before the home screen, in the page and in the build", () => {
     const html = read("src/frontend/index.html");
     const build = read("scripts/build-frontend.js");
-    for (const [f, v] of [["map-v2-explore.jsx", "20261123d"], ["map-v2-nav.jsx", "20261026c"]]) {
+    for (const [f, v] of [["map-v2-explore.jsx", "20261123e"], ["map-v2-nav.jsx", "20261026c"]]) {
       expect(html).toContain(`src="app/${f}?v=${v}"`);
       expect(html.indexOf("app/map-v2-sheet.jsx")).toBeLessThan(html.indexOf("app/" + f));
       expect(html.indexOf("app/" + f)).toBeLessThan(html.indexOf("app/home.jsx"));
@@ -732,12 +732,14 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     fireEvent.pointerMove(panel, { clientX: 100, clientY: 360, pointerId: 1, pointerType: "touch" });
     fireEvent.pointerUp(panel, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
     expect(calls.onBack).not.toHaveBeenCalled();
-    // at top + continue down → lower (founder, 2026-11-23)
+    // Fresh gesture at scroll-top + down → lower (founder, 2026-11-23). Follows the finger, snaps on release.
     Object.defineProperty(bodyEl, "scrollTop", { configurable: true, get: () => 0 });
     fireEvent.pointerDown(details, { clientX: 100, clientY: 300, pointerId: 2, pointerType: "touch" });
     fireEvent.pointerMove(panel, { clientX: 100, clientY: 360, pointerId: 2, pointerType: "touch" });
+    expect((panel as HTMLElement).style.transform).toMatch(/translateY/);
     fireEvent.pointerUp(panel, { clientX: 100, clientY: 400, pointerId: 2, pointerType: "touch" });
     expect(calls.onBack).toHaveBeenCalledTimes(1);
+    expect((panel as HTMLElement).style.transform).toBe("");
     fireEvent.pointerDown(bar, { clientX: 100, clientY: 80, pointerId: 3, pointerType: "touch" });
     fireEvent.pointerMove(panel, { clientX: 100, clientY: 140, pointerId: 3, pointerType: "touch" });
     fireEvent.pointerUp(panel, { clientX: 100, clientY: 180, pointerId: 3, pointerType: "touch" });
@@ -745,7 +747,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     unmount();
   });
 
-  it("raised: a third tap on the chosen card dives (close + zoom closer)", () => {
+  it("raised: a third tap on the chosen card dives (close + centre on screen, no zoom)", () => {
     const { calls, unmount } = carousel({ raised: true });
     fireEvent.click(cardsIn()[0]);
     expect(calls.onDive).toHaveBeenCalledWith("a");
@@ -855,6 +857,9 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     expect(home).toContain("React.createElement(X.PinCarousel");
     expect(home).toContain("inline: true");
     expect(home).toContain("'aria-label': XS.chipsLabel");
+    expect(home).toContain("centreOnScreen");
+    expect(home).not.toContain("zoomCloser");
+    expect(read("src/frontend/app/map.jsx")).toContain("centreOnScreen(id)");
     const css = read("src/frontend/assets/map-v2.css");
     // the chips: one row that scrolls sideways (no column), and the carousel moves by transform only
     expect(css).toMatch(/\[data-mv2='home-filters-wrap'\]/);

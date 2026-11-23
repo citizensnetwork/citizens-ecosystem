@@ -85,9 +85,13 @@ export async function mockMapNetwork(
   });
 }
 
+/** Hermetic map centre: fixtures live around Pretoria; guest landing is country-wide (pins gated). */
+const E2E_TOWN = { lng: 28.2293, lat: -25.7479, zoom: 12.5 };
+
 /**
  * Open the map screen and wait until the MapLibre instance and `min` markers exist, and map-v2.css has painted (the
  * app turns motion on only then, data-mv2-motion: before it, panels still sit where an unstyled page puts them).
+ * Then jump to the fixture town so pins are drawn and hittable (production guests land on the country overview).
  */
 export async function openMap(page: Page, path = "/", min = 1) {
   await page.goto(path);
@@ -97,6 +101,18 @@ export async function openMap(page: Page, path = "/", min = 1) {
       && document.documentElement.hasAttribute("data-mv2-motion"),
     min,
     { timeout: 20_000 },
+  );
+  await page.evaluate((to) => {
+    const m = (window as unknown as { __ccMap: { jumpTo(o: object, d: object): void } }).__ccMap;
+    m.jumpTo({ center: [to.lng, to.lat], zoom: to.zoom }, { originalEvent: {} });
+  }, E2E_TOWN);
+  await page.waitForFunction(
+    () => {
+      const m = (window as unknown as { __ccMap?: { getZoom(): number; isMoving(): boolean } }).__ccMap;
+      return !!m && !m.isMoving() && m.getZoom() >= 12;
+    },
+    undefined,
+    { timeout: 10_000 },
   );
 }
 
