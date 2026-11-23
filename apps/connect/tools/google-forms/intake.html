@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#efece2">
+<!--
+  Citizens join page. One file, no build.
+
+  It adds a row to the intake sheet (tools/google-forms/intake.gs). Ticking
+  Approve is still the only step that publishes a Connect listing. Wear rows
+  are stored and are not published on Connect.
+
+  Served by the Apps Script web app, the line below is filled in automatically.
+  Hosted anywhere else, put the web app /exec address in the meta tag. Only a
+  script.google.com address is accepted. The page never carries the intake secret.
+
+  Open a chosen app with ?app=connect or ?app=wear (platform= works too).
+  Vision, Learn, Play, Move and Impact stay locked until their own intake exists.
+-->
+<meta name="citizens-intake-submit" content="">
+<title>Join Citizens</title>
+<style>
+  :root {
+    --white: #fffdf8;
+    --ink: #272a25;
+    --gold: #f2bd22;
+    --paper: #efece2;
+    --stage: #f7f6f1;
+    --muted: #272a25a6;
+    --line: #272a2514;
+    --edge: #ffffffb8;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  html { text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--gold) 7%, transparent), transparent 50%),
+      var(--paper);
+    color: var(--ink);
+    font: 16px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: inherit; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+  .skip {
+    position: absolute;
+    left: 0.5rem;
+    top: -4rem;
+    z-index: 40;
+    padding: 0.7rem 1rem;
+    background: var(--ink);
+    color: var(--white);
+    font-weight: 600;
+    border-radius: 999px;
+  }
+  .skip:focus { top: 0.5rem; }
+
+  .top {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.7rem 1.25rem;
+    padding-top: calc(0.7rem + env(safe-area-inset-top, 0px));
+    background: color-mix(in srgb, var(--paper) 86%, transparent);
+    color: var(--ink);
+    border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(16px);
+  }
+  .mark {
+    font-size: 1.35rem;
+    line-height: 1;
+    font-weight: 500;
+    letter-spacing: -0.04em;
+    text-decoration: none;
+  }
+  .word {
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    text-decoration: none;
+  }
+
+  .wrap {
+    width: min(42rem, calc(100% - 1.5rem));
+    margin: 0 auto;
+    padding: clamp(1.6rem, 6vw, 3.2rem) 0 3.5rem;
+  }
+
+  .eyebrow {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    margin: 0.85rem 0 0.85rem;
+    font-size: clamp(2.25rem, 6.3vw, 3.9rem);
+    font-weight: 500;
+    letter-spacing: -0.055em;
+    line-height: 1.04;
+  }
+  .lede {
+    margin: 0;
+    max-width: 60ch;
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--muted);
+  }
+
+  .joining {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin: 1.35rem 0 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .picker { position: relative; display: inline-block; }
+  .picker-full { display: block; width: 100%; margin-top: 0.4rem; }
+  .picker-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .picker-face {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 2.6rem 0 1rem;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background-color: var(--white);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.4 6 6.2 11 1.4' stroke='%23272a25' stroke-opacity='.4' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1.05rem center;
+    background-size: 12px 8px;
+    color: var(--ink);
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1;
+    text-align: left;
+    text-transform: none;
+  }
+  .joining .picker-face {
+    width: auto;
+    min-width: 9.75rem;
+    height: 44px;
+    border-radius: 999px;
+    padding: 0 2.7rem 0 1.05rem;
+    background-position: right 1.15rem center;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .picker-face:focus-visible { border-color: var(--ink); }
+  .picker-menu {
+    position: absolute;
+    z-index: 25;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 100%;
+    width: max-content;
+    max-width: min(24rem, 80vw);
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
+    background: var(--white);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 12px 35px #272a2509;
+  }
+  .picker-option {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    padding: 0.55rem 0.8rem;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.3;
+    text-align: left;
+    text-transform: none;
+  }
+  .picker-menu li + li .picker-option { box-shadow: inset 0 1px 0 #272a2512; }
+  .picker-option[aria-selected="true"] { background: var(--paper); }
+  .picker-option:hover:not(:disabled) { background: color-mix(in srgb, var(--paper) 65%, white); }
+  .picker-option:disabled { color: var(--muted); cursor: default; }
+  .note {
+    margin: 0.85rem 0 0;
+    padding: 1rem 1.1rem;
+    background: linear-gradient(125deg, color-mix(in srgb, var(--stage) 91%, transparent), color-mix(in srgb, var(--stage) 65%, transparent) 70%, color-mix(in srgb, var(--stage) 44%, transparent));
+    border: 1px solid var(--edge);
+    border-radius: 24px;
+    box-shadow: 0 12px 35px #272a2509;
+  }
+
+  .card {
+    margin-top: 1.15rem;
+    padding: 1.35rem 1.15rem 1.5rem;
+    background: linear-gradient(125deg, color-mix(in srgb, var(--stage) 91%, transparent), color-mix(in srgb, var(--stage) 65%, transparent) 70%, color-mix(in srgb, var(--stage) 44%, transparent));
+    border: 1px solid var(--edge);
+    border-radius: 28px;
+    box-shadow: 0 12px 35px #272a2509;
+    backdrop-filter: blur(22px);
+  }
+
+  .steps {
+    display: flex;
+    gap: 0.4rem;
+    margin: 0 0 1rem;
+    padding: 0 0 0.2rem;
+    list-style: none;
+    overflow-x: auto;
+  }
+  .steps button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0.3rem 0.75rem;
+    border: 1px solid #272a2526;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .steps button[aria-current="step"] {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--white);
+  }
+
+  h2 {
+    margin: 0.15rem 0 0.35rem;
+    font-size: clamp(1.35rem, 3vw, 1.7rem);
+    font-weight: 500;
+    letter-spacing: -0.045em;
+    line-height: 1.15;
+  }
+  .section-lead { margin: 0 0 0.2rem; color: var(--muted); }
+
+  .field > label,
+  .field > span {
+    display: block;
+    margin: 0;
+    color: var(--ink);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.35;
+    text-transform: none;
+  }
+  .field { margin-top: 1.65rem; }
+  .hint { margin: 0.35rem 0 0; color: var(--muted); font-size: 12.5px; font-weight: 500; }
+  .count { margin: 0.3rem 0 0; color: var(--muted); font-size: 12px; text-align: right; }
+
+  input[type="text"], input[type="email"], input[type="tel"], input[type="url"], textarea {
+    display: block;
+    width: 100%;
+    margin-top: 0.4rem;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--white);
+    color: var(--ink);
+    font: inherit;
+    font-size: 1rem;
+  }
+  textarea { min-height: 7rem; resize: vertical; }
+  input:focus, textarea:focus, select:focus { border-color: var(--ink); outline: none; }
+
+  .pair { display: grid; gap: 1.65rem 0.8rem; }
+  @media (min-width: 640px) {
+    .pair { grid-template-columns: 1fr 1fr; }
+  }
+
+  .choices { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.5rem; }
+  .choice {
+    min-height: 40px;
+    padding: 0.4rem 0.85rem;
+    border: 1px solid #272a2526;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--ink);
+    font-weight: 600;
+  }
+  .choice.is-on { background: var(--ink); border-color: var(--ink); color: var(--white); }
+
+  .check {
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+    margin-top: 1.35rem;
+    font-weight: 500;
+  }
+  .check input { width: 1.15rem; height: 1.15rem; margin-top: 0.45rem; accent-color: var(--ink); flex: none; }
+  .check span { font-weight: 500; }
+
+  details { margin-top: 0.9rem; }
+  summary { min-height: 44px; cursor: pointer; font-weight: 600; padding: 0.6rem 0; }
+
+  .still, .alert {
+    margin: 0.8rem 0 0;
+    padding: 0.85rem 1rem;
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--paper) 70%, white);
+    border: 1px solid var(--line);
+  }
+  .alert:empty { display: none; }
+  .nudge { margin: 1rem 0 0; color: var(--muted); font-size: 0.92rem; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 1.1rem; }
+  .btn {
+    min-height: 44px;
+    padding: 0.55rem 1.15rem;
+    border-radius: 999px;
+    font-weight: 600;
+  }
+  .btn.primary { background: var(--ink); color: var(--white); border: 1px solid var(--ink); }
+  .btn.finish { background: transparent; color: var(--ink); border: 1px solid #272a2540; }
+  .btn.finish.primary { background: var(--ink); color: var(--white); border-color: var(--ink); }
+  .btn.back { background: transparent; border: 0; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; padding-inline: 0.35rem; }
+  .btn:disabled { opacity: 0.6; cursor: progress; }
+
+  .photos { display: grid; gap: 0.8rem; }
+  @media (min-width: 640px) { .photos { grid-template-columns: 1fr 1fr; } }
+  .photo {
+    display: block;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    background: color-mix(in srgb, var(--white) 70%, transparent);
+    cursor: pointer;
+  }
+  .photo input { margin-top: 0.45rem; max-width: 100%; }
+  .photo img { display: block; margin-top: 0.55rem; max-height: 120px; border-radius: 16px; }
+
+  .hp {
+    position: absolute;
+    left: -10000px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  footer {
+    margin-top: 1.6rem;
+    color: var(--muted);
+    font-size: 12.5px;
+  }
+  footer a { font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
+
+  .thanks h1 { max-width: 12ch; }
+  .thanks h1:focus { outline: none; }
+  .also {
+    margin-top: 2.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+  }
+  .also-label {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .also .lede { margin-top: 0.65rem; max-width: 42ch; }
+  .also-actions { margin: 1.15rem 0 0; }
+  .also .btn {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+  }
+  .also .hint { margin-top: 0.9rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#join">Skip to the form</a>
+<header class="top">
+  <a class="mark" href="https://219.co.za/">219<span>.</span></a>
+  <a class="word" href="https://219.co.za/citizens">Citizens</a>
+</header>
+
+<main class="wrap" id="join">
+  <div id="intro">
+    <p class="eyebrow">Join</p>
+    <h1 data-copy="hero">Take your place.</h1>
+    <p class="lede" data-copy="lede">A minute here is enough to be added to Citizens Connect. Everything after that makes you easier to find.</p>
+
+    <div class="joining">
+      <span id="app-label">Joining</span>
+      <select id="app" aria-labelledby="app-label">
+        <option value="connect">Connect</option>
+        <option value="wear">Wear</option>
+        <option value="vision" disabled>Vision — soon</option>
+        <option value="learn" disabled>Learn — soon</option>
+        <option value="play" disabled>Play — soon</option>
+        <option value="move" disabled>Move — soon</option>
+        <option value="impact" disabled>Impact — soon</option>
+      </select>
+    </div>
+    <p id="app-note" class="note" hidden></p>
+  </div>
+
+  <noscript><p class="note">This form needs JavaScript to send your details.</p></noscript>
+
+  <div class="card" id="card">
+    <ol class="steps">
+      <li><button type="button" data-goto="0" aria-current="step">Essentials</button></li>
+      <li><button type="button" data-goto="1">Place</button></li>
+      <li><button type="button" data-goto="2">Story</button></li>
+      <li><button type="button" data-goto="3">Reach</button></li>
+      <li><button type="button" data-goto="4">Photos</button></li>
+      <li><button type="button" data-goto="5">More</button></li>
+    </ol>
+    <p id="still-needed" class="still" hidden>A few essentials are still needed before this can be sent. You can go back, or finish once they're in.</p>
+    <p id="form-alert" class="alert" role="alert"></p>
+
+    <form id="intake" novalidate>
+      <label class="hp">Company website
+        <input type="text" id="company-url" name="company_url" tabindex="-1" autocomplete="off">
+      </label>
+
+      <section data-step="0">
+        <h2 tabindex="-1">The essentials</h2>
+        <p class="section-lead">This is the part we need. It is enough to be added.</p>
+        <div class="pair">
+          <div class="field">
+            <label for="full-name">Your name</label>
+            <input id="full-name" type="text" data-phrase="applicant full name" autocomplete="name" maxlength="120" required>
+          </div>
+          <div class="field">
+            <label for="owner-email">Email you'll sign in with</label>
+            <input id="owner-email" type="email" data-phrase="owner's email" autocomplete="email" inputmode="email" maxlength="254" required>
+            <p class="hint">We email a 6-digit code to this address. It is not shown publicly.</p>
+          </div>
+        </div>
+        <div class="field">
+          <label for="listing-name" data-copy="listingLabel">Name people should see</label>
+          <input id="listing-name" type="text" data-phrase="organisation / ministry name" autocomplete="organization" maxlength="120" required>
+          <p class="hint" data-copy="listingHint">The ministry, business, or your own name — exactly as it should appear.</p>
+        </div>
+        <div class="field">
+          <span id="type-label">How you're set up</span>
+          <div class="choices" data-choice="type" role="radiogroup" aria-labelledby="type-label">
+            <input type="hidden" data-phrase="organisation type" value="">
+            <button type="button" class="choice" data-value="Church">Church</button>
+            <button type="button" class="choice" data-value="Christian Nonprofit / Ministry">Nonprofit / Ministry</button>
+            <button type="button" class="choice" data-value="Christian Business">Business</button>
+            <button type="button" class="choice" data-value="Individual">Individual</button>
+          </div>
+          <p class="hint">Individual means a person serving in their own name.</p>
+        </div>
+        <div class="field">
+          <label id="category-label" for="category">What you mainly do</label>
+          <select id="category" class="full" data-phrase="primary category" aria-labelledby="category-label">
+            <option value="">Choose one</option>
+            <option>Church</option>
+            <option>Outreach / Mission</option>
+            <option>Market / Expo</option>
+            <option>Business</option>
+            <option>Sport &amp; Recreation</option>
+            <option>Social Gathering</option>
+            <option>Arts &amp; Culture</option>
+            <option>Media</option>
+            <option>Retreat / Healing</option>
+            <option>Clinic</option>
+            <option>Education / Equipping</option>
+            <option>Rehab / Development</option>
+          </select>
+        </div>
+        <label class="check">
+          <input id="faith" type="checkbox" data-phrase="faith alignment" value="We are a Christian or faith-rooted organisation, ministry, business or initiative, and we affirm Citizens' Christian identity.">
+          <span>We are a Christian or faith-rooted organisation, ministry, business or initiative, and we affirm Citizens' Christian identity.</span>
+        </label>
+        <label class="check">
+          <input id="permission" type="checkbox" data-phrase="permission to publish" value="I am authorised to represent this listing and I consent to Citizens publishing the listing details above publicly on Citizens Connect.">
+          <span data-copy="permission">I am authorised to represent this listing and I consent to Citizens publishing the listing details above publicly on Citizens Connect.</span>
+        </label>
+        <details>
+          <summary>Add a phone or your role</summary>
+          <div class="pair">
+            <div class="field">
+              <label for="phone">Phone</label>
+              <input id="phone" type="tel" data-phrase="applicant phone number" autocomplete="tel" inputmode="tel" maxlength="40">
+              <p class="hint">Only if we need to reach you. Not shown publicly.</p>
+            </div>
+            <div class="field">
+              <label for="role">Your role</label>
+              <input id="role" type="text" data-phrase="your role in the organisation" maxlength="120" placeholder="Pastor, founder, organiser">
+            </div>
+          </div>
+        </details>
+        <p class="nudge">You can finish and submit whenever this feels like enough. The more you share, the easier you are to find.</p>
+        <div class="actions">
+          <button type="button" class="btn back" data-back hidden>Back</button>
+          <button type="button" class="btn finish" data-finish>Finish and submit</button>
+          <button type="button" class="btn primary" data-next>Continue</button>
+        </div>
+      </section>
+
+      <section data-step="1" hidden>
+        <h2 tabindex="-1">Where you are</h2>
+        <p class="section-lead">A fixed address can become a pin. Online and mobile work is still listed.</p>
+        <div class="field">
+          <span id="fixed-label">Is there a place people can visit?</span>
+          <div class="choices" data-choice="fixed" role="radiogroup" aria-labelledby="fixed-label">
+            <input type="hidden" data-phrase="fixed physical location" value="">
+            <button type="button" class="choice" data-value="Yes">Yes</button>
+            <button type="button" class="choice" data-value="No, we're online, mobile or have no permanent office">No fixed place</button>
+          </div>
+        </div>
+        <div id="address-block">
+          <div class="field">
+            <label for="address">Street address</label>
+            <textarea id="address" data-phrase="street address" maxlength="300" placeholder="123 Church St, Hatfield, Pretoria"></textarea>
+          </div>
+          <div class="field">
+            <label for="maps">Google Maps link</label>
+            <input id="maps" type="url" data-phrase="google maps link" inputmode="url" maxlength="500" placeholder="https://maps.google.com/...">
+            <p class="hint">In Google Maps, tap Share and paste the link. It gives the most accurate pin.</p>
+          </div>
+        </div>
+        <div class="field">
+          <label for="areas">Areas you serve</label>
+          <input id="areas" type="text" data-phrase="which area" maxlength="300" placeholder="Hatfield, Pretoria East, Tshwane">
+        </div>
+        <p class="nudge">You can finish and submit whenever this feels like enough. The more you share, the easier you are to find.</p>
+        <div class="actions">
+          <button type="button" class="btn back" data-back>Back</button>
+          <button type="button" class="btn finish" data-finish>Finish and submit</button>
+          <button type="button" class="btn primary" data-next>Continue</button>
+        </div>
+      </section>
+
+      <section data-step="2" hidden>
+        <h2 tabindex="-1">Your story</h2>
+        <p class="section-lead">A few lines are plenty. People read this on your card.</p>
+        <div class="field">
+          <label for="bio">Short bio</label>
+          <textarea id="bio" data-phrase="short bio" maxlength="1000" placeholder="Who you are, and who you serve."></textarea>
+          <p class="count" id="bio-count">0 / 1000</p>
+          <p class="hint">About 240 characters show on the card. You can write up to 1000.</p>
+        </div>
+        <div class="pair">
+          <div class="field">
+            <label for="website">Website</label>
+            <input id="website" type="text" data-phrase="website" inputmode="url" maxlength="500" placeholder="https://">
+          </div>
+          <div class="field">
+            <label for="contact-email">Public contact email</label>
+            <input id="contact-email" type="email" data-phrase="public contact email" inputmode="email" maxlength="254" placeholder="hello@">
+            <p class="hint">Shown on the listing. It can differ from the sign-in email.</p>
+          </div>
+        </div>
+        <p class="nudge">You can finish and submit whenever this feels like enough. The more you share, the easier you are to find.</p>
+        <div class="actions">
+          <button type="button" class="btn back" data-back>Back</button>
+          <button type="button" class="btn finish" data-finish>Finish and submit</button>
+          <button type="button" class="btn primary" data-next>Continue</button>
+        </div>
+      </section>
+
+      <section data-step="3" hidden>
+        <h2 tabindex="-1">Ways to reach you</h2>
+        <p class="section-lead">Skip any you don't use. A handle or a full link both work.</p>
+        <div class="pair">
+          <div class="field"><label for="instagram">Instagram</label><input id="instagram" type="text" data-phrase="instagram" maxlength="500" placeholder="@name"></div>
+          <div class="field"><label for="facebook">Facebook</label><input id="facebook" type="text" data-phrase="facebook" maxlength="500"></div>
+          <div class="field"><label for="tiktok">TikTok</label><input id="tiktok" type="text" data-phrase="tiktok" maxlength="500" placeholder="@name"></div>
+          <div class="field"><label for="youtube">YouTube</label><input id="youtube" type="text" data-phrase="youtube" maxlength="500"></div>
+          <div class="field"><label for="x">X (Twitter)</label><input id="x" type="text" data-phrase="x (twitter)" maxlength="500" placeholder="@name"></div>
+          <div class="field"><label for="linkedin">LinkedIn</label><input id="linkedin" type="text" data-phrase="linkedin" maxlength="500"></div>
+        </div>
+        <div class="field">
+          <label for="whatsapp">WhatsApp</label>
+          <input id="whatsapp" type="text" data-phrase="whatsapp" maxlength="500" placeholder="A number, wa.me link, or group invite">
+        </div>
+        <p class="nudge">You can finish and submit whenever this feels like enough. The more you share, the easier you are to find.</p>
+        <div class="actions">
+          <button type="button" class="btn back" data-back>Back</button>
+          <button type="button" class="btn finish" data-finish>Finish and submit</button>
+          <button type="button" class="btn primary" data-next>Continue</button>
+        </div>
+      </section>
+
+      <section data-step="4" hidden>
+        <h2 tabindex="-1">Photos</h2>
+        <p class="section-lead">Optional. A logo and a wide photo are the first things people see. JPEG or PNG works best.</p>
+        <div class="photos">
+          <label class="photo">Logo
+            <input id="logo" type="file" accept="image/jpeg,image/png,image/webp" data-image="logo">
+            <img id="logo-preview" alt="" hidden>
+          </label>
+          <label class="photo">Cover photo
+            <input id="cover" type="file" accept="image/jpeg,image/png,image/webp" data-image="cover">
+            <img id="cover-preview" alt="" hidden>
+          </label>
+        </div>
+        <p class="nudge">You can finish and submit whenever this feels like enough. The more you share, the easier you are to find.</p>
+        <div class="actions">
+          <button type="button" class="btn back" data-back>Back</button>
+          <button type="button" class="btn finish" data-finish>Finish and submit</button>
+          <button type="button" class="btn primary" data-next>Continue</button>
+        </div>
+      </section>
+
+      <section data-step="5" hidden>
+        <h2 tabindex="-1">A little more</h2>
+        <p class="section-lead">Only if you feel like it. None of this is required.</p>
+        <div class="field">
+          <label for="team">People to invite later</label>
+          <textarea id="team" data-phrase="team members to invite" maxlength="2000" placeholder="Name and email, one per line"></textarea>
+        </div>
+        <div class="field">
+          <label for="events">Events or a venue</label>
+          <textarea id="events" data-phrase="regular events or have venues" maxlength="500" placeholder="Weekly gatherings, a venue, or not yet"></textarea>
+        </div>
+        <div class="field">
+          <label for="heard">How did you hear about Citizens?</label>
+          <input id="heard" type="text" data-phrase="how did you hear" maxlength="200">
+        </div>
+        <div class="field">
+          <span id="auto-label">Keeping the listing up to date</span>
+          <div class="choices" data-choice="auto" role="radiogroup" aria-labelledby="auto-label">
+            <input type="hidden" data-phrase="keeping your listing up to date" value="">
+            <button type="button" class="choice" data-value="No thanks">No thanks</button>
+            <button type="button" class="choice" data-value="Yes, suggest updates for my approval">Suggest updates</button>
+            <button type="button" class="choice" data-value="Yes, and publish events automatically">Publish events</button>
+          </div>
+          <p class="hint">Leave this blank and nothing is read from your website or socials. Events can be suggested, or published for you. You can change this later.</p>
+        </div>
+        <div class="field" data-only="wear" hidden>
+          <label for="delivery">How do you get clothes to people?</label>
+          <textarea id="delivery" data-phrase="delivery options" maxlength="500" placeholder="Collect in Pretoria, courier, at markets"></textarea>
+        </div>
+        <p class="nudge">You can finish and submit whenever this feels like enough. The more you share, the easier you are to find.</p>
+        <div class="actions">
+          <button type="button" class="btn back" data-back>Back</button>
+          <button type="button" class="btn finish primary" data-finish>Finish and submit</button>
+          <button type="button" class="btn primary" data-next hidden>Continue</button>
+        </div>
+      </section>
+    </form>
+  </div>
+
+  <section id="thanks" class="thanks" hidden>
+    <p class="eyebrow">Received</p>
+    <h1 id="thanks-title" tabindex="-1">You're on the list.</h1>
+    <p class="lede" id="thanks-body"></p>
+    <div class="also">
+      <p class="also-label">Also contribute</p>
+      <p class="lede">Apply to another Citizens app whenever you're ready. It opens a fresh form.</p>
+      <p class="also-actions"><a class="btn primary" id="also-link" href="?app=wear">Apply to Wear</a></p>
+      <p class="hint">Vision, Learn, Play, Move and Impact aren't open yet.</p>
+    </div>
+  </section>
+
+  <footer>
+    <a href="https://219.co.za/">219.</a>
+    · Citizens apps · Connecting the Kingdom
+  </footer>
+</main>
+<iframe name="intake-frame" id="intake-frame" hidden title=""></iframe>
+
+<script>
+(function () {
+  // Filled by the Apps Script template. A raw file keeps this text, and it is ignored.
+  var INTAKE_EXEC = "<?!= execUrl ?>";
+
+  var EMAIL_RE = /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9.-]{1,189}\.[A-Za-z]{2,24}$/;
+  var DRAFT_KEY = "citizens-intake-v1";
+  var EXEC_RE = /^https:\/\/script\.google\.com\/(?:macros\/s\/|a\/macros\/[a-z0-9.-]+\/s\/)[A-Za-z0-9_-]+\/(?:exec|dev)$/i;
+
+  // Gold is the warm glow in the page, the same one Central uses. Wear keeps its own gold.
+  var THEMES = {
+    connect: { gold: "#f2bd22", paper: "#efece2" },
+    wear: { gold: "#c9a84c", paper: "#efe8d8" },
+    vision: { gold: "#c9a84c", paper: "#efece2" },
+    learn: { gold: "#f2bd22", paper: "#efece2" },
+    play: { gold: "#f2bd22", paper: "#efece2" },
+    move: { gold: "#f2bd22", paper: "#efece2" },
+    impact: { gold: "#f2bd22", paper: "#efece2" }
+  };
+  var OPEN = { connect: true, wear: true };
+
+  var COPY = {
+    connect: {
+      hero: "Take your place.",
+      lede: "A minute here is enough to be added to Citizens Connect. Everything after that makes you easier to find.",
+      listingLabel: "Name people should see",
+      listingHint: "The ministry, business, or your own name — exactly as it should appear.",
+      permission: "I am authorised to represent this listing and I consent to Citizens publishing the listing details above publicly on Citizens Connect.",
+      thanks: "Nothing goes live until it's reviewed. We'll email the address you gave when the listing is ready. Sign in with that same email — we'll send a 6-digit code — and confirm the listing is yours."
+    },
+    wear: {
+      hero: "Bring your brand in.",
+      lede: "A minute here is enough to be added to Citizens Wear. Everything after that helps us understand the brand.",
+      listingLabel: "Brand name",
+      listingHint: "The brand name, exactly as it should appear.",
+      permission: "I am authorised to represent this brand and I consent to Citizens keeping these details and contacting me about Citizens Wear.",
+      thanks: "Nothing is published until it's reviewed. We'll be in touch at the address you gave."
+    }
+  };
+
+  var current = 0;
+  var currentApp = "connect";
+  var ready = false;
+  var sending = false;
+  var pendingNonce = "";
+  var timer = 0;
+  var pollTimer = 0;
+
+  function allowedExec(value) {
+    return EXEC_RE.test(String(value || ""));
+  }
+
+  function submitUrl() {
+    // Post back to the address in the bar. /dev then runs the latest saved code,
+    // and /exec runs the deployed version. A Workspace address includes /a/macros/.
+    var own = String(location.href || "").split("#")[0].split("?")[0];
+    if (allowedExec(own)) return own;
+    var meta = document.querySelector('meta[name="citizens-intake-submit"]');
+    var fromMeta = meta ? meta.getAttribute("content") : "";
+    if (allowedExec(fromMeta)) return fromMeta;
+    if (allowedExec(INTAKE_EXEC)) return INTAKE_EXEC;
+    return "";
+  }
+
+  function queryApp() {
+    var params = new URLSearchParams(location.search);
+    return String(params.get("app") || params.get("platform") || "").toLowerCase();
+  }
+
+  function readDraft() {
+    try {
+      var raw = sessionStorage.getItem(DRAFT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function saveDraft() {
+    if (!ready) return;
+    try {
+      var fields = {};
+      document.querySelectorAll("[data-phrase]").forEach(function (el) {
+        var phrase = el.getAttribute("data-phrase");
+        fields[phrase] = el.type === "checkbox" ? (el.checked ? "1" : "") : el.value;
+      });
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ app: currentApp, step: current, fields: fields }));
+    } catch (err) { /* private mode */ }
+  }
+
+  function applyCopy(app) {
+    var copy = COPY[app] || COPY.connect;
+    Object.keys(copy).forEach(function (key) {
+      if (key === "thanks") return;
+      document.querySelectorAll('[data-copy="' + key + '"]').forEach(function (el) {
+        el.textContent = copy[key];
+      });
+    });
+    var permission = document.getElementById("permission");
+    if (permission) permission.value = copy.permission;
+    document.title = app === "wear" ? "Join Citizens Wear" : "Join Citizens Connect";
+  }
+
+  function applyPlatform(app) {
+    if (!OPEN[app]) app = "connect";
+    currentApp = app;
+    var theme = THEMES[app] || THEMES.connect;
+    document.documentElement.style.setProperty("--gold", theme.gold);
+    document.documentElement.style.setProperty("--paper", theme.paper);
+    document.documentElement.setAttribute("data-platform", app);
+    var select = document.getElementById("app");
+    if (select && select.value !== app) select.value = app;
+    if (select && select.syncPicker) select.syncPicker();
+    applyCopy(app);
+    document.querySelectorAll("[data-only]").forEach(function (el) {
+      el.hidden = el.getAttribute("data-only") !== app;
+    });
+    var fixed = document.querySelector('[data-phrase="fixed physical location"]');
+    var address = document.getElementById("address-block");
+    if (address && fixed) address.hidden = fixed.value.indexOf("No,") === 0;
+  }
+
+  function phraseValue(el) {
+    var only = el.closest("[data-only]");
+    if (only && only.hidden) return "";
+    if (el.type === "checkbox") return el.checked ? String(el.value || "").trim() : "";
+    return String(el.value || "").trim();
+  }
+
+  function valueOf(phrase) {
+    var el = document.querySelector('[data-phrase="' + phrase + '"]');
+    return el ? phraseValue(el) : "";
+  }
+
+  function validate() {
+    if (valueOf("applicant full name").length < 2) return { message: "Add your name.", id: "full-name" };
+    var email = valueOf("owner's email");
+    if (!EMAIL_RE.test(email)) return { message: "Add the email you will sign in with.", id: "owner-email" };
+    if (valueOf("organisation / ministry name").length < 2) return { message: "Add the name people should see.", id: "listing-name" };
+    if (!valueOf("organisation type")) return { message: "Choose how you're set up.", id: "type-label" };
+    if (!valueOf("primary category")) return { message: "Choose what you mainly do.", id: "category" };
+    if (!document.getElementById("faith").checked) return { message: "Faith alignment is needed before this can be saved.", id: "faith" };
+    if (!document.getElementById("permission").checked) return { message: "Permission is needed before this can be saved.", id: "permission" };
+    var contact = valueOf("public contact email");
+    if (contact && !EMAIL_RE.test(contact)) return { message: "The public contact email does not look right.", id: "contact-email" };
+    return null;
+  }
+
+  function showProblem(message, id) {
+    var alert = document.getElementById("form-alert");
+    alert.textContent = message;
+    var el = id ? document.getElementById(id) : null;
+    if (el && el.focus) el.focus();
+  }
+
+  function show(index, focus) {
+    var sections = document.querySelectorAll("[data-step]");
+    if (index < 0 || index >= sections.length) return;
+    current = index;
+    sections.forEach(function (section, i) {
+      var on = i === index;
+      section.hidden = !on;
+      var back = section.querySelector("[data-back]");
+      var next = section.querySelector("[data-next]");
+      var finishBtn = section.querySelector("[data-finish]");
+      if (back) back.hidden = index === 0;
+      if (next) next.hidden = index === sections.length - 1;
+      if (finishBtn) finishBtn.classList.toggle("primary", index === sections.length - 1);
+    });
+    document.querySelectorAll("[data-goto]").forEach(function (btn, i) {
+      if (i === index) btn.setAttribute("aria-current", "step");
+      else btn.removeAttribute("aria-current");
+    });
+    var still = document.getElementById("still-needed");
+    if (still) still.hidden = index === 0 || !validate();
+    if (focus) {
+      var title = sections[index].querySelector("h2");
+      if (title) title.focus();
+    }
+    saveDraft();
+  }
+
+  function refreshChoices() {
+    document.querySelectorAll("[data-choice]").forEach(function (group) {
+      var hidden = group.querySelector("input");
+      var currentValue = hidden ? hidden.value : "";
+      group.querySelectorAll(".choice").forEach(function (btn) {
+        var on = btn.getAttribute("data-value") === currentValue;
+        btn.classList.toggle("is-on", on);
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    });
+  }
+
+  function setBusy(on) {
+    document.querySelectorAll("[data-finish], [data-next], [data-back]").forEach(function (btn) {
+      btn.disabled = on;
+    });
+    document.querySelectorAll("[data-finish]").forEach(function (btn) {
+      btn.textContent = on ? "Sending…" : "Finish and submit";
+    });
+  }
+
+  function nonce() {
+    var bytes = new Uint8Array(16);
+    if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes);
+    else for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    var out = "";
+    for (var j = 0; j < bytes.length; j++) out += ("0" + bytes[j].toString(16)).slice(-2);
+    return out;
+  }
+
+  function payload(images) {
+    var answers = {};
+    document.querySelectorAll("[data-phrase]").forEach(function (el) {
+      var value = phraseValue(el);
+      if (value) answers[el.getAttribute("data-phrase")] = value;
+    });
+    return {
+      app: currentApp,
+      company_url: document.getElementById("company-url").value,
+      nonce: pendingNonce,
+      answers: answers,
+      images: images
+    };
+  }
+
+  function readOne(file, maxW) {
+    return new Promise(function (resolve, reject) {
+      if (!file) return resolve(null);
+      if (file.size > 12 * 1024 * 1024) return reject(new Error("That photo is too large. Please choose one under 12 MB."));
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        var scale = Math.min(1, maxW / (img.width || maxW));
+        var canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((img.width || maxW) * scale));
+        canvas.height = Math.max(1, Math.round((img.height || maxW) * scale));
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        var qualities = [0.82, 0.7, 0.55];
+        var attempt = 0;
+        var next = function () {
+          canvas.toBlob(function (blob) {
+            if (!blob) return reject(new Error("That photo could not be read. Please use a JPEG or PNG."));
+            if (blob.size > 1100000 && attempt < qualities.length - 1) {
+              attempt += 1;
+              next();
+              return;
+            }
+            if (blob.size > 1100000) return reject(new Error("That photo is still too large. Please choose a smaller one."));
+            var reader = new FileReader();
+            reader.onload = function () {
+              var data = String(reader.result || "");
+              var comma = data.indexOf(",");
+              resolve({ mime: "image/jpeg", base64: comma >= 0 ? data.slice(comma + 1) : data });
+            };
+            reader.onerror = function () { reject(new Error("That photo could not be read. Please use a JPEG or PNG.")); };
+            reader.readAsDataURL(blob);
+          }, "image/jpeg", qualities[attempt]);
+        };
+        next();
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        reject(new Error("That photo could not be read. Please use a JPEG or PNG."));
+      };
+      img.src = url;
+    });
+  }
+
+  function readPhotos() {
+    var logo = document.getElementById("logo").files[0];
+    var cover = document.getElementById("cover").files[0];
+    return Promise.all([readOne(logo, 800), readOne(cover, 1600)]).then(function (pair) {
+      return { logo: pair[0], cover: pair[1] };
+    });
+  }
+
+  function otherHref(app) {
+    try {
+      var url = new URL(location.href);
+      url.hash = "";
+      url.searchParams.set("app", app);
+      url.searchParams.delete("platform");
+      return url.toString();
+    } catch (err) {
+      return "?app=" + app;
+    }
+  }
+
+  function showThanks(result) {
+    var copy = COPY[currentApp] || COPY.connect;
+    var extra = "";
+    var skipped = result && result.photosSkipped || [];
+    if (skipped.length) extra = " We couldn't store " + skipped.join(" and ") + ". It can be added later.";
+    document.getElementById("thanks-body").textContent = copy.thanks + extra;
+    var other = currentApp === "wear" ? "connect" : "wear";
+    var link = document.getElementById("also-link");
+    link.textContent = other === "wear" ? "Apply to Wear" : "Apply to Connect";
+    link.href = otherHref(other);
+    document.getElementById("intro").hidden = true;
+    document.getElementById("card").hidden = true;
+    var skip = document.querySelector(".skip");
+    if (skip) skip.hidden = true;
+    document.getElementById("thanks").hidden = false;
+    document.title = "You're on the list";
+    document.getElementById("thanks-title").focus();
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch (err) { /* ignore */ }
+  }
+
+  function post(url, images) {
+    pendingNonce = nonce();
+    var frame = document.getElementById("intake-frame");
+    var form = document.createElement("form");
+    form.method = "POST";
+    form.action = url;
+    form.target = frame.name;
+    form.acceptCharset = "UTF-8";
+    var field = document.createElement("input");
+    field.type = "hidden";
+    field.name = "payload";
+    field.value = JSON.stringify(payload(images));
+    var reply = document.createElement("input");
+    reply.type = "hidden";
+    reply.name = "reply";
+    reply.value = "html";
+    form.appendChild(field);
+    form.appendChild(reply);
+    form.hidden = true;
+    var previous = document.getElementById("intake-post");
+    if (previous) previous.remove();
+    form.id = "intake-post";
+    document.body.appendChild(form);
+    window.clearTimeout(timer);
+    timer = window.setTimeout(function () {
+      sending = false;
+      setBusy(false);
+      showProblem("We could not confirm that this was saved. Please try once more. If Form Responses 1 already has a row with Source web-form, leave it.");
+    }, 25000);
+    form.submit();
+    watchResult();
+  }
+
+  function applyResult(result) {
+    if (!pendingNonce) return;
+    window.clearTimeout(timer);
+    window.clearTimeout(pollTimer);
+    pendingNonce = "";
+    sending = false;
+    setBusy(false);
+    if (result && result.ok) showThanks(result);
+    else showProblem((result && result.error) || "We could not save this. Please try again.");
+  }
+
+  // The posted reply runs inside Google's frame and often cannot tell this page.
+  // The page itself can ask the script, which stored the result under the nonce.
+  function watchResult() {
+    var g = window.google;
+    var runner = g && g.script && g.script.run;
+    if (!runner) return;
+    var n = pendingNonce;
+    var tries = 0;
+    var tick = function () {
+      if (!n || pendingNonce !== n) return;
+      tries += 1;
+      if (tries > 40) return;
+      try {
+        runner
+          .withSuccessHandler(function (result) {
+            if (pendingNonce !== n) return;
+            if (!result) {
+              pollTimer = window.setTimeout(tick, 800);
+              return;
+            }
+            applyResult(result);
+          })
+          .withFailureHandler(function () {
+            if (pendingNonce === n) pollTimer = window.setTimeout(tick, 800);
+          })
+          .intakeResult(n);
+      } catch (err) {
+        if (pendingNonce === n) pollTimer = window.setTimeout(tick, 800);
+      }
+    };
+    pollTimer = window.setTimeout(tick, 400);
+  }
+
+  function finish() {
+    if (sending) return;
+    var problem = validate();
+    if (problem) {
+      var field = document.getElementById(problem.id);
+      var section = field && field.closest("[data-step]");
+      if (section) show(Number(section.getAttribute("data-step")), false);
+      showProblem(problem.message, problem.id);
+      return;
+    }
+    var url = submitUrl();
+    if (!url) {
+      showProblem("We could not send this yet, because this copy of the form has no sheet to write to. Open the join link you were given.");
+      return;
+    }
+    document.getElementById("form-alert").textContent = "";
+    sending = true;
+    setBusy(true);
+    readPhotos().then(function (images) {
+      post(url, images);
+    }).catch(function (err) {
+      sending = false;
+      setBusy(false);
+      showProblem(err && err.message ? err.message : "That photo could not be read.");
+    });
+  }
+
+  function onMessage(event) {
+    var data = event.data;
+    if (!data || data.source !== "citizens-intake") return;
+    // A sandboxed Apps Script frame reports its origin as the string "null".
+    var origin = event.origin || "";
+    var fromScript = origin === "https://script.google.com" || origin === "https://script.googleusercontent.com" || origin === "null";
+    if (!fromScript) return;
+    if (!pendingNonce || data.nonce !== pendingNonce) return;
+    applyResult(data.result || {});
+  }
+
+  var previewUrl = { logo: "", cover: "" };
+
+  function preview(input, img) {
+    if (!img || img.tagName !== "IMG") return;
+    var kind = input && input.getAttribute("data-image");
+    if (kind && previewUrl[kind]) {
+      URL.revokeObjectURL(previewUrl[kind]);
+      previewUrl[kind] = "";
+    }
+    var file = input && input.files && input.files[0];
+    // A thumbnail is only for a real photo. The address is always a blob URL
+    // from this page, shown on an image element, which does not run a script.
+    if (!file || !/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      img.hidden = true;
+      img.removeAttribute("src");
+      return;
+    }
+    var url = String(URL.createObjectURL(file));
+    if (url.indexOf("blob:") !== 0) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+    if (kind) previewUrl[kind] = url;
+    var shown = new Image();
+    shown.alt = "";
+    shown.id = img.id;
+    shown.src = url;
+    img.replaceWith(shown);
+  }
+
+  function dressSelect(select) {
+    var picker = document.createElement("div");
+    picker.className = "picker" + (select.classList.contains("full") ? " picker-full" : "");
+    select.parentNode.insertBefore(picker, select);
+    picker.appendChild(select);
+    select.classList.add("picker-native");
+    select.tabIndex = -1;
+
+    var face = document.createElement("button");
+    face.type = "button";
+    face.className = "picker-face";
+    face.setAttribute("aria-haspopup", "listbox");
+    face.setAttribute("aria-expanded", "false");
+
+    var menu = document.createElement("ul");
+    menu.className = "picker-menu";
+    menu.hidden = true;
+    menu.setAttribute("role", "listbox");
+
+    function nameFor(text) {
+      var label = document.querySelector("[id='" + (select.getAttribute("aria-labelledby") || "") + "']");
+      var title = label ? label.textContent.replace(/\s+/g, " ").trim() : "";
+      return title ? title + ", " + text : text;
+    }
+
+    function syncFace() {
+      var chosen = select.options[select.selectedIndex];
+      var text = chosen ? chosen.textContent : "";
+      face.textContent = text;
+      face.setAttribute("aria-label", nameFor(text));
+    }
+
+    function close() {
+      menu.hidden = true;
+      face.setAttribute("aria-expanded", "false");
+      picker.classList.remove("is-open");
+    }
+
+    function paint() {
+      menu.textContent = "";
+      Array.prototype.forEach.call(select.options, function (opt) {
+        var item = document.createElement("li");
+        var choice = document.createElement("button");
+        choice.type = "button";
+        choice.className = "picker-option";
+        choice.textContent = opt.textContent;
+        choice.setAttribute("role", "option");
+        choice.disabled = opt.disabled;
+        if (opt.disabled) choice.setAttribute("aria-disabled", "true");
+        if (opt === select.options[select.selectedIndex]) choice.setAttribute("aria-selected", "true");
+        choice.addEventListener("click", function () {
+          if (opt.disabled) return;
+          select.value = opt.value;
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+          syncFace();
+          close();
+        });
+        item.appendChild(choice);
+        menu.appendChild(item);
+      });
+    }
+
+    function open() {
+      document.querySelectorAll(".picker.is-open").forEach(function (openPicker) {
+        if (openPicker !== picker && openPicker.closeMenu) openPicker.closeMenu();
+      });
+      paint();
+      menu.hidden = false;
+      face.setAttribute("aria-expanded", "true");
+      picker.classList.add("is-open");
+    }
+
+    face.addEventListener("click", function () {
+      if (menu.hidden) open();
+      else close();
+    });
+    select.addEventListener("change", syncFace);
+    picker.closeMenu = close;
+    select.syncPicker = syncFace;
+    picker.appendChild(face);
+    picker.appendChild(menu);
+    syncFace();
+  }
+
+  function dressSelects() {
+    document.querySelectorAll("select").forEach(dressSelect);
+    document.addEventListener("click", function (event) {
+      document.querySelectorAll(".picker.is-open").forEach(function (picker) {
+        if (!picker.contains(event.target) && picker.closeMenu) picker.closeMenu();
+      });
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape") return;
+      document.querySelectorAll(".picker.is-open").forEach(function (picker) {
+        if (picker.closeMenu) picker.closeMenu();
+      });
+    });
+  }
+
+  function init() {
+    var requested = queryApp();
+    var draft = readDraft();
+    var note = document.getElementById("app-note");
+    if (requested && !OPEN[requested] && THEMES[requested]) {
+      note.hidden = false;
+      var label = requested.charAt(0).toUpperCase() + requested.slice(1);
+      note.textContent = label + " isn't open on this form yet. Connect and Wear are. You're on Connect unless you pick Wear.";
+    }
+    var fromDraft = draft && OPEN[draft.app] ? draft.app : "";
+    applyPlatform(OPEN[requested] ? requested : (fromDraft || "connect"));
+
+    if (draft && draft.fields) {
+      document.querySelectorAll("[data-phrase]").forEach(function (el) {
+        var stored = draft.fields[el.getAttribute("data-phrase")];
+        if (stored == null || stored === "") return;
+        if (el.type === "checkbox") el.checked = true;
+        else el.value = stored;
+      });
+      var permission = document.getElementById("permission");
+      if (permission && permission.checked) permission.value = COPY[currentApp].permission;
+    }
+    refreshChoices();
+    var bio = document.getElementById("bio");
+    document.getElementById("bio-count").textContent = String(bio.value.length) + " / 1000";
+    show(draft && typeof draft.step === "number" ? draft.step : 0, false);
+
+    document.getElementById("app").addEventListener("change", function (event) {
+      var next = event.target.value;
+      if (!OPEN[next]) return;
+      applyPlatform(next);
+      saveDraft();
+    });
+    document.getElementById("intake").addEventListener("submit", function (event) {
+      event.preventDefault();
+      finish();
+    });
+    document.getElementById("intake").addEventListener("click", function (event) {
+      var btn = event.target.closest("button");
+      if (!btn) return;
+      if (btn.classList.contains("choice")) {
+        var group = btn.closest("[data-choice]");
+        var hidden = group.querySelector("input");
+        var value = btn.getAttribute("data-value");
+        hidden.value = hidden.value === value ? "" : value;
+        refreshChoices();
+        applyPlatform(currentApp);
+        saveDraft();
+        return;
+      }
+      if (btn.hasAttribute("data-finish")) finish();
+      if (btn.hasAttribute("data-next")) show(current + 1, true);
+      if (btn.hasAttribute("data-back")) show(current - 1, true);
+    });
+    document.querySelector(".steps").addEventListener("click", function (event) {
+      var btn = event.target.closest("[data-goto]");
+      if (!btn) return;
+      show(Number(btn.getAttribute("data-goto")), true);
+    });
+    document.getElementById("intake").addEventListener("input", function (event) {
+      if (event.target.id === "bio") {
+        document.getElementById("bio-count").textContent = String(event.target.value.length) + " / 1000";
+      }
+      saveDraft();
+    });
+    document.getElementById("logo").addEventListener("change", function () {
+      preview(document.getElementById("logo"), document.getElementById("logo-preview"));
+    });
+    document.getElementById("cover").addEventListener("change", function () {
+      preview(document.getElementById("cover"), document.getElementById("cover-preview"));
+    });
+    window.addEventListener("message", onMessage);
+    dressSelects();
+    ready = true;
+  }
+
+  var started = false;
+  function start() {
+    if (started) return;
+    started = true;
+    init();
+  }
+  // This script sits at the end of the body, so the fields already exist even
+  // while the document is still marked loading.
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  start();
+})();
+</script>
+</body>
+</html>
