@@ -136,6 +136,11 @@
               h('button', { type: 'button', className: 'me-contrib cn-glass', onClick: () => app.go('apply') },
                 h('span', null, h('b', null, 'Become a Contributor'), h('small', null, 'Put your church, ministry or business on the map'))),
               h('button', { type: 'button', className: 'me-contrib-link cn-text', onClick: () => app.go('dashboard') }, 'Already approved? Open your listing home →')),
+          app.isAdmin ? h('button', { type: 'button', className: 'me-contrib-link cn-text', onClick: () => app.go('admin') }, 'Admin Panel') : null,
+          app.realUser && !app.isContributor ? h('button', {
+            type: 'button', className: 'me-contrib-link cn-text',
+            onClick: () => app.askAboutListing && app.askAboutListing(app.realUser.id, true).then((found) => { if (!found && app.toast) app.toast('No pending listing found for your email.', 'red'); }).catch(() => app.toast && app.toast('Could not check for a listing — please check your connection.', 'red')),
+          }, 'Claim a Contributor listing') : null,
           h('button', { type: 'button', className: 'status-entry cn-glass', onClick: onStatus },
             h('span', null, '＋'), h('span', null, status || 'Share a little of your day')),
           h('section', { className: 'me-photos' },
@@ -329,7 +334,7 @@
       app.isAdmin ? h('section', { className: 'ps-section' }, h('h2', null, 'Administration'),
         h('button', { type: 'button', className: 'ps-row cn-glass', onClick: () => app.go('admin') },
           h('span', null, h('b', null, 'Admin dashboard'), h('small', null, 'Applications, membership, moderation, insights and audit log')))) : null,
-      app.signOut ? h('button', { type: 'button', className: 'cn-text', onClick: () => app.signOut() }, 'Sign out') : null,
+      app.signOut ? h('button', { type: 'button', className: 'cn-text', onClick: () => app.signOut() }, 'Sign Out') : null,
       h('button', { type: 'button', className: 'cn-text', onClick: onBack }, 'Back to Me'));
   }
 

@@ -245,9 +245,9 @@ test.describe("Device Back button", () => {
     // sheet this used to open no longer exists — it duplicated the pill row —
     // so the account panel, the app's one profile entry point, stands in: on the map home it is the nav's Me.)
     await openMe(page);
-    await expect(page.getByRole("button", { name: /View Profile/ })).toBeVisible();
+    await expect(page.locator(".me-page")).toBeVisible();
     await page.goBack();
-    await expect(page.getByRole("button", { name: /View Profile/ })).toBeHidden();
+    await expect(page.locator(".me-page")).toHaveCount(0);
     await expect.poll(() => screenName(page)).toBe("discover");
 
     // At the root with nothing open, Back really does leave — never a trap.
@@ -455,26 +455,15 @@ test.describe("One profile entry point", () => {
     // There is no "You" tab.
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(0);
     await openMe(page);
-    const bottomNav = page.locator("[data-mv2='explore-dock']");
-    await expect(bottomNav.getByRole("button", { name: "You" })).toHaveCount(0);
-    await expect(bottomNav.getByRole("button", { name: "Explore" })).toBeVisible();
-
-    // Exactly one account menu, and it opens inside the viewport.
-    const panel = page.getByRole("button", { name: /View Profile/ });
-    await expect(panel).toBeVisible();
-    const box = await panel.boundingBox();
+    await expect(page.locator(".me-page")).toBeVisible();
+    const me = await page.locator(".me-page").boundingBox();
     const vp = page.viewportSize()!;
-    expect(box).not.toBeNull();
-    expect(box!.y).toBeGreaterThanOrEqual(0);
-    expect(box!.y + box!.height).toBeLessThanOrEqual(vp.height);
-    await page.keyboard.press("Escape");
-
-    // The list screen keeps its account button in the top corner (#210 part 3: the nav's Explore is the Discover page).
-    // (Escape closed the menu and lowered the panel: raise it again for its nav)
-    if (!(await bottomNav.isVisible())) await page.locator("[data-mv2='explore-grab']").click();
-    await bottomNav.getByRole("button", { name: "Explore" }).click();
+    expect(me).not.toBeNull();
+    expect(me!.y).toBeGreaterThanOrEqual(0);
+    expect(me!.height).toBeGreaterThan(200);
+    expect(me!.y + 40).toBeLessThanOrEqual(vp.height);
+    await page.locator("[data-rail-item='explore']").click();
     await expect(page.locator('[data-screen="explore"]')).toBeVisible();
-    await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(1);
   });
 
   test("the map's top bar is search only, and the categories are inside the Explore panel", async ({ page }) => {

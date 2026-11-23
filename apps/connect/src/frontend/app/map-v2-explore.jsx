@@ -597,6 +597,12 @@
     // Close-search (and similar): reopen the Where-to strip under the crown (founder, 2026-11-22).
     const stripSignal = props.stripSignal || 0;
     useEffect(() => { if (stripSignal) { setStage('strip'); setMe(''); } }, [stripSignal]);
+    // The app rail's Map returns the Where to… panel to its minimum.
+    useEffect(() => {
+      const min = () => { setFocus(null); setMe(''); setStage(desk ? 'strip' : 'rest'); };
+      window.addEventListener('cc-rail-map', min);
+      return () => window.removeEventListener('cc-rail-map', min);
+    }, [desk]);
 
     // the chosen tab in view, in the middle of its row
     const tabKey = tile || sec;

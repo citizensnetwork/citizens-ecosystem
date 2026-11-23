@@ -427,6 +427,11 @@
       setFilterEdges((p) => (p.l === l && p.r === r ? p : { l: l, r: r }));
     };
     useEffect(() => {
+      const min = () => { setPeek(null); setSheet(null); setSearchOpen(false); setFocus(null); setSelected(null); setLitId(null); };
+      window.addEventListener('cc-rail-map', min);
+      return () => window.removeEventListener('cc-rail-map', min);
+    }, []);
+    useEffect(() => {
       if (!searchOpen) { setFilterEdges({ l: false, r: false }); return undefined; }
       measureFilters();
       const t = setTimeout(measureFilters, 80);

@@ -1270,3 +1270,45 @@
 .connect-map>.listing-profile{position:absolute;inset:0;z-index:32;overflow:auto;background:#f7f6f1}
 [data-theme='dark'] .connect-map>.listing-profile{background:#1b1c18}
 .connect-placed .explore-page,.connect-placed.desktop-review .explore-page{padding:0 0 96px}
+
+/* The one rail. Closed on the map; open beside Me, Explore, Let's and the dashboards. */
+.connect-app{display:flex;height:100%;width:100%;min-height:0;background:#f7f6f1;color:#272a25}
+.connect-app-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.cn-rail{position:relative;z-index:40;flex:0 0 64px;width:64px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px;padding:14px 6px 18px;background:linear-gradient(180deg,#f7f6f1ee,#f7f6f1c4);backdrop-filter:blur(24px);border-right:1px solid #ffffffd9;color:#d4af37;pointer-events:none}
+.cn-rail button,.cn-rail-door{pointer-events:auto}
+.cn-rail[data-open='true']{flex-basis:228px;width:228px;align-items:stretch;justify-content:flex-start;padding:18px 12px;gap:8px}
+.cn-rail-stack{display:flex;flex-direction:column-reverse;align-items:center;gap:8px;width:100%}
+.cn-rail[data-open='true'] .cn-rail-stack{flex-direction:column;align-items:stretch;margin-top:8px}
+.cn-rail-btn,.cn-rail-do{display:grid;justify-items:center;gap:4px;width:48px;min-height:48px;padding:8px 4px;border:0;border-radius:50%;background:transparent;color:#d4af37;cursor:pointer}
+.cn-rail[data-open='true'] .cn-rail-btn,.cn-rail[data-open='true'] .cn-rail-do{width:100%;border-radius:16px;grid-template-columns:28px 1fr;justify-items:start;align-items:center;padding:8px 10px}
+.cn-rail-btn .inline-icon,.cn-rail-do .inline-icon{inline-size:22px;color:#d4af37}
+.cn-rail-btn small,.cn-rail-do small,.cn-rail-label{font-size:12px;letter-spacing:.02em;color:#272a25}
+.cn-rail[data-open='false'] .cn-rail-label{display:none}
+.cn-rail-btn.on,.cn-rail-do.on{background:radial-gradient(circle,#d4af37bf 0%,#d4af3740 42%,transparent 70%);color:#d4af37;box-shadow:0 0 16px #d4af3755}
+.cn-rail-crown{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none}
+.cn-rail[data-open='true'] .cn-rail-crown{display:none}
+.cn-rail-brand{display:flex;align-items:center;gap:10px;border:0;background:transparent;padding:4px 6px 12px;text-align:left;color:inherit}
+.cn-rail-brand b{display:block;font-size:14px;font-weight:600;letter-spacing:-.03em;color:#272a25}
+.cn-rail-brand small{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:#d4af37}
+.cn-rail-do{position:absolute;top:14px;left:50%;transform:translateX(-50%);align-self:center}
+.cn-rail[data-open='true'] .cn-rail-do{position:static;transform:none;align-self:stretch}
+.cn-rail-door{position:absolute;left:calc(100% + 8px);top:14px;z-index:50;display:grid;gap:4px;min-width:180px;padding:8px;border-radius:18px}
+.cn-rail[data-open='true'] .cn-rail-door{position:static;min-width:0;box-shadow:none}
+.cn-rail-door button{border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:12px;font-size:13px;color:#272a25}
+.cn-rail-door button:hover{background:#d4af3718}
+.connect-app .connect-placed.connect-shell,.connect-app .phone-review .connect-frame,.connect-app .desktop-review .connect-frame{max-width:none;height:100%;box-shadow:none}
+.connect-app[data-rail='closed'] [data-mv2='explore-crown']{position:fixed;left:32px;top:50%;bottom:auto;margin:0;transform:translate(-50%,-50%) !important;z-index:60}
+.connect-app:has([data-mv2='explore-crown']) .cn-rail-crown{visibility:hidden}
+.connect-app [data-mv2='desktop-nav'],.connect-app [data-mv2='explore-dock']{display:none !important}
+[data-theme='dark'] .connect-app{background:#1b1c18;color:#f7f6f1}
+[data-theme='dark'] .cn-rail{background:linear-gradient(180deg,#23251ff2,#1b1c18e6);border-right-color:#ffffff1a}
+[data-theme='dark'] .cn-rail-btn small,[data-theme='dark'] .cn-rail-do small,[data-theme='dark'] .cn-rail-label,[data-theme='dark'] .cn-rail-brand b,[data-theme='dark'] .cn-rail-door button{color:#f7f6f1}
+[data-theme='dark'] .cn-rail-door{background:#23251ff2;border:1px solid #ffffff1a}
+@media(max-width:767px){
+  .cn-rail,.cn-rail[data-open='true']{flex-basis:64px;width:64px;align-items:center;justify-content:flex-end;padding:14px 6px 18px}
+  .cn-rail[data-open='true'] .cn-rail-stack{flex-direction:column-reverse;align-items:center}
+  .cn-rail[data-open='true'] .cn-rail-btn,.cn-rail[data-open='true'] .cn-rail-do{width:48px;border-radius:50%;grid-template-columns:none;justify-items:center;padding:8px 4px}
+  .cn-rail-brand,.cn-rail-label{display:none !important}
+  .cn-rail-do,.cn-rail[data-open='true'] .cn-rail-do{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:48px}
+  .cn-rail[data-open='true'] .cn-rail-crown{display:block}
+}

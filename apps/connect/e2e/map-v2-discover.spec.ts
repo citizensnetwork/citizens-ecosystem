@@ -9,8 +9,8 @@ type Seed = { contributors: Row[]; places: Row[]; events: Row[] };
 const seedOf = () => makeSeed({ contributors: 8, places: 8, events: 6, now: FIXED_NOW, spread: 0.02, seed: 23 }) as unknown as Seed;
 
 const page$ = (page: Page) => page.locator("[data-mv2='discover']");
-const toggle = (page: Page) => page.locator("[data-mv2='nav-toggle']");
-const nav = (page: Page) => page.locator("[data-mv2='nav']");
+const toggle = (page: Page) => page.locator("[data-rail-item='explore']");
+const nav = (page: Page) => page.locator(".cn-rail");
 const GROUPS = ["Churches & worship", "Serve & care", "Culture & fun", "Learn & grow", "Audiences", "Business"];
 
 async function network(page: Page) {
@@ -48,7 +48,7 @@ test.describe("on a phone", () => {
     await network(page);
     await openMap(page, "/", 5);
     await openExploreAll(page, "tap");
-    await page.getByRole("navigation", { name: "Connect" }).getByRole("button", { name: "Explore" }).tap();
+    await page.locator("[data-rail-item='explore']").tap();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page$(page)).toBeVisible();
     await toggle(page).tap();
@@ -82,15 +82,16 @@ test.describe("on a phone", () => {
 test.describe("on a laptop", () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test("the sidebar keeps Kingdom Exploration at /discover; See all opens Explore", async ({ page }) => {
+  test("Do opens Kingdom Projects; See all opens Explore", async ({ page }) => {
     await network(page);
     await openMap(page, "/", 5);
     await openExploreAll(page);
     await page.getByRole("button", { name: "Explore more" }).click();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page$(page)).toBeVisible();
-    await page.locator("aside").getByRole("button", { name: "Kingdom Exploration" }).click();
-    await expect(page).toHaveURL(/\/discover$/);
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
+    await page.getByRole("button", { name: "Do" }).click();
+    await page.getByRole("menuitem", { name: "Kingdom Projects" }).click();
+    await expect(page).toHaveURL(/\/community$/);
+    await expect(page.locator('[data-screen="community"]')).toBeVisible();
   });
 });
