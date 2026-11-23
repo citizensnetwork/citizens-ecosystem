@@ -1,0 +1,129 @@
+name: Citizens Connect weekly QA
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/citizens-connect-qa.yml"
+      - "apps/connect/qa/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "23 5 * * 1"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Test QA report logic
+        run: node --test apps/connect/qa/report.test.mjs
+      - name: Install dependencies
+        id: install
+        continue-on-error: true
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+      - name: Install Chromium
+        id: chromium
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: pnpm --filter citizens-connect exec playwright install --with-deps chromium
+      - name: Run Connect Vitest
+        id: unit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: pnpm --filter citizens-connect test
+      - name: Run hermetic Connect Playwright
+        id: e2e
+        if: steps.chromium.outcome == 'success'
+        continue-on-error: true
+        run: pnpm --filter citizens-connect test:e2e --reporter=dot
+      - name: Run hermetic prefix Playwright
+        id: prefix
+        if: steps.chromium.outcome == 'success'
+        continue-on-error: true
+        run: pnpm --filter citizens-connect test:e2e:base-path --reporter=dot
+      - name: Load the latest retained scheduled baseline
+        if: always() && github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          runs=$(gh run list --workflow citizens-connect-qa.yml --branch "$DEFAULT_BRANCH" \
+            --event schedule --status completed --limit 15 --json databaseId,number \
+            --jq ".[] | select(.number < $GITHUB_RUN_NUMBER) | .databaseId")
+          for run in $runs; do
+            if gh run download "$run" --pattern "citizens-connect-qa-$run-*" --dir ".qa-baseline/$run"; then
+              latest=$(find ".qa-baseline/$run" -name evidence.json | sort -V | tail -1)
+              if [ -n "$latest" ]; then
+                cp "$latest" .qa-baseline/evidence.json
+                break
+              fi
+            fi
+          done
+      - name: Run public smoke and write reports
+        if: always()
+        env:
+          QA_PUBLIC: ${{ github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch }}
+          QA_UNIT: ${{ steps.unit.outcome }}
+          QA_E2E: ${{ steps.e2e.outcome }}
+          QA_PREFIX: ${{ steps.prefix.outcome }}
+        run: node apps/connect/qa/report.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: citizens-connect-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .qa-report/*
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 90
+      - name: Flag unavailable automated coverage
+        if: always()
+        run: |
+          if [ '${{ steps.install.outcome }}' != success ] || [ '${{ steps.chromium.outcome }}' != success ]; then
+            exit 1
+          fi
+
+  delivery:
+    needs: qa
+    if: >-
+      always() && github.event_name == 'schedule' &&
+      github.ref_name == github.event.repository.default_branch &&
+      github.run_attempt == '1' && vars.CONNECT_QA_RESEND_AUTHORIZED == 'true'
+    environment: connect-qa-reporting
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/download-artifact@v4
+        with:
+          name: citizens-connect-qa-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .qa-report
+      - name: Submit report to Resend
+        env:
+          QA_RESEND_KEY: ${{ secrets.CONNECT_QA_RESEND_KEY }}
+          QA_RESEND_VERIFIED_DOMAIN: ${{ vars.CONNECT_QA_RESEND_VERIFIED_DOMAIN }}
+        run: node apps/connect/qa/delivery.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: citizens-connect-delivery-${{ github.run_id }}
+          path: .qa-delivery/*
+          include-hidden-files: true
+          retention-days: 90
