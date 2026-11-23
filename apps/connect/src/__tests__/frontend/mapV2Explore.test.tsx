@@ -512,16 +512,22 @@ describe("the stylesheet and the wiring", () => {
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123b");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123c");
     const sheetCss = read("src/frontend/assets/map-v2.css");
     expect(sheetCss).toMatch(/\[data-mv2='explore'\] \{[\s\S]*?touch-action: none;/);
-    // raised: body scrolls; section does not
+    // raised: body scrolls; every child restates pan-y (overflow ends the chain)
     expect(sheetCss).toMatch(
       /\[data-mv2='pinpeek'\]\[data-raised\] \[data-mv2='pinpeek-body'\] \{[\s\S]*?overflow-y: auto;[\s\S]*?touch-action: pan-y;/,
     );
-    // inline rows must stay pan-x only (not pan-x pan-y) or they steal vertical pans from the body
     expect(sheetCss).toMatch(
-      /\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\],\s*\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\]\[data-top\] \{[\s\S]*?--mv2-ta-row: pan-x;/,
+      /\[data-mv2='pinpeek'\]\[data-raised\] \[data-mv2='pinpeek-body'\] \*[\s\S]*?touch-action: pan-y;/,
+    );
+    // rows use pan-x pan-y (same as a full sheet): pan-x alone ∩ body's pan-y = none and kills vertical swipe
+    expect(sheetCss).toMatch(
+      /\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\],\s*\[data-mv2='sheet'\]\[data-inline\] \[data-mv2='scroller'\]\[data-top\] \{[\s\S]*?--mv2-ta-row: pan-x pan-y;/,
+    );
+    expect(sheetCss).toMatch(
+      /\[data-mv2='pinpeek'\]\[data-raised\] \[data-mv2='pinpeek-body'\] \[data-mv2='xrow'\][\s\S]*?touch-action: pan-x pan-y;/,
     );
     const home = read("src/frontend/app/home.jsx");
     expect(home).toContain("X.tileMatches(tile, m)");
