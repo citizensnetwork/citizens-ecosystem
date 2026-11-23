@@ -1,0 +1,343 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "CC-QA-2026-11-23-P2",
+  "started_at": "2026-11-23T11:49:22.492Z",
+  "target_url": "https://219.co.za/citizens/connect/",
+  "repository": "citizensnetwork/citizens-ecosystem",
+  "commit_sha": "ff8e3770d2a3931fa471de53c6b668200b7326d1",
+  "deployment": null,
+  "environment": "production_guest_read_only",
+  "previous_run_id": "CC-QA-2026-11-23-P1",
+  "scope": [
+    "CC-01–CC-06 desktop and narrow mobile",
+    "Local clipboard only",
+    "No staging, production writes, native device or live mail"
+  ],
+  "tests": [
+    {
+      "scenario_id": "CC-01",
+      "status": "pass",
+      "observed_at": "2026-11-23T11:49:22.492Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, desktop 1280×900 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Open a fresh canonical guest session",
+        "Select Browse as Guest and observe controls",
+        "Refresh once"
+      ],
+      "expected": "Usable guest surface before refresh, with the guest route preserved",
+      "actual": "HTTP 200. Visible and enabled after selection: Map 186 ms, Search 188 ms, Explore 189 ms. No blank surface. One routine refresh preserved Discover.",
+      "evidence_reference": [
+        "observations.json#entry",
+        "evidence/desktop-settled-map.png"
+      ]
+    },
+    {
+      "scenario_id": "CC-02",
+      "status": "pass",
+      "observed_at": "2026-11-23T11:53:12.087Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, desktop 1280×900 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Render tiles and zoom",
+        "Grant a synthetic Pretoria browser location",
+        "Select a marker and compare its preview"
+      ],
+      "expected": "Pretoria marker and preview agree",
+      "actual": "Synthetic Pretoria location, zoom, and the named place preview all verified.",
+      "evidence_reference": [
+        "observations.json#map",
+        "evidence/desktop-settled-map.png"
+      ]
+    },
+    {
+      "scenario_id": "CC-03",
+      "status": "blocked",
+      "observed_at": "2026-11-23T11:51:10.665Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, desktop 1280×900 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Open Search and toggle Churches & worship",
+        "Try This weekend and reset",
+        "Look for a separate calendar comparison"
+      ],
+      "expected": "Category and date filtering and reset agree across map and calendar",
+      "actual": "Category toggled and reset. This weekend displayed a filter chip and reset cleared it. A separate calendar surface was not identified for parity.",
+      "evidence_reference": [
+        "observations.json#filters"
+      ]
+    },
+    {
+      "scenario_id": "CC-04",
+      "status": "fail",
+      "observed_at": "2026-11-23T11:51:10.665Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, desktop 1280×900 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Search for a known public event",
+        "Select its pin",
+        "Enter a synthetic nonsense phrase with Explore collapsed",
+        "Clear the query"
+      ],
+      "expected": "Known match opens and a zero-match state explains how to recover",
+      "actual": "Matching pin opened its preview. The nonsense query removed the pin without a visible no-match message in the inspected map state. Clear search removed the query and restored the pin. See CCQA-0002.",
+      "evidence_reference": [
+        "observations.json#search",
+        "evidence/desktop-zero-results.png"
+      ]
+    },
+    {
+      "scenario_id": "CC-05",
+      "status": "pass",
+      "observed_at": "2026-11-23T11:52:07.996Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, desktop 1280×900 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Open the event pin",
+        "Select its preview again and open full details",
+        "Use local Copy Link behavior",
+        "Reopen the copied URL"
+      ],
+      "expected": "Copied URL returns the exact event",
+      "actual": "Full event opened. The app copied a Connect event URL and the same event reopened with HTTP 200. Native share was disabled in the harness to use the app's clipboard fallback.",
+      "evidence_reference": [
+        "observations.json#sharing"
+      ]
+    },
+    {
+      "scenario_id": "CC-06",
+      "status": "pass",
+      "observed_at": "2026-11-23T11:52:33.432Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, desktop 1280×900 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Tab through the guest map controls",
+        "Open and close Search",
+        "Check viewport width and the observed panel state"
+      ],
+      "expected": "Sampled controls are reachable and panels recover without page-width overflow",
+      "actual": "Sampled keyboard traversal and Search panel recovery were observed. No page overflow. At narrow width the idle map shows a crown ahead of persistent Map and Explore labels. Contrast and assistive technology conformance remain untested.",
+      "evidence_reference": [
+        "observations.json#accessibility",
+        "evidence/desktop-settled-map.png"
+      ]
+    },
+    {
+      "scenario_id": "CC-01",
+      "status": "pass",
+      "observed_at": "2026-11-23T11:50:36.249Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, narrow 390×844 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Open a fresh canonical guest session",
+        "Select Browse as Guest and observe controls",
+        "Refresh once"
+      ],
+      "expected": "Usable guest surface before refresh, with the guest route preserved",
+      "actual": "HTTP 200. Visible and enabled after selection: Map 158 ms, Search 158 ms, Explore 159 ms. No blank surface. One routine refresh preserved Discover.",
+      "evidence_reference": [
+        "observations.json#entry",
+        "evidence/narrow-settled-map.png"
+      ]
+    },
+    {
+      "scenario_id": "CC-02",
+      "status": "pass",
+      "observed_at": "2026-11-23T11:53:19.228Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, narrow 390×844 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Render tiles and zoom",
+        "Grant a synthetic Pretoria browser location",
+        "Select a marker and compare its preview"
+      ],
+      "expected": "Pretoria marker and preview agree",
+      "actual": "Synthetic Pretoria location, zoom, and the named place preview all verified.",
+      "evidence_reference": [
+        "observations.json#map",
+        "evidence/narrow-settled-map.png"
+      ]
+    },
+    {
+      "scenario_id": "CC-03",
+      "status": "blocked",
+      "observed_at": "2026-11-23T11:51:27.416Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, narrow 390×844 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Open Search and toggle Churches & worship",
+        "Try This weekend and reset",
+        "Look for a separate calendar comparison"
+      ],
+      "expected": "Category and date filtering and reset agree across map and calendar",
+      "actual": "Category toggled and reset. The scripted Explore transition timed out before the weekend/date check. Calendar parity remains unverified.",
+      "evidence_reference": [
+        "observations.json#filters"
+      ]
+    },
+    {
+      "scenario_id": "CC-04",
+      "status": "fail",
+      "observed_at": "2026-11-23T11:51:27.416Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, narrow 390×844 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Search for a known public event",
+        "Select its pin",
+        "Enter a synthetic nonsense phrase with Explore collapsed",
+        "Clear the query"
+      ],
+      "expected": "Known match opens and a zero-match state explains how to recover",
+      "actual": "Matching pin opened its preview. The nonsense query removed the pin without a visible no-match message in the inspected map state. Clear search removed the query and restored the pin. See CCQA-0002.",
+      "evidence_reference": [
+        "observations.json#search",
+        "evidence/narrow-zero-results.png"
+      ]
+    },
+    {
+      "scenario_id": "CC-05",
+      "status": "pass",
+      "observed_at": "2026-11-23T11:52:13.718Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, narrow 390×844 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Open the event pin",
+        "Select its preview again and open full details",
+        "Use local Copy Link behavior",
+        "Reopen the copied URL"
+      ],
+      "expected": "Copied URL returns the exact event",
+      "actual": "Full event opened. The app copied a Connect event URL and the same event reopened with HTTP 200. Native share was disabled in the harness to use the app's clipboard fallback.",
+      "evidence_reference": [
+        "observations.json#sharing"
+      ]
+    },
+    {
+      "scenario_id": "CC-06",
+      "status": "pass",
+      "observed_at": "2026-11-23T11:52:40.293Z",
+      "environment": "production_guest_read_only",
+      "browser_or_device": "Headless Microsoft Edge Chromium, narrow 390×844 CSS px",
+      "fixture_reference": "Public catalogue; anonymous context. Synthetic query or synthetic browser geolocation where described.",
+      "steps": [
+        "Tab through the guest map controls",
+        "Open and close Search",
+        "Check viewport width and the observed panel state"
+      ],
+      "expected": "Sampled controls are reachable and panels recover without page-width overflow",
+      "actual": "Sampled keyboard traversal and Search panel recovery were observed. No page overflow. At narrow width the idle map shows a crown ahead of persistent Map and Explore labels. Contrast and assistive technology conformance remain untested.",
+      "evidence_reference": [
+        "observations.json#accessibility",
+        "evidence/narrow-settled-map.png"
+      ]
+    },
+    {
+      "scenario_id": "CC-07",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Execute on its separately approved target.",
+      "actual": "No approved isolated staging target and synthetic identity set supplied.",
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-08",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Execute on its separately approved target.",
+      "actual": "No Android release candidate, emulator or hardware evidence supplied.",
+      "evidence_reference": []
+    }
+  ],
+  "findings": [
+    {
+      "id": "CCQA-0001",
+      "severity": "high",
+      "lifecycle": "new",
+      "scenario_id": "CC-01",
+      "user_impact": "Guest discovery controls required refresh in one observed session.",
+      "evidence": [
+        "Phase 0 attachment: CC-QA-2026-11-23-P0/report.md#evidence-and-provenance",
+        "quality/connect/runs/2026-11-23/CC-QA-2026-11-23-P2/observations.json#entry"
+      ],
+      "code_location": null,
+      "proposed_fix": "Reproduce and diagnose the guest initialization path in a fresh session before changing it.",
+      "design_guidance": "Show loading and keyboard-accessible recovery. Preserve a clear route to discovery and service.",
+      "acceptance_checks": [
+        "Fresh desktop and narrow guest sessions reach usable controls on first entry.",
+        "Refresh restores the same guest route.",
+        "Any stalled load gives actionable recovery feedback."
+      ],
+      "first_observed_run": "CC-QA-2026-11-23-P0",
+      "observation": "One desktop Chrome guest transition produced a blank cream screen with an empty accessibility tree. One refresh restored guest controls. Frequency, root cause and narrow-viewport impact are unknown.",
+      "last_reviewed_run": "CC-QA-2026-11-23-P2",
+      "phase_2_disposition": "Open. Blank first entry not reproduced in successful fresh desktop, 412 px and 390 px narrow sessions. A separate 390 px pass timed out waiting for the welcome control, then reached the public map on a later navigation. No blank screen was confirmed in that pass.",
+      "reproduction_steps": [
+        "Open the canonical Connect URL in a fresh guest browser context.",
+        "Select Browse as Guest and observe Map, Search and Explore before any reload.",
+        "If the surface is blank, capture redacted evidence and reload once to test recovery."
+      ]
+    },
+    {
+      "id": "CCQA-0002",
+      "severity": "medium",
+      "lifecycle": "new",
+      "scenario_id": "CC-04",
+      "user_impact": "A guest seeing an empty map can mistake zero matches for a load failure, or give up before clearing the query.",
+      "reproduction_steps": [
+        "Open Search on the guest map.",
+        "Type a synthetic phrase with no matches while keeping the Explore panel collapsed.",
+        "The matched pin disappears. Look for a visible zero-results cue without expanding the panel. Use Clear search and confirm the pin returns."
+      ],
+      "evidence": [
+        "quality/connect/runs/2026-11-23/CC-QA-2026-11-23-P2/observations.json#search",
+        "quality/connect/runs/2026-11-23/CC-QA-2026-11-23-P2/evidence/desktop-zero-results.png",
+        "quality/connect/runs/2026-11-23/CC-QA-2026-11-23-P2/evidence/narrow-zero-results.png"
+      ],
+      "proposed_fix": "Add a concise zero-results status next to the map search input and keep Clear search available. Distinguish empty results, loading and errors.",
+      "design_guidance": "Keep the map context visible and use plain language to help the guest return to discovery.",
+      "acceptance_checks": [
+        "At 1280 and 390 CSS px, a zero-match query shows visible and screen-reader-readable feedback without opening another panel.",
+        "Clear search restores the unfiltered results.",
+        "A successful query and an in-progress load use distinct states."
+      ],
+      "code_location": null,
+      "first_observed_run": "CC-QA-2026-11-23-P2"
+    }
+  ],
+  "android_decision": "Unverified",
+  "storage": {
+    "status": "local_only",
+    "location": "phase2-output/CC-QA-2026-11-23-P2"
+  },
+  "email_delivery": {
+    "status": "pending",
+    "from": "qa-sender@example.org",
+    "to": "qa-recipient@example.org",
+    "provider_message_id": null
+  },
+  "provenance": {
+    "hub_alias": "dpl_68btYd3zTY36StX1uB7qsgcvMzcg",
+    "hub_sha": "e8af517a5d59cb8e4bb7f7c26be6522f392b670a",
+    "connect_alias": "dpl_GzvvGEvptbdMECAktCHsM2QsAUaF",
+    "connect_alias_sha": "ff8e3770d2a3931fa471de53c6b668200b7326d1",
+    "shared_bundle": "app/bundle.152e20e593.js",
+    "attribution": "Both aliases READY and both canonical Connect pages advertised the same browser bundle. Exact upstream deployment for the Hub request remains unverified."
+  }
+}

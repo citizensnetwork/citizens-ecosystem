@@ -1,0 +1,16 @@
+# NEXT_SESSION · Citizens Connect QA
+
+**Next phase: Phase 2, public guest journeys, visual UX and accessibility.** Phase 1 produced a reproducible framework and validated synthetic evidence. Public browser execution needs a supported runtime. Repository publication is pending, and the latest pointer has no published run.
+
+Attach the Phase 0 package and Phase 1 package, plus the programme handoff with [PHASE_2.md](../../../programme/phases/PHASE_2.md). Read [apps/connect/VISION.md](https://github.com/citizensnetwork/citizens-ecosystem/blob/main/apps/connect/VISION.md) first, then the source instructions, programme and dated reports. Phase 1 verified `main` at `ff8e3770d2a3931fa471de53c6b668200b7326d1`. Re-resolve it and verify current live provenance. If the framework has yet to land, apply the attached review patch to a clean checkout at that revision for local tooling. Use the attached operator `evidence.json` for the previous-run comparison.
+
+1. Start with CC-01. Open a fresh desktop guest session and a fresh narrow guest session using the guarded launcher or equivalent read-only enforcement. Capture the first transition after Browse as Guest before trying refresh. Carry **CCQA-0001** forward until supported by new evidence.
+2. Execute CC-02–CC-06 using the [coverage map](../../../programme/COVERAGE.md). Collect evidence for each browser profile, including map tiles, filter recovery, same-listing share link, keyboard traversal, narrow panels and contributor discoverability. Attribute guard or browser limitations to the tool. Apply the charter’s design rubric to observed screens.
+3. Record actual status per scenario and viewport. Preserve the previous fixture-only baseline and report any live deployment attribution gaps. Use the original handoff schema privately for full evidence and the redacted projection for review.
+4. Keep production read-only. Limit sharing to copying and reopening the URL. Keep sign-in, form submission, writes, notification delivery, Android and staging mutations out of this phase. Merge, deploy and publish only under separate authorisation. Advance the latest pointer once the dated evidence is merged and verified readable.
+
+**Open blockers.** B-01 is browser startup and end-to-end request-policy verification. B-06 is Hub-to-Connect attribution and B-07 is map tile evidence. B-02 staging isolation, B-03 publication, B-04 native Android validation and B-05 mail remain open. See the [dated report](report.md#blockers-and-handoff).
+
+## Copy-paste prompt
+
+> Execute Citizens Connect QA Phase 2 using the attached programme handoff and Phase 0 and Phase 1 packets. Read apps/connect/VISION.md first, recheck main and production deployment provenance, then run CC-01 through CC-06 in fresh desktop and narrow browser sessions using read-only request enforcement. Reproduce CCQA-0001 by observing the first Browse as Guest transition before refreshing. Record browser and tool blockers separately from product failures. Follow the coverage map, evaluate the vision-aligned design rubric, and capture only redacted evidence. Produce a dated report, original-schema evidence.json, updated NEXT_SESSION.md and a reviewable patch. Keep production read-only, leave mutations for verified staging, and advance the latest pointer only after evidence is merged and accessible.

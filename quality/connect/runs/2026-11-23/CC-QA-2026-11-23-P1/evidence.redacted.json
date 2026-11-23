@@ -1,0 +1,177 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "CC-QA-2026-11-23-P1",
+  "started_at": "2026-11-23T12:47:44+02:00",
+  "target_url": "https://219.co.za/citizens/connect/",
+  "repository": "citizensnetwork/citizens-ecosystem",
+  "commit_sha": "ff8e3770d2a3931fa471de53c6b668200b7326d1",
+  "deployment": null,
+  "environment": "local-synthetic",
+  "previous_run_id": "CC-QA-2026-11-23-P0",
+  "scope": [
+    "Synthetic loopback HTTP fixture and staging gate checks. No deployed application or guest scenario selected.",
+    "The source commit identifies the checkout base, with Phase 1 runner changes applied locally."
+  ],
+  "tests": [
+    {
+      "scenario_id": "CC-01",
+      "status": "not_run",
+      "observed_at": null,
+      "environment": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Fresh guest entry and refresh reach usable discovery controls and load app assets.",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-02",
+      "status": "not_run",
+      "observed_at": null,
+      "environment": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Explore Pretoria, zoom, and open a marker whose details match the selection.",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-03",
+      "status": "not_run",
+      "observed_at": null,
+      "environment": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Category and date filters agree across map and calendar, and reset restores results.",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-04",
+      "status": "not_run",
+      "observed_at": null,
+      "environment": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Open a public search result, recover after a nonsense query and repeat discovery.",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-05",
+      "status": "not_run",
+      "observed_at": null,
+      "environment": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Open a public event or place and reopen the same item from its copied URL.",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-06",
+      "status": "not_run",
+      "observed_at": null,
+      "environment": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Keyboard and narrow layouts have visible focus, reachable controls and recoverable panels.",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-07",
+      "status": "not_run",
+      "observed_at": null,
+      "environment": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "An isolated synthetic citizen can join and cancel, and a synthetic contributor can create a draft. Cleanup is verified.",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-08",
+      "status": "not_run",
+      "observed_at": null,
+      "environment": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Android release candidate passes native launch, back, permission, deep link, share, auth, offline recovery and notification checks on emulator and hardware.",
+      "actual": null,
+      "evidence_reference": []
+    }
+  ],
+  "framework_checks": [
+    {
+      "name": "canonical route or single same-origin slash redirect",
+      "status": "pass",
+      "reason": null
+    },
+    {
+      "name": "Connect HTML response has the app root",
+      "status": "pass",
+      "reason": null
+    },
+    {
+      "name": "Connect MapLibre stylesheet responds with CSS",
+      "status": "pass",
+      "reason": null
+    },
+    {
+      "name": "production staging target is denied",
+      "status": "pass",
+      "reason": null
+    },
+    {
+      "name": "unverified preview staging target is denied",
+      "status": "pass",
+      "reason": null
+    },
+    {
+      "name": "missing staging target is denied",
+      "status": "pass",
+      "reason": null
+    }
+  ],
+  "findings": [
+    {
+      "id": "CCQA-0001",
+      "severity": "high",
+      "lifecycle": "new",
+      "scenario_id": "CC-01",
+      "user_impact": "Guest discovery controls required refresh in one observed session.",
+      "evidence": ["Phase 0 attachment: CC-QA-2026-11-23-P0/report.md#evidence-and-provenance"],
+      "code_location": null,
+      "proposed_fix": "Reproduce and diagnose the guest initialization path in a fresh session before changing it.",
+      "design_guidance": "Show loading and keyboard-accessible recovery. Preserve a clear route to discovery and service.",
+      "acceptance_checks": [
+        "Fresh desktop and narrow guest sessions reach usable controls on first entry.",
+        "Refresh restores the same guest route.",
+        "Any stalled load gives actionable recovery feedback."
+      ],
+      "first_observed_run": "CC-QA-2026-11-23-P0",
+      "observation": "One desktop Chrome guest transition produced a blank cream screen with an empty accessibility tree. One refresh restored guest controls. Frequency, root cause and narrow-viewport impact are unknown."
+    }
+  ],
+  "android_decision": "Unverified",
+  "storage": {
+    "status": "local_only",
+    "location": "quality/connect/runs/2026-11-23/CC-QA-2026-11-23-P1/evidence.json"
+  },
+  "email_delivery": {
+    "status": "pending",
+    "from": "qa-sender@example.org",
+    "to": "qa-recipient@example.org",
+    "provider_message_id": null
+  },
+  "run_status": "pass"
+}

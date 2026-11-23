@@ -1,0 +1,10 @@
+{
+  "CC-01": "Fresh guest entry and refresh reach usable discovery controls and load app assets.",
+  "CC-02": "Explore Pretoria, zoom, and open a marker whose details match the selection.",
+  "CC-03": "Category and date filters agree across map and calendar, and reset restores results.",
+  "CC-04": "Open a public search result, recover after a nonsense query and repeat discovery.",
+  "CC-05": "Open a public event or place and reopen the same item from its copied URL.",
+  "CC-06": "Keyboard and narrow layouts have visible focus, reachable controls and recoverable panels.",
+  "CC-07": "An isolated synthetic citizen can join and cancel, and a synthetic contributor can create a draft. Cleanup is verified.",
+  "CC-08": "Android release candidate passes native launch, back, permission, deep link, share, auth, offline recovery and notification checks on emulator and hardware."
+}

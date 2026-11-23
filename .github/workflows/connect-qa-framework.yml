@@ -1,0 +1,37 @@
+name: Connect QA framework
+
+on:
+  pull_request:
+    paths:
+      - 'quality/connect/**'
+      - '.github/workflows/connect-qa-framework.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-dry-run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: python -m pip install -r quality/connect/requirements.txt
+      - run: python -m unittest discover -s quality/connect -v
+      - run: node --test quality/connect/guest-policy.test.mjs
+      - name: Run and validate synthetic evidence
+        run: |
+          python quality/connect/qa.py dry-run --out "$RUNNER_TEMP/connect-qa"
+          python quality/connect/qa.py validate quality/connect/programme/templates/evidence.example.json "$RUNNER_TEMP/connect-qa/evidence.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: connect-qa-dry-run-evidence
+          path: ${{ runner.temp }}/connect-qa/evidence.json
+          if-no-files-found: ignore
+          retention-days: 7

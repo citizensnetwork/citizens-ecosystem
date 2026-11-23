@@ -1,0 +1,494 @@
+{
+  "entry": [
+    {
+      "profile": "desktop 1280×900 CSS px",
+      "http": 200,
+      "controls": {
+        "Map": {
+          "ms": 186,
+          "enabled": true
+        },
+        "Search": {
+          "ms": 188,
+          "enabled": true
+        },
+        "Explore": {
+          "ms": 189,
+          "enabled": true
+        }
+      },
+      "blank": false,
+      "refreshRestores": true,
+      "screenshot": "desktop-settled-map.png",
+      "layout": {
+        "screens": [
+          "discover"
+        ],
+        "noOverflow": true,
+        "mainCount": 1,
+        "programs": [
+          {
+            "name": "Map",
+            "height": 47,
+            "width": 44,
+            "font": "16px",
+            "color": "rgb(10, 9, 8)",
+            "background": "rgb(245, 241, 232)"
+          },
+          {
+            "name": "Search",
+            "height": 48,
+            "width": 48,
+            "font": "16px",
+            "color": "rgb(10, 9, 8)",
+            "background": "rgba(255, 255, 255, 0.82)"
+          },
+          {
+            "name": "Explore",
+            "height": 44,
+            "width": 44,
+            "font": "16px",
+            "color": "rgb(10, 9, 8)",
+            "background": "rgba(0, 0, 0, 0)"
+          },
+          {
+            "name": "Me",
+            "height": 44,
+            "width": 44,
+            "font": "16px",
+            "color": "rgb(10, 9, 8)",
+            "background": "rgba(0, 0, 0, 0)"
+          }
+        ]
+      }
+    },
+    {
+      "profile": "narrow 390×844 CSS px",
+      "http": 200,
+      "controls": {
+        "Map": {
+          "ms": 158,
+          "enabled": true
+        },
+        "Search": {
+          "ms": 158,
+          "enabled": true
+        },
+        "Explore": {
+          "ms": 159,
+          "enabled": true
+        }
+      },
+      "blank": false,
+      "refreshRestores": true,
+      "screenshot": "narrow-settled-map.png",
+      "layout": {
+        "screens": [
+          "discover"
+        ],
+        "noOverflow": true,
+        "mainCount": 1,
+        "programs": [
+          {
+            "name": "Map",
+            "visible": false
+          },
+          {
+            "name": "Search",
+            "height": 48,
+            "width": 48,
+            "font": "16px",
+            "color": "rgb(10, 9, 8)",
+            "background": "rgba(255, 255, 255, 0.82)"
+          },
+          {
+            "name": "Explore",
+            "visible": false
+          },
+          {
+            "name": "Me",
+            "visible": false
+          }
+        ]
+      }
+    }
+  ],
+  "map": [
+    {
+      "profile": "desktop 1280×900 CSS px",
+      "loadedCanvas": true,
+      "geolocationAvailable": true,
+      "located": true,
+      "markerCount": 41,
+      "zoomed": true,
+      "pretoriaMarker": true,
+      "matchingPreview": true,
+      "initialMarkerCheck": {
+        "zoomClicked": true,
+        "markerVisible": true,
+        "matchingDetail": true,
+        "mapCanvas": true,
+        "pretoriaLabelObserved": false
+      }
+    },
+    {
+      "profile": "narrow 390×844 CSS px",
+      "loadedCanvas": true,
+      "geolocationAvailable": true,
+      "located": true,
+      "markerCount": 41,
+      "zoomed": true,
+      "pretoriaMarker": true,
+      "matchingPreview": true,
+      "initialMarkerCheck": {
+        "zoomClicked": true,
+        "markerVisible": true,
+        "matchingDetail": true,
+        "mapCanvas": true,
+        "pretoriaLabelObserved": false
+      }
+    }
+  ],
+  "filters": [
+    {
+      "profile": "desktop 1280×900 CSS px",
+      "categoryChecked": "true",
+      "categoryReset": "false",
+      "weekendVisible": true,
+      "weekendChip": true,
+      "weekendReset": true
+    },
+    {
+      "profile": "narrow 390×844 CSS px",
+      "categoryChecked": "true",
+      "categoryReset": "false",
+      "error": "TimeoutError"
+    }
+  ],
+  "search": [
+    {
+      "profile": "desktop 1280×900 CSS px",
+      "matchingPin": true,
+      "preview": true,
+      "noMatchingPin": true,
+      "emptyMessage": false,
+      "queryCleared": true,
+      "pinReturned": true
+    },
+    {
+      "profile": "narrow 390×844 CSS px",
+      "matchingPin": true,
+      "preview": true,
+      "noMatchingPin": true,
+      "emptyMessage": false,
+      "queryCleared": true,
+      "pinReturned": true
+    }
+  ],
+  "sharing": [
+    {
+      "profile": "desktop 1280×900 CSS px",
+      "previewCard": true,
+      "hasFullControl": true,
+      "detailVisible": true,
+      "shareVisible": true,
+      "copyValid": true,
+      "http": 200,
+      "sameEvent": true
+    },
+    {
+      "profile": "narrow 390×844 CSS px",
+      "previewCard": true,
+      "hasFullControl": true,
+      "detailVisible": true,
+      "shareVisible": true,
+      "copyValid": true,
+      "http": 200,
+      "sameEvent": true
+    }
+  ],
+  "accessibility": [
+    {
+      "profile": "desktop 1280×900 CSS px",
+      "searchOpened": true,
+      "searchClosed": true,
+      "crown": "Hide nav",
+      "noOverflow": true,
+      "tabStops": [
+        {
+          "label": "Map",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "DIV",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Zoom in",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Zoom out",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Search events, places, people…",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "A",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Map",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Explore",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Me",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "DIV",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        }
+      ]
+    },
+    {
+      "profile": "narrow 390×844 CSS px",
+      "searchOpened": true,
+      "searchClosed": true,
+      "crown": "Hide",
+      "noOverflow": true,
+      "tabStops": [
+        {
+          "label": "Map",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "DIV",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Zoom in",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Zoom out",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Search",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "A",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BODY",
+          "inViewport": true,
+          "ring": false
+        },
+        {
+          "label": "Map",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "DIV",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Zoom in",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Zoom out",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "SUMMARY",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "A",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "A",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Search",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "A",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BUTTON",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "BODY",
+          "inViewport": true,
+          "ring": false
+        },
+        {
+          "label": "Map",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "DIV",
+          "inViewport": true,
+          "ring": true
+        },
+        {
+          "label": "Zoom in",
+          "inViewport": true,
+          "ring": true
+        }
+      ]
+    }
+  ],
+  "requestGuard": [
+    {
+      "profile": "desktop 1280×900 CSS px",
+      "styled": {
+        "blockedRequests": 48,
+        "blockedRedirects": 0,
+        "fetchFailures": 0,
+        "pinnedStaticRedirects": 8
+      },
+      "deniedFamilies": {
+        "GET Supabase": 22,
+        "POST Supabase": 16,
+        "GET /icons/icon.svg": 7,
+        "GET images.unsplash.com": 3
+      },
+      "access": {
+        "blockedRequests": 14,
+        "blockedRedirects": 0,
+        "fetchFailures": 0,
+        "pinnedStaticRedirects": 3
+      }
+    },
+    {
+      "profile": "narrow 390×844 CSS px",
+      "styled": {
+        "blockedRequests": 46,
+        "blockedRedirects": 0,
+        "fetchFailures": 0,
+        "pinnedStaticRedirects": 8
+      },
+      "deniedFamilies": {
+        "GET Supabase": 21,
+        "POST Supabase": 16,
+        "GET /icons/icon.svg": 7,
+        "GET images.unsplash.com": 2
+      },
+      "access": {
+        "blockedRequests": 14,
+        "blockedRedirects": 0,
+        "fetchFailures": 0,
+        "pinnedStaticRedirects": 3
+      }
+    }
+  ]
+}

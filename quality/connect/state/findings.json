@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "findings": [
+    {
+      "id": "CCQA-0001",
+      "severity": "high",
+      "lifecycle": "new",
+      "scenario_id": "CC-01",
+      "user_impact": "Guest discovery controls required refresh in one observed session.",
+      "evidence": [
+        "Phase 0 attachment: CC-QA-2026-11-23-P0/report.md#evidence-and-provenance",
+        "quality/connect/runs/2026-11-23/CC-QA-2026-11-23-P2/observations.json#entry"
+      ],
+      "code_location": null,
+      "proposed_fix": "Reproduce and diagnose the guest initialization path in a fresh session before changing it.",
+      "design_guidance": "Show loading and keyboard-accessible recovery. Preserve a clear route to discovery and service.",
+      "acceptance_checks": [
+        "Fresh desktop and narrow guest sessions reach usable controls on first entry.",
+        "Refresh restores the same guest route.",
+        "Any stalled load gives actionable recovery feedback."
+      ],
+      "first_observed_run": "CC-QA-2026-11-23-P0",
+      "observation": "One desktop Chrome guest transition produced a blank cream screen with an empty accessibility tree. One refresh restored guest controls. Frequency, root cause and narrow-viewport impact are unknown.",
+      "last_reviewed_run": "CC-QA-2026-11-23-P2",
+      "phase_2_disposition": "Open. Blank first entry not reproduced in successful fresh desktop, 412 px and 390 px narrow sessions. A separate 390 px pass timed out waiting for the welcome control, then reached the public map on a later navigation. No blank screen was confirmed in that pass.",
+      "reproduction_steps": [
+        "Open the canonical Connect URL in a fresh guest browser context.",
+        "Select Browse as Guest and observe Map, Search and Explore before any reload.",
+        "If the surface is blank, capture redacted evidence and reload once to test recovery."
+      ]
+    },
+    {
+      "id": "CCQA-0002",
+      "severity": "medium",
+      "lifecycle": "new",
+      "scenario_id": "CC-04",
+      "user_impact": "A guest seeing an empty map can mistake zero matches for a load failure, or give up before clearing the query.",
+      "reproduction_steps": [
+        "Open Search on the guest map.",
+        "Type a synthetic phrase with no matches while keeping the Explore panel collapsed.",
+        "The matched pin disappears. Look for a visible zero-results cue without expanding the panel. Use Clear search and confirm the pin returns."
+      ],
+      "evidence": [
+        "quality/connect/runs/2026-11-23/CC-QA-2026-11-23-P2/observations.json#search",
+        "quality/connect/runs/2026-11-23/CC-QA-2026-11-23-P2/evidence/desktop-zero-results.png",
+        "quality/connect/runs/2026-11-23/CC-QA-2026-11-23-P2/evidence/narrow-zero-results.png"
+      ],
+      "proposed_fix": "Add a concise zero-results status next to the map search input and keep Clear search available. Distinguish empty results, loading and errors.",
+      "design_guidance": "Keep the map context visible and use plain language to help the guest return to discovery.",
+      "acceptance_checks": [
+        "At 1280 and 390 CSS px, a zero-match query shows visible and screen-reader-readable feedback without opening another panel.",
+        "Clear search restores the unfiltered results.",
+        "A successful query and an in-progress load use distinct states."
+      ],
+      "code_location": null,
+      "first_observed_run": "CC-QA-2026-11-23-P2"
+    }
+  ]
+}

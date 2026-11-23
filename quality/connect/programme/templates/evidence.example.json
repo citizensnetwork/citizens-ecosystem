@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "EXAMPLE-NOT-A-REAL-RUN",
+  "started_at": "2026-11-23T09:00:00+02:00",
+  "target_url": "https://219.co.za/citizens/connect/",
+  "repository": "citizensnetwork/citizens-ecosystem",
+  "commit_sha": null,
+  "deployment": null,
+  "environment": "example-only",
+  "previous_run_id": null,
+  "scope": [],
+  "tests": [
+    {
+      "scenario_id": "CC-01",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "See MASTER.md scenario catalogue",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-02",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "See MASTER.md scenario catalogue",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-03",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "See MASTER.md scenario catalogue",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-04",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "See MASTER.md scenario catalogue",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-05",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "See MASTER.md scenario catalogue",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-06",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "See MASTER.md scenario catalogue",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-07",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "See MASTER.md scenario catalogue",
+      "actual": null,
+      "evidence_reference": []
+    },
+    {
+      "scenario_id": "CC-08",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "See MASTER.md scenario catalogue",
+      "actual": null,
+      "evidence_reference": []
+    }
+  ],
+  "findings": [],
+  "android_decision": "Unverified",
+  "storage": {
+    "status": "pending",
+    "location": null
+  },
+  "email_delivery": {
+    "status": "not_attempted",
+    "from": "qa-sender@example.org",
+    "to": "qa-recipient@example.org",
+    "provider_message_id": null
+  }
+}

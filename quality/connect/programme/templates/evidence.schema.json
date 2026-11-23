@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Citizens Connect QA evidence",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "started_at",
+    "target_url",
+    "repository",
+    "commit_sha",
+    "deployment",
+    "environment",
+    "previous_run_id",
+    "scope",
+    "tests",
+    "findings",
+    "android_decision",
+    "storage",
+    "email_delivery"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "target_url": {
+      "const": "https://219.co.za/citizens/connect/"
+    },
+    "repository": {
+      "const": "citizensnetwork/citizens-ecosystem"
+    },
+    "commit_sha": {
+      "type": ["string", "null"]
+    },
+    "deployment": {
+      "type": ["string", "null"]
+    },
+    "environment": {
+      "type": "string"
+    },
+    "previous_run_id": {
+      "type": ["string", "null"]
+    },
+    "scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "scenario_id",
+          "status",
+          "observed_at",
+          "browser_or_device",
+          "fixture_reference",
+          "steps",
+          "expected",
+          "actual",
+          "evidence_reference"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string"
+          },
+          "status": {
+            "enum": ["pass", "fail", "blocked", "not_run"]
+          },
+          "observed_at": {
+            "type": ["string", "null"]
+          },
+          "browser_or_device": {
+            "type": ["string", "null"]
+          },
+          "fixture_reference": {
+            "type": ["string", "null"]
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected": {
+            "type": "string"
+          },
+          "actual": {
+            "type": ["string", "null"]
+          },
+          "evidence_reference": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "severity",
+          "lifecycle",
+          "scenario_id",
+          "user_impact",
+          "evidence",
+          "proposed_fix",
+          "design_guidance",
+          "acceptance_checks"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^CCQA-[0-9]{4,}$"
+          },
+          "severity": {
+            "enum": ["critical", "high", "medium", "low"]
+          },
+          "lifecycle": {
+            "enum": ["new", "recurring", "resolved"]
+          },
+          "scenario_id": {
+            "type": "string"
+          },
+          "user_impact": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "proposed_fix": {
+            "type": "string"
+          },
+          "design_guidance": {
+            "type": "string"
+          },
+          "acceptance_checks": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "android_decision": {
+      "enum": ["Ready", "Blocked", "Unverified"]
+    },
+    "storage": {
+      "type": "object",
+      "required": ["status", "location"],
+      "properties": {
+        "status": {
+          "enum": ["merged", "pr_only", "local_only", "pending"]
+        },
+        "location": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "email_delivery": {
+      "type": "object",
+      "required": ["status", "from", "to", "provider_message_id"],
+      "properties": {
+        "status": {
+          "enum": ["accepted", "failed", "pending", "not_attempted"]
+        },
+        "from": {
+          "const": "qa-sender@example.org"
+        },
+        "to": {
+          "const": "qa-recipient@example.org"
+        },
+        "provider_message_id": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}
