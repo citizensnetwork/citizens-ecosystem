@@ -1,6 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { FAKE_PROJECT, FAKE_PROJECT_CORS, mockAppShell, signInToFakeProject, type FakeUser } from "./support/fake-project";
-import { smallSeed, FIXED_NOW, type MapSeed, openListing } from "./support/map-v2";
+import { smallSeed, FIXED_NOW, type MapSeed, openListing, rememberSeed } from "./support/map-v2";
 import { goTo } from "./support/app-hooks";
 
 // ════════════════════════════════════════════════════════════════════
@@ -42,6 +42,7 @@ const newDb = (): Db => ({ saved: [], cohosts: [], ownEvents: [], notifications:
 /** Answers the fake project's REST tables like RLS would: the caller's own rows only. */
 async function openAs(page: Page, user: FakeUser, profile: { role: string; contributor_status: string }, db: Db, seed = seed0()) {
   await page.clock.setFixedTime(FIXED_NOW);
+  rememberSeed(page, seed); // a Contributor's sheet opens through the owner line of a place they run
   await mockAppShell(page, { supabaseUrl: FAKE_PROJECT, anonKey: "e2e-anon-key" });
   await signInToFakeProject(page, { user, profile });
   await page.route("**/api/contributor/claim", (route: Route) => route.fulfill({ status: 404, json: { error: "nothing_to_claim" } }));
@@ -136,13 +137,13 @@ async function openMapSignedIn(page: Page, min = 5) {
   await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 20_000 });
   await page.waitForFunction((n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n, min, { timeout: 20_000 });
 }
-const sheet = (page: Page) => page.locator(".cn-big");
+const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 async function pick(page: Page, id: string, lng: number, lat: number) {
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: MapHook }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [lng, lat]);
   await openListing(page, id);
   await expect(sheet(page)).toBeVisible();
 }
-const act = (page: Page, re: RegExp) => page.locator(".cn-big .cn-actions button", { hasText: re });
+const act = (page: Page, re: RegExp) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: re });
 const saveBtn = (page: Page) => act(page, /^Saved?$/);
 const followBtn = (page: Page) => act(page, /^Follow(ing)?$/);
 

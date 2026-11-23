@@ -81,6 +81,85 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
+    "@engine/config#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@engine/db#build": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "@engine/db#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/supabase-engine/**",
+        "$TURBO_ROOT$/supabase-control/**",
+        "$TURBO_ROOT$/supabase/migrations/**",
+        "$TURBO_ROOT$/packages/engine-config/src/**"
+      ]
+    },
+    "@engine/db#test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/supabase-engine/**",
+        "$TURBO_ROOT$/supabase-control/**",
+        "$TURBO_ROOT$/supabase/migrations/**",
+        "$TURBO_ROOT$/packages/engine-config/src/**"
+      ],
+      "outputs": ["coverage/**"]
+    },
+    "citizens-hub#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
+        "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
+        "$TURBO_ROOT$/packages/engine-config/src/configs/**"
+      ]
+    },
+    "citizens-hub#test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
+        "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
+        "$TURBO_ROOT$/packages/engine-config/src/configs/**"
+      ],
+      "outputs": ["coverage/**"]
+    },
+    "@engine/config#test": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/connect/public/manifest.json",
+        "$TURBO_ROOT$/apps/connect/src/frontend/index.html",
+        "$TURBO_ROOT$/apps/connect/src/frontend/auth-client.js",
+        "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
+        "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
+        "$TURBO_ROOT$/apps/connect/src/lib/**",
+        "$TURBO_ROOT$/apps/connect/src/app/api/**",
+        "$TURBO_ROOT$/supabase/migrations/**",
+        "$TURBO_ROOT$/supabase/functions/notify-nearby-rsvp/**"
+      ]
+    },
+    "@engine/config#test:coverage": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/connect/public/manifest.json",
+        "$TURBO_ROOT$/apps/connect/src/frontend/index.html",
+        "$TURBO_ROOT$/apps/connect/src/frontend/auth-client.js",
+        "$TURBO_ROOT$/apps/connect/src/frontend/assets/**",
+        "$TURBO_ROOT$/apps/connect/src/frontend/app/**",
+        "$TURBO_ROOT$/apps/connect/src/lib/**",
+        "$TURBO_ROOT$/apps/connect/src/app/api/**",
+        "$TURBO_ROOT$/supabase/migrations/**",
+        "$TURBO_ROOT$/supabase/functions/notify-nearby-rsvp/**"
+      ],
+      "outputs": ["coverage/**"]
+    },
     "dev": {
       "cache": false,
       "persistent": true

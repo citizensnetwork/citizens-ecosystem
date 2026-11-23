@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { useState, useEffect } = React;
   const { cx, Avatar, logoFit, SmartImage, Button, Segmented, Empty, MediaPicker, Field, Input, Textarea, Toggle } = window.UI;
@@ -234,13 +235,13 @@
             : h(MediaPicker, { value: f.profilePhoto, onChange: (v) => up('profilePhoto', v), aspect: '1/1', label: 'logo', scope: 'event-cover' }))),
           h('div', { className: 'flex-1 space-y-1' },
             h(Field, { label: 'Bio' }, h(Textarea, { value: f.bio, rows: 3, readOnly: locked, onChange: (e) => up('bio', e.target.value), placeholder: 'Tell citizens who you are…' })))),
-        mode === 'owner' && h(Field, { label: 'Cover photos', hint: 'Shown at the top of your public listing and on Kingdom Discovery cards.' },
+        mode === 'owner' && h(Field, { label: 'Cover photos', hint: 'Shown at the top of your public listing and on ' + W.term('discovery') + ' cards.' },
           h(CoverPhotoManager, { photos: contributor.coverPhotos })),
         mode === 'editor' && h(Field, { label: 'Category', hint: 'Shown on the public listing.' },
           h(Input, { value: f.category, onChange: (e) => up('category', e.target.value), placeholder: 'e.g. Church' })),
         h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
           h(Field, { label: 'Website' }, h(Input, { value: f.website, readOnly: locked, onChange: (e) => up('website', e.target.value), placeholder: 'yourministry.org' })),
-          h(Field, { label: 'Public contact email', hint: 'Shown to citizens — different from your sign-in email.' }, h(Input, { type: 'email', value: f.contactEmail, readOnly: locked, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@yourministry.org' }))),
+          h(Field, { label: 'Public contact email', hint: 'Shown to ' + W.term('user', 'many').toLocaleLowerCase('en') + ' — different from your sign-in email.' }, h(Input, { type: 'email', value: f.contactEmail, readOnly: locked, onChange: (e) => up('contactEmail', e.target.value), placeholder: 'hello@yourministry.org' }))),
         h('div', { className: 'grid grid-cols-1 sm:grid-cols-2 gap-3' },
           !f.noFixedLocation && h(Field, { label: 'Physical address' }, h(Input, { value: f.location, readOnly: locked, onChange: (e) => up('location', e.target.value), placeholder: 'Street, suburb, city' }))),
         h(Toggle, {
@@ -369,7 +370,7 @@
       h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0' },
         h('div', { className: 'flex items-center justify-between' },
           h('div', { className: 'flex items-center gap-3' },
-            h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(212,175,55,0.4)', fit: logoFit(activeContributor.kind) }),
+            h(Avatar, { src: activeContributor.profilePhoto, name: activeContributor.name, size: 40, rounded: 'xl', ring: 'rgba(242,189,34,0.4)', fit: logoFit(activeContributor.kind) }),
             h('div', null,
               h('h2', { className: 'text-foreground leading-none text-xl' }, 'Dashboard'),
               h('p', { className: 'text-xs text-muted-foreground mt-0.5' }, activeContributor.name),
@@ -384,7 +385,6 @@
                 app.role === 'contributor' && h('option', { value: '' }, 'My listing'),
                 (app.teamListings || []).map((t) => h('option', { key: t.id, value: t.id }, ((t.contributor && t.contributor.name) || 'Listing') + (t.role === 'viewer' ? ' (view)' : '')))))),
           h('div', { className: 'flex items-center gap-2' },
-            h('span', { className: 'px-2.5 py-1 rounded-full text-[10px] font-bold bg-accent text-gold-dark flex items-center gap-1' }, h(Icon, { name: 'Crown', size: 11 }), activeContributor.involvementLevel),
             h('button', { onClick: () => go('settings'), className: 'w-9 h-9 rounded-xl border border-border flex items-center justify-center text-muted-foreground hover:text-foreground' }, h(Icon, { name: 'Settings', size: 16 }))))),
 
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8' },

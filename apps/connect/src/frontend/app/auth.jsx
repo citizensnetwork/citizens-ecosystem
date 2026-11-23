@@ -12,22 +12,16 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { useState, useEffect } = React;
   const { cx, Button, inputCls } = window.UI;
 
-  // ── "Connecting ___" rotating slogan (2s) ──
-  const PHRASES = [
-    'Non-Profits to People',
-    'Events to Interests',
-    'Volunteers to Vacancies',
-    'Leaders to Projects',
-    'Ideas to Communities',
-    'Churches to Numbers',
-    'Limbs to Members',
-    'Pretoria to Purpose',
-    'the Kingdom', // anchor — gold, title case (not all-caps)
-  ];
+  // ── The world's rotating sign-in slogan ("<lead> ___", one phrase every 2s) ──
+  // The phrases come from the world's vocabulary; the last one is the anchor (gold, title
+  // case, not all-caps). A world without a slogan shows none.
+  const SLOGAN = W.configuration.vocabulary.slogan || null;
+  const PHRASES = SLOGAN ? SLOGAN.phrases : [];
 
   function SloganCarousel() {
     const [i, setI] = useState(0);
@@ -37,7 +31,7 @@
     }, []);
     const anchor = i === PHRASES.length - 1;
     return h('div', { className: 'flex flex-col items-center text-center font-brand' },
-      h('span', { className: 'text-foreground font-semibold text-base sm:text-lg tracking-tight leading-tight' }, 'Connecting'),
+      h('span', { className: 'text-foreground font-semibold text-base sm:text-lg tracking-tight leading-tight' }, SLOGAN.lead),
       h('span', { className: 'flex items-center justify-center mt-1', style: { minHeight: '1.5em' } },
         h('span', {
           key: i,
@@ -86,7 +80,7 @@
   //    it paints before Tailwind's Play CDN has generated any class (S3).
   function LoadingSplash() {
     return h('div', {
-      role: 'status', 'aria-label': 'Loading Citizens Connect', 'data-screen-label': 'Loading',
+      role: 'status', 'aria-label': W.t('screen.loading'), 'data-screen-label': 'Loading',
       style: {
         height: '100%', width: '100%', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', gap: 20, background: LANDING_WASH,
@@ -95,7 +89,7 @@
       h(CrownMark, { size: 72 }),
       h('div', {
         className: 'spin',
-        style: { width: 24, height: 24, borderRadius: '50%', border: '2.5px solid rgba(212,175,55,0.25)', borderTopColor: '#D4AF37' },
+        style: { width: 24, height: 24, borderRadius: '50%', border: '2.5px solid rgba(242,189,34,0.25)', borderTopColor: '#F2BD22' },
       }));
   }
 
@@ -264,21 +258,21 @@
           // crown — floats near the top of the screen
           h(CrownMark, { size: 84 }),
 
-          // scripture eyebrow — small gap below the crown
-          h('p', { className: 'font-brand italic text-[12px] sm:text-[13px] text-foreground/60 text-center leading-relaxed mt-7 px-2' },
-            h('sup', { className: 'crown-gold-text font-bold not-italic text-[9px] mr-0.5' }, '19'),
-            '"Now, therefore, you are no longer strangers and foreigners, but fellow —"'),
+          // epigraph — small gap below the crown; a world without one shows none
+          W.t('screen.signIn.epigraph') && h('p', { className: 'font-brand italic text-[12px] sm:text-[13px] text-foreground/60 text-center leading-relaxed mt-7 px-2' },
+            W.t('screen.signIn.epigraphNumber') && h('sup', { className: 'crown-gold-text font-bold not-italic text-[9px] mr-0.5' }, W.t('screen.signIn.epigraphNumber')),
+            W.t('screen.signIn.epigraph')),
 
-          // "Citizens" title — completes the verse. Smaller gap above than the
+          // The world's short name — completes the epigraph. Smaller gap above than the
           // crown→scripture gap; mid-sized, larger than surrounding text but
           // not overwhelming (per design: no full-caps wordmark treatment here).
           h('h1', {
             className: 'font-brand crown-gold-text font-extrabold text-center mt-3 leading-none',
             style: { fontSize: 'clamp(34px, 9vw, 46px)', letterSpacing: '0.005em' },
-          }, 'Citizens'),
+          }, W.t('screen.wordmark.primary')),
 
           // slogan carousel — same gap as crown→scripture (equal rhythm either side of the title)
-          h('div', { className: 'mt-7' }, h(SloganCarousel)),
+          SLOGAN && h('div', { className: 'mt-7' }, h(SloganCarousel)),
 
           // circular Google sign-in, then the email-code option, then the guest link
           h('div', { className: 'flex flex-col items-center gap-4 mt-12 w-full' },

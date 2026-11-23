@@ -21,6 +21,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { cx, safeUrl, Avatar, logoFit, SmartImage, SocialLinks } = window.UI;
   const Icon = window.Icon;
@@ -71,7 +72,7 @@
     const isContributor = item.type === 'contributor';
 
     const cat = window.DATA.getItemCategory(item);
-    const hex = cat ? cat.hex : '#D4AF37';
+    const hex = cat ? cat.hex : '#F2BD22';
     // A label on the category colour: white or near-black, whichever has the better WORST contrast over the colours it
     // sits on (WCAG relative luminance). Light colours (the crown gold, yellows) get near-black; dark ones keep white.
     const rgb = (() => { const n = parseInt(String(hex).replace('#', '').slice(0, 6), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; })();
@@ -153,7 +154,7 @@
       photo
         ? h(F, null,
             h(SmartImage, {
-              src: photo, cat, label: isEvent ? 'Event' : isPlace ? 'Place' : 'Contributor',
+              src: photo, cat, label: isEvent ? 'Event' : isPlace ? 'Place' : W.t('screen.map.type.partner'),
               alt: title, className: 'w-full h-full',
             }),
             h('div', { className: 'absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-black/40 to-transparent' }))

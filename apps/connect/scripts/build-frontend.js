@@ -110,10 +110,14 @@ buildFrontend({
   // `window.X` set by earlier ones).
   appFileOrder: [
     'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'saved-lib.jsx', 'cohost-lib.jsx', 'moments-lib.jsx', 'convince-lib.jsx', 'serving-areas-lib.jsx', 'onboarding-presets-lib.jsx', 'data.jsx', 'lets-lib.jsx', 'store.jsx', 'ui.jsx', 'report.jsx', 'listing-claim.jsx', 'auth.jsx', 'cohosts.jsx', 'moments.jsx', 'convince.jsx', 'map-v2-strings.jsx', 'serving-areas.jsx', 'map-v2-time.jsx', 'map-v2-qr.jsx', 'map-v2-pins.jsx', 'map.jsx',
-    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-card.jsx', 'map-v2-row.jsx', 'map-v2-nearby.jsx', 'map-v2-online.jsx', 'map-v2-sheet.jsx', 'map-v2-explore.jsx', 'connect-chrome.jsx', 'connect-previews.jsx', 'connect-explore.jsx', 'connect-me.jsx', 'map-v2-nav.jsx', 'map-v2-discover.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
+    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-card.jsx', 'map-v2-row.jsx', 'map-v2-nearby.jsx', 'map-v2-online.jsx', 'map-v2-sheet.jsx', 'map-v2-explore.jsx', 'map-v2-nav.jsx', 'map-v2-discover.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
     'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx', 'lets.jsx', 'intake-upgrade.jsx',
     'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
   ],
+
+  // Real-ESM entries bundled beside the screens: the world (words, categories, switches)
+  // from @engine/config (engine step E7). index.html loads it before auth-client.js.
+  browserBundles: ['engine-world.js'],
 
   // The config.js env-var mapping and the CDN pins live in ./frontend-config.js
   // (their own file so a test can run the real configuration into a temp directory).

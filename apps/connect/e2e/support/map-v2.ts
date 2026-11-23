@@ -10,6 +10,41 @@ export const FIXED_NOW = Date.UTC(2026, 9, 10, 8, 0, 0); // 2026-10-10 10:00 in 
 
 export type MapSeed = { contributors: unknown[]; places: unknown[]; events: unknown[] };
 
+// The seed each page is served, so the helpers below can find what a Contributor owns (a Contributor has no pin and no
+// Explore card since PR 365: the map reaches them through the owner line of a place or an event they run).
+const seeds = new WeakMap<Page, MapSeed>();
+/** For a spec that serves its own directories: tell the helpers which seed the page shows. */
+export function rememberSeed(page: Page, seed: MapSeed) {
+  seeds.set(page, seed);
+}
+type Row = { id: string; created_by?: string | null; latitude?: number; longitude?: number; date?: string };
+/** The place (else the upcoming event) a Contributor in this page's seed owns, or null when `id` is not a Contributor. */
+export function ownedBy(page: Page, id: string): { id: string; lng: number; lat: number } | null {
+  const seed = seeds.get(page);
+  if (!seed || !(seed.contributors as Row[]).some((c) => c.id === id)) return null;
+  const own = (seed.places as Row[]).find((r) => r.created_by === id)
+    ?? (seed.events as Row[]).find((r) => r.created_by === id && Date.parse(r.date ?? "") >= FIXED_NOW);
+  if (!own || typeof own.latitude !== "number" || typeof own.longitude !== "number") {
+    throw new Error(`Contributor ${id} owns no place or upcoming event with a position in this seed: nothing on the map opens their sheet`);
+  }
+  return { id: own.id, lng: own.longitude, lat: own.latitude };
+}
+/** Bring a listing's point into the middle of the map (no animation), keeping a zoom at which its pin is drawn. */
+async function centreOn(page: Page, to: { lng: number; lat: number }) {
+  await page.evaluate(([lng, lat]) => {
+    const m = (window as unknown as { __ccMap: { getZoom(): number; jumpTo(o: object, d: object): void } }).__ccMap;
+    m.jumpTo({ center: [lng, lat], zoom: Math.max(m.getZoom(), 14) }, { originalEvent: {} });
+  }, [to.lng, to.lat]);
+}
+/** On an open place or event sheet, the owner line opens the owner's own sheet in its place. */
+async function throughOwner(page: Page, ownerId: string, how: "click" | "tap") {
+  const line = page.locator(`[data-mv2='sheet'] [data-owner="${ownerId}"]`);
+  await line.waitFor({ state: "visible", timeout: 10_000 });
+  if (how === "tap") await line.tap();
+  else await line.click();
+  await expect(line).toHaveCount(0, { timeout: 5_000 });
+}
+
 /**
  * Hermetic network for the map screen: config.js, MapTiler and /api/** answered locally, the
  * three public directories served from `seed`, a guest session so the landing is skipped, and
@@ -20,6 +55,7 @@ export async function mockMapNetwork(
   seed: MapSeed = smallSeed(FIXED_NOW),
   extra?: (page: Page) => Promise<void>,
 ) {
+  seeds.set(page, seed);
   await page.clock.setFixedTime(FIXED_NOW);
   await page.route("**/config.js", (route: Route) =>
     route.fulfill({
@@ -49,12 +85,16 @@ export async function mockMapNetwork(
   });
 }
 
-/** Open the map screen and wait until the MapLibre instance and `min` markers exist. */
+/**
+ * Open the map screen and wait until the MapLibre instance and `min` markers exist, and map-v2.css has painted (the
+ * app turns motion on only then, data-mv2-motion: before it, panels still sit where an unstyled page puts them).
+ */
 export async function openMap(page: Page, path = "/", min = 1) {
   await page.goto(path);
   await page.waitForSelector('[data-screen="discover"]', { timeout: 20_000 });
   await page.waitForFunction(
-    (n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n,
+    (n) => !!(window as unknown as { __ccMap?: unknown }).__ccMap && document.querySelectorAll(".maplibregl-marker").length >= n
+      && document.documentElement.hasAttribute("data-mv2-motion"),
     min,
     { timeout: 20_000 },
   );
@@ -93,30 +133,94 @@ export async function mapSettled(page: Page) {
 }
 
 /**
- * Issue #210: a pin no longer opens the sheet. It scrolls the Explore row to its card and outlines it; the CARD opens
- * the sheet. This does both. The pin is pressed by a DOM click, because the row can cover a pin near the foot of the
- * screen (a spec that centres the map on a pin puts it right behind the row); the card is then pressed for real,
- * by a mouse or, with `how: "tap"`, by a touch tap, so the gesture that opens the sheet is a real one.
+ * Founder, 2026-11-17: a phone's Explore panel rests on the crown (a wide screen's on the Where to… strip), and only the
+ * OPEN panel lists every row and shows the sticky nav. The crown shows the strip; the handle opens the rest.
  */
-export async function openListing(page: Page, id: string, _how: "click" | "tap" = "click") {
+export async function openExploreAll(page: Page, how: "click" | "tap" = "click") {
+  // Raised pinpeek covers Explore; Close it before opening the panel (2nd-tap surface, 2026-11-22).
+  const peek = page.locator("[data-mv2='pinpeek']:not([hidden])");
+  if (await peek.count()) {
+    // Prefer the X (full dismiss). Force: the centred handle used to paint over it (width:100%).
+    const close = page.locator("[data-mv2='pinpeek-close']");
+    if (how === "tap") await close.tap({ force: true });
+    else await close.click({ force: true });
+    await expect(peek).toHaveCount(0, { timeout: 5_000 });
+  }
+  const explore = page.locator("[data-mv2='explore']");
+  if ((await explore.getAttribute("data-open")) !== null) return;
+  const press = (l: Locator) => (how === "tap" ? l.tap() : l.click());
+  // Minimize-with-filter (founder, 2026-11-22): grab only toggles rest↔focus while a chip is on.
+  // Clear it so the handle can raise the full open panel again.
+  const chipX = page.locator("[data-mv2='filter-chip-x']");
+  if (await chipX.count()) {
+    if (how === "tap") await chipX.tap();
+    else await chipX.click();
+    await expect(page.locator("[data-mv2='filter-chip']")).toHaveCount(0, { timeout: 5_000 });
+  }
+  if ((await explore.getAttribute("data-mode")) === "rest") {
+    await press(page.locator("[data-mv2='explore-crown']"));
+    await expect(explore).not.toHaveAttribute("data-mode", "rest", { timeout: 5_000 });
+  }
+  await press(page.locator("[data-mv2='explore-grab']"));
+  await expect(explore).toHaveAttribute("data-open", "", { timeout: 5_000 });
+}
+
+/**
+ * Issue #210: a pin no longer opens the sheet; a CARD in the Explore panel does. Its first tap chooses it (its row takes
+ * the panel over and its pin glows, founder 2026-11-17); the second tap opens the preview. Both taps are real ones, by a
+ * mouse or, with `how: "tap"`, by touch. Without a panel (the clean map), the pin is pressed by a DOM click.
+ */
+export async function openListing(page: Page, id: string, how: "click" | "tap" = "click") {
+  // the Explore panel hides behind an open listing: close it first (Escape closes the sheet at once and gives its entry back)
+  const open = page.locator("[data-mv2='sheet']");
+  if (await page.locator("[data-mv2='explore']").count() && await open.count()) {
+    await page.keyboard.press("Escape");
+    await expect(open).toHaveCount(0, { timeout: 5_000 });
+  }
+  // a Contributor: open the place (or event) they own, then its owner line
+  const own = ownedBy(page, id);
+  if (own) {
+    await centreOn(page, own);
+    await openListing(page, own.id, how);
+    await throughOwner(page, id, how);
+    return;
+  }
   await mapSettled(page);
+  const explore = page.locator("[data-mv2='explore']");
+  if (await explore.count()) {
+    await openExploreAll(page, how);
+    const card = () => page.locator(`[data-mv2='explore'] [data-explore-id="${id}"]`).first();
+    await card().waitFor({ state: "visible", timeout: 10_000 });
+    // a card still chosen from an earlier opening says "Tap again to open": one tap does it
+    const chosen = (await card().getAttribute("data-selected")) !== null;
+    if (!chosen) {
+      if (how === "tap") await card().tap();
+      else await card().click();
+      await expect(card()).toHaveAttribute("data-selected", "", { timeout: 5_000 });
+    }
+    if (how === "tap") await card().tap();
+    else await card().click();
+    return;
+  }
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
-  await pin.waitFor({ state: "attached", timeout: 15_000 });
-  // A marker MapLibre has panned off the screen cannot be clicked through the viewport.
-  // Two clicks: the first selects the Ink marker and opens the conveyor, the second opens the big preview.
-  await pin.evaluate((el) => {
-    const hit = el.querySelector(".marker-hit");
-    const target = hit instanceof HTMLElement ? hit : el;
-    if (target instanceof HTMLElement) target.click();
-  });
-  await page.locator(".cn-conveyor").waitFor({ state: "visible", timeout: 10_000 });
-  await pin.evaluate((el) => {
-    const hit = el.querySelector(".marker-hit");
-    const target = hit instanceof HTMLElement ? hit : el;
-    if (target instanceof HTMLElement) target.click();
-  });
-  await page.locator(".cn-big").waitFor({ state: "visible", timeout: 10_000 });
-  void _how;
+  if (how === "tap") await pin.tap({ force: true });
+  else await pin.click({ force: true });
+}
+
+/**
+ * Founder, 2026-11-17: the map home has no account button; its actions are in the nav's Me. On a wide screen Me is in
+ * the nav beside the search bar; on a phone it is in the sticky nav of the open Explore panel. This opens that menu.
+ */
+export async function openMe(page: Page) {
+  // already open (Me toggles, so pressing it again would close it)
+  if (await page.getByRole("button", { name: "View Profile" }).isVisible()) return;
+  const rail = page.locator("[data-mv2='desktop-item'][data-nav='me']");
+  if (await rail.isVisible()) {
+    await rail.click();
+    return;
+  }
+  await openExploreAll(page);
+  await page.locator("[data-mv2='explore-dock'] [data-nav='me']").click();
 }
 
 /**
@@ -127,19 +231,21 @@ export async function openListing(page: Page, id: string, _how: "click" | "tap" 
  */
 export async function toCleanMap(page: Page) {
   await page.evaluate(() => (window as unknown as { __cc: { go: (p: string, q: object) => void } }).__cc.go("home", { view: "map" }));
-  await page.locator("[data-screen='discover']").waitFor({ state: "visible", timeout: 10_000 });
+  await page.locator("[data-mv2='explore']").waitFor({ state: "detached", timeout: 10_000 });
 }
 export async function openPinSheet(page: Page, id: string, how: "click" | "tap" = "click") {
-  await toCleanMap(page);
+  if (await page.locator("[data-mv2='explore']").count()) await toCleanMap(page);
+  // a Contributor has no pin: open the place (or event) they own, then its owner line
+  const own = ownedBy(page, id);
+  if (own) {
+    await centreOn(page, own);
+    await openPinSheet(page, own.id, how);
+    await throughOwner(page, id, how);
+    return;
+  }
   const pin = page.locator(`.maplibregl-marker[data-cc-id="${id}"]`);
-  await pin.waitFor({ state: "visible", timeout: 15_000 });
-  // One tap opens the conveyor. A second tap opens the big preview.
   if (how === "tap") await pin.tap({ force: true });
   else await pin.click({ force: true });
-  await page.locator(".cn-conveyor").waitFor({ state: "visible", timeout: 10_000 });
-  if (how === "tap") await pin.tap({ force: true });
-  else await pin.click({ force: true });
-  await page.locator(".cn-big").waitFor({ state: "visible", timeout: 10_000 });
 }
 
 /**
@@ -226,7 +332,7 @@ export async function mockContributorDetail(
  * right before EVERY tap: a toast or a label change can move things between two taps.
  */
 export async function stillBox(page: Page, locator: Locator, { samples = 4, gapMs = 60 } = {}) {
-  const sheet = page.locator(".cn-big");
+  const sheet = page.locator("[data-mv2='sheet']");
   await expect
     .poll(
       async () => {

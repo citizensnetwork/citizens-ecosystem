@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { openListing } from "./support/map-v2";
+import { openListing, openExploreAll } from "./support/map-v2";
 import {
   FAKE_PROJECT,
   FAKE_PROJECT_CORS,
@@ -317,9 +317,8 @@ test.describe("Browser Back and Forward", () => {
     await page.goto("/manifest.json");
     await page.goto(`/c/${SLUG}`);
     await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("navigation", { name: "Connect navigation" }).getByRole("button", { name: "Explore", exact: true }).click();
-    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
-    expect(path(page)).toBe("/explore");
+    await page.getByRole("button", { name: "Kingdom Exploration" }).first().click();
+    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
 
     await page.goBack();
     await expect.poll(() => screen(page)).toBe("profile");
@@ -343,7 +342,9 @@ test.describe("Browser Back and Forward", () => {
     await expect(page.locator('[data-entity-card="event"]')).toBeHidden();
     await expect.poll(() => screen(page)).toBe("discover");
     expect(path(page)).toBe("/");
-    // and Back is not now stuck: the second press leaves, it does not open the card again
+    // Raised pinpeek has two levels: one more Back closes the cards, then leave Connect
+    await page.goBack();
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     await page.goBack();
     await expect.poll(() => page.url()).toContain("manifest.json");
   });
@@ -437,22 +438,23 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1, { timeout: 15_000 });
     expect(await pushes(page)).toEqual([]);
 
-    // tap a pin: one guard entry, pushed while the tap's user activation is live
+    // tap a card: raised pinpeek pushes two guards (cards + raised) while the tap's user activation is live
     await openListing(page, EVENT_ID);
     await expect(page.locator('[data-entity-card="event"]')).toBeVisible();
-    await expect.poll(async () => (await pushes(page)).length).toBe(1);
+    await expect.poll(async () => (await pushes(page)).length).toBe(2);
     expect((await pushes(page))[0]).toMatchObject({ active: true, guard: true });
+    expect((await pushes(page))[1]).toMatchObject({ active: true, guard: true });
 
-    // "View Full Profile" moves on: the sheet's guard entry becomes the event's entry (no 2nd push)
+    // "View Full Profile" clears the peek (guards drop) and moves on: no extra push
     await page.locator("[data-mv2='view-full']").click();
     await expect(page.locator('[data-screen="event"]')).toBeVisible();
     expect(path(page)).toBe(`/e/${EVENT_ID}`);
-    expect(await pushes(page)).toHaveLength(1);
 
     // one Back = the map again with the card closed; a second leaves Connect
     await page.goBack();
     await expect.poll(() => screen(page)).toBe("discover");
     await expect(page.locator('[data-entity-card="event"]')).toBeHidden();
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     expect(path(page)).toBe("/");
     await page.goBack();
     await expect.poll(() => page.url()).toContain("manifest.json");
@@ -465,7 +467,11 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole("navigation", { name: "Connect navigation" }).getByRole("button", { name: "Explore", exact: true }).click();
+    // the map home's menu is the open Explore panel's nav (founder, 2026-11-17: Central is hidden for now; opening the
+    // panel itself pushes nothing), and its Explore opens the Explore page
+    await openExploreAll(page);
+    expect(await pushes(page)).toEqual([]);
+    await page.locator("[data-mv2='explore-dock']").getByRole("button", { name: "Explore" }).click();
     await expect(page.locator('[data-screen="explore"]')).toBeVisible();
     expect(path(page)).toBe("/explore");
     expect(await pushes(page)).toEqual([{ active: true, guard: false, url: "/explore" }]);
@@ -524,20 +530,26 @@ test.describe("Back is built from taps only (Chrome's history-manipulation inter
     await page.goto("/");
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1, { timeout: 15_000 });
     const card = page.locator('[data-entity-card="event"]');
+    const peek = page.locator("[data-mv2='pinpeek']");
 
     await openListing(page, EVENT_ID);
     await expect(card).toBeVisible();
     await page.getByRole("button", { name: "Close details" }).click(); // closed by its button
     await expect(card).toBeHidden();
+    await expect(peek).toHaveCount(0);
     await page.waitForTimeout(300);
     await openListing(page, EVENT_ID);
     await expect(card).toBeVisible();
-    await page.goBack(); // closed by Back
+    await page.goBack(); // raised → cards
     await expect(card).toBeHidden();
+    await page.goBack(); // cards → closed
+    await expect(peek).toHaveCount(0);
     await openListing(page, EVENT_ID);
     await expect(card).toBeVisible();
     await page.goBack();
     await expect(card).toBeHidden();
+    await page.goBack();
+    await expect(peek).toHaveCount(0);
     expect(path(page)).toBe("/");
 
     await page.goBack();
@@ -825,12 +837,15 @@ test.describe("The Capacitor hardware Back button", () => {
     await go(page, "event", { id: EVENT_ID });
     await expect(page.locator('[data-screen="event"]')).toBeVisible();
 
-    // an open overlay is dismissed before the screen changes
+    // an open overlay is dismissed before the screen changes (raised pinpeek = two levels)
     await go(page, "home");
     await openEventCard(page);
     await expect(page.locator('[data-entity-card="event"]')).toBeVisible();
     await back();
     await expect(page.locator('[data-entity-card="event"]')).toBeHidden();
+    expect(await exited()).toBe(false);
+    await back();
+    await expect(page.locator("[data-mv2='pinpeek']")).toHaveCount(0);
     expect(await exited()).toBe(false);
 
     // then back through the screens

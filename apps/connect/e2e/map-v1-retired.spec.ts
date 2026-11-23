@@ -13,15 +13,15 @@ const stored = (page: Page) => page.evaluate(() => localStorage.getItem("cc_map_
 /** The map a person gets today: Map v2's stylesheet applied, its pins (controls, not bare SVG), its sheet on a tap. */
 async function expectTheOneMap(page: Page, pageErrors: string[]) {
   expect(await theme(page)).not.toBeNull();
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#d4af37");
-  expect(await page.locator(".maplibregl-marker .marker-hit").count()).toBeGreaterThanOrEqual(8);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent").trim())).toBe("#f2bd22");
+  expect(await page.locator(".maplibregl-marker[role='button']").count()).toBeGreaterThanOrEqual(5);
   await expect(page.locator('[data-cc-pin="contributor-logo"]')).toHaveCount(0); // the old logo pin
   expect(await page.evaluate(() => typeof (window as unknown as { isMapV2?: unknown }).isMapV2)).toBe("undefined");
   expect(pageErrors).toEqual([]);
 
-  const seed = smallSeed(FIXED_NOW) as { contributors: { id: string }[] };
-  await openListing(page, seed.contributors[0].id); // a pin picks its card in the Explore row; the card opens the sheet
-  await expect(page.locator(".cn-big")).toBeVisible(); // the sheet, not the old floating preview card
+  const seed = smallSeed(FIXED_NOW) as { places: { id: string }[] };
+  await openListing(page, seed.places[0].id); // a place card in the Explore row opens the sheet
+  await expect(page.locator("[data-mv2='sheet']")).toBeVisible(); // the sheet, not the old floating preview card
 }
 
 test.describe("the old map is retired", () => {
@@ -29,13 +29,13 @@ test.describe("the old map is retired", () => {
     const pageErrors: string[] = [];
     page.on("pageerror", (e) => pageErrors.push(e.message));
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v1", 8);
+    await openMap(page, "/?map=v1", 5);
     await expectTheOneMap(page, pageErrors);
   });
 
   test("?map=v2 is no different, and neither stores anything", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     expect(await stored(page)).toBeNull();
     await page.goto("/?map=v1");
     await page.waitForSelector('[data-screen="discover"]');
@@ -57,7 +57,7 @@ test.describe("the old map is retired", () => {
       }
     });
     await mockMapNetwork(page);
-    await openMap(page, "/", 8);
+    await openMap(page, "/", 5);
     await expectTheOneMap(page, pageErrors);
     expect(await stored(page)).toBeNull();
     await page.reload();
@@ -68,7 +68,7 @@ test.describe("the old map is retired", () => {
 
   test("the old map's pin styles are not shipped in the page", async ({ page }) => {
     await mockMapNetwork(page);
-    await openMap(page, "/", 8);
+    await openMap(page, "/", 5);
     const shipped = await page.evaluate(async () => (await (await fetch("/")).text()));
     expect(shipped).not.toContain("cc-pin-label");
     expect(shipped).not.toContain("cc-pin-pulse");

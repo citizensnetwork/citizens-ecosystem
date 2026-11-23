@@ -1,6 +1,6 @@
 -- ════════════════════════════════════════════════════════════════════
 --  183_saved_items: P2-04 Save. APPLIED 2026-10-17 through MCP apply_migration as `183_saved_items`, on Stephen's yes in chat
---  (pre-apply tag `connect-pre-mig183-saved-items`; security advisor unchanged: 0 ERROR, no new finding; rollback-only probe
+--  (no pre-apply git tag; the file need not be named; security advisor unchanged: 0 ERROR, no new finding; rollback-only probe
 --  docs/audit/probes/183_saved_items.probe.sql: 21 of 21 PASS before and after the apply).
 --
 --  A PRIVATE bookmark for a Contributor or a Place (an Event keeps Consider, a state of its rsvps row). Follow is a public

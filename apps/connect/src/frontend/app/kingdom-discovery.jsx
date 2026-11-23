@@ -14,7 +14,7 @@
 
   const TYPES = [
     { id: 'all', label: 'All' },
-    { id: 'contributor', label: 'Contributors' },
+    { id: 'contributor', label: window.WORLD.term('partner', 'Many') },
     { id: 'place', label: 'Places' },
     { id: 'event', label: 'Events' },
   ];

@@ -61,7 +61,7 @@ async function installNews(page: Page, posts: Post[]) {
   }, posts);
 }
 
-const sheet = (page: Page) => page.locator(".cn-big");
+const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 const reader = (page: Page) => page.locator("[data-mv2='news-card']");
 const card = (page: Page) => sheet(page).locator("[data-mv2='card2'][data-news]").first();
 
@@ -70,7 +70,7 @@ async function openSheetNews(page: Page, seed: Seed, posts: Post[]) {
   await installNews(page, posts);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { gallery: 0 });
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
   await openPinSheet(page, c.id);
   await expect(sheet(page)).toBeVisible();
@@ -101,10 +101,10 @@ test("News tab: newest first, with a plain 'posted' time, and the tab appears on
   }, posts);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed, { gallery: 0 });
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   await page.evaluate(([lo, la]) => (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo({ center: [lo, la], zoom: 15.5 }, { originalEvent: {} }), [c.physical_longitude, c.physical_latitude]);
   await openPinSheet(page, c.id);
-  const sheet = page.locator(".cn-big");
+  const sheet = page.locator("[data-mv2='sheet']");
   await expect(sheet).toBeVisible();
 
   await expect(sheet.getByRole("tab")).toHaveText(["News"]);
@@ -195,13 +195,16 @@ test("tapping a news card opens the reader, and every close leaves the sheet whe
   expect(await page.evaluate(() => document.documentElement.style.overflow)).toBe("hidden");
   expect(await page.evaluate(() => document.getElementById("root")?.inert)).toBe(true);
 
-  // Tab starts at the title, then the close button, then the link, then wraps.
+  // Tab starts at the title, then Back, Close, then the link; trap wraps link → Back.
+  const newsBack = page.locator("[data-mv2='news-back']");
+  await page.keyboard.press("Tab");
+  await expect(newsBack).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Close news post" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(link).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Close news post" })).toBeFocused();
+  await expect(newsBack).toBeFocused();
   await page.keyboard.press("Shift+Tab");
   await expect(link).toBeFocused();
 

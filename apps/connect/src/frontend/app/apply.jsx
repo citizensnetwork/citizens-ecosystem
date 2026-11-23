@@ -14,6 +14,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { useState } = React;
   const { cx, Field, Input, Textarea, Button, Toggle, MediaPicker, Stepper, Avatar } = window.UI;
@@ -26,15 +27,10 @@
   // The four kinds migration 173 stores. Labels are the citizen-facing words
   // already used on the card and the map ("Organisation"), not the admin
   // form's American spelling. The value stays `organization`.
-  const CONTRIBUTOR_KINDS = [
-    { value: 'ministry', label: 'Ministry' },
-    { value: 'organization', label: 'Organisation' },
-    { value: 'business', label: 'Business' },
-    { value: 'individual', label: 'Individual' },
-  ];
+  const CONTRIBUTOR_KINDS = W.configuration.categories.partnerKinds.map((k) => ({ value: k.id, label: k.label }));
 
   function contributorKind(value) {
-    return CONTRIBUTOR_KINDS.some((k) => k.value === value) ? value : 'ministry';
+    return CONTRIBUTOR_KINDS.some((k) => k.value === value) ? value : W.configuration.categories.defaultPartnerKind;
   }
 
   function contributorKindLabel(value) {
@@ -56,10 +52,10 @@
       };
     }
     return {
-      title: 'About your ministry',
-      nameLabel: 'Organisation / ministry name',
-      namePlaceholder: 'e.g. New Wine Fellowship',
-      fallbackName: safe === 'organization' ? 'Your organisation' : safe === 'business' ? 'Your business' : 'Your ministry',
+      title: W.t('screen.apply.aboutTitle'),
+      nameLabel: W.t('screen.apply.nameLabel'),
+      namePlaceholder: W.t('screen.apply.namePlaceholder'),
+      fallbackName: safe === 'organization' ? 'Your organisation' : safe === 'business' ? 'Your business' : W.t('screen.apply.fallbackName'),
     };
   }
 
@@ -156,8 +152,8 @@
       h('div', { className: 'absolute -right-2 bottom-2 w-16 h-16 rounded-full bg-white/10' }),
       h('div', { className: 'relative' },
         h('div', { className: 'w-11 h-11 rounded-2xl bg-white/25 flex items-center justify-center mb-3' }, h(Icon, { name: 'Crown', size: 20, className: 'text-white' })),
-        h('h1', { className: 'text-white text-xl mb-1' }, 'Become a Contributor'),
-        h('p', { className: 'text-white/85 text-xs leading-relaxed max-w-sm' }, 'Contributors create events & places, broadcast updates, message citizens, and lead Kingdom initiatives across the map.')));
+        h('h1', { className: 'text-white text-xl mb-1' }, W.t('screen.apply.title')),
+        h('p', { className: 'text-white/85 text-xs leading-relaxed max-w-sm' }, W.t('screen.apply.intro'))));
 
     // The Contributor type list, as in the category grid and the admin card (an events-only lookup left 6 of the 12 types unnamed).
     const cat = window.DATA.getItemCategory({ type: 'contributor', category: f.category });
@@ -232,7 +228,7 @@
             f.website && h(ReviewRow, { label: 'Website', value: f.website })),
           h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-foreground' },
             h(Icon, { name: 'Sparkles', size: 15, className: 'shrink-0 mt-0.5 text-gold-dark' }),
-            h('p', { className: 'text-xs leading-relaxed' }, // C21: "on the map" only when the wizard has a pin (both coordinates); an online-only listing is in Kingdom Discovery
+            h('p', { className: 'text-xs leading-relaxed' }, // C21: "on the map" only when the wizard has a pin (both coordinates); an online-only listing is only in the discovery list
               'An admin reviews every application before it goes live ' + window.DATA.listedWhere(window.DATA.hasMapPin(f) && !offMap) + '. You can add your logo and contact details from your Dashboard while you wait.',
               // #259: said only when they chose at least one area (the founder's rule), and never "on the map" without a pin (C21)
               chosenAreas && h('span', { className: 'block mt-1' }, window.MapV2Strings.serving.findableNote),
@@ -264,7 +260,7 @@
     const [step, setStep] = useState(0);
     const ma = myApplication || {};
     const [f, setF] = useState({
-      name: ma.name || '', category: ma.category || 'churches-ministries', bio: ma.bio || '',
+      name: ma.name || '', category: ma.category || W.configuration.categories.partnerTypes[0].id, bio: ma.bio || '',
       location: ma.location || '', lat: ma.lat ?? null, lng: ma.lng ?? null, website: ma.website || '', contactEmail: '',
       // No stock stand-ins: empty → MediaPicker offers upload, and the profile
       // falls back to honest initials/category tiles until real art is added.
@@ -318,7 +314,7 @@
       // DEFER TO V2: team roster + socials are enrichment, not required for a
       // v1 listing to exist and be findable.
       {
-        title: 'Team & socials', subtitle: 'Add the people and channels behind your ministry.',
+        title: 'Team & socials', subtitle: W.t('screen.apply.teamSubtitle'),
         node: h(F, null,
           h(Field, { label: 'Team members' },
             h('div', { className: 'flex gap-2 mb-2' },

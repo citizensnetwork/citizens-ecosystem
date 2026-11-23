@@ -14,6 +14,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { useState, useEffect } = React;
   const { cx, Button, Field, Input, Textarea, Toggle, MediaPicker } = window.UI;
@@ -23,7 +24,7 @@
   // C21: "on the map" only for an application that has a pin; an online-only one goes into Kingdom Discovery; until the
   // application has loaded (onMap null) it only says "live"
   const reviewBanner = (onMap) => 'Thanks! Your listing is being reviewed. You can finish your profile meanwhile; it goes '
-    + (onMap === true ? 'on the map' : onMap === false ? 'into Kingdom Discovery' : 'live') + ' once approved.';
+    + (onMap === true ? 'on the map' : onMap === false ? 'into ' + W.term('discovery') : 'live') + ' once approved.';
 
   const fmtDate = (d) => (d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 
@@ -48,12 +49,12 @@
       socials,
       // A missing or unknown kind displays as ministry (today's default) and
       // is what a save writes. ApplyParts owns the allow-list.
-      kind: (window.ApplyParts && window.ApplyParts.contributorKind(row.contributor_kind || row.kind)) || 'ministry',
+      kind: (window.ApplyParts && window.ApplyParts.contributorKind(row.contributor_kind || row.kind)) || W.configuration.categories.defaultPartnerKind,
     };
   }
 
   function payloadFromForm(f) {
-    const kind = (window.ApplyParts && window.ApplyParts.contributorKind(f.kind)) || 'ministry';
+    const kind = (window.ApplyParts && window.ApplyParts.contributorKind(f.kind)) || W.configuration.categories.defaultPartnerKind;
     return {
       display_name: f.name.trim(),
       contributor_kind: kind,
@@ -185,7 +186,7 @@
     };
 
     const leaveRejected = (page) => { setContributorStatus('rejected'); go(page); };
-    const nameLabel = (window.ApplyParts && window.ApplyParts.aboutCopy(f.kind).nameLabel) || 'Organisation / ministry name';
+    const nameLabel = (window.ApplyParts && window.ApplyParts.aboutCopy(f.kind).nameLabel) || W.t('screen.apply.nameLabel');
 
     return h('div', { className: 'flex-1 flex flex-col h-full bg-background', 'data-screen': 'pending-application' },
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto' },
@@ -226,7 +227,7 @@
             h(Button, { variant: 'gold', icon: 'Check', disabled: !canSave, onClick: save, className: 'w-full' }, saving ? 'Saving…' : 'Save changes')),
 
           !decided && h('p', { className: 'text-[11px] text-muted-foreground text-center leading-relaxed px-4' },
-            'Events, places and news open up as soon as you are approved. Meanwhile you can still browse the map and follow other Contributors.'))));
+            'Events, places and news open up as soon as you are approved. Meanwhile you can still browse the map and follow other ' + W.term('partner', 'many') + '.'))));
   }
 
   window.PendingApplicationPage = PendingApplicationPage;

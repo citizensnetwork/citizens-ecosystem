@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { createWorld } from "@engine/config/world";
+import { citizensConfiguration, citizensEntitlements } from "@engine/config/citizens";
 
 /**
  * The standalone frontend (`src/frontend/app/*.jsx`) is plain
@@ -9,8 +11,15 @@ import { join } from "node:path";
  */
 const APP_DIR = join(process.cwd(), "src/frontend/app");
 
+/**
+ * The world the app's screens read their words from (`window.WORLD`, set by
+ * src/frontend/engine-world.js before any screen loads): the Citizens one.
+ */
+export const citizensWorld = createWorld(citizensConfiguration, citizensEntitlements);
+
 /** Evaluate one frontend IIFE against a stub `window` and return that window. */
 export function loadFrontend(file: string, win: Record<string, unknown> = {}) {
+  if (!("WORLD" in win)) win.WORLD = citizensWorld;
   const src = readFileSync(join(APP_DIR, file), "utf8");
   // Enough of React for a module body that only DESTRUCTURES hooks at load
   // time; nothing here renders.

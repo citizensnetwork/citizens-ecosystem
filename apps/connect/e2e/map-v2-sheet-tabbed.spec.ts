@@ -7,7 +7,7 @@ import { mockMapNetwork, mockContributorDetail, openMap, makeSeed, smallSeed, FI
 type C = { id: string; contributor_slug: string; physical_longitude: number; physical_latitude: number; full_name: string };
 type Seed = MapSeed & { contributors: C[]; places: { id: string; longitude: number; latitude: number }[]; events: { id: string; longitude: number; latitude: number }[] };
 
-const sheet = (page: Page) => page.locator(".cn-big");
+const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 
 type MapHook = { jumpTo: (o: object, d: object) => void };
 const jump = (page: Page, lng: number, lat: number, zoom: number) =>
@@ -47,7 +47,7 @@ test.describe("tabbed block on a phone", () => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 3 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[0];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(sheet(page).getByRole("tab", { name: "Gallery" })).toBeVisible();
@@ -93,7 +93,7 @@ test.describe("tabbed block on a phone", () => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 0 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[2];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(page.locator("[data-mv2='empty']")).toBeVisible();
@@ -118,7 +118,7 @@ test.describe("tabbed block on a phone", () => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 6, delayMs: 1200 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[2];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(page.locator("[data-mv2='tabbed'] [data-skeleton]").first()).toBeVisible();
@@ -171,7 +171,7 @@ test.describe("tabbed block on a phone", () => {
     }, posts);
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 3 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(sheet(page).getByRole("tab")).toHaveText(["Events", "News", "Gallery"]);
     await expect(page.locator("[data-mv2='nearby'] [data-near]").first()).toBeVisible();
@@ -200,7 +200,9 @@ test.describe("tabbed block on a phone", () => {
   });
 
   test("with nothing nearby the hairline still sits above the QR action", async ({ page }) => {
-    const seed = makeSeed({ contributors: 1, places: 0, events: 0, now: FIXED_NOW, spread: 0.02, seed: 7 }) as Seed;
+    // one place, the Contributor's own, 20+ km away: it is how the map reaches them (its owner line), and too far for Nearby
+    const seed = makeSeed({ contributors: 1, places: 1, events: 0, now: FIXED_NOW, spread: 0.02, seed: 7 }) as Seed;
+    seed.places[0].latitude = Number(seed.contributors[0].physical_latitude) + 0.2;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 3 });
     await openMap(page, "/?map=v2", 1);
@@ -266,6 +268,9 @@ test.describe("tabbed block sticks only while its scroller scrolls", () => {
       const block = sc.querySelector("[data-mv2='tabbed']") as HTMLElement;
       sc.scrollTop += block.getBoundingClientRect().top - sc.getBoundingClientRect().top + 140;
     });
+    // data-top follows the scroller's scroll EVENT, which the browser fires on the next frame, not when scrollTop is set
+    // (a loaded runner read it in between). A touch always starts after that frame, so the rule only needs it by then.
+    await expect.poll(() => scroller.evaluate((el) => el.hasAttribute("data-top")), { timeout: 3_000 }).toBe(false);
     const stuck = await scroller.evaluate((el) => {
       const sc = el as HTMLElement;
       const tabs = sc.querySelector("[data-mv2='tabs']") as HTMLElement;
@@ -426,7 +431,7 @@ test.describe("tabbed block keyboard and dark look", () => {
         expires_at: new Date(FIXED_NOW + 20 * 3_600_000).toISOString(),
       }],
     });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[2];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(sheet(page).getByRole("tab")).toHaveText(["Today"]);
@@ -455,7 +460,7 @@ test.describe("tabbed block keyboard and dark look", () => {
     const seed = smallSeed(FIXED_NOW) as Seed;
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed, { gallery: 1 });
-    await openMap(page, "/?map=v2", 8);
+    await openMap(page, "/?map=v2", 5);
     const c = seed.contributors[0];
     await openOn(page, c.id, c.physical_longitude, c.physical_latitude);
     await expect(page.locator("[data-mv2='tabbed']")).toHaveCount(1);

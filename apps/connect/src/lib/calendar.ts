@@ -1,4 +1,5 @@
 import type { Event } from "@/types/db";
+import { world } from "@/lib/world";
 
 /** Build a Google Calendar "Add Event" URL */
 export function buildGoogleCalendarUrl(event: Event): string {
@@ -43,7 +44,7 @@ export function generateICalString(event: Event): string {
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Citizens Connect//EN",
+    `PRODID:-//${world.t("meta.calendarProducer")}//EN`,
     "BEGIN:VEVENT",
     `DTSTART:${fmt(start)}`,
     `DTEND:${fmt(end)}`,

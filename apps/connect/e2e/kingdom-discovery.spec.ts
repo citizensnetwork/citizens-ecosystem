@@ -1,7 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { goTo, mapReady, setRoleAndGo } from "./support/app-hooks";
-import { openListing } from "./support/map-v2";
-
 // ════════════════════════════════════════════════════════════════════
 //  Connect v1 golden path (founder decision D-12): a self-serve Contributor
 //  application WAITS for an admin. Apply → pending Dashboard ("being
@@ -166,21 +164,14 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     await expect(discoveryScreen).toBeVisible();
     await expect(discoveryScreen.getByText(ORG_NAME)).toBeVisible({ timeout: 10_000 });
 
-    // ── Map — the new Contributor has a pin (this is the exact gap fixed:
-    //     Contributors previously never appeared on the map at all) ──
+    // ── Map — a new Contributor with no place or event is not pinned.
+    //     They show on Kingdom Discovery and on their profile. ──
     await goTo(page, "home");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
-    const marker = page.locator(".maplibregl-marker");
-    await expect(marker).toHaveCount(1, { timeout: 15_000 });
+    await expect(page.locator(".maplibregl-marker")).toHaveCount(0, { timeout: 15_000 });
 
-    // ── The pin → its card in the Explore row (#210) → the bottom sheet (Map v2, the default
-    //     since D15; it used to jump straight to the full page), and its
-    //     "View Full Profile" button is the way in to the Contributor's profile ──
-    await openListing(page, (await marker.getAttribute("data-cc-id"))!);
-    const preview = page.locator(".cn-big");
-    await expect(preview).toBeVisible({ timeout: 10_000 });
-    await expect(preview.getByText(ORG_NAME).first()).toBeVisible();
-    await preview.getByRole("button", { name: "View Full Profile" }).click();
+    await goTo(page, "kingdom-discovery");
+    await discoveryScreen.getByRole("button", { name: new RegExp(ORG_NAME) }).first().click();
     await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(ORG_NAME).first()).toBeVisible();
 

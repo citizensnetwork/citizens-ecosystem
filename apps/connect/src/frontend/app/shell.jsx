@@ -18,15 +18,23 @@
     { page: 'notifications', label: 'Notifications', icon: 'Bell' },
   ];
 
-  function roleBadge(role, level) {
+  function roleBadge(role) {
     if (role === 'admin') return { label: 'Admin', color: '#8E44AD', fg: '#FFFFFF', icon: 'Shield' };
-    if (role === 'contributor') return { label: level || 'Contributor', color: '#D4AF37', fg: '#0A0908', icon: 'Crown' };
+    if (role === 'contributor') return { label: 'Contributor', color: '#F2BD22', fg: '#0A0908', icon: 'Crown' };
     return null;
   }
 
   // ── Profile / role-switch panel ──
-  // anchor 'top' (under the account button), 'nav' (above Map v2's folding nav, #210) or the sidebar's default.
+  // anchor 'top' (under the account button), 'nav' (above Map v2's folding nav, #210), 'rail' (beside the map home's
+  // desktop nav), 'dock' (above the map home's sticky nav), or the sidebar's default.
   // extras: Map v2's nav has no Projects, Messages or Alerts of its own, so its account menu lists them, with counts.
+  // `true` lists all three; an array lists only those pages (the map home's Me: Let's… is hidden with Do for now).
+  const PANEL_POS = {
+    top: 'right-0 top-full mt-2',
+    nav: 'left-0 right-0 mx-auto bottom-0',
+    rail: 'left-full top-0 ml-3',
+    dock: 'right-0 bottom-full mb-3',
+  };
   function ProfilePanel({ onClose, anchor, extras }) {
     const app = window.useApp();
     useBackGuard(true, onClose);
@@ -34,12 +42,19 @@
     const ref = useRef(null);
     const [claiming, setClaiming] = useState(false);
     useEffect(() => {
-      const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+      // A press outside closes the panel, but not one on the button that opened it (the panel's own parent box):
+      // that button toggles, and closing here first would let its click open the panel straight back up.
+      const h = (e) => {
+        const box = ref.current;
+        if (!box || box.contains(e.target)) return;
+        if (box.parentNode && box.parentNode.contains(e.target)) return;
+        onClose();
+      };
       const t = setTimeout(() => document.addEventListener('mousedown', h), 0);
       return () => { clearTimeout(t); document.removeEventListener('mousedown', h); };
     }, [onClose]);
 
-    const pos = anchor === 'top' ? 'right-0 top-full mt-2' : anchor === 'nav' ? 'left-0 right-0 mx-auto bottom-0' : 'left-full bottom-0 ml-2';
+    const pos = PANEL_POS[anchor] || 'left-full bottom-0 ml-2';
     const go2 = (p) => { go(p); onClose(); };
 
     // An admin, or the Google Form, may have made a listing for this person's email (see
@@ -62,10 +77,12 @@
     const links = [{ p: 'profile', label: 'View Profile', icon: 'User' }];
     if (extras) {
       const menu = (window.MapV2Strings && window.MapV2Strings.nav && window.MapV2Strings.nav.menu) || {};
-      links.push(
+      const wanted = Array.isArray(extras) ? extras : ['lets', 'messages', 'notifications'];
+      [
         { p: 'lets', label: menu.lets, icon: 'Users' },
         { p: 'messages', label: menu.messages, icon: 'MessageCircle', count: unreadMsgs },
-        { p: 'notifications', label: menu.alerts, icon: 'Bell', count: unreadNotifs });
+        { p: 'notifications', label: menu.alerts, icon: 'Bell', count: unreadNotifs },
+      ].forEach((l) => { if (wanted.indexOf(l.p) !== -1) links.push(l); });
     }
     // citizenscentral.co.za/dashboard is a real, bookmarkable destination
     // (next.config.ts rewrite + store.jsx deep link) once you ARE a
@@ -93,8 +110,7 @@
         React.createElement('div', { className: 'flex items-center gap-1.5 mt-0.5' },
           role === 'admin' && React.createElement(Icon, { name: 'Shield', size: 11, className: 'text-[#8E44AD]' }),
           role === 'contributor' && React.createElement(Icon, { name: 'Crown', size: 11, className: 'text-gold' }),
-          React.createElement('span', { className: 'text-[10px] font-semibold text-muted-foreground capitalize' }, role),
-          role === 'contributor' && user.involvementLevel && React.createElement('span', { className: 'text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-accent text-gold-dark' }, user.involvementLevel)),
+          React.createElement('span', { className: 'text-[10px] font-semibold text-muted-foreground capitalize' }, role)),
         React.createElement('p', { className: 'text-xs text-muted-foreground mt-2 leading-relaxed line-clamp-2' }, user.bio),
 
         React.createElement('div', { className: 'mt-3 space-y-0.5 border-t border-border pt-3' },
@@ -177,7 +193,7 @@
 
     const badge = (p) => (p === 'notifications' ? unreadNotifs : p === 'messages' ? unreadMsgs : p === 'admin' && isAdmin ? app.applications.filter((a) => a.status === 'pending').length : 0);
     const active = (p) => nav.page === p || (p === 'home' && nav.page === 'event') || (p === 'home' && nav.page === 'place');
-    const rb = roleBadge(role, user.involvementLevel);
+    const rb = roleBadge(role);
 
     return React.createElement('aside', {
       className: cx('hidden md:flex flex-col glass border-r border-white/40 z-40 shrink-0 transition-all duration-300 relative', collapsed ? 'w-[74px]' : 'w-64'),
@@ -201,7 +217,7 @@
           className: cx('flex items-center w-full rounded-xl transition-colors hover:bg-accent/50 p-2', collapsed ? 'justify-center' : 'gap-3'),
         },
           React.createElement('div', { className: 'relative shrink-0' },
-            React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 36, ring: 'rgba(212,175,55,0.4)' }),
+            React.createElement(Avatar, { src: user.profilePhoto, name: user.name, size: 36, ring: 'rgba(242,189,34,0.4)' }),
             role !== 'citizen' && React.createElement('span', {
               className: 'absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-background flex items-center justify-center',
               style: { background: rb.color },
@@ -254,9 +270,13 @@
   }
 
   // ── Floating create FAB (contributors) ──
+  // Pack 08: the + button is hidden on the map so the map keeps the screen.
+  // The create flow itself stays (openCreate, this menu, every other screen). Restore by flipping the flag.
+  const SHOW_CREATE_ON_MAP = false;
   function CreateFab() {
     const { isContributor, listingRole, nav, openCreate } = window.useApp();
     const [open, setOpen] = useState(false);
+    if (!SHOW_CREATE_ON_MAP && nav.page === 'home') return null;
     if (!(isContributor || listingRole === 'editor') || ['messages', 'settings', 'intake-upgrade'].includes(nav.page)) return null;
     // There is no bottom bar: the button sits level with the folding nav, clear of the Explore row above it.
     return React.createElement('div', { className: 'fixed right-4 md:bottom-6 z-40 flex flex-col items-end gap-2 bottom-[calc(env(safe-area-inset-bottom)+12px)]' },
@@ -267,7 +287,7 @@
           React.createElement(Icon, { name: 'CalendarPlus', size: 15, className: 'text-gold-dark' }), React.createElement('span', { className: 'text-xs font-bold' }, 'Create Event'))),
       React.createElement('button', {
         onClick: () => setOpen((o) => !o),
-        className: 'w-14 h-14 rounded-2xl gold-gradient text-white shadow-[0_8px_24px_rgba(212,175,55,0.5)] flex items-center justify-center transition-transform active:scale-95',
+        className: 'w-14 h-14 rounded-2xl gold-gradient text-white shadow-[0_8px_24px_rgba(242,189,34,0.5)] flex items-center justify-center transition-transform active:scale-95',
         style: { transform: open ? 'rotate(45deg)' : 'none' },
       }, React.createElement(Icon, { name: 'Plus', size: 24, strokeWidth: 2.5 })));
   }
@@ -280,13 +300,14 @@
       case 'home': return React.createElement(window.HomePage);
       case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
       // #210: Map v2's Discover page.
-      case 'explore': return window.ConnectExplore ? React.createElement(window.ConnectExplore.Page) : React.createElement(window.MapV2Discover.Discover);
+      case 'explore': return React.createElement(window.MapV2Discover.Discover);
       case 'lets': return React.createElement(window.LetsPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
       case 'notifications': return React.createElement(window.NotificationsPage);
       case 'dashboard': return React.createElement((listingRole === 'editor' || listingRole === 'viewer') ? window.DashboardPage : (isPendingApplicant ? window.PendingApplicationPage : window.DashboardPage));
       case 'admin': return React.createElement(window.AdminPage);
+      case 'settings': return React.createElement(window.SettingsPage);
       case 'intake-upgrade': return React.createElement(window.IntakeUpgradePage);
       case 'apply': return React.createElement(window.ApplyPage);
       case 'onboarding': return React.createElement(window.OnboardingPage);
@@ -294,8 +315,7 @@
       case 'place': return React.createElement(window.PlaceProfilePage, { id: nav.params.id });
       case 'profile': return nav.params.id
         ? React.createElement(window.ContributorProfilePage, { id: nav.params.id })
-        : (window.ConnectMe ? React.createElement(window.ConnectMe.Page) : React.createElement(window.CitizenProfilePage));
-      case 'settings': return window.ConnectMe ? React.createElement(window.ConnectMe.Page, { space: 'Settings' }) : React.createElement(window.SettingsPage);
+        : React.createElement(window.CitizenProfilePage);
       default: return React.createElement(window.HomePage);
     }
   }
@@ -316,24 +336,21 @@
   }
 
   function Shell() {
-    const { createKind, createEditing, authed, guestMode, authResolved } = window.useApp();
-    const chrome = window.ConnectChrome;
-    const wide = chrome.useWide();
-    const frame = chrome.useShell();
+    const { createKind, createEditing, authed, guestMode, authResolved, nav } = window.useApp();
+    // On the map home the crown is the home button. The folding nav stays for every other screen,
+    // and for the clean map (view=map), which has no crown.
+    const onMapHome = nav && nav.page === 'home' && !(nav.params && nav.params.view === 'map');
     // Signed out: the landing — but while a probable session is still resolving,
     // the loading splash instead, so a returning member sees no "sign in" flash.
     if (!authed && !guestMode) return React.createElement(authResolved ? window.AuthScreen : window.LoadingSplash);
-    return React.createElement('div', {
-      className: 'connect-shell ' + (wide ? 'desktop-review' : 'phone-review'),
-      'data-search': frame.search ? 'open' : 'closed',
-      'data-filter': frame.filter ? 'on' : 'off',
-      'data-marker-language': 'Ink',
-    },
-      React.createElement('div', { className: 'connect-frame' + (frame.central ? ' connect-central' : '') },
-        React.createElement('main', { className: 'connect-main' },
-          React.createElement(AssistBanner),
-          frame.central ? React.createElement(chrome.CentralView) : React.createElement(CurrentPage)),
-        chrome && React.createElement(chrome.Nav)),
+    return React.createElement('div', { className: 'flex h-full w-full overflow-hidden bg-background' },
+      !onMapHome && React.createElement(Sidebar),
+      React.createElement('main', { className: 'flex-1 flex flex-col overflow-hidden relative min-h-0' },
+        React.createElement(AssistBanner),
+        React.createElement(CurrentPage)),
+      // Map v2 (#210): one folding round button instead of a bottom bar. The map home uses the crown instead.
+      !onMapHome && React.createElement(window.MapV2Nav),
+      React.createElement(CreateFab),
       createKind && React.createElement(window.CreateFlow, { kind: createKind, editing: createEditing }),
       window.CCtweaks && React.createElement(window.CCtweaks),
       window.CCListingClaim && React.createElement(window.CCListingClaim.Host),

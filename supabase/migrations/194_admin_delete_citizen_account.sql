@@ -1,10 +1,13 @@
 -- ════════════════════════════════════════════════════════════════════
 --  194_admin_delete_citizen_account
 --
---  NOT APPLIED. The owner applies this file after an explicit yes
---  (pre-apply tag, rollback-only probe
---  docs/audit/probes/194_admin_delete_citizen_account.probe.sql,
---  advisor 0 ERROR). Commit only. Do not apply from a pull request.
+--  APPLIED (live version 20261019172913, after the founder's yes in chat).
+--  Rule from 2026-11-01: apply after the founder says yes in chat. The
+--  founder does not name the file, and there is no pre-apply git tag.
+--  After applying, run
+--  docs/audit/probes/194_admin_delete_citizen_account.probe.sql
+--  and the security advisor (0 ERROR, no unexpected new finding).
+--  Database, auth and security changes still need that yes.
 --
 --  Admin → Citizens. Two functions, both SECURITY DEFINER with
 --  search_path '' (every name schema-qualified) and an auth.uid()
@@ -317,7 +320,7 @@ comment on function public.admin_delete_citizen_account(uuid, boolean, text) is
 
 commit;
 
--- ── ROLLBACK (NOT APPLIED until the owner says yes)
+-- ── ROLLBACK (comment only; do not run as part of the apply)
 -- begin;
 -- drop function if exists public.admin_delete_citizen_account(uuid, boolean, text);
 -- drop function if exists public.admin_list_citizens(text, text, text, text, integer);

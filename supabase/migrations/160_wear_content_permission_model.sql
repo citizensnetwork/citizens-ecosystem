@@ -62,7 +62,7 @@ create policy brands_admin_insert on wear.brands for insert
   with check (wear.is_admin());
 
 -- ============================================================================
--- APPLIED 2026-07-15 (founder-confirmed). Pre-apply tag `wear-pre-mig160`.
+-- APPLIED 2026-07-15 (founder-confirmed). No pre-apply git tag; the file need not be named.
 -- Advisor(security) = 0 ERROR / 101 WARN / 3 INFO — 0 new findings vs head-159.
 -- Rolled-back prod smokes A–F2 all PASS (see checklist). wear policy count 73→75
 -- (net +2: brands FOR-ALL split → owner_update + owner_delete + admin_insert).

@@ -9,11 +9,15 @@ import { mockMapNetwork, mockContributorDetail, openMap, smallSeed, FIXED_NOW, t
 // ════════════════════════════════════════════════════════════════════
 
 test.use({ viewport: { width: 390, height: 844 } });
-type Seed = MapSeed & { contributors: { id: string; physical_longitude: number; physical_latitude: number }[] };
+type Seed = MapSeed & {
+  contributors: { id: string; physical_longitude: number; physical_latitude: number }[];
+  events: { id: string; longitude: number; latitude: number; image_url: string | null }[];
+};
 
 /** Opens the map and records every MapTiler style the map requests. */
-async function openRecording(page: Page, path = "/?map=v2") {
+async function openRecording(page: Page, path = "/?map=v2", prep?: (seed: Seed) => void) {
   const seed = smallSeed(FIXED_NOW) as Seed;
+  if (prep) prep(seed);
   const styles: string[] = [];
   page.on("request", (r) => {
     const m = /api\.maptiler\.com\/maps\/([^/]+)\/style\.json/.exec(r.url());
@@ -21,7 +25,7 @@ async function openRecording(page: Page, path = "/?map=v2") {
   });
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed);
-  await openMap(page, path, 8);
+  await openMap(page, path, 5);
   return { seed, styles };
 }
 const theme = (page: Page) => page.evaluate(() => document.documentElement.getAttribute("data-theme"));
@@ -76,24 +80,30 @@ test.describe("P1-12 the map look follows the phone", () => {
 
   test("in the dark look the sheet, pins and labels use the dark tokens, and logos stay on white", async ({ page }) => {
     await page.emulateMedia({ colorScheme: "dark" });
-    const { seed } = await openRecording(page);
-    const c = seed.contributors[0];
+    const { seed } = await openRecording(page, "/?map=v2", (s) => {
+      s.events[0].image_url = "https://fixture.example/cover.png";
+    });
+    const ev = seed.events[0];
     await page.evaluate(
       ([lo, la]) =>
         (window as unknown as { __ccMap: { jumpTo: (o: object, d: object) => void } }).__ccMap.jumpTo(
           { center: [lo, la], zoom: 15.5 },
           { originalEvent: {} },
         ),
-      [c.physical_longitude, c.physical_latitude],
+      [ev.longitude, ev.latitude],
     );
-    const pin = page.locator(`.maplibregl-marker[data-cc-id="${c.id}"]`);
-    // Ink contributor frame: charcoal paper, paper hairline. The photo sits on that face, not a white disc.
-    await expect(pin.locator(".marker-frame")).toHaveCSS("border-top-color", "rgb(247, 246, 241)");
-    await expect(pin.locator(".marker-face")).toHaveCSS("background-color", "rgb(39, 42, 37)");
-    await openListing(page, c.id);
-    const sheet = page.locator(".cn-big");
-    await expect(sheet).toHaveCSS("background-color", "rgb(26, 23, 20)");
+    const pin = page.locator(`.maplibregl-marker[data-cc-id="${ev.id}"]`);
+    await expect(pin.locator("[data-mv2='label-text']")).toHaveCSS("color", "rgb(247, 244, 238)"); // --pin-label (dark)
+    await openListing(page, ev.id);
+    // 2nd tap opens the raised pinpeek (inline sheet is transparent; the peek uses --xp-sheet)
+    const peek = page.locator("[data-mv2='pinpeek']");
+    // dark --xp-sheet / --surface-1 (browsers may resolve the glass sheet to either)
+    const bg = await peek.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(bg === "rgba(27, 28, 24, 0.95)" || bg === "rgb(26, 23, 20)").toBe(true);
+    const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet.locator("[data-mv2='name']")).toHaveCSS("color", "rgb(247, 244, 238)");
+    await expect(pin.locator("[data-mv2='logo-wrap']")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+    // the gold action keeps its near-black label
     await expect(sheet.getByRole("link", { name: "Directions" })).toHaveCSS("color", "rgb(10, 9, 8)");
   });
 });

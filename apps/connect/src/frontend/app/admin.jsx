@@ -3,6 +3,8 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
+  const lower = (text) => text.toLocaleLowerCase('en'); // a term inside a staff sentence
   const F = React.Fragment;
   const { useState, useEffect, useRef } = React;
   const { cx, Avatar, Button, Segmented, Empty, Input, Field, Textarea, Toggle, Overlay, MediaPicker } = window.UI;
@@ -96,8 +98,8 @@
               // C21: "on the map" only when the application has a pin (both coordinates); an online-only applicant is in Kingdom Discovery alone
               mode === 'approve' && h('p', { className: 'text-xs text-muted-foreground leading-relaxed', 'data-testid': 'approve-where' },
                 app.hasPin
-                  ? 'This puts them on the map and in Kingdom Discovery, and emails them.'
-                  : 'This puts them in Kingdom Discovery, and emails them. They have no map pin, so they will not be on the map.'),
+                  ? 'This puts them on the map and in ' + W.term('discovery') + ', and emails them.'
+                  : 'This puts them in ' + W.term('discovery') + ', and emails them. They have no map pin, so they will not be on the map.'),
               // Only a rejection carries words: the applicant is shown this reason (notification + email).
               mode === 'reject' && h('textarea', { value: note, onChange: (e) => setNote(e.target.value), rows: 3, maxLength: 1000, placeholder: 'Why not yet? The applicant will read this, so keep it kind and clear.', 'aria-label': 'Reason for the applicant', className: window.UI.inputCls + ' resize-none' }),
               error && h('p', { className: 'text-xs font-semibold text-[#DC2626]', role: 'alert' }, error),
@@ -113,12 +115,7 @@
   }
   const fmt = (d) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-  const CONTRIBUTOR_KINDS = [
-    { value: 'ministry', label: 'Ministry' },
-    { value: 'organization', label: 'Organization' },
-    { value: 'business', label: 'Business' },
-    { value: 'individual', label: 'Individual' },
-  ];
+  const CONTRIBUTOR_KINDS = W.configuration.categories.partnerKinds.map((k) => ({ value: k.id, label: k.label }));
 
   // ── Admin: manually create a Contributor listing ──
   // Goes live immediately (map + Kingdom Discovery), tied to an email the
@@ -128,7 +125,7 @@
   // welcome" (D-13, on by default) has the SERVER mail them the sign-in steps;
   // the result says whether it was sent, failed, or skipped.
   const EMPTY_CREATE = {
-    orgName: '', claimEmail: '', kind: 'ministry', category: '', bio: '', website: '',
+    orgName: '', claimEmail: '', kind: W.configuration.categories.defaultPartnerKind, category: '', bio: '', website: '',
     contactEmail: '', socials: {}, cover: '',
     location: '', lat: null, lng: null, noFixedLocation: false, emailOwner: true,
   };
@@ -139,7 +136,7 @@
     // The server's sentence says exactly what to do for these (an admin account, an application in progress,
     // a listing that already exists or is already waiting for its owner).
     if ((code === 'email_already_registered' || code === 'listing_exists' || code === 'listing_pending') && message) return message;
-    if (code === 'email_already_registered') return 'That email already has an account on Citizens.';
+    if (code === 'email_already_registered') return 'That email already has an account on ' + W.term('worldShort') + '.';
     if (code === 'invalid_contact_email') return 'The public contact email is not a valid email address.';
     if (code === 'invalid_cover_url') return 'The cover photo must be an https or http image link.';
     if (code === 'invalid_whatsapp_number') return 'WhatsApp needs a phone number (for example 071 234 5678) or a wa.me link.';
@@ -218,7 +215,7 @@
         const claimEmail = f.claimEmail.trim();
         const emailRequested = f.emailOwner;
         // C21: the server says whether the new listing has a pin; if it did not say, claim nothing about the map
-        toast('Contributor listing created — ' + (body.onMap === true ? 'live on the map now.' : body.onMap === false ? 'live in Kingdom Discovery now. It has no map pin.' : 'live now.'), 'green');
+        toast(W.term('partner', 'One') + ' listing created — ' + (body.onMap === true ? 'live on the map now.' : body.onMap === false ? 'live in ' + W.term('discovery') + ' now. It has no map pin.' : 'live now.'), 'green');
         toast(welcomeEmailLine(emailRequested, body.email, claimEmail), emailRequested && body.email === 'sent' ? 'green' : 'gold');
         // C10: the listing waits for its owner to confirm it. Say so, and say which kind of confirmation.
         if (body.ownerHasAccount === true) toast(claimEmail + ' already has an account, so the owner will be asked to attach the listing to it. Nothing on that account changes unless they confirm.', 'gold');
@@ -237,7 +234,7 @@
 
     return h('form', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in max-w-xl', 'data-testid': 'admin-create-form', onSubmit: submit },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
-        "Create a Contributor listing on their behalf — it goes live in Kingdom Discovery immediately, and on the map when you give it a location. The real person or org signs in with the email below (a 6-digit code we email them, or Google) and is asked to confirm the listing is theirs; only then does it become theirs to manage from their own Contributor Portal. If that email already has an account, they are asked to attach the listing to it, and nothing on the account changes unless they confirm."),
+        "Create " + W.term('partner', 'a') + " listing on their behalf — it goes live in " + W.term('discovery') + " immediately, and on the map when you give it a location. The real person or org signs in with the email below (a 6-digit code we email them, or Google) and is asked to confirm the listing is theirs; only then does it become theirs to manage from their own " + W.t('screen.portal.title') + ". If that email already has an account, they are asked to attach the listing to it, and nothing on the account changes unless they confirm."),
 
       result && h('div', { className: 'p-3 rounded-xl bg-[#DCFCE7] border border-green-200 flex items-start gap-2', 'data-testid': 'create-result' },
         h(Icon, { name: 'CheckCircle2', size: 15, className: 'text-[#16A34A] shrink-0 mt-0.5' }),
@@ -252,7 +249,7 @@
                   ? "The welcome email couldn't be sent. Let them know yourself."
                   : "Email isn't set up on the server yet, so no welcome was sent. Let them know yourself."))),
 
-      h(Field, { label: 'Organisation / ministry name', required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: 'e.g. New Wine Fellowship' })),
+      h(Field, { label: W.t('screen.apply.nameLabel'), required: true }, h(Input, { value: f.orgName, onChange: (e) => up('orgName', e.target.value), placeholder: W.t('screen.apply.namePlaceholder') })),
       h(Field, { label: "Owner's email", required: true, hint: 'The email they sign in with (a 6-digit code we email them, or Google). They are asked to confirm the listing is theirs.' }, h(Input, { type: 'email', value: f.claimEmail, onChange: (e) => up('claimEmail', e.target.value), placeholder: 'contact@ministry.org' })),
 
       h('div', { className: 'grid grid-cols-2 gap-3' },
@@ -324,7 +321,7 @@
 
       error && h('div', { role: 'alert', 'data-testid': 'create-error', className: 'p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-xs font-semibold text-destructive' }, error),
 
-      h(Button, { type: 'submit', variant: 'gold', icon: 'Plus', disabled: !canSubmit, className: 'w-full' }, submitting ? 'Creating…' : 'Create Contributor Listing'));
+      h(Button, { type: 'submit', variant: 'gold', icon: 'Plus', disabled: !canSubmit, className: 'w-full' }, submitting ? 'Creating…' : 'Create ' + W.term('partner', 'One') + ' Listing'));
   }
 
   // ── Admin: every Contributor listing — hide / unhide ──
@@ -388,8 +385,8 @@
       confirming && h('div', { className: 'mt-3 pt-3 border-t border-border space-y-2 fade-in' },
         h('p', { className: 'text-xs text-foreground leading-relaxed' }, hidden
           // true for every listing: the map shows it only when it has a pin, Kingdom Discovery always (C21)
-          ? 'Put ' + name + ' back in Kingdom Discovery, and on the map if it has a pin?'
-          : 'Hide ' + name + ' from Kingdom Discovery, and from the map if it has a pin? Nothing is deleted — you can unhide it any time.'),
+          ? 'Put ' + name + ' back in ' + W.term('discovery') + ', and on the map if it has a pin?'
+          : 'Hide ' + name + ' from ' + W.term('discovery') + ', and from the map if it has a pin? Nothing is deleted — you can unhide it any time.'),
         h('div', { className: 'flex gap-2' },
           h(Button, { size: 'sm', variant: hidden ? 'success' : 'danger', className: 'flex-1', disabled: busy, onClick: onConfirm },
             busy ? 'Saving…' : hidden ? 'Confirm unhide' : 'Confirm hide'),
@@ -476,7 +473,7 @@
         preview && h(F, null,
           h('p', { className: 'text-sm text-foreground leading-relaxed' }, placeholder
             ? h(F, null, h('strong', null, name), ' has never been signed into. Deleting removes it and everything attached to it ', h('strong', null, 'permanently'), '.')
-            : h(F, null, h('strong', null, name), ' has an account. Deleting removes their Contributor listing, events and places, but ', h('strong', null, 'keeps their citizen account'), '.')),
+            : h(F, null, h('strong', null, name), ' has an account. Deleting removes their ' + W.term('partner') + ' listing, events and places, but ', h('strong', null, 'keeps their ' + lower(W.term('user')) + ' account'), '.')),
           touched.length > 0 && h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
             (placeholder ? 'Removes: ' : 'Takes down: ') + touched.join(', ') + '.'),
           !placeholder && h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
@@ -561,7 +558,7 @@
         setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, contributor_hidden: hidden } : r)));
         syncListingVisibility({ id: row.id, slug: row.contributor_slug, hidden });
         toast(hidden
-          ? (row.full_name || 'Listing') + ' is hidden — off the map and Kingdom Discovery.'
+          ? (row.full_name || 'Listing') + ' is hidden — off the map and ' + W.term('discovery') + '.'
           : (row.full_name || 'Listing') + ' is live again.', 'green');
       } catch (e) {
         toast('Could not update that listing — please try again.', 'red');
@@ -593,7 +590,7 @@
     const wideCreate = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(min-width: 768px)').matches;
     return h('div', { className: 'px-4 sm:px-5 py-4 space-y-3 fade-in', 'data-admin-listings': '', 'data-admin-contributors': '' },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
-        'Every Contributor listing. Hide takes one off the map and Kingdom Discovery for everyone — nothing is deleted, and Unhide puts it straight back. Delete removes a listing for good; if its owner has an account, only the listing goes and they stay as a citizen.'),
+        'Every ' + W.term('partner') + ' listing. Hide takes one off the map and ' + W.term('discovery') + ' for everyone — nothing is deleted, and Unhide puts it straight back. Delete removes a listing for good; if its owner has an account, only the listing goes and they stay as ' + lower(W.term('user', 'a')) + '.'),
       h('div', { className: 'flex flex-col gap-2 sm:flex-row sm:items-center' },
         h('div', { className: 'flex flex-1 items-center gap-2 px-3 py-2.5 bg-card border border-border rounded-xl min-h-[44px]' },
           h(Icon, { name: 'Search', size: 14, className: 'text-muted-foreground shrink-0' }),
@@ -606,11 +603,11 @@
           id: 'admin-create-contributor', type: 'button',
           variant: 'gold', icon: 'Plus', className: 'w-full sm:w-auto min-h-[44px]',
           onClick: () => onCreateOpenChange(true),
-        }, 'Create Contributor')),
+        }, 'Create ' + W.term('partner', 'One'))),
       failed
         ? h(Empty, { icon: 'WifiOff', title: 'Could not load listings', sub: 'Check your connection, then reopen this tab.' })
         : rows.length === 0 && !loading
-          ? h(Empty, { icon: 'Store', title: q.trim() ? 'No listings match your search' : 'No Contributor listings yet' })
+          ? h(Empty, { icon: 'Store', title: q.trim() ? 'No listings match your search' : 'No ' + W.term('partner') + ' listings yet' })
           : rows.map((r) => h(ListingRow, {
               key: r.id, row: r,
               confirming: confirmId === r.id, busy: busyId === r.id,
@@ -624,7 +621,7 @@
       deleting && h(DeleteListingModal, { row: deleting, onClose: () => setDeleting(null), onDone: (result) => handleDeleted(deleting, result) }),
       createOpen && h(Overlay, {
         variant: wideCreate ? 'side' : 'sheet',
-        title: 'Create Contributor',
+        title: 'Create ' + W.term('partner', 'One'),
         onClose: () => onCreateOpenChange(false),
       },
         h('div', { className: 'overflow-y-auto', 'data-testid': 'admin-create-overlay', 'data-overlay': wideCreate ? 'side' : 'sheet' },
@@ -829,7 +826,7 @@
 
     return h('div', { className: 'px-4 sm:px-5 py-4 space-y-3 fade-in', 'data-admin-citizens': '' },
       h('p', { className: 'text-xs text-muted-foreground leading-relaxed' },
-        'Citizen accounts. Delete removes a person\'s sign-in for good. Contributor listings stay on the Contributors tab.'),
+        W.term('user', 'One') + ' accounts. Delete removes a person\'s sign-in for good. ' + W.term('partner', 'One') + ' listings stay on the ' + W.t('screen.admin.tab.partners') + ' tab.'),
       h('div', { className: 'flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center' },
         h('div', { className: 'flex flex-1 items-center gap-2 px-3 py-2.5 bg-card border border-border rounded-xl min-h-[44px] min-w-[12rem]' },
           h(Icon, { name: 'Search', size: 14, className: 'text-muted-foreground shrink-0' }),
@@ -939,7 +936,7 @@
         const mailed = body.email === 'sent';
         toast(
           // C21: the server says whether the approved listing has a pin; if it did not say, claim nothing about the map
-          (approved ? 'Approved. They are live' + (body.onMap === true ? ' on the map.' : body.onMap === false ? ' in Kingdom Discovery (no map pin).' : '.') : 'Rejected. They can apply again.')
+          (approved ? 'Approved. They are live' + (body.onMap === true ? ' on the map.' : body.onMap === false ? ' in ' + W.term('discovery') + ' (no map pin).' : '.') : 'Rejected. They can apply again.')
             + (mailed ? ' We emailed them.' : " We couldn't email them, so let them know yourself."),
           approved && mailed ? 'green' : 'gold',
         );
@@ -976,7 +973,7 @@
             .map(([l, v, c]) => h('div', { key: l, className: 'bg-card rounded-xl p-2.5 border border-border text-center' },
               h('p', { className: 'text-base font-bold', style: { color: c } }, v),
               h('p', { className: 'text-[9px] text-muted-foreground' }, l)))),
-        h(Segmented, { options: [{ value: 'applications', label: 'Applications' + (pending ? ' (' + pending + ')' : '') }, { value: 'overview', label: 'Overview' }, { value: 'contributors', label: 'Contributors' }, { value: 'citizens', label: 'Citizens' }, { value: 'reports', label: 'Reports' }], value: tab, onChange: setTab })),
+        h(Segmented, { options: [{ value: 'applications', label: 'Applications' + (pending ? ' (' + pending + ')' : '') }, { value: 'overview', label: 'Overview' }, { value: 'contributors', label: W.t('screen.admin.tab.partners') }, { value: 'citizens', label: W.t('screen.admin.tab.users') }, { value: 'reports', label: 'Reports' }], value: tab, onChange: setTab })),
 
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8' },
         tab === 'applications' && h('div', { className: 'px-4 sm:px-5 py-4 space-y-4 fade-in' },

@@ -17,7 +17,7 @@ import { touchSession, tapTouch } from "./support/touch";
 type C = { id: string; contributor_slug: string; full_name: string; physical_longitude: number; physical_latitude: number };
 type E = { id: string; title: string; created_by: string; latitude: number; longitude: number; co_host_ids?: string[] };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[]; events: E[] };
-const sheet = (page: Page) => page.locator(".cn-big");
+const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 type MapHook = { jumpTo: (o: object, d: object) => void };
 
 async function openMapWith(page: Page, seed: ReturnType<typeof seed0>) {
@@ -68,13 +68,14 @@ test.describe("P2-09 an accepted co-host shows on both Contributors, the card an
     const seed = withCoHost();
     await openMapWith(page, seed);
     await pickEvent(page, seed.events[1]);
-    await expect(page.locator("[data-mv2='card']")).toBeVisible();
-    await expect(page.locator("[data-cohosts]")).toHaveCount(0);
+    // Raised pinpeek: co-hosts live on the inline details sheet, not the preview card.
+    await expect(page.locator("[data-mv2='pinpeek']")).toBeVisible();
+    await expect(page.locator("[data-mv2='pinpeek-details'] [data-cohosts]")).toHaveCount(0);
 
     await pickEvent(page, seed.events[0]);
-    const line = page.locator("[data-mv2='card'] [data-cohosts]");
+    const line = page.locator("[data-mv2='pinpeek-details'] [data-cohosts]");
     await expect(line).toHaveText("with Fixture Fellowship 3");
-    await page.locator(`[data-cohost='${seed.contributors[2].id}']`).click();
+    await page.locator(`[data-cohost='${seed.contributors[2].id}']`).first().click();
     await expect(page).toHaveURL(new RegExp(`/c/${seed.contributors[2].contributor_slug}$`));
   });
 

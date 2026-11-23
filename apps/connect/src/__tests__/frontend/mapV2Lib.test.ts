@@ -141,7 +141,7 @@ describe("motion tokens and reduced motion", () => {
 
   it("the stylesheet collapses every duration under prefers-reduced-motion", () => {
     const block = /@media \(prefers-reduced-motion: reduce\)\s*\{([\s\S]*?)\n\}/.exec(css)?.[1] ?? "";
-    for (const t of ["--dur-fast", "--dur-base", "--dur-slow", "--shimmer-dur"]) {
+    for (const t of ["--dur-fast", "--dur-base", "--dur-slow", "--dur-morph", "--shimmer-dur"]) {
       expect(block).toMatch(new RegExp(`${t}:\\s*0ms;`));
     }
   });
@@ -162,6 +162,12 @@ describe("the map look follows the phone (founder, D1 as revised 2026-10-12)", (
   it("ignores a choice stored by the retired Map look control", () => {
     expect(boot({ storage: memoryStorage({ cc_map_theme: "dark" }), dark: false }).api.resolvedTheme()).toBe("light");
     expect(boot({ storage: memoryStorage({ cc_map_theme: "light" }), dark: true }).api.resolvedTheme()).toBe("dark");
+  });
+
+  it("a Settings override in citizens-theme wins over the device", () => {
+    expect(boot({ storage: memoryStorage({ "citizens-theme": "dark" }), dark: false }).api.resolvedTheme()).toBe("dark");
+    expect(boot({ storage: memoryStorage({ "citizens-theme": "light" }), dark: true }).api.resolvedTheme()).toBe("light");
+    expect(boot({ storage: memoryStorage({ "citizens-theme": "system" }), dark: true }).api.resolvedTheme()).toBe("dark");
   });
 
   it("offers no way to set a look in-app", () => {
@@ -229,5 +235,20 @@ describe("count buckets (tracker P2-08): shown only from 100, rounded down, neve
 
   it("accepts a numeric string from the API", () => {
     expect(bucket().countBucket("1234")).toBe("1,000+");
+  });
+});
+
+describe("motion waits for the stylesheet (map-v2.css is added after the screen mounts)", () => {
+  const lib = readFileSync(join(process.cwd(), "src/frontend/app/map-v2-lib.jsx"), "utf8");
+  const css = readFileSync(join(process.cwd(), "src/frontend/assets/map-v2.css"), "utf8");
+
+  it("turns motion on only once the stylesheet has loaded and painted, so nothing animates from its unstyled place", () => {
+    // set inside the load (and error) handler, two frames later
+    const done = lib.slice(lib.indexOf("const done = () => {"), lib.indexOf("link.onload = done;"));
+    expect(done).toContain("setAttribute('data-mv2-motion', '')");
+    expect(done).toContain("requestAnimationFrame(() => window.requestAnimationFrame(ready))");
+    expect(lib).toContain("link.onerror = done;");
+    // until then no Map v2 element (or its pseudo-elements) transitions or animates
+    expect(css).toMatch(/:root:not\(\[data-mv2-motion\]\) \[data-mv2\],\s*:root:not\(\[data-mv2-motion\]\) \[data-mv2\]::before,\s*:root:not\(\[data-mv2-motion\]\) \[data-mv2\]::after \{\s*transition: none !important;\s*animation: none !important;\s*\}/);
   });
 });

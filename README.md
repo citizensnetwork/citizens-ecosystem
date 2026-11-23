@@ -59,9 +59,11 @@ Per-app work: `pnpm --filter @citizens/wear dev`, `pnpm --filter citizens-connec
 
 `supabase/migrations/` is owned by the **repo**, not one app (hoisted from Connect in
 ecosystem Step 5). Head **146**. Rules live in the
-[shared DB contract](apps/connect/docs/SHARED_DB_CONTRACT.md): migrations are applied via
-MCP `apply_migration` with pre-apply git tags + security-advisor checks, numbered
-sequentially across all apps. Cross-app data flows through Connect's `/api/v1`
+[shared DB contract](apps/connect/docs/SHARED_DB_CONTRACT.md): a migration is applied
+via MCP `apply_migration` after the founder says yes in chat. The founder does not name
+the file, and there is no pre-apply git tag. After applying, run that migration's probe
+and the security advisor. Database, auth and security changes still need that yes.
+Numbered sequentially across all apps. Cross-app data flows through Connect's `/api/v1`
 ([contract](apps/connect/docs/api-v1.md)) — never raw sibling tables.
 
 ## Deploys (Vercel — one project per app)

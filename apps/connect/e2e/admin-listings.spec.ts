@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { FAKE_PROJECT, mockAppShell, signInToFakeProject } from "./support/fake-project";
+import { openMe } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Admin → Listings: the moderation safety net for listings that go live
@@ -106,7 +107,10 @@ test.describe("Admin → Listings", () => {
     });
 
     await page.goto("/");
-    await page.goto("/admin");
+    // the map home has no sidebar: Admin Panel is in the account menu, the nav's Me (founder, 2026-11-17)
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+    await openMe(page);
+    await page.getByRole("button", { name: /Admin Panel/ }).first().click();
     await expect(page.locator('[data-screen="admin"]')).toBeVisible();
     await page.getByRole("button", { name: "Contributors", exact: true }).click();
 
@@ -208,7 +212,10 @@ test.describe("Admin → Listings", () => {
       route.fulfill({ json: { data: rows, meta: { page: 1, pageSize: 20, total: rows.length } } }),
     );
     await page.goto("/");
-    await page.goto("/admin");
+    // the map home has no sidebar: Admin Panel is in the account menu, the nav's Me (founder, 2026-11-17)
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
+    await openMe(page);
+    await page.getByRole("button", { name: /Admin Panel/ }).first().click();
     await expect(page.locator('[data-screen="admin"]')).toBeVisible();
     await page.getByRole("button", { name: "Contributors", exact: true }).click();
   }

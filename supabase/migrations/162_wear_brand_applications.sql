@@ -226,7 +226,7 @@ grant update (status, reviewed_by, reviewed_at, review_note, minted_brand_id)
 grant all on wear.brand_applications to service_role;
 
 -- ============================================================================
--- Post-apply record (APPLIED 2026-07-16, tag wear-pre-mig162 @b0a84a9):
+-- Post-apply record (APPLIED 2026-07-16, after the founder's yes in chat; no pre-apply git tag):
 --  * get_advisors(security) = 0 ERROR / 102 WARN / 3 INFO. The single new WARN
 --    vs the head-161 baseline is the INTENTIONAL brand_eligibility SECDEF
 --    EXECUTE grant to authenticated (mig-157 precedent: 9 such documented

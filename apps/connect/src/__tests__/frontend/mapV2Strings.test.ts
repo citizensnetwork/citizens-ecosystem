@@ -50,7 +50,10 @@ describe("the strings file", () => {
       // A capital after . ! ? starts the next sentence (the report copy is two sentences).
       // "Sample name" and "View Full Profile" are the sample argument and one existing label.
       // Kingdom Projects is the existing proper name of that screen (issue #313 keeps it reachable).
-      const cleaned = s.text.replace(/Sample name|View Full Profile|Kingdom Projects/g, "name");
+      // Connecting the Kingdom is the product slogan (VISION.md; raised pin-peek divider, 2026-11-22).
+      // Near and Now…, New on Connect and Where to… are names the founder gave parts of Explore (C40, PR 365).
+      // A weekday's full name is a proper noun too (the short ones are let through by the lookbehind below).
+      const cleaned = s.text.replace(/Sample name|View Full Profile|Kingdom Projects|Connecting the Kingdom|Citizens Connect|Where Christians|Near and Now|New on Connect|Where to|\b(?:Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day\b/g, "name");
       const rest = cleaned.split(/(?<=[.!?])\s+/).map((sentence) => sentence.split(/\s+/).slice(1).join(" ")).join(" ");
       expect(rest, `${s.path}: ${s.text}`).not.toMatch(/\b[A-Z][a-z]+\b(?<!\bMon|\bTue|\bWed|\bThu|\bFri|\bSat|\bSun)/);
     }

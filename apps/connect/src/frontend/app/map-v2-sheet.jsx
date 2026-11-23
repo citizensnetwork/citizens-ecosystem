@@ -149,15 +149,21 @@
 
   // #210: the expanded sheet's 16:9 cover, in the card's own media box; a neutral tile with the category icon when
   // there is no picture or it fails to load (so every expanded sheet starts with the same shape).
-  function Cover({ src, icon }) {
+  function Cover({ src, icon, blank }) {
     const [bad, setBad] = useState(false);
     useEffect(() => setBad(false), [src]);
     const url = window.UI.safeUrl(src);
     const Icon = window.Icon;
-    return url && !bad
-      ? h('span', { 'data-mv2': 'card-media', 'data-cover': '' },
-        h('img', { src: url, alt: '', decoding: 'async', onError: () => setBad(true), 'data-mv2': 'card-photo' }))
-      : h('span', { 'data-mv2': 'card-media', 'data-cover': '', 'data-tile': '', 'aria-hidden': 'true' }, h(Icon, { name: icon, size: 40 }));
+    if (url && !bad) {
+      return h('span', { 'data-mv2': 'card-media', 'data-cover': '' },
+        h('img', { src: url, alt: '', decoding: 'async', onError: () => setBad(true), 'data-mv2': 'card-photo' }));
+    }
+    // Raised hero: empty 16:9 plane (no category glyph). Expanded sheet still uses the tile icon.
+    if (blank) {
+      return h('span', { 'data-mv2': 'card-media', 'data-cover': '', 'data-blank': '', 'aria-hidden': 'true' });
+    }
+    return h('span', { 'data-mv2': 'card-media', 'data-cover': '', 'data-tile': '', 'aria-hidden': 'true' },
+      Icon ? h(Icon, { name: icon || 'MapPin', size: 40 }) : null);
   }
 
   function Action({ icon, label, href, onClick, external, primary, on }) {
@@ -199,28 +205,34 @@
   //  Save, Share ...) is the one action row above, in the same pills. No white box, no second Follow button. The organiser
   //  and the co-hosts are links to their own profiles; the socials, the counts and, for an upcoming event, the Convince
   //  note follow. `data-card` and `data-entity-card` keep the hooks the card had.
-  function ListingBody({ item, type, org, go, onClose }) {
+  // part: 'lead' (description + where, above actions) | 'tail' (hours, organiser, socials) | omit = all
+  function ListingBody({ item, type, org, go, onClose, onPick, part }) {
     const { realUser, myProfileMeta, user, toast, contributors } = window.useApp();
     const Str = S();
     const Icon = window.Icon;
     const U = window.EntityCardUtils || {};
     const isEvent = type === 'event';
-    const facts = [];
+    const leadFacts = [];
+    const tailFacts = [];
     const where = isEvent ? item.location : item.address;
-    if (where) facts.push({ key: 'loc', icon: 'MapPin', text: where });
-    if (isEvent && item.date && U.fmtDate) facts.push({ key: 'date', icon: 'Calendar', text: U.fmtDate(item.date) + (item.time ? ' · ' + item.time : '') });
-    if (!isEvent && item.openHours) facts.push({ key: 'hours', icon: 'Clock', text: item.openHours });
-    if (isEvent) facts.push({ key: 'counts', icon: 'Users', text: Str.counts((item.connectCount || 0).toLocaleString(), (item.considerCount || 0).toLocaleString()) });
+    if (where) leadFacts.push({ key: 'loc', icon: 'MapPin', text: where });
+    if (isEvent && item.date && U.fmtDate) leadFacts.push({ key: 'date', icon: 'Calendar', text: U.fmtDate(item.date) + (item.time ? ' · ' + item.time : '') });
+    if (!isEvent && item.openHours) tailFacts.push({ key: 'hours', icon: 'Clock', text: item.openHours });
+    if (isEvent) tailFacts.push({ key: 'counts', icon: 'Users', text: Str.counts((item.connectCount || 0).toLocaleString(), (item.considerCount || 0).toLocaleString()) });
     const bucket = !isEvent && window.UI.followerBucket ? window.UI.followerBucket(item.followerCount) : '';
-    if (bucket) facts.push({ key: 'fol', icon: 'Heart', text: Str.followers(bucket) });
+    if (bucket) tailFacts.push({ key: 'fol', icon: 'Heart', text: Str.followers(bucket) });
 
     const orgName = (org && org.name) || item.organizerName || '';
     // to the organiser's own page: navigate first, then close, so the sheet's history entry is replaced (see BACK, above)
     const toProfile = (pid) => () => { go('profile', { id: pid }); onClose(); };
+    // The owner line opens the owner's own sheet in this one (founder, 2026-11-17: a Contributor has no pin and no Explore
+    // card, so this line is how the map reaches them), the way a Nearby row does: no new history entry, and the full
+    // profile is one tap further, on that sheet. Without a sheet to switch (onPick), it goes to the profile page.
+    const toOwner = (pid) => (onPick ? () => onPick(pid, 'contributor') : toProfile(pid));
     const organiser = orgName
       ? h('li', { key: 'org', 'data-mv2': 'fact' },
         org
-          ? h('button', { type: 'button', 'data-mv2': 'fact-link', onClick: toProfile(org.id) },
+          ? h('button', { type: 'button', 'data-mv2': 'fact-link', 'data-owner': org.id, onClick: toOwner(org.id) },
             h('span', null, Str.by + ' ', h('b', null, orgName)), h(Icon, { name: 'BadgeCheck', size: 16 }), h(Icon, { name: 'ChevronRight', size: 18 }))
           : h('span', { 'data-mv2': 'fact-line' }, h('span', null, Str.by + ' ', h('b', null, orgName))))
       : null;
@@ -241,34 +253,197 @@
         h(window.ConsiderNote, { shared: !(myProfileMeta && myProfileMeta.notificationPrefs && myProfileMeta.notificationPrefs.share_considering === false), onOpenSettings: () => go('settings') }),
         h(window.FriendsConsidering, { sb: window.CC_SUPABASE, eventId: item.id, eventTitle: item.title, me: realUser.id, myName: realUser.nameIsFallback ? '' : (user && user.name) || '', authedFetch: window.authedFetch, toast }))
       : null;
-    const socials = item.socials ? h('div', { 'data-mv2': 'socials' }, h(window.UI.SocialLinks, { socials: item.socials, variant: 'compact' })) : null;
-    const rows = facts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
+    // Socials sit under the category chip in the raised profile (HandleRow); keep a compact row in the full sheet only.
+    const socials = !part && item.socials ? h('div', { 'data-mv2': 'socials' }, h(window.UI.SocialLinks, { socials: item.socials, variant: 'compact' })) : null;
+    const leadRows = leadFacts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
+    const tailRows = tailFacts.map((f) => h('li', { key: f.key, 'data-mv2': 'fact' }, h(Icon, { name: f.icon, size: 16 }), h('span', { 'data-mv2': 'fact-line' }, f.text)));
+    const bio = item.description ? h('p', { 'data-mv2': 'bio' }, item.description) : null;
+    if (part === 'lead') {
+      // One data-entity-card hook for the listing (lead only): the tail is the rest of the same body.
+      return h('div', { 'data-mv2': 'card', 'data-entity-card': type, 'data-part': 'lead' },
+        bio,
+        leadRows.length ? h('ul', { 'data-mv2': 'facts', role: 'list' }, leadRows) : null);
+    }
+    if (part === 'tail') {
+      return h('div', { 'data-mv2': 'card', 'data-part': 'tail' },
+        (tailRows.length || organiser || coHostLine) ? h('ul', { 'data-mv2': 'facts', role: 'list' }, tailRows, organiser, coHostLine) : null,
+        convince);
+    }
     return h('div', { 'data-mv2': 'card', 'data-entity-card': type },
-      item.description ? h('p', { 'data-mv2': 'bio' }, item.description) : null,
-      (rows.length || organiser || coHostLine) ? h('ul', { 'data-mv2': 'facts', role: 'list' }, rows, organiser, coHostLine) : null,
+      bio,
+      (leadRows.length || tailRows.length || organiser || coHostLine)
+        ? h('ul', { 'data-mv2': 'facts', role: 'list' }, leadRows, tailRows, organiser, coHostLine) : null,
       socials,
       convince);
   }
 
+  /** Circular Call / Web / social handles under the category (only when a value exists; demo fakes a few when empty). */
+  function HandleRow({ item }) {
+    const Icon = window.Icon;
+    const D = window.DATA;
+    const U = window.UI || {};
+    const safe = U.safeUrl || ((u) => (/^https?:\/\//i.test(u) ? u : ''));
+    const raw = Object.assign({}, (item && item.socials) || {});
+    const tel = item && (item.phone || item.whatsapp) ? String(item.phone || item.whatsapp).trim() : '';
+    const web = item && item.website ? String(item.website).trim() : '';
+    // Demo polish: when a listing has no handles yet, show a few placeholders so the row's shape is reviewable.
+    const empty = !tel && !web && !Object.keys(raw).some((k) => raw[k]);
+    if (empty) {
+      raw.instagram = 'citizensconnect';
+      raw.facebook = 'https://facebook.com/citizensconnect';
+      raw.youtube = '@citizensconnect';
+      raw.whatsapp = '+27821234567';
+      raw.x = 'citizensconnect';
+      raw.discord = 'https://discord.gg/citizensconnect';
+    }
+    const bits = [];
+    if (tel) {
+      const href = 'tel:' + tel.replace(/[^\d+]/g, '');
+      bits.push({ key: 'call', href: href, icon: 'Phone', label: S().call });
+    }
+    if (web) {
+      const href = safe(web.indexOf('http') === 0 ? web : 'https://' + web);
+      if (href) bits.push({ key: 'web', href: href, icon: 'Globe', label: S().website });
+    }
+    // Core platforms (DB-backed) plus invite-style links Discord / Slack when present on the listing.
+    const platforms = (D && D.SOCIAL_PLATFORMS ? D.SOCIAL_PLATFORMS.slice() : []).concat([
+      { key: 'discord', label: 'Discord', icon: 'BrandDiscord', urlFor: (v) => {
+        const t = String(v || '').trim();
+        if (!t) return '';
+        if (/^https?:\/\//i.test(t)) return t;
+        return 'https://discord.gg/' + t.replace(/^@/, '');
+      } },
+      { key: 'slack', label: 'Slack', icon: 'BrandSlack', urlFor: (v) => {
+        const t = String(v || '').trim();
+        if (!t) return '';
+        if (/^https?:\/\//i.test(t)) return t;
+        return 'https://' + t.replace(/^(https?:\/\/)?/i, '');
+      } },
+    ]);
+    const seen = Object.create(null);
+    platforms.forEach((p) => {
+      if (seen[p.key]) return;
+      seen[p.key] = true;
+      const v = raw[p.key];
+      if (!v) return;
+      const href = safe(p.urlFor(v));
+      if (href) bits.push({ key: p.key, href: href, icon: p.icon, label: p.label });
+    });
+    if (!bits.length) return null;
+    return h('div', { 'data-mv2': 'handle-row', 'aria-label': S().tabsLabel },
+      bits.map((b) => h('a', {
+        key: b.key, href: b.href, target: b.key === 'call' ? undefined : '_blank',
+        rel: b.key === 'call' ? undefined : 'noopener noreferrer',
+        'aria-label': b.label, title: b.label, 'data-mv2': 'handle-chip',
+      }, Icon ? h(Icon, { name: b.icon, size: 14 }) : null)));
+  }
+
+  /** Gallery / Events / Posts sideways rows for the raised pinpeek (hidden when empty). */
+  function ProfileCarousels({ item, type, org, events, newsPosts, onPick, onReadPost }) {
+    const Str = S();
+    const time = T();
+    const now = Date.now();
+    const orgId = (org && org.id) || item.organizerId || (type === 'contributor' ? item.id : null);
+    const gallery = [];
+    const push = (u) => { const s = u && String(u).trim(); if (s && gallery.indexOf(s) === -1) gallery.push(s); };
+    if (item.coverPhoto) push(item.coverPhoto);
+    (item.gallery || []).forEach(push);
+    if (!gallery.length && item.profilePhoto) push(item.profilePhoto);
+    const evList = (Array.isArray(events) ? events : [])
+      .filter((e) => e && e.id !== item.id && !window.DATA.isPastEvent(e, now) && (orgId ? e.organizerId === orgId : false))
+      .sort((a, b) => Date.parse(a.startsAt || 0) - Date.parse(b.startsAt || 0))
+      .slice(0, 8);
+    const oid = orgId != null ? String(orgId) : '';
+    const posts = (Array.isArray(newsPosts) && oid)
+      ? newsPosts.filter((n) => n && String(n.contributorId || n.contributor_id || '') === oid)
+        .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || ''))).slice(0, 8)
+      : [];
+    const sections = [];
+    const XP = (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.panel) || {};
+    const rowStr = {
+      label: Str.tabs.posts || Str.tabs.news || '',
+      scrollLeft: XP.scrollLeft || '', scrollRight: XP.scrollRight || '',
+    };
+    const listingName = item.title || item.name || '';
+    const safeImg = (u) => (u && window.UI && window.UI.safeUrl ? window.UI.safeUrl(u) : '');
+    if (gallery.length && window.MapV2Row && window.MapV2Card) {
+      sections.push(h('section', { key: 'gal', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.gallery },
+        h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.gallery),
+        h(window.MapV2Row.Row, {
+          items: gallery.map((src, i) => ({ id: 'g' + i, src: src })),
+          idPrefix: 'mv2-ig', strings: Object.assign({}, rowStr, { label: Str.tabs.gallery }), nav: 'float', keyOf: (x) => x.id,
+          render: (x) => h(window.MapV2Card, {
+            variant: 'image', title: listingName, media: { src: x.src }, tile: true, idPrefix: 'mv2-ig-' + x.id,
+          }),
+        })));
+    }
+    if (evList.length && window.MapV2Row && window.MapV2Card) {
+      sections.push(h('section', { key: 'ev', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.events },
+        h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.events),
+        h(window.MapV2Row.Row, {
+          items: evList, idPrefix: 'mv2-ie', strings: Object.assign({}, rowStr, { label: Str.tabs.events }), nav: 'float', keyOf: (e) => e.id,
+          render: (e) => h(window.MapV2Card, {
+            variant: 'event',
+            item: { type: 'event', category: e.category },
+            kind: window.MapV2Strings.pin.type.event,
+            title: e.title,
+            meta: [time && time.eventStartsIn ? time.eventStartsIn(e.startsAt, now, e.endsAt) : '', e.location].filter(Boolean),
+            date: time && time.dateParts ? time.dateParts(e.startsAt) : null,
+            idPrefix: 'mv2-ie-' + e.id,
+            onClick: () => { if (onPick) onPick(e.id, 'event'); },
+          }),
+        })));
+    }
+    if (posts.length && window.MapV2Row && window.MapV2Card) {
+      sections.push(h('section', { key: 'posts', 'data-mv2': 'profile-row', 'aria-label': Str.tabs.posts || Str.tabs.news },
+        h('h3', { 'data-mv2': 'profile-row-title' }, Str.tabs.posts || Str.tabs.news),
+        h(window.MapV2Row.Row, {
+          items: posts, idPrefix: 'mv2-ip', strings: rowStr, nav: 'float', keyOf: (p) => p.id,
+          render: (p) => {
+            const ago = time && time.postedAgo ? time.postedAgo(p.createdAt || p.date, now) : '';
+            const img = safeImg(p.image || p.image_url);
+            return h(window.MapV2Card, {
+              variant: img ? 'image' : 'text',
+              title: p.title || '',
+              excerpt: p.body || '',
+              meta: ago ? [ago] : [],
+              media: img ? { src: img } : null,
+              tile: !!img,
+              moreLabel: Str.news && Str.news.readMore,
+              idPrefix: 'mv2-ip-' + p.id,
+              onClick: (e) => { if (onReadPost) onReadPost(p, e && e.currentTarget); },
+              'data-news': '',
+              'aria-haspopup': 'dialog',
+            });
+          },
+        })));
+    }
+    if (!sections.length) return null;
+    return h('div', { 'data-mv2': 'profile-carousels' }, sections);
+  }
+
   // ── the sheet ────────────────────────────────────────────────────
-  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view }) {
+  function MapV2Sheet({ id, type, onClose, onOccupy, nearby, onPick, expanded, view, inline, nest }) {
     const app = window.useApp();
     const { go, shareLink, contributors, events, places, newsPosts, followedOrgs, toggleFollow, savedContributors, savedPlaces, toggleSave, realUser } = app;
     // Place and Event actions (#210, founder 2026-10-30): the same pills as a Contributor's, so the sheet speaks one way
     const { followedPlaces, togglePlaceFollow, connected, toggleConnect, considering, toggleConsider, startConversationWith } = app;
     const Str = S();
-    const wide = useWide();
+    // INLINE (founder, 2026-11-18): the details under the map home's pin carousel (map-v2-explore.jsx PinCarousel). The
+    // same header facts, actions and body, laid out in the carousel's own raised panel: no box of its own, no drag, no
+    // grab bar or cover (the card above already shows them), and no history entry or Escape key (the carousel's level owns both).
+    const wide = useWide() && !inline;
     const root = useRef(null);
     const scroller = useRef(null);
     const tabbed = useRef(null);
     const title = useRef(null);
-    const opensAt = expanded ? 'full' : 'half';
+    const opensAt = expanded || inline ? 'full' : 'half';
     const [snap, setSnap] = useState(opensAt);
     const [tab, setTab] = useState(null);
     const [enter, setEnter] = useState(null);       // 'next' | 'prev': the side a newly chosen tab's panel slides in from
     const [viewer, setViewer] = useState(null);     // { index, from }
     const [evSort, setEvSort] = useState(null);     // 'upcoming' | 'recent' | null (null = Upcoming when there is any, else Recent)
-    const [qr, setQr] = useState(null);             // { from }: the QR code dialog (Contributor only)
+    const [qr, setQr] = useState(null);             // { from }: the QR code dialog (partner listings only)
     const [reading, setReading] = useState(null);   // { id, from }: the news reader (one post, one dialog)
     const [announce, setAnnounce] = useState(Str.snapMessage[opensAt]);
     const dragState = useRef(null);
@@ -277,9 +452,10 @@
     const lastPadding = useRef(null);
     const snapRef = useRef(snap);
     snapRef.current = snap;
+    const pressedAt = useRef(0);    // when a finger or a mouse last pressed the sheet (see onFocus below)
 
     // ONE history entry for the whole life of the sheet, registered by this mount.
-    useBackGuard(true, onClose);
+    useBackGuard(!inline, onClose);
 
     const isContributor = type === 'contributor';
     const item = type === 'event' ? events.find((e) => e.id === id)
@@ -311,12 +487,18 @@
       return [...byId.values()].filter((e) => Number.isFinite(Date.parse(e.when))).sort((a, b) => Date.parse(b.when) - Date.parse(a.when)).slice(0, RECENT_MAX);
     }, [events, item, isContributor, detail.data, contributors]);
     const posts = useMemo(() => (isContributor && item
-      ? newsPosts.filter((n) => n.contributorId === item.id).sort((a, b) => String(b.date).localeCompare(String(a.date)))
+      ? newsPosts.filter((n) => n && String(n.contributorId || n.contributor_id || '') === String(item.id))
+        .sort((a, b) => String(b.date || b.createdAt || '').localeCompare(String(a.date || a.createdAt || '')))
       : []), [newsPosts, item, isContributor]);
-    // The owner deleted the post while it was open (Dashboard writes straight into newsPosts).
+    // Close the reader if the post disappeared (Dashboard deletes straight into newsPosts).
+    // Check the full feed — place/event peeks open posts via ProfileCarousels while `posts` is
+    // contributor-scoped only, so an empty `posts` must not wipe a place owner's article (founder, 2026-11-22).
     useEffect(() => {
-      if (reading && !posts.some((p) => p.id === reading.id)) setReading(null);
-    }, [reading, posts]);
+      if (!reading) return;
+      const still = (Array.isArray(newsPosts) ? newsPosts : []).some((p) => p && p.id === reading.id)
+        || posts.some((p) => p && p.id === reading.id);
+      if (!still) setReading(null);
+    }, [reading, posts, newsPosts]);
     // P2-01 Nearby: the closest listings the map is drawing, nearest first. What is already on this sheet is left out:
     // the listing itself, a Contributor's own upcoming events (its Events tab), and an Event's organiser (its header).
     const near = useMemo(() => {
@@ -355,11 +537,11 @@
     const distance = useMemo(() => {
       const N = window.MapV2Nearby;
       const from = view && (view.user || view.centre);
-      if (!expanded || !N || !from || !item || typeof item.lat !== 'number' || typeof item.lng !== 'number') return '';
+      if (!(expanded || inline) || !N || !from || !item || typeof item.lat !== 'number' || typeof item.lng !== 'number') return '';
       const meters = N.metersBetween(from, item);
       const words = window.MapV2Strings.explore;
       return Number.isFinite(meters) ? N.distanceText(meters, view.user ? words : words.centre) : '';
-    }, [expanded, view, item]);
+    }, [expanded, inline, view, item]);
 
     // A different pin: start again where this sheet opened, on the first tab, scrolled to the top (not on the first
     // mount: nothing to reset, and every state update here is another render on the way to the header).
@@ -406,15 +588,16 @@
 
     // Escape closes at once (an open photo viewer or news reader takes the key first: it listens in the capture phase).
     useEffect(() => {
+      if (inline) return undefined;
       const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); onClose(); } };
       document.addEventListener('keydown', onKey);
       return () => document.removeEventListener('keydown', onKey);
-    }, [onClose]);
+    }, [onClose, inline]);
 
     // Tell the map how much of it the sheet covers, so the selected pin clears it (tracker E5). Not the expanded sheet
     // (#210): it covers the whole map, and the person's map and Explore panel must be exactly as they left them on close.
     useEffect(() => {
-      if (!onOccupy || expanded) return undefined;
+      if (!onOccupy || expanded || inline) return undefined;
       let pad;
       if (wide) pad = { top: 0, right: 0, bottom: 0, left: cssLen('calc(var(--sheet-panel-w) + 2 * var(--space-3))') };
       else if (snap === 'peek') pad = { top: 0, right: 0, left: 0, bottom: cssLen('var(--sheet-peek-h)') };
@@ -473,7 +656,7 @@
       else setSnap(target);
     };
     const onPointerDown = (e) => {
-      if (wide || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (wide || inline || (e.pointerType === 'mouse' && e.button !== 0)) return;
       const t = e.target;
       const inScroller = scroller.current && scroller.current.contains(t);
       // Inside the content at full the content owns the swipe, except for a finger on content that is at its top:
@@ -539,7 +722,7 @@
     const org = !isContributor && item.organizerId ? contributors.find((c) => c.id === item.organizerId) : null;
     const name = item.title || item.name || '';
     const cat = window.DATA.getItemCategory(Object.assign({}, item, { type }));
-    const hex = cat ? cat.hex : '#D4AF37';
+    const hex = cat ? cat.hex : '#F2BD22';
     const catLabel = cat ? cat.name : ((isContributor && window.MapV2Strings.pin.kind[item.kind]) || window.MapV2Strings.pin.type[type]);
     const avatarSrc = isContributor ? item.profilePhoto : org && org.profilePhoto;
     const avatarName = isContributor ? name : org && org.name;
@@ -649,7 +832,7 @@
           h(window.Icon, { name: 'Handshake', size: 14, 'aria-hidden': true }),
           Str.collaborate)
       : null;
-    if (collabChip && !expanded) actions.unshift(collabChip);
+    if (collabChip && !expanded && !inline) actions.unshift(collabChip);
     // P2-06: the QR code is a tool for printing, not a first-glance action: it sits at the bottom of the content, so the
     // action row stays at the height it had and half still shows the header, the actions and the first tab
     // (only for a slug the router itself would resolve: nothing odd from the data ever reaches a printed code)
@@ -668,11 +851,25 @@
     const openProfile = () => { go(navTarget(type), { id }); onClose(); };
 
     // ── body ────────────────────────────────────────────────────────
+    // Inline profile (raised pin peek): wording/explanations sit above the action pills (founder, 2026-11-22).
+    const splitLead = inline && !isContributor;
     let body;
+    let leadBody = null;
     if (!isContributor) {
-      body = h(ListingBody, { item, type, org, go, onClose });
+      if (splitLead) {
+        leadBody = h(ListingBody, { item, type, org, go, onClose, onPick, part: 'lead' });
+        body = h(ListingBody, { item, type, org, go, onClose, onPick, part: 'tail' });
+      } else {
+        body = h(ListingBody, { item, type, org, go, onClose, onPick });
+      }
     } else {
       const bio = item.bio ? h('p', { 'data-mv2': 'bio' }, item.bio) : null;
+      // Raised pinpeek: Gallery / Events / Posts carousels (ProfileCarousels) — same as places.
+      // Tabs stay for the full / expanded sheet only (founder, 2026-11-22).
+      if (inline) {
+        leadBody = bio;
+        body = null;
+      } else {
       let panel = null;
       if (active === 'events') {
         const mode = evSort || (orgEvents.length ? 'upcoming' : 'recent');
@@ -715,13 +912,15 @@
           keyOf: (p) => p.id,
           render: (p) => {
             const ago = T().postedAgo(p.createdAt || p.date, now);
-            const img = p.image && window.UI.safeUrl(p.image);
+            const img = (p.image || p.image_url) && window.UI && window.UI.safeUrl
+              ? window.UI.safeUrl(p.image || p.image_url) : '';
             return h(window.MapV2Card, {
               variant: img ? 'image' : 'text',
-              title: p.title,
-              excerpt: p.body,
+              title: p.title || '',
+              excerpt: p.body || '',
               meta: ago ? [ago] : [],
               media: img ? { src: img } : null,
+              tile: !!img,
               moreLabel: Str.news.readMore,
               idPrefix: 'mv2-post-' + p.id,
               onClick: (e) => setReading({ id: p.id, from: e.currentTarget }),
@@ -768,6 +967,7 @@
           h('p', { 'data-mv2': 'empty-title' }, Str.empty.title(name)),
           h('p', { 'data-mv2': 'empty-hint' }, Str.empty.hint),
           h('div', { 'data-mv2': 'actions' }, dir ? actions.filter((a) => a.key === 'dir') : (site ? actions.filter((a) => a.key === 'web') : (email ? actions.filter((a) => a.key === 'mail') : null)))));
+      }
     }
 
     // P2-01: each nearby listing described the way its own sheet header would be (name, category, how far)
@@ -776,7 +976,8 @@
       const mc = window.DATA.getItemCategory(m);
       const kind = (m.type === 'contributor' && window.MapV2Strings.pin.kind[m.kind]) || window.MapV2Strings.pin.type[m.type];
       const label = mc ? mc.name : kind;
-      const what = m.type === 'contributor' ? label : window.MapV2Strings.pin.type[m.type] + ' · ' + label;
+      // category alone (no "Place ·" / "Event ·" prefix — founder, 2026-11-22)
+      const what = label;
       let openState = null;
       if (m.type === 'place') {
         const pl = places.find((p) => p.id === m.id);
@@ -802,8 +1003,8 @@
       followers && h('span', { key: 'fol', 'data-mv2': 'followers' }, ' · ' + Str.followers(followers)),
     ];
     // #210 expanded: a fixed bar (the grab bar to the eye, X to a thumb), then the header at the top of the content
-    const group = expanded && window.MapV2Explore ? window.MapV2Explore.groupOf(item) : '';
-    const grab = expanded
+    const group = (expanded || inline) && window.MapV2Explore ? window.MapV2Explore.groupOf(item) : '';
+    const grab = inline ? null : expanded
       ? h('div', { 'data-mv2': 'grab' },
         h('div', { 'data-mv2': 'xbar' }, !wide && h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }), closeBtn))
       : h('div', { 'data-mv2': 'grab' },
@@ -820,37 +1021,117 @@
     // the chip is the Explore card's own (map-v2-card.jsx): the group's dot and outline, the category's words.
     // Then the facts: how far, open or starting, followers.
     const facts = [];
-    if (expanded) {
+    if (expanded || inline) {
       if (distance) facts.push(h('span', { key: 'd', 'data-mv2': 'distance' }, distance));
-      if (state) facts.push(h('span', { key: 's', 'data-mv2': 'state', 'data-status': state.status }, state.text));
+      // Expanded sheet keeps relative open/starts copy; raised cover uses calendar date·time tiles instead.
+      if (state && !inline) facts.push(h('span', { key: 's', 'data-mv2': 'state', 'data-status': state.status }, state.text));
       if (followers) facts.push(h('span', { key: 'f', 'data-mv2': 'followers' }, Str.followers(followers)));
     }
-    const xhead = expanded && h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
-      h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
-      h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
-      h('p', { 'data-mv2': 'xmeta' },
-        h('span', { 'data-mv2': 'card-chip' },
-          h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
-          h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
-        expanded && collabChip,
-        facts.length > 0 && h('span', { 'data-mv2': 'sub' },
-          facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), []))));
-    return h('section', {
+    // Same calendar line as ListingBody lead (cut-and-paste for events on the cover) — founder, 2026-11-22.
+    const Ufmt = window.EntityCardUtils || {};
+    const eventWhen = type === 'event' && item.date && Ufmt.fmtDate
+      ? (Ufmt.fmtDate(item.date) + (item.time ? ' · ' + item.time : ''))
+      : '';
+    const chipMeta = h('p', { 'data-mv2': 'xmeta' },
+      h('span', { 'data-mv2': 'card-chip' },
+        h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
+        h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
+      type === 'place' && ((org && org.name) || item.organizerName)
+        ? h('span', { 'data-mv2': 'xcard-by' }, Str.by + ' ' + ((org && org.name) || item.organizerName))
+        : null,
+      (expanded || inline) && collabChip,
+      facts.length > 0 && h('span', { 'data-mv2': 'sub' },
+        facts.reduce((out, f, i) => out.concat(i ? [h('span', { key: 'sep' + i, 'aria-hidden': 'true' }, ' · '), f] : [f]), [])));
+    // Raised cover: chip (+ owner) beside the avatar; distance / event when sit bottom-right.
+    const ownerBy = (!isContributor && ((org && org.name) || item.organizerName))
+      ? (Str.by + ' ' + ((org && org.name) || item.organizerName))
+      : '';
+    const coverMeta = h('div', { 'data-mv2': 'cover-meta' },
+      h('span', { 'data-mv2': 'card-chip' },
+        h('span', { 'data-mv2': 'card-dot', 'data-cat': group || undefined, 'data-fallback': group ? undefined : '', 'aria-hidden': 'true' }),
+        h('span', { 'data-mv2': 'card-chip-label' }, catLabel)),
+      ownerBy ? h('span', { 'data-mv2': 'cover-by' }, ownerBy) : null);
+    const coverRail = (distance || eventWhen)
+      ? h('div', { 'data-mv2': 'cover-rail' },
+        distance
+          ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'distance' }, distance)
+          : null,
+        eventWhen
+          ? h('span', { 'data-mv2': 'cover-tile', 'data-kind': 'when' },
+            Icon ? h(Icon, { name: 'Calendar', size: 12 }) : null,
+            h('span', null, eventWhen))
+          : null)
+      : null;
+    // Raised pinpeek: avatar back at the cover foot (slightly larger than original); copy ~10px up.
+    const coverSrc = item.coverPhoto || (org && org.coverPhoto) || '';
+    const faceSrc = avatarSrc || item.profilePhoto || (org && org.profilePhoto) || '';
+    const xhead = (expanded || inline) && (inline
+      ? h('header', { 'data-mv2': 'xhead', 'data-hero': '', 'data-map-sheet-header': '', 'data-cat': group || undefined },
+        h('div', { 'data-mv2': 'cover-hero' },
+          h(Cover, { src: coverSrc, blank: true }),
+          h('div', { 'data-mv2': 'cover-scrim', 'aria-hidden': 'true' }),
+          h('div', { 'data-mv2': 'cover-foot' },
+            h('div', { 'data-mv2': 'cover-avatar' },
+              h(Avatar, {
+                src: faceSrc, name: avatarName || name, hex, size: 'half',
+                glyph: h(Icon, { name: (cat && cat.icon) || 'MapPin', size: 24 }),
+              })),
+            h('div', { 'data-mv2': 'cover-copy' },
+              h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
+              coverMeta)),
+          coverRail),
+        h(HandleRow, { item: item }))
+      : h('header', { 'data-mv2': 'xhead', 'data-map-sheet-header': '', 'data-cat': group || undefined },
+        h(Cover, { src: item.coverPhoto, icon: (cat && cat.icon) || 'MapPin' }),
+        h('h2', { 'data-mv2': 'name', tabIndex: -1, ref: title }, name),
+        chipMeta,
+        h(HandleRow, { item: item })));
+    const footLinks = h('div', { 'data-mv2': 'sheet-foot' },
+      reportAction ? h('div', { 'data-mv2': 'report-compact' }, reportAction) : null,
+      h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull));
+    return h(inline ? 'div' : 'section', {
       ref: root, 'data-mv2': 'sheet', 'data-snap': wide ? 'panel' : snap, 'data-wide': wide ? '1' : undefined,
-      'data-expanded': expanded ? '' : undefined,
-      role: 'dialog', 'aria-label': Str.dialogLabel(name), 'aria-modal': 'false',
+      'data-expanded': expanded ? '' : undefined, 'data-inline': inline ? '' : undefined,
+      role: inline ? undefined : 'dialog', 'aria-label': inline ? undefined : Str.dialogLabel(name), 'aria-modal': inline ? undefined : 'false',
       onPointerDown,
+      // The keyboard reaches what the half sheet hides below the screen's edge (the map screen cannot scroll to it:
+      // overflow clip): focus there raises the sheet to full, so what has focus is always in view. A finger or a mouse
+      // press focuses too, and must never move the sheet: focus that follows a press within the moment is left alone.
+      onPointerDownCapture: () => { pressedAt.current = Date.now(); },
+      onFocus: (e) => {
+        if (wide || inline || snapRef.current === 'full' || !e.target || !e.target.getBoundingClientRect) return;
+        // the sheet's own title takes focus as the sheet slides in (tabindex -1: the keyboard never lands there)
+        if (e.target.getAttribute && e.target.getAttribute('tabindex') === '-1') return;
+        if (Date.now() - pressedAt.current < 600) return;
+        // a control (a button, a link, a tab), never a container the size of the sheet (the scroller takes focus too)
+        const r = e.target.getBoundingClientRect();
+        if (r.height < window.innerHeight / 3 && r.bottom > window.innerHeight) setSnap('full');
+      },
     },
       grab,
       h('div', { ref: scroller, 'data-mv2': 'scroller' },
         xhead,
+        leadBody,
         h('div', { 'data-mv2': 'actions' }, actions),
         body,
-        N && nearRows.length > 0 && h(N.List, { key: type + ':' + id, rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
+        inline ? h(ProfileCarousels, {
+          item: item, type: type, org: isContributor ? item : org, events: events, newsPosts: newsPosts, onPick: onPick,
+          onReadPost: (p, from) => setReading({ id: p.id, from: from || null }),
+        }) : null,
+        // Report (compact) + View Full sit above the slogan divider on raised pinpeek (founder, 2026-11-22).
+        inline ? footLinks : null,
+        // Nested Explore under the slogan replaces the Nearby list on the raised pin peek.
+        // Decorative interrupted hairline (not role=separator: the tabbed block's hairline rule in mapV2Tabbed).
+        inline && nest && Str.slogan ? h('div', { 'data-mv2': 'slogan-rule', 'aria-hidden': 'true' },
+          h('span', { 'data-mv2': 'slogan-rule-line' }),
+          h('span', { 'data-mv2': 'slogan-rule-text' }, Str.slogan),
+          h('span', { 'data-mv2': 'slogan-rule-line' })) : null,
+        inline && nest && window.MapV2Explore && window.MapV2Explore.PeekExplore
+          ? h(window.MapV2Explore.PeekExplore, nest) : null,
+        !(inline && nest) && N && nearRows.length > 0 && h(N.List, { key: type + ':' + id, rows: nearRows, strings: Str.nearby, onPick: (pid, ptype) => { if (onPick) onPick(pid, ptype); } }),
         qrAction,
-        reportAction,
-        h('button', { type: 'button', 'data-mv2': 'view-full', onClick: openProfile }, Str.viewFull)),
-      h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
+        !inline ? footLinks : null),
+      !inline && h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, announce),
       // the QR code for this listing's public link (always the public site: a printed code must never point at a preview or localhost;
       // the phone app has no web origin of its own, so its build supplies the public site's address, see CC_ROUTES.publicUrl)
       qr && qrOk && ReactDOM.createPortal(h(window.MapV2QR.Dialog, {
@@ -861,9 +1142,10 @@
         images, index: viewer.index, strings: Str.gallery, returnFocus: viewer.from,
         onClose: () => setViewer(null), onIndex: (i) => setViewer((v) => ({ index: i, from: v && v.from })),
       }), document.body),
-      // the open news post: same centred dialog the profile page uses, over the whole viewport
-      reading && window.MapV2News && posts.some((p) => p.id === reading.id) && ReactDOM.createPortal(h(window.MapV2News.Reader, {
-        post: posts.find((p) => p.id === reading.id), sourceName: name, strings: Str.news,
+      // the open news post: soft blurred overlay with Back (place/event posts + contributor news)
+      reading && window.MapV2News && (newsPosts || posts || []).some((p) => p.id === reading.id) && ReactDOM.createPortal(h(window.MapV2News.Reader, {
+        post: (newsPosts || posts || []).find((p) => p.id === reading.id),
+        sourceName: (org && org.name) || name, strings: Str.news,
         returnFocus: reading.from, onClose: () => setReading(null),
       }), document.body));
   }

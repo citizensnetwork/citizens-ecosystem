@@ -10,7 +10,7 @@ import { mockMapNetwork, mockContributorDetail, openMap, openPinSheet, smallSeed
 
 type Row = { id: string; longitude?: number; latitude?: number; physical_longitude?: number; physical_latitude?: number };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: Row[]; places: Row[]; events: Row[] };
-const sheet = (page: Page) => page.locator(".cn-big");
+const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 type MapHook = { jumpTo: (o: object, d: object) => void };
 type Kind = "contributor" | "place" | "event";
 
@@ -18,7 +18,7 @@ async function openAsGuest(page: Page, kind: Kind) {
   const seed = seed0();
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed);
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   const row = (kind === "contributor" ? seed.contributors : kind === "place" ? seed.places : seed.events)[0];
   const lng = Number(row.physical_longitude ?? row.longitude);
   const lat = Number(row.physical_latitude ?? row.latitude);
@@ -32,21 +32,11 @@ async function openAsGuest(page: Page, kind: Kind) {
 
 const toastWith = (page: Page, text: string) => page.locator("[role='status']").filter({ hasText: text });
 const signInButton = (page: Page) => page.locator("[data-toast-action]");
-const actionBtn = (page: Page, re: RegExp) => page.locator(".cn-big .cn-actions button", { hasText: re });
+const actionBtn = (page: Page, re: RegExp) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: re });
 
 test.describe("#201 a guest's Follow, Save, Consider and Connect never flip, and say why", () => {
-  test("Follow on a Contributor", async ({ page }) => {
-    await openAsGuest(page, "contributor");
-    const btn = actionBtn(page, /^Follow(ing)?$/);
-    await btn.click();
-    await expect(toastWith(page, "Sign in to follow.")).toBeVisible();
-    await expect(signInButton(page)).toHaveText("Sign in");
-    await expect(btn).toHaveText("Follow");
-    await expect(btn).not.toHaveAttribute("data-on", /.*/);
-  });
-
-  test("Save on a Contributor", async ({ page }) => {
-    await openAsGuest(page, "contributor");
+  test("Save on a Place", async ({ page }) => {
+    await openAsGuest(page, "place");
     const btn = actionBtn(page, /^Save(d)?$/);
     await btn.click();
     await expect(toastWith(page, "Sign in to save.")).toBeVisible();

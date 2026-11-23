@@ -11,6 +11,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const { useState, useEffect, useCallback } = React;
   const { Avatar } = window.UI;
   const MAX_RESULTS = 6;
@@ -37,7 +38,7 @@
     }, [sb, event.id]);
     useEffect(() => { refresh(); }, [refresh]);
 
-    const nameOf = (cid) => { const c = contributors.find((x) => x.id === cid); return c ? c.name : 'A Contributor'; };
+    const nameOf = (cid) => { const c = contributors.find((x) => x.id === cid); return c ? c.name : W.term('partner', 'A'); };
     const list = Array.isArray(rows) ? rows : [];
     const live = list.filter((r) => r.status === 'invited' || r.status === 'accepted');
     const taken = new Set(list.map((r) => r.contributorId));
@@ -58,7 +59,7 @@
     return h('div', { 'data-cohosts-panel': event.id, className: 'p-3 border-t border-border space-y-3' },
       h('div', null,
         h('p', { className: 'text-sm font-bold text-foreground' }, 'Co-hosts ', h('span', { 'data-cohosts-count': '', className: 'text-xs font-normal text-muted-foreground' }, '(' + live.length + ' of ' + C.MAX + ')')),
-        h('p', { className: 'text-xs text-muted-foreground' }, 'Invite another Contributor. They get an invitation, and the event joins their page once they accept.')),
+        h('p', { className: 'text-xs text-muted-foreground' }, W.t('screen.cohost.invite') + ' They get an invitation, and the event joins their page once they accept.')),
       rows === null && h('p', { role: 'status', className: 'text-xs text-muted-foreground' }, 'Loading…'),
       rows && rows.error && h('p', { role: 'alert', className: 'text-xs text-red-600' }, 'We could not load the co-hosts. Close this and open it again.'),
       list.length > 0 && h('ul', { 'data-cohosts-list': '', role: 'list', className: 'space-y-2' },
@@ -71,9 +72,9 @@
             r.status === 'invited' ? 'Withdraw' : 'Remove')))),
       live.length < C.MAX
         ? h('div', { className: 'space-y-2' },
-            h('input', { type: 'search', 'data-cohost-search': '', value: q, onChange: (e) => setQ(e.target.value), placeholder: 'Find a Contributor by name', 'aria-label': 'Find a Contributor to invite as a co-host',
+            h('input', { type: 'search', 'data-cohost-search': '', value: q, onChange: (e) => setQ(e.target.value), placeholder: 'Find ' + W.term('partner', 'a') + ' by name', 'aria-label': 'Find ' + W.term('partner', 'a') + ' to invite as a co-host',
               className: 'w-full min-h-[44px] px-3 rounded-xl border border-border bg-white/70 text-sm' }),
-            needle.length >= 2 && found.length === 0 && h('p', { 'data-cohost-none': '', className: 'text-xs text-muted-foreground' }, 'No Contributor with that name.'),
+            needle.length >= 2 && found.length === 0 && h('p', { 'data-cohost-none': '', className: 'text-xs text-muted-foreground' }, 'No ' + W.term('partner') + ' with that name.'),
             found.length > 0 && h('ul', { 'data-cohost-results': '', role: 'list', className: 'space-y-1' },
               found.map((c) => h('li', { key: c.id, className: 'flex items-center gap-2' },
                 h(Avatar, { src: c.profilePhoto, name: c.name, size: 32, rounded: 'xl' }),

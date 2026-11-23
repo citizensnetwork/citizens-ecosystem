@@ -1,5 +1,6 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
 import { FAKE_PROJECT, mockAppShell, signInToFakeProject } from "./support/fake-project";
+import { openMe } from "./support/map-v2";
 
 // ════════════════════════════════════════════════════════════════════
 //  Verify-first attach for Form / Admin-created listings (C10, issue #159).
@@ -233,18 +234,15 @@ test.describe("Verify-first attach (C10)", () => {
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    // nothing waiting: said plainly. The map shell no longer carries the account button; Header screens still do.
-    await page.getByRole("button", { name: "Do", exact: true }).click();
-    await page.getByRole("menuitem", { name: /Kingdom Projects/ }).click();
-    await expect(page.locator('[data-screen="community"]')).toBeVisible();
-    await page.getByRole("button", { name: "Your account" }).first().click();
+    // nothing waiting: said plainly (the map home's account menu is the nav's Me)
+    await openMe(page);
     await page.getByRole("button", { name: "Claim a Contributor listing" }).click();
     await expect(page.getByText("No pending listing found for your email.")).toBeVisible();
     expect(server.confirms).toBe(0);
 
     // something waiting: the screen opens (and still nothing is claimed until Confirm)
     server.waiting = WAITING;
-    await page.getByRole("button", { name: "Your account" }).first().click();
+    await openMe(page);
     await page.getByRole("button", { name: "Claim a Contributor listing" }).click();
     await expect(dialog(page)).toBeVisible();
     expect(server.confirms).toBe(0);

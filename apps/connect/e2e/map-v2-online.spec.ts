@@ -66,8 +66,17 @@ const SHEET = "[data-mv2='online-sheet']";
 const globe = (page: Page) => page.locator(GLOBE);
 const sheet = (page: Page) => page.locator(SHEET);
 
+// The middle of an element once it has stopped moving: the list slides up as it opens, and a touch aimed at where Close
+// WAS lands on the list's header by the time the finger lifts (a busy runner measures mid-slide).
 async function at(page: Page, selector: string): Promise<Pt> {
-  const b = await page.locator(selector).first().boundingBox();
+  const box = () => page.locator(selector).first().boundingBox();
+  let b = await box();
+  for (let i = 0; i < 30; i++) {
+    await page.waitForTimeout(50);
+    const next = await box();
+    if (b && next && Math.abs(next.x - b.x) < 0.5 && Math.abs(next.y - b.y) < 0.5) break;
+    b = next;
+  }
   if (!b) throw new Error("no box for " + selector);
   return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
 }
@@ -96,17 +105,18 @@ test.describe("the globe on a phone (real touch)", () => {
     await expect(page.locator("[data-mv2='globe-host']")).toHaveCount(0);
   });
 
-  test("a globe appears with a count in the overlay stack, one labelled button, not a second map control", async ({ page }) => {
+  test("a globe appears with a count, among the map's controls, the size of the map's own buttons (36 px), one labelled button, and it stays when the zoom buttons hide", async ({ page }) => {
     await openAtPretoria(page, { [PTA]: TWO });
     await expect(globe(page)).toHaveCount(1);
-    await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area, 3");
-    await expect(globe(page)).toContainText("Online here");
+    await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area: 3 listings");
     await expect(globe(page).locator("[data-mv2='globe-count']")).toHaveText("3");
     const b = (await globe(page).boundingBox())!;
-    expect(b.height).toBeGreaterThanOrEqual(36);
-    expect(b.height).toBeLessThanOrEqual(48);
-    await expect(page.locator(".map-overlay-stack").locator(GLOBE)).toHaveCount(1);
-    await expect(page.locator("[data-mv2='globe-host']")).toHaveCount(0);
+    expect(b.width).toBeGreaterThanOrEqual(35.5);
+    expect(b.height).toBeGreaterThanOrEqual(35.5);
+    // it sits in the bottom-right control stack, in the same column as the zoom buttons, above them
+    const zoomIn = (await page.locator(".maplibregl-ctrl-zoom-in").boundingBox())!;
+    expect(Math.abs(b.x - zoomIn.x)).toBeLessThanOrEqual(2);
+    expect(b.y).toBeLessThan(zoomIn.y);
     await expect(globe(page)).toBeVisible();
   });
 
@@ -118,7 +128,7 @@ test.describe("the globe on a phone (real touch)", () => {
     await expect(sheet(page)).toBeVisible();
     await expect(globe(page)).toHaveAttribute("aria-expanded", "true");
     await expect(sheet(page).getByRole("heading", { level: 2 })).toHaveText("Online in this area");
-    await expect(sheet(page)).toContainText("Serving Pretoria · not a physical venue");
+    await expect(sheet(page)).toContainText("Online or no fixed place · Pretoria");
     await expect(sheet(page)).not.toContainText(/on the map/i);
 
     await tapTouch(cdp, await at(page, "[data-online='close']"));
@@ -193,7 +203,7 @@ test.describe("the globe on a phone (real touch)", () => {
     expect(servingRequests(api)).toHaveLength(1); // five pans, still the same area: nothing more asked
 
     await jump(page, 28.1894, -25.8603, 11); // Centurion
-    await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area, 1");
+    await expect(globe(page)).toHaveAttribute("aria-label", "Online in this area: 1 listing");
     expect(servingRequests(api)).toEqual(["/api/v1/serving?area=" + PTA, "/api/v1/serving?area=" + CEN]);
 
     await jump(page, 30.9, -29.0, 8); // KwaZulu-Natal: nobody there
@@ -209,7 +219,10 @@ test.describe("the globe on a phone (real touch)", () => {
     const api = await openAtPretoria(page, { [PTA]: TWO });
     await expect(globe(page)).toHaveCount(1);
     for (const r of api.requests) expect(r).not.toMatch(/lat|lng|-25\.|28\.2/);
-    expect(api.requests.filter((r) => r.startsWith("/api/v1/service-areas"))).toEqual(["/api/v1/service-areas"]); // one cacheable index read
+    // one cacheable index read; when the map is close enough for a city, its sub-areas are asked for by the parent's id only
+    const areaReads = api.requests.filter((r) => r.startsWith("/api/v1/service-areas"));
+    expect(areaReads.filter((r) => r === "/api/v1/service-areas")).toHaveLength(1);
+    for (const r of areaReads) expect(r).toMatch(/^\/api\/v1\/service-areas(\?parent=[0-9a-f-]{36})?$/);
   });
 
   test("a failed list shows an error with a retry that asks again", async ({ page }) => {

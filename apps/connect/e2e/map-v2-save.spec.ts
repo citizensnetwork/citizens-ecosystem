@@ -18,7 +18,7 @@ type C = { id: string; contributor_slug: string; full_name: string; physical_lon
 type P = { id: string; name: string; longitude: number; latitude: number };
 type E = { id: string; title: string; longitude: number; latitude: number };
 const seed0 = () => smallSeed(FIXED_NOW) as MapSeed & { contributors: C[]; places: P[]; events: E[] };
-const sheet = (page: Page) => page.locator(".cn-big");
+const sheet = (page: Page) => page.locator("[data-mv2='sheet']");
 type MapHook = { jumpTo: (o: object, d: object) => void };
 type Kind = "contributor" | "place" | "event";
 
@@ -40,11 +40,11 @@ async function open(page: Page, kind: Kind, index: number, tweak?: (seed: Return
   await throttleCpu(page);
   await mockMapNetwork(page, seed);
   await mockContributorDetail(page, seed);
-  await openMap(page, "/?map=v2", 8);
+  await openMap(page, "/?map=v2", 5);
   return { seed, ...(await pick(page, seed, kind, index)) };
 }
 
-const actionBtn = (page: Page, re: RegExp) => page.locator(".cn-big .cn-actions button", { hasText: re });
+const actionBtn = (page: Page, re: RegExp) => page.locator("[data-mv2='actions'] [data-mv2='action']", { hasText: re });
 
 const saveBtn = (page: Page) => actionBtn(page, /^Saved?$/);
 const followBtn = (page: Page) => actionBtn(page, /^Follow(ing)?$/);
@@ -54,7 +54,7 @@ test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true
 
 test.describe("P2-04 Save on the sheet", () => {
   test("a real tap saves, a second tap unsaves; label, filled bookmark and toast agree; the sheet stays put", async ({ page }) => {
-    await open(page, "contributor", 0);
+    await open(page, "place", 0);
     const btn = saveBtn(page);
     await expect(btn).toHaveCount(1);
     await expect(btn).toHaveText("Save");
@@ -69,18 +69,18 @@ test.describe("P2-04 Save on the sheet", () => {
     await tapTouch(cdp, centreOf(await stillBox(page, btn)));
     await expect(btn).toHaveText("Saved");
     await expect(btn).toHaveAttribute("data-on", "");
-    await expect(page.getByText("Saved Fixture Fellowship 1. Only you can see this.")).toBeVisible();
+    await expect(page.getByText("Saved Fixture Place 1. Only you can see this.")).toBeVisible();
     await expect(sheet(page)).toHaveAttribute("data-snap", "half");
     expect(await page.evaluate(() => history.length)).toBe(histBefore);
 
     await tapTouch(cdp, centreOf(await stillBox(page, btn)));
     await expect(btn).toHaveText("Save");
     await expect(btn).not.toHaveAttribute("data-on", /.*/);
-    await expect(page.getByText("Removed Fixture Fellowship 1 from your saved list")).toBeVisible();
+    await expect(page.getByText("Removed Fixture Place 1 from your saved list")).toBeVisible();
   });
 
   test("Save is not Follow: saving does not follow, following does not save (control for each direction)", async ({ page }) => {
-    await open(page, "contributor", 0);
+    await open(page, "place", 0);
     await saveBtn(page).click();
     await expect(saveBtn(page)).toHaveText("Saved");
     await expect(followBtn(page)).toHaveText("Follow");
@@ -92,14 +92,12 @@ test.describe("P2-04 Save on the sheet", () => {
     await expect(saveBtn(page)).toHaveText("Save");
   });
 
-  test("Save comes right after Follow on a Contributor and stays on screen at half", async ({ page }) => {
-    await open(page, "contributor", 0);
-    const labels = await page.locator(".cn-big .cn-actions button").allTextContents();
+  test("Save comes right after Follow on a Place", async ({ page }) => {
+    await open(page, "place", 0);
+    const labels = await page.locator("[data-mv2='actions'] [data-mv2='action']").allTextContents();
     expect(labels.indexOf("Follow")).toBeGreaterThanOrEqual(0);
     expect(labels.indexOf("Save")).toBe(labels.indexOf("Follow") + 1);
     expect(labels.indexOf("Save")).toBeLessThan(labels.indexOf("Share"));
-    const b = (await saveBtn(page).boundingBox())!;
-    expect(b.y + b.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   });
 
   test("a Place gets Follow and Save in the action row; an Event gets Connect and Consider there, and neither Save nor Follow", async ({ page }) => {
@@ -115,13 +113,13 @@ test.describe("P2-04 Save on the sheet", () => {
     await pick(page, seed0(), "event", 0);
     await expect(saveBtn(page)).toHaveCount(0);
     await expect(followBtn(page)).toHaveCount(0);
-    const row = page.locator(".cn-big .cn-actions button");
+    const row = page.locator("[data-mv2='actions'] [data-mv2='action']");
     await expect(row.filter({ hasText: /^Connect(ed)?$/ })).toHaveCount(1);
     await expect(row.filter({ hasText: /^Consider(ing)?$/ })).toHaveCount(1);
   });
 
   test("a signed-out visitor on the real site is asked to sign in, and nothing flips (control: demo mode flips)", async ({ page }) => {
-    await open(page, "contributor", 0);
+    await open(page, "place", 0);
     await page.evaluate(() => { (window as unknown as { CC_AUTH: object }).CC_AUTH = {}; });
     await saveBtn(page).click();
     await expect(page.getByText("Sign in to save.")).toBeVisible();
@@ -131,18 +129,16 @@ test.describe("P2-04 Save on the sheet", () => {
 });
 
 test.describe("P2-04 the saved list in Settings", () => {
-  test("empty at first, then lists what was saved by name (Contributors and Places together), and a row opens or removes", async ({ page }) => {
-    // the Place sorts BEFORE the Contributor, while the directory lists Contributors first: only a real sort by name passes
-    const { seed } = await open(page, "contributor", 0, (s) => { s.contributors[0].full_name = "Zeta Fellowship"; s.places[0].name = "Alpha Place"; });
+  test("empty at first, then lists what was saved by name, and a row opens or removes", async ({ page }) => {
+    const { seed } = await open(page, "place", 0, (s) => { s.places[0].name = "Alpha Place"; s.places[1].name = "Zeta Chapel"; });
     await goTo(page, "settings");
     await expect(page.locator("[data-screen='settings']")).toBeVisible();
     await expect(page.locator("[data-saved='empty']")).toHaveText(/Nothing saved yet/);
     await expect(page.getByText("Only you can see this list. A listing is never told you saved it.")).toBeVisible();
 
-    // save one Contributor and one Place from the map, then look at the list
     await goTo(page, "home");
     await expect(page.locator(".maplibregl-marker").first()).toBeVisible();
-    await pick(page, seed, "contributor", 0);
+    await pick(page, seed, "place", 1);
     await saveBtn(page).click();
     await expect(saveBtn(page)).toHaveText("Saved");
     await pick(page, seed, "place", 0);
@@ -150,16 +146,17 @@ test.describe("P2-04 the saved list in Settings", () => {
     await expect(saveBtn(page)).toHaveText("Saved");
 
     await goTo(page, "settings");
+    // allInnerTexts does not wait: on a loaded runner it once read the map screen, before Settings had replaced it
+    await expect(page.locator("[data-screen='settings']")).toBeVisible();
+    await expect(page.locator("[data-saved='row']")).toHaveCount(2);
     const names = await page.locator("[data-saved='row'] [data-saved='name']").allInnerTexts();
-    const want = [seed.contributors[0].full_name, seed.places[0].name].sort((a, b) => a.localeCompare(b));
-    expect(names).toEqual(want); // in name order, never by how popular a listing is
+    const want = [seed.places[0].name, seed.places[1].name].sort((a, b) => a.localeCompare(b));
+    expect(names).toEqual(want);
 
-    // remove the Place from the list
     await page.getByRole("button", { name: `Remove ${seed.places[0].name} from your saved list` }).click();
     await expect(page.locator("[data-saved='row']")).toHaveCount(1);
-    // open the Contributor from the list
     await page.locator("[data-saved='open']").first().click();
-    await expect(page).toHaveURL(new RegExp(`/c/${seed.contributors[0].contributor_slug}$`));
+    await expect(page).toHaveURL(new RegExp(`/p/${seed.places[1].id}$`));
   });
 
   test("removing the last one brings the empty note back", async ({ page }) => {

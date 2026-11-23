@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { citizensWorld } from "./support/loadFrontend";
 
 type Helpers = {
   normaliseEmail: (v: unknown) => string;
@@ -23,7 +24,7 @@ let A: Helpers;
 
 beforeAll(() => {
   const src = readFileSync(join(process.cwd(), "src/frontend/auth-client.js"), "utf8");
-  const win: Record<string, unknown> = {};
+  const win: Record<string, unknown> = { WORLD: citizensWorld };
   // The script warns once that Supabase isn't configured; that's expected here.
   const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   new Function("window", src)(win);

@@ -38,22 +38,19 @@
   //    z≈8–9   one province, e.g. Gauteng ("provincial")
   //    z≈10–11 one metro, e.g. Pretoria
   //    z≈13+   suburb / street
-  //  Founder's rule: places drop out at provincial scale, events with them at
-  //  wider scale still, and — so the national view reads clean and professional
-  //  rather than as a scatter of pins — Contributors too below zoom 6
-  //  (2026-10-02; they used to be permanent anchors that never gated).
+  //  Founder's rule: places drop out at provincial scale, events at a wider
+  //  scale still. Contributors are not a pin (a profile status). A contributor
+  //  shows up here only as a place or an event listing.
   //  This is the ONE place the thresholds live; each type hides when z < gate.
-  const ZOOM_GATES = { place: 9.5, event: 7.5, contributor: 6 };
+  const ZOOM_GATES = { place: 9.5, event: 7.5 };
   //  What the current zoom is showing — reported upward so the map screen can
   //  say WHY pins vanished instead of leaving it a mystery.
-  //    'all'          everything with coordinates
-  //    'places'       places gated out (provincial)
-  //    'contributors' events gated out too — only Contributors remain
-  //    'none'         Contributors gated out as well (national) — nothing drawn
+  //    'all'          places and events
+  //    'places'       places gated out (provincial) — events remain
+  //    'none'         events gated out too — nothing is pinned
   function zoomBandFor(z) {
     if (z >= ZOOM_GATES.place) return 'all';
     if (z >= ZOOM_GATES.event) return 'places';
-    if (z >= ZOOM_GATES.contributor) return 'contributors';
     return 'none';
   }
   // A pin is hidden only when its own type is gated out (Impact Ideas are an
@@ -106,72 +103,6 @@
     const style = theme === 'dark' ? (env.MAPTILER_STYLE_DARK || DARK_STYLE) : (env.MAPTILER_STYLE || 'streets-v2');
     return 'https://api.maptiler.com/maps/' + style + '/style.json?key=' + key;
   }
-
-  // Recolour the live MapTiler style toward the approved map palette. The engine stays MapLibre.
-  function restyleBasemap(map) {
-    if (!map || !map.getStyle) return;
-    const style = map.getStyle();
-    if (!style || !style.layers) return;
-    const dark = window.MapV2 && window.MapV2.resolvedTheme() === 'dark';
-    const k = dark
-      ? { g: '#1d1f1a', b: '#24261f', bi: '#2c2e27', park: '#24302a', road: '#33352e', w1: '#1d2b2c', w2: '#26393a', lab: '#a9a89c', halo: '#1b1c18' }
-      : { g: '#edeee5', b: '#e4e2d8', bi: '#d8d8ce', park: '#cbd8c3', road: '#fbfbf5', w1: '#a7c0bd', w2: '#c8dad5', lab: '#777e71', halo: '#f7f6f1' };
-    style.layers.forEach((layer) => {
-      const id = String(layer.id || '').toLowerCase();
-      try {
-        if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', k.g);
-        else if (layer.type === 'fill') {
-          const c = /water|ocean|river|lake/.test(id) ? k.w1 : /park|wood|grass|green|landcover/.test(id) ? k.park : /building/.test(id) ? k.bi : k.b;
-          map.setPaintProperty(layer.id, 'fill-color', c);
-        } else if (layer.type === 'line') {
-          map.setPaintProperty(layer.id, 'line-color', /water/.test(id) ? k.w2 : k.road);
-        } else if (layer.type === 'symbol') {
-          map.setPaintProperty(layer.id, 'text-color', k.lab);
-          map.setPaintProperty(layer.id, 'text-halo-color', k.halo);
-        }
-      } catch (e) { /* a layer whose paint is data-driven keeps MapTiler's value */ }
-    });
-  }
-
-  function capsuleButton(label, className, on, pressed) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = className + (on ? ' on' : '');
-    b.textContent = pressed || label;
-    b.setAttribute('aria-pressed', on ? 'true' : 'false');
-    return b;
-  }
-  function syncCapsules(wrap, m) {
-    const old = wrap.querySelector('.marker-capsules');
-    if (old) old.remove();
-    if (!m || m.type === 'place' || m.type === 'idea') return;
-    const bar = document.createElement('div');
-    bar.className = 'marker-capsules cn-glass';
-    bar.setAttribute('aria-label', m.type + ' quick actions');
-    const acts = window.ConnectActions || {};
-    if (m.type === 'contributor') {
-      const following = !!(acts.followed && acts.followed.has && acts.followed.has(m.id));
-      const follow = capsuleButton('Follow', 'lead', following, following ? 'Following' : '');
-      follow.addEventListener('click', (e) => { e.stopPropagation(); if (acts.toggleFollow) acts.toggleFollow(m.id, m.title); });
-      const message = capsuleButton('Message', '', false, '');
-      message.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (acts.startConversationWith) acts.startConversationWith(m.title || '', m.profilePhoto || '', true, m.id);
-      });
-      bar.appendChild(follow);
-      bar.appendChild(message);
-    } else {
-      const connected = !!(acts.connected && acts.connected.has && acts.connected.has(m.id));
-      const connect = capsuleButton('Connect', 'connect', connected, connected ? 'Connected' : '');
-      connect.addEventListener('click', (e) => { e.stopPropagation(); if (acts.toggleConnect) acts.toggleConnect(m.id); });
-      const share = capsuleButton('Share', '', false, '');
-      share.addEventListener('click', (e) => { e.stopPropagation(); if (acts.shareLink) acts.shareLink({ page: 'event', params: { id: m.id } }); });
-      bar.appendChild(connect);
-      bar.appendChild(share);
-    }
-    wrap.appendChild(bar);
-  }
-
 
   // MapTiler's Free plan (founder: staying on it, tracker MAP:D12) requires its logo, linked to
   // maptiler.com, bottom-left on every map that shows its tiles, beside the © MapTiler / © OpenStreetMap
@@ -278,6 +209,10 @@
 
   function pinIcon(m, cat) {
     if (m.type === 'idea') return 'Lightbulb';
+    // Prefer the Where-to block glyph so map pins match the strip tiles (founder, 2026-11-22).
+    const X = window.MapV2Explore;
+    const tile = X && X.tileFor ? X.tileFor(m) : null;
+    if (tile && tile.icon) return tile.icon;
     if (cat && cat.icon) return cat.icon;
     if (m.type === 'contributor' && KIND_ICON[m.kind]) return KIND_ICON[m.kind];
     return FALLBACK_ICON[m.type] || 'MapPin';
@@ -305,6 +240,38 @@
     // never ask for more padding than the map is tall (MapLibre would refuse to fit at all)
     if (h && top + bottom > h * 0.8) return 70;
     return { top, bottom, left: FRAME_GAP, right: FRAME_GAP };
+  }
+
+  // The share of the map's height a focused point sits above the middle (founder, 2026-11-17: "25% higher").
+  // Explore card first-tap still uses this; Where to… and pin peek use bandOffset (search ↔ drawer mid-band).
+  const FOCUS_LIFT = 0.25;
+  function liftOffset(el) {
+    const h = el ? (el.clientHeight || el.getBoundingClientRect().height || 0) : 0;
+    return [0, -Math.round(h * FOCUS_LIFT)];
+  }
+
+  /**
+   * MapLibre easeTo offset so a point lands on the mid Y between the search bar (home-top) and a foot panel.
+   * Founder 2026-11-22: Where-to town centre and pin reveal share this band (no fixed % guess when measurable).
+   */
+  function bandOffset(el, footPx) {
+    if (!el) return [0, 0];
+    const h = el.clientHeight || 0;
+    if (!(h > 0)) return [0, 0];
+    const box = el.getBoundingClientRect();
+    const home = (el.closest && el.closest("[data-mv2='home']")) || el;
+    const topEl = home.querySelector && home.querySelector("[data-mv2='home-top']");
+    let top = 0;
+    if (topEl) top = Math.max(0, topEl.getBoundingClientRect().bottom - box.top);
+    let bottom = Math.max(0, Number(footPx) || 0);
+    if (!(bottom > 0)) {
+      const peek = home.querySelector && home.querySelector("[data-mv2='pinpeek']:not([hidden])");
+      const xp = home.querySelector && home.querySelector("[data-mv2='explore']:not([hidden])");
+      const footEl = peek || xp;
+      if (footEl) bottom = Math.max(0, box.bottom - footEl.getBoundingClientRect().top);
+    }
+    const mid = (top + (h - bottom)) / 2;
+    return [0, Math.round(mid - h / 2)];
   }
 
   // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
@@ -336,7 +303,7 @@
     }
   }
 
-  function StylizedMap({ markers, filterCategory, selectedId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
+  function StylizedMap({ markers, filterCategory, selectedId, litId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     // mapRef is a ref, so setting it alone doesn't re-run the pin-rendering
@@ -376,7 +343,7 @@
       markerObjs.current.forEach((mk) => {
         const w = mk.getElement();
         if (!w) return;
-        const hidden = markerHidden(mk._ccType, z, selectedRef.current === mk._ccId);
+        const hidden = !mk._ccKeep && markerHidden(mk._ccType, z, selectedRef.current === mk._ccId);
         w.style.display = hidden ? 'none' : '';
       });
       const band = zoomBandFor(z);
@@ -441,15 +408,8 @@
         geo.on('geolocate', onLocatedV2);
         // Once the user pans/zooms by hand, stop auto-framing the data.
         const onUserMove = (e) => { if (!e || e.originalEvent) userMovedRef.current = true; };
-        const onGesture = (e) => {
-          onUserMove(e);
-          if (e && e.originalEvent) {
-            try { window.dispatchEvent(new Event('cc-map-gesture')); } catch { /* old webview */ }
-          }
-        };
-        map.on('dragstart', onGesture);
-        map.on('zoomstart', onGesture);
-        map.on('wheel', () => { try { window.dispatchEvent(new Event('cc-map-gesture')); } catch { /* old webview */ } });
+        map.on('dragstart', onUserMove);
+        map.on('zoomstart', onUserMove);
         mapRef.current = map;
         // Inspection/test hook, in the same spirit as store.jsx's `window.__cc`:
         // lets a spec (or the console) jumpTo an exact zoom instead of
@@ -461,8 +421,6 @@
         // fitBounds below, so the first frame is already correct.
         map.on('zoom', applyZoomGates);
         map.on('load', applyZoomGates);
-        const paintBasemap = () => restyleBasemap(map);
-        map.on('style.load', paintBasemap);
         // The phone's own look changed (light/dark): swap the base style on the same map; the DOM pins are untouched.
         const onTheme = () => {
           const t = window.MapV2.resolvedTheme();
@@ -521,9 +479,6 @@
           if (ro) ro.disconnect();
           map.off('zoom', applyZoomGates);
           map.off('load', applyZoomGates);
-          map.off('style.load', paintBasemap);
-          map.off('dragstart', onGesture);
-          map.off('zoomstart', onGesture);
           map.off('idle', onIdleV2);
           clearTimeout(idleTimer);
           map.off('moveend', tellView);
@@ -563,22 +518,15 @@
         const S = window.MapV2Strings, P = window.MapV2Pins;
         const catLabel = cat ? cat.name : ((m.type === 'contributor' && S.pin.kind[m.kind]) || S.pin.type[m.type] || '');
         const label = P.ariaLabelFor(m, catLabel, S.pin);
-        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, m.coverPhoto, !!m.isLive, !!m.isBusy, !!m.linked,
+        const sig = [m.type, m.title, m.category, m.kind, m.profilePhoto, m.coverPhoto, !!m.isLive, !!m.isBusy,
           m.broadcast ? m.broadcast.message + '|' + m.broadcast.bubbleId : '', catLabel].join('');
-        const grouped = window.ConnectChrome && window.ConnectChrome.groupHex && window.ConnectChrome.groupHex(m.category);
-        const fill = grouped || '#272a25';
+        // Category colour, as on main. Ideas stay on the brand gold.
+        const fill = m.type === 'idea' ? '#F2BD22' : (cat ? cat.hex : '#F2BD22');
         const build = () => P.build(m, { lucideInner, icon: pinIcon(m, cat), hex: fill, strings: S.pin, onDismissBubble: onDismissBubbleRef.current });
         let mk = markerObjs.current.get(m.id);
         if (mk && mk._ccAnchor === anchor) {
           const wrap = mk.getElement();
-          if (mk._ccSig !== sig) {
-            const hit = wrap.querySelector('.marker-hit');
-            if (hit) hit.replaceChildren(build());
-            else wrap.replaceChildren(build());
-            syncCapsules(wrap, m);
-            wrap.setAttribute('aria-label', label);
-            mk._ccSig = sig;
-          }
+          if (mk._ccSig !== sig) { wrap.replaceChildren(build()); wrap.setAttribute('aria-label', label); mk._ccSig = sig; }
           mk.setLngLat(coords);
         } else {
           if (mk) mk.remove();
@@ -588,7 +536,6 @@
           wrap.appendChild(build());
           const activate = () => { if (onSelectRef.current) onSelectRef.current(m.id, m.type); };
           P.makeOperable(wrap, activate);
-          syncCapsules(wrap, m);
           wrap.addEventListener('click', (e) => { e.stopPropagation(); activate(); });
           mk = new window.maplibregl.Marker({ element: wrap, anchor }).setLngLat(coords).addTo(mp);
           mk._ccAnchor = anchor;
@@ -597,9 +544,13 @@
         }
         mk._ccType = m.type;
         mk._ccId = m.id;
+        mk._ccKeep = typeof filterCategory === 'function' && !!filterCategory(m);
         mk._ccMeta = { title: m.title, nextEventAt: m.nextEventAt, lastActivityAt: m.lastActivityAt };
         P.applyDim(mk.getElement(), dim);
+        // a filter from the Explore panel (a Where to… tile, a row, a group) makes its matching pins glow
+        P.applyMatch(mk.getElement(), mk._ccKeep);
         P.applySelected(mk.getElement(), selected);
+        P.applyLit(mk.getElement(), litId === m.id, !!(litId && litId !== m.id));
       }
 
       // ── individual pins — show them all ──
@@ -610,9 +561,10 @@
         // Map v2's pills (#210) pass a test per marker (a group, or "Events"); the old map passes one category id.
         const passes = typeof filterCategory === 'function' ? filterCategory(m) : m.category === filterCategory;
         const dim = !!(filterCategory && !passes && m.type !== 'idea');
+        if (m.type === 'contributor') return;
         const selected = selectedId === m.id;
-        // Event and Contributor badges hang from their point ('bottom'); every other pin is centred on it.
-        const anchor = 'center';
+        // Events wear the tailed disc, so they hang from the point. Place circles sit on it.
+        const anchor = m.type === 'event' ? 'bottom' : 'center';
         upsertPinV2(m, cat, coords, anchor, dim, selected);
       });
       // drop markers whose item is gone
@@ -627,7 +579,7 @@
       // they were actually added at.
       applyZoomGates();
       layoutV2();
-    }, [markers, filterCategory, selectedId, applyZoomGates, layoutV2, mapReady]);
+    }, [markers, filterCategory, selectedId, litId, applyZoomGates, layoutV2, mapReady]);
 
     // Map v2: the sheet tells the map how much of it the sheet covers; the map eases the selected pin into the
     // middle of what is left visible (tracker E5: about 27 % from the top with the sheet at 46 %). An imperative
@@ -674,6 +626,108 @@
           const items = framedItemsRef.current;
           if (!mp || userMovedRef.current || !items || !items.length) return;
           frameData(mp, items, containerRef.current);
+        },
+        // Founder, 2026-11-17: whatever the map brings into focus (an area, a card's pin) sits FOCUS_LIFT of the map's height
+        // above the middle, so it stays clear of the Explore panel at the foot. `offset` moves the point, not the camera's
+        // padding, so nothing else on the map shifts.
+        focusLifted(minZoom) {
+          requestAnimationFrame(() => {
+            const mp = mapRef.current;
+            const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
+            if (!mp || !mk) return;
+            userMovedRef.current = true;
+            const to = { center: mk.getLngLat(), offset: liftOffset(containerRef.current), duration: window.MapV2.dur('slow'), essential: true };
+            if (Number.isFinite(minZoom) && mp.getZoom() < minZoom) to.zoom = minZoom;
+            mp.easeTo(to, { originalEvent: {} });
+          });
+        },
+        // Where to…: opts.band centres the town between search and the foot drawer (founder, 2026-11-22).
+        // opts.lift === false keeps true screen centre; default still uses FOCUS_LIFT.
+        survey(lat, lng, zoom, opts) {
+          const mp = mapRef.current;
+          if (!mp || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+          userMovedRef.current = true;
+          let offset = [0, 0];
+          if (opts && opts.band) offset = bandOffset(containerRef.current, opts.foot);
+          else if (!(opts && opts.lift === false)) offset = liftOffset(containerRef.current);
+          mp.easeTo({
+            center: [lng, lat], zoom: zoom, offset,
+            duration: window.MapV2.dur('slow'), essential: true,
+          }, { originalEvent: {} });
+        },
+        restore() {
+          const mp = mapRef.current;
+          const items = framedItemsRef.current;
+          userMovedRef.current = false;
+          if (mp && items && items.length) frameData(mp, items, containerRef.current);
+        },
+        // The map home's levels (founder, 2026-11-18): each level keeps the camera it was entered with, so Back puts the
+        // map exactly where the person left it. A plain copy (no MapLibre objects), safe to keep in React state. The tilt is
+        // fixed (D17, set once above), so it is neither read nor written here.
+        camera() {
+          const mp = mapRef.current;
+          if (!mp) return null;
+          const c = mp.getCenter();
+          return { lng: c.lng, lat: c.lat, zoom: mp.getZoom(), bearing: mp.getBearing() };
+        },
+        setCamera(cam) {
+          const mp = mapRef.current;
+          if (!mp || !cam || !Number.isFinite(cam.lng) || !Number.isFinite(cam.lat) || !Number.isFinite(cam.zoom)) return;
+          userMovedRef.current = true;
+          const to = { center: [cam.lng, cam.lat], zoom: cam.zoom, bearing: Number(cam.bearing) || 0 };
+          const dur = window.MapV2 && window.MapV2.dur ? window.MapV2.dur('base') : 0;
+          if (!(dur > 0)) { mp.jumpTo(to, { originalEvent: {} }); return; }
+          // Back must land exactly where the level was entered. If the ease is cut short (CI saw it end 80-90% of the way
+          // on a slow machine) and neither the person (a press or a wheel on the map) nor a newer camera move took over,
+          // the rest of the way is a jump.
+          const box = mp.getCanvasContainer();
+          let touched = false;
+          const touch = () => { touched = true; };
+          box.addEventListener('pointerdown', touch, true);
+          box.addEventListener('wheel', touch, { capture: true, passive: true });
+          mp.easeTo(Object.assign({}, to, { duration: dur, essential: true }), { originalEvent: {} });
+          // after easeTo: stopping an earlier animation fires its own moveend first, and this must not take that one
+          mp.once('moveend', () => setTimeout(() => {
+            box.removeEventListener('pointerdown', touch, true);
+            box.removeEventListener('wheel', touch, { capture: true });
+            if (touched || mapRef.current !== mp || mp.isMoving()) return;
+            const c = mp.getCenter();
+            const off = Math.abs(c.lng - cam.lng) > 1e-9 || Math.abs(c.lat - cam.lat) > 1e-9 || Math.abs(mp.getZoom() - cam.zoom) > 1e-6;
+            if (off) mp.jumpTo(to, { originalEvent: {} });
+          }, 0));
+        },
+        // The pins the person can see right now: inside the map's bounds and not hidden by the zoom gates.
+        visibleIds() {
+          const mp = mapRef.current;
+          if (!mp) return [];
+          const b = mp.getBounds();
+          const out = [];
+          markerObjs.current.forEach((mk, id) => {
+            const w = mk.getElement();
+            if (!w || w.style.display === 'none') return;
+            if (b.contains(mk.getLngLat())) out.push(id);
+          });
+          return out;
+        },
+        // Snap the chosen pin onto the mid-band centre between search (home-top) and `bottom` px at the foot.
+        // `id` is required on the first paint of a new selection: selectedRef may still hold the previous id (React).
+        // Founder 2026-11-22: always the mid-band centre (not “already somewhere in the band”).
+        revealSelected(bottom, id) {
+          requestAnimationFrame(() => {
+            const mp = mapRef.current;
+            const el = containerRef.current;
+            const targetId = id || selectedRef.current;
+            const mk = targetId ? markerObjs.current.get(targetId) : null;
+            if (!mp || !el || !mk) return;
+            const foot = Math.max(0, Number(bottom) || 0);
+            const offset = bandOffset(el, foot);
+            const p = mp.project(mk.getLngLat());
+            const tx = el.clientWidth / 2 + offset[0];
+            const ty = el.clientHeight / 2 + offset[1];
+            if (Math.abs(p.x - tx) < 10 && Math.abs(p.y - ty) < 10) return;
+            userMovedRef.current = true;
+            mp.easeTo({ center: mk.getLngLat(), offset, duration: window.MapV2.dur('slow'), essential: true }, { originalEvent: {} });
+          });
         },
       };
       return () => { apiRef.current = null; };
@@ -796,7 +850,7 @@
       // fixed center pin (the map moves under it, not the other way round)
       h('div', { className: 'absolute left-1/2 top-1/2 pointer-events-none', style: { transform: 'translate(-50%, -100%)', filter: 'drop-shadow(0 3px 6px rgba(0,0,0,.35))' } },
         h('svg', { width: 28, height: 36, viewBox: '0 0 30 38' },
-          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#D4AF37' }),
+          h('path', { d: 'M15 0C6.7 0 0 6.7 0 15c0 10.5 15 23 15 23s15-12.5 15-23C30 6.7 23.3 0 15 0z', fill: '#F2BD22' }),
           h('circle', { cx: 15, cy: 15, r: 6, fill: '#fff' }))),
       h('button', {
         type: 'button', onClick: useMyLocation, disabled: busy === 'locate',

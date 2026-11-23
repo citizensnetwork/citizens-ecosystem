@@ -33,7 +33,7 @@
   --text-2: #5c5444;
 
   /* accent: a fill with a near-black label; gold ink for text, rings, icons */
-  --accent: #d4af37;
+  --accent: #f2bd22;
   --accent-contrast: #0a0908;
   --accent-ink: #836100;
 
@@ -93,6 +93,7 @@
   --z-toast: 400;
   /* motion: transform and opacity only. The JS twins are MapV2.motion. */
   --dur-fast: 120ms;
+  --dur-morph: 480ms;          /* the crown opening into the sticky nav */
   --dur-base: 200ms;
   --dur-slow: 320ms;
   --ease-enter: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -109,7 +110,8 @@
   --pin-mid-scale: 0.8333;          /* the glyph pin below the photo zoom is 40 px of the 48 px disc */
   --pin-glyph-size: 22px;
   --label-max-w: 192px;
-  --pin-border-w: 3px;
+  --pin-border-w: 1.5px;             /* the place circle's white ring */
+  --pin-disc-border-w: 3px;          /* the event disc keeps the original white ring */
   --pin-ring-w: 3px;               /* the category-colour ring around a logo */
   --pin-badge: 14px;             /* category glyph badge on a logo pin */
   --pin-tail: 8px;
@@ -130,12 +132,26 @@
   --font-body: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
   --viewer-bg: rgba(10, 9, 8, 0.94);
   --viewer-fg: #f7f4ee;
+  --on-media: #ffffff;                 /* text/icons on a dark photo cover */
+  --on-media-muted: rgba(255, 255, 255, 0.55);
+  --on-media-chip: rgba(0, 0, 0, 0.28);
+  --cover-text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --cover-scrim: linear-gradient(180deg, rgba(0, 0, 0, 0.02) 40%, rgba(0, 0, 0, 0.5) 100%);
+  --cover-foot-inset: 10px;            /* title / tiles sit this far above the cover bottom edge */
+
+  --handle-stack-gap: 1px;             /* bar + chevron in the grab handle */
+  --handle-chevron-nudge: calc(var(--focus-w) * -1);
+  --report-compact-h: calc(var(--space-6) + var(--space-1)); /* 28px: quiet Report under hero */
   --qr-paper: #ffffff;               /* a QR code is always black on white, in either look */
   --qr-card-w: 360px;
   --qr-size: 260px;
   --reader-w: 560px;             /* the news reader's reading width; UI.Overlay's default maxWidth */
-  --scrim-blur: 4px;             /* the dim behind the news reader; the same blur UI.Overlay already uses */
-  --dim-opacity: 0.3;               /* a pin outside the chosen category filter */
+  --scrim-blur: 14px;            /* soft blurred news-reader scrim (founder, 2026-11-22); Overlay still reads this token */
+  --reader-radius: calc(var(--radius-lg) + var(--space-3)); /* news card corners: lg + 12 */
+  --reader-elev: 0 12px 40px color-mix(in srgb, var(--scrim) 28%, transparent);
+  --reader-card-blur: 8px;       /* frosted news-card glass */
+  --cover-tile-blur: 6px;        /* soft cover meta chips */
+  --dim-opacity: 0.35;              /* a pin set aside while one is highlighted, or outside a filter */
   --hrow-card-w: 264px;             /* one card width for every card in a sideways row, portrait or landscape (4i) */
   --hrow-peek: 48px;                /* a row's card is never wider than the row minus this, so the next card shows at the edge */
   --disabled-opacity: 0.4;          /* a control that cannot act right now (it stays focusable) */
@@ -153,7 +169,7 @@
   --explore-bg: rgba(255, 255, 255, 0.96);  /* the Explore panel: nearly solid and NOT blurred (a large blur re-renders every pan frame) */
   --glass-blur: 16px;
   --nav-dim: rgba(10, 9, 8, 0.18);          /* the map fades back a little while the nav is open */
-  --accent-soft: rgba(212, 175, 55, 0.26);  /* the selected nav item's soft gold highlight */
+  --accent-soft: rgba(242, 189, 34, 0.26);  /* the selected nav item's soft gold highlight */
   --select-w: 3px;                          /* the gold ring of the nav button and a selected Explore card */
   --nav-btn: 56px;                          /* the folded nav: one round button */
   --nav-zone: calc(var(--nav-btn) + var(--space-3) * 2 + env(safe-area-inset-bottom, 0px));
@@ -167,6 +183,35 @@
   --icon-sm: 16px;                          /* the small line icons beside a fact or a category */
   --explore-body-min: 160px;                /* the least the panel holds, so the category list always has room */
   --ctrl-btn: 36px;                         /* the map's own zoom and locate buttons */
+  --crown: 52px;                            /* the home button: a glass circle on a 1px gold ring */
+  --xp-strip: 152px;                        /* handle + Where Christians… lead + tiles (founder, 2026-11-22) */
+  --xp-focus: 340px;                        /* one row in focus: tabs, a line, taller preview cards */
+  --xp-card-w: 156px;                       /* the panel's preview cards */
+  --xp-card-img: 88px;
+  --z-xp-layer: 1;                          /* inside the Explore host: the panel, a row's arrows */
+  --z-xp-crown: 2;                          /* the crown and the sticky nav, above the panel */
+  --z-xp-rail: 3;                           /* the desktop nav, above both */
+  --pin-lit-scale: 1.25;                    /* the pin a card has chosen */
+  --grp-worship: #7040b5;
+  --grp-serve: #087d69;
+  --grp-culture: #c14f2a;
+  --grp-learn: #245fba;
+  --grp-audiences: #b33272;
+  --grp-business: #687d20;
+  --xp-max: 720px;                          /* the desktop Explore sheet */
+  --xp-tile-size: 84px;                     /* a Where to… tile */
+  --xp-dock-h: 64px;                        /* the sticky nav the crown becomes */
+  /* lowered strip hugs the cards (handle + photo + body + pads); no blank foot under the row */
+  --pp-card-w: 180px;                       /* preview card width in the pin carousel */
+  --pp-card-img: 136px;                     /* preview photo height */
+  --pp-card-body: 118px;                    /* title, category, gold meta, foot */
+  --pp-peek: calc(var(--hit) + var(--space-3) + var(--pp-card-img) + var(--pp-card-body) + var(--space-4) + env(safe-area-inset-bottom, 0px));
+  --xp-sheet: rgba(249, 248, 243, 0.95);
+  --xp-tile: rgba(236, 238, 240, 0.72);     /* frosted grey glass: tiles and tabs, including the selected one */
+  --xp-tile-line: rgba(39, 42, 37, 0.1);
+  --xp-tile-on: rgba(255, 255, 255, 0.94);  /* the selected tab: a more opaque grey plate, ink text, no gold */
+  --xp-tile-ink: #272a25;
+  --xp-muted: #6d7067;
 }
 
 /* ── 2. Tokens: dark (the setting, built from the same brand tokens) ── */
@@ -175,15 +220,15 @@
   --surface-1: #1a1714;
   --surface-2: #26221d;
   --card-bg: #ffffff;
-  --map-bg: #1d1f1a;              /* what the map shows before its tiles arrive */
+  --map-bg: #292929;              /* what the map shows before its tiles arrive (the old map's was warm beige) */
   --map-base: #292929;           /* dataviz-dark background hsl(0,0%,16%) */
 
   --text-1: #f7f4ee;
   --text-2: #b9ae9a;
 
-  --accent: #d4af37;
+  --accent: #f2bd22;
   --accent-contrast: #0a0908;
-  --accent-ink: #d4af37;
+  --accent-ink: #f2bd22;
 
   --ok: #62d68f;
   --closed: #ff8f80;
@@ -194,7 +239,7 @@
   --pin-label: #f7f4ee;
   --pin-label-halo: rgba(10, 9, 8, 0.9);
 
-  --focus-ring: #d4af37;
+  --focus-ring: #f2bd22;
   --divider: rgba(247, 244, 238, 0.14);
   --scrim: rgba(0, 0, 0, 0.55);
 
@@ -213,7 +258,13 @@
   --glass-bg: rgba(26, 23, 20, 0.84);
   --explore-bg: rgba(26, 23, 20, 0.96);
   --nav-dim: rgba(0, 0, 0, 0.32);
-  --accent-soft: rgba(212, 175, 55, 0.3);
+  --accent-soft: rgba(242, 189, 34, 0.3);
+  --xp-sheet: rgba(27, 28, 24, 0.95);
+  --xp-tile: rgba(60, 63, 68, 0.6);
+  --xp-tile-line: rgba(247, 246, 241, 0.14);
+  --xp-tile-on: rgba(90, 93, 98, 0.92);
+  --xp-tile-ink: #f7f6f1;
+  --xp-muted: #a9a89c;
 }
 
 /* ── 3. Reduced motion: every duration collapses, so no transition or
@@ -223,6 +274,7 @@
     --dur-fast: 0ms;
     --dur-base: 0ms;
     --dur-slow: 0ms;
+    --dur-morph: 0ms;
     --shimmer-dur: 0ms;
   }
 }
@@ -267,7 +319,7 @@
   height: max(100%, var(--hit));
   transform: translate(-50%, -50%);
 }
-.mv2-pin--contributor {
+.mv2-pin--disc {
   width: var(--pin-size);
   height: calc(var(--pin-size) + var(--pin-tail));
 }
@@ -278,25 +330,33 @@
   transform: scale(var(--pin-scale, 1));
   transition: transform var(--dur-base) var(--ease-enter);
 }
-.mv2-pin--contributor [data-mv2='body'] {
+.mv2-pin--disc [data-mv2='body'] {
   position: absolute;
   inset: 0;
   --pin-scale: var(--pin-mid-scale);
 }
-.cc-map[data-cc-photo='1'] .mv2-pin--contributor [data-mv2='body'] {
+.cc-map[data-cc-photo='1'] .mv2-pin--disc [data-mv2='body'] {
   --pin-scale: 1;
 }
 .mv2-pin--place [data-mv2='body'],
 .mv2-pin--idea [data-mv2='body'] {
   transform-origin: 50% 50%;
 }
-.mv2-pin.is-selected [data-mv2='body'] {
+.mv2-pin--disc.is-selected [data-mv2='body'] {
   --pin-scale: var(--pin-selected-scale);
 }
 .mv2-pin--place.is-selected [data-mv2='body'],
-.mv2-pin--event.is-selected [data-mv2='body'],
 .mv2-pin--idea.is-selected [data-mv2='body'] {
   --pin-scale: var(--pin-selected-scale-shape);
+}
+.mv2-pin.is-lit [data-mv2='body'] {
+  --pin-scale: var(--pin-lit-scale);
+}
+.mv2-pin.is-lit {
+  filter: drop-shadow(0 0 var(--space-2) var(--pin-cat));
+}
+.mv2-pin[data-quiet] {
+  opacity: var(--dim-opacity);
 }
 
 /* contributor: disc on a tail */
@@ -311,7 +371,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  border: var(--pin-border-w) solid var(--pin-border);
+  border: var(--pin-disc-border-w) solid var(--pin-border);
   background: var(--pin-cat);
   color: var(--pin-glyph);
   box-shadow: 0 0 0 1px var(--pin-hairline), var(--pin-lift);
@@ -517,6 +577,17 @@
   width: var(--hit);
   height: var(--hit);
   transform: translate(-50%, -50%);
+}
+
+/* Motion waits for the stylesheet. This file arrives after the screen has mounted (map-v2-lib.jsx adds it), so the
+   first styled frame would otherwise ANIMATE every panel from its unstyled place: the Explore panel slid down over the
+   map on a slow load. map-v2-lib.jsx sets data-mv2-motion two frames after this file has loaded; until then nothing
+   here moves, and changing the transition itself starts none. */
+:root:not([data-mv2-motion]) [data-mv2],
+:root:not([data-mv2-motion]) [data-mv2]::before,
+:root:not([data-mv2-motion]) [data-mv2]::after {
+  transition: none !important;
+  animation: none !important;
 }
 
 /* ── 4b. Sheet (app/map-v2-sheet.jsx) ───────────────────────────────
@@ -1435,7 +1506,7 @@
   justify-content: center;
   box-sizing: border-box;
   padding: max(var(--space-3), env(safe-area-inset-top, 0px)) var(--space-3) max(var(--space-3), env(safe-area-inset-bottom, 0px));
-  background: var(--scrim);
+  background: color-mix(in srgb, var(--scrim) 72%, transparent);
   -webkit-backdrop-filter: blur(var(--scrim-blur));
   backdrop-filter: blur(var(--scrim-blur));
   touch-action: none;
@@ -1451,10 +1522,12 @@
   max-height: 100%;
   min-height: 0;
   overflow: hidden;
-  border-radius: var(--sheet-radius);
-  background: var(--surface-1);
+  border-radius: var(--reader-radius);
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
   color: var(--text-1);
-  box-shadow: var(--elev-2);
+  box-shadow: var(--reader-elev);
+  -webkit-backdrop-filter: blur(var(--reader-card-blur));
+  backdrop-filter: blur(var(--reader-card-blur));
   animation: mv2-news-in var(--dur-base) var(--ease-enter) both;
 }
 [data-mv2='news-head'] {
@@ -1462,8 +1535,30 @@
   flex: none;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
   border-bottom: 1px solid var(--divider);
+}
+[data-mv2='news-back'] {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gallery-gap);
+  min-height: var(--hit);
+  margin: 0;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-1);
+  font-family: inherit;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='news-back']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 [data-mv2='news-from'] {
   flex: 1 1 auto;
@@ -1524,9 +1619,13 @@
   text-underline-offset: var(--focus-offset);
 }
 @media (prefers-reduced-transparency: reduce) {
-  [data-mv2='news'] {
+  [data-mv2='news'],
+  [data-mv2='news-card'] {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+  }
+  [data-mv2='news-card'] {
+    background: var(--surface-1);
   }
 }
 
@@ -1963,6 +2062,13 @@ a[data-mv2='card2'],
 [data-mv2='hrow-item'] > [data-mv2='card2'] {
   flex: 1 1 auto;
   min-width: 0;
+  min-height: calc(var(--hit) + var(--space-6));
+}
+/* News / text posts in profile carousels: keep a readable card even without a photo */
+[data-mv2='profile-row'] [data-mv2='card2'][data-variant='text'],
+[data-mv2='profile-row'] [data-mv2='card2'][data-news] {
+  min-height: calc(var(--hit) * 2);
+  background: var(--surface-0);
 }
 /* the cards in a row share a height, so "Read more" sits at the bottom of each */
 [data-mv2='hrow'] > [data-layout='row'] [data-mv2='card-copy'] > [data-mv2='post-more'] {
@@ -2205,7 +2311,9 @@ a[data-mv2='card2'],
 }
 [data-mv2='home-search']:focus-within {
   border-color: var(--accent-ink);
-  box-shadow: 0 0 0 1px var(--accent-ink), var(--elev-1);
+  background: var(--surface-0);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 [data-mv2='home-search'] input {
   flex: 1 1 auto;
@@ -2384,7 +2492,7 @@ a[data-mv2='card2'],
    on its chip and a top edge. A pin tap outlines its card in gold (--select-w) and says so in words
    ("Selected on the map"). The home screen shows this row OR the listing sheet, never both. Outside the sheet the
    row's touch rule falls back to plain pan-x (4i), so a sideways swipe scrolls the row and nothing else. */
-[data-mv2='explore'] {
+[data-mv2='explore-legacy'] {
   --hrow-card-w: var(--explore-row-card-w);
   position: absolute;
   left: 0;
@@ -2402,10 +2510,10 @@ a[data-mv2='card2'],
   color: var(--text-1);
   font-family: var(--font-body);
 }
-[data-mv2='explore'][hidden] {
+[data-mv2='explore-legacy'][hidden] {
   display: none;
 }
-[data-mv2='home'][data-narrow] [data-mv2='explore'] {
+[data-mv2='home'][data-narrow] [data-mv2='explore-legacy'] {
   margin: 0 var(--space-2);
   border-radius: var(--sheet-radius);
 }
@@ -2439,7 +2547,7 @@ a[data-mv2='card2'],
 [data-mv2='explore-title'] {
   flex: none;
   margin: 0;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: var(--fs-3);
   line-height: var(--lh-3);
   font-weight: var(--fw-semibold);
@@ -2510,10 +2618,10 @@ a[data-mv2='card2'],
   outline-offset: var(--focus-offset);
 }
 /* Lowered: the title strip only. The body keeps its box (and so the cards keep their scroll place); it is just not seen. */
-[data-mv2='explore'][data-min] {
+[data-mv2='explore-legacy'][data-min] {
   padding-bottom: var(--space-1);
 }
-[data-mv2='explore'][data-min] [data-mv2='explore-body'] {
+[data-mv2='explore-legacy'][data-min] [data-mv2='explore-body'] {
   height: 0;
   min-height: 0;
   overflow: hidden;
@@ -2650,7 +2758,7 @@ a[data-mv2='card2'],
   line-height: var(--lh-2);
   color: var(--text-2);
 }
-[data-mv2='explore'] [data-mv2='hrow-item'] > [data-mv2='explore-card'] {
+[data-mv2='explore-legacy'] [data-mv2='hrow-item'] > [data-mv2='explore-card'] {
   position: relative;
   display: flex;
   flex: 1 1 auto;
@@ -2662,14 +2770,14 @@ a[data-mv2='card2'],
   border-top: var(--select-w) solid var(--cat-c, var(--divider));
 }
 /* the home panel's cards (founder, 2026-10-30): narrower, a flatter picture and tighter padding, so more of the map shows */
-[data-mv2='explore'] [data-mv2='card2'] {
+[data-mv2='explore-legacy'] [data-mv2='card2'] {
   gap: var(--space-1);
   padding: var(--space-2);
 }
-[data-mv2='explore'] [data-mv2='card-media'] {
+[data-mv2='explore-legacy'] [data-mv2='card-media'] {
   aspect-ratio: var(--explore-cover-ratio);
 }
-[data-mv2='explore'] [data-mv2='explore-badge'] {
+[data-mv2='explore-legacy'] [data-mv2='explore-badge'] {
   top: calc(var(--space-2) * 2);
   left: calc(var(--space-2) * 2);
 }
@@ -2708,12 +2816,12 @@ a[data-mv2='card2'],
   overflow: hidden;
   white-space: nowrap;
 }
-[data-mv2='explore'] [data-mv2='explore-view'] > [data-mv2='hrow'] > [data-mv2='hrow-head'] {
+[data-mv2='explore-legacy'] [data-mv2='explore-view'] > [data-mv2='hrow'] > [data-mv2='hrow-head'] {
   position: absolute;
   top: calc(var(--explore-grab-h) - var(--space-1));
   right: var(--space-4);
 }
-[data-mv2='explore']:has([data-mv2='hrow-nav']) [data-mv2='explore-all'] {
+[data-mv2='explore-legacy']:has([data-mv2='hrow-nav']) [data-mv2='explore-all'] {
   margin-right: calc(var(--hit) * 2 + var(--space-1) + var(--space-2));
 }
 /* What the next tap does ("Tap again to open"), in words, over the picture's corner: it takes no space, so choosing a
@@ -3002,9 +3110,19 @@ a[data-mv2='card2'],
   flex-direction: column;
   gap: var(--space-2);
   padding: 0 0 var(--space-3);
+  font-family: var(--font-body);
 }
 [data-mv2='xhead'] > [data-mv2='card-media'] {
   border-radius: var(--radius-md);
+}
+/* raised pin-peek / expanded card: PR 383 body font + spacing (not the old display serif) */
+[data-mv2='sheet'][data-inline] [data-mv2='xhead'] [data-mv2='name'],
+[data-mv2='sheet'][data-expanded] [data-mv2='xhead'] [data-mv2='name'] {
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
 }
 [data-mv2='xmeta'] {
   display: flex;
@@ -3012,6 +3130,7 @@ a[data-mv2='card2'],
   align-items: center;
   gap: var(--space-2);
   margin: 0;
+  font-family: var(--font-body);
 }
 /* C41: "Open to collaborate". Gold fill with the contrast label (never white on gold).
    Words carry the meaning; the icon is decorative. Not a control, so it does not take a hit target. */
@@ -3323,5 +3442,1663 @@ a[data-mv2='card2'],
   [data-mv2='lets-starter']:active,
   [data-mv2='lets-card']:active {
     transform: none;
+  }
+}
+
+/* ── Pack 08. The home Explore panel, the crown, and the nav (app/map-v2-explore.jsx, app/home.jsx).
+   Founder, 2026-11-17: four looks of one panel (data-mode): rest (the crown alone, a phone's default), strip (the
+   handle and the Where to… tiles), focus (one row's tabs and cards at ONE fixed height) and open (every row). The panel
+   is always its full height and slides by transform (never by height), so moving it costs the phone no layout; the
+   crown and the sticky nav swap outright with a short fade, no morph. Tiles and tabs are frosted grey; gold is the
+   crown's ring and the Explore more mark. */
+[data-mv2='home'][data-crown] {
+  --explore-h: 0px;
+  --nav-clear: 0px;
+}
+/* The map screen never scrolls. `hidden` alone still lets a focus or a scrollIntoView (a keyboard Tab onto a tile while
+   the panel is still sliding in) scroll the whole screen up under the person; `clip` cannot be scrolled at all. The
+   doubled attribute outranks Tailwind's .overflow-hidden, which stays as the fallback where clip is unknown. */
+[data-mv2='home'][data-screen] {
+  overflow: clip;
+}
+/* What the panel covers, for the map's corner, credit and controls (they sit just above it). Read from the panel's look,
+   so it never waits on a measurement. At rest they clear the crown. */
+[data-mv2='home'][data-crown]:has([data-mv2='explore-host'][data-mode='rest']) {
+  --explore-h: calc(var(--crown) + var(--space-4));
+}
+[data-mv2='home'][data-crown]:has([data-mv2='explore-host'][data-mode='strip']) {
+  --explore-h: var(--xp-strip);
+}
+[data-mv2='home'][data-crown]:has([data-mv2='explore-host'][data-mode='focus']) {
+  --explore-h: var(--xp-focus);
+}
+[data-mv2='explore-host'] {
+  --xp-vis: 0px;
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--z-controls) + 2);
+  pointer-events: none;
+}
+[data-mv2='explore-host'][data-mode='strip'] {
+  --xp-vis: var(--xp-strip);
+}
+[data-mv2='explore-host'][data-mode='focus'] {
+  --xp-vis: var(--xp-focus);
+}
+[data-mv2='explore-host'][data-mode='open'] {
+  --xp-vis: 100%;
+}
+[data-mv2='explore-host'][hidden] {
+  display: none;
+}
+[data-mv2='explore-scrim'] {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  pointer-events: none;
+  transition: background var(--dur-base) var(--ease-enter);
+}
+[data-mv2='explore-host'][data-open] [data-mv2='explore-scrim'] {
+  background: var(--nav-dim);
+  pointer-events: auto;
+}
+[data-mv2='explore'] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: env(safe-area-inset-bottom, 0px);
+  z-index: var(--z-xp-layer);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  height: calc(100% - var(--xp-dock-h) - env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--divider);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--xp-sheet);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-2);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  pointer-events: auto;
+  overflow: hidden;
+  transform: translateY(calc(100% - var(--xp-vis)));
+  transition: transform var(--dur-slow) var(--ease-enter), visibility 0s;
+}
+/* At rest the panel is off screen: out of reach of a tap (and, through `inert`, of the keyboard) once it has slid away. */
+[data-mv2='explore'][data-mode='rest'] {
+  visibility: hidden;
+  transition: transform var(--dur-slow) var(--ease-enter), visibility 0s linear var(--dur-slow);
+}
+[data-mv2='home']:not([data-narrow]) [data-mv2='explore'] {
+  left: 50%;
+  right: auto;
+  width: min(var(--xp-max), calc(100% - var(--space-8)));
+  transform: translateX(-50%) translateY(calc(100% - var(--xp-vis)));
+}
+/* Drawer chrome: centred handle (+ up chevron when lowest) and muted brand mark at top-right */
+[data-mv2='explore-grab'] {
+  position: relative;
+  flex: 0 0 auto;
+  height: var(--space-6);
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: grab;
+  touch-action: none;
+}
+[data-mv2='explore-handle'] {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--handle-stack-gap);
+  min-width: calc(var(--hit) * 1.5);
+  min-height: var(--hit);
+  color: var(--text-1);
+  opacity: 0.4;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+[data-mv2='explore-handle'] [data-mv2='handle-bar'] {
+  width: var(--handle-w);
+  height: var(--handle-h);
+  border-radius: var(--radius-full);
+  background: currentColor;
+  opacity: 0.7;
+}
+[data-mv2='explore-handle'] svg {
+  display: none;
+  margin-top: var(--handle-chevron-nudge);
+}
+[data-mv2='explore-grab'][data-hint='up'] [data-mv2='explore-handle'] svg {
+  display: block;
+}
+[data-mv2='explore'][data-open] [data-mv2='explore-handle'] {
+  opacity: 0.28;
+}
+[data-mv2='drawer-mark'] {
+  position: absolute;
+  top: 50%;
+  right: var(--space-4);
+  z-index: var(--z-xp-layer);
+  margin: 0;
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  opacity: 0.55;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+[data-mv2='where-block'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+}
+[data-mv2='where-lead'] {
+  margin: 0;
+  padding: var(--space-1) var(--space-5) 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+}
+[data-mv2='explore-scroll'] {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+[data-mv2='explore'][data-open] [data-mv2='explore-scroll'] {
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: calc(var(--xp-dock-h) + var(--space-8));
+}
+[data-mv2='xsec-h'] small,
+[data-mv2='xfocus-bar'] small {
+  font-family: var(--font-body);
+  font-size: var(--fs-1);
+  color: var(--xp-muted);
+}
+[data-mv2='xsec-h'] small {
+  min-width: 0;
+  text-align: right;
+}
+/* "All types" and "Close": plain words to tap (founder, 2026-11-17), with a full-size target around them */
+[data-mv2='explore-reset'] {
+  position: relative;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-1);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  text-decoration: underline;
+  text-underline-offset: var(--space-1);
+  cursor: pointer;
+}
+[data-mv2='explore-reset']::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--hit) - var(--lh-1)) / -2) calc(var(--space-3) * -1);
+}
+[data-mv2='explore-tiles'] {
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding: var(--space-1) var(--space-5) var(--space-3);
+  scrollbar-width: none;
+}
+[data-mv2='explore-tile'] {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  width: var(--xp-tile-size);
+  height: var(--xp-tile-size);
+  padding: 0;
+  border: 1px solid var(--xp-tile-line);
+  border-radius: var(--radius-lg);
+  background: var(--xp-tile);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-mv2='explore-tiles'][data-tabs] {
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+}
+[data-mv2='explore-tiles'][data-tabs] [data-mv2='explore-tile'] {
+  flex-direction: row;
+  width: auto;
+  min-width: var(--hit);
+  height: var(--hit);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+}
+[data-mv2='explore-tiles'][data-tabs] [data-mv2='explore-tile']:has(svg) {
+  padding-left: var(--space-2);
+}
+[data-mv2='explore-tile'][aria-selected='true'] {
+  background: var(--xp-tile-on);
+  color: var(--xp-tile-ink);
+  border-color: var(--text-1);
+}
+[data-mv2='explore-tile'] svg {
+  width: var(--space-6);
+  height: var(--space-6);
+}
+[data-mv2='explore-tiles'][data-tabs] [data-mv2='explore-tile'] svg {
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+}
+[data-mv2='explore-empty'] {
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-4);
+  font-size: var(--fs-2);
+  color: var(--xp-muted);
+}
+/* Focus chrome: subtle Back / Close on the corners (no "Live and nearby" / "Close" labels). */
+[data-mv2='xfocus-chrome'] {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--hit);
+  padding: 0 var(--space-2);
+}
+[data-mv2='xfocus-back'],
+[data-mv2='xfocus-close'] {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-6) + var(--space-1));
+  height: calc(var(--space-6) + var(--space-1));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  opacity: 0.9;
+}
+[data-mv2='xfocus-back']:hover,
+[data-mv2='xfocus-close']:hover,
+[data-mv2='xfocus-back']:focus-visible,
+[data-mv2='xfocus-close']:focus-visible {
+  opacity: 1;
+  color: var(--text-1);
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='tiles-wrap'] {
+  position: relative;
+  min-width: 0;
+}
+[data-mv2='tiles-wrap'] > [data-mv2='xarrow'] {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-xp-layer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+[data-mv2='tiles-wrap'] > [data-mv2='xarrow'][data-dir='prev'] {
+  left: var(--space-1);
+}
+[data-mv2='tiles-wrap'] > [data-mv2='xarrow'][data-dir='next'] {
+  right: var(--space-1);
+}
+/* the focus: tabs and the cards. Its height is the panel's (--xp-focus). */
+[data-mv2='xfocus-bar'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--space-5);
+  padding: 0 var(--space-5);
+}
+[data-mv2='xfocus-bar'] small {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+[data-mv2='xsec-h'] {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5) var(--space-2);
+}
+[data-mv2='xsec-h'] h3 {
+  flex: none;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+}
+/* a row's title takes the row over (its focus): it reads as the title it is, with a chevron-free plain button */
+[data-mv2='xsec-go'] {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+[data-mv2='xrow'] {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  overflow-x: auto;
+  padding: var(--space-1) var(--space-5) var(--space-3);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+/* The panel's cards (founder, 2026-11-17: smaller, so a row shows more of them and the map more of itself). */
+[data-mv2='xcard'] {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  width: var(--xp-card-w);
+  padding: 0;
+  border: 1px solid var(--xp-tile-line);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  text-align: left;
+  overflow: hidden;
+  scroll-snap-align: start;
+  box-shadow: var(--elev-1);
+  cursor: pointer;
+}
+[data-mv2='xcard'][data-selected] {
+  outline: var(--focus-w) solid var(--text-1);
+  outline-offset: calc(var(--space-1) * -1);
+}
+[data-mv2='xcard-img'] {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--xp-card-img);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+[data-mv2='xcard-img'] img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+[data-mv2='xcard-live'],
+[data-mv2='xcard-badge'] {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  color: var(--text-1);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='xcard-badge'] {
+  top: auto;
+  bottom: var(--space-1);
+}
+/* light NE-arrow cue on the photo (second tap for details) */
+[data-mv2='xcard-cue'] {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  color: var(--text-1);
+  box-shadow: var(--elev-1);
+  pointer-events: none;
+}
+[data-mv2='xcard-cue-icon'] {
+  display: block;
+}
+[data-mv2='xcard-live'] i {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--live);
+}
+[data-mv2='xcard-body'] {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  padding: var(--space-2) var(--space-2) var(--space-3);
+  font-family: var(--font-body);
+}
+[data-mv2='xcard-top'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+[data-mv2='xcard'][data-kind='event'] {
+  border-color: color-mix(in srgb, var(--cat-c, var(--xp-tile-line)) 35%, var(--xp-tile-line));
+}
+[data-mv2='xcard'][data-kind='event'] [data-mv2='xcard-img'] {
+  background: color-mix(in srgb, var(--cat-c, var(--surface-2)) 12%, var(--surface-2));
+}
+[data-mv2='xcard-body'] b {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-family: var(--font-body);
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-2);
+}
+[data-mv2='xcard-by'] {
+  display: block;
+  padding-left: var(--space-3);
+  color: var(--xp-muted);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-regular);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+[data-mv2='xcard-body'] small,
+[data-mv2='xcard-chip'],
+[data-mv2='xcard-meta'] {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-family: var(--font-body);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-regular);
+  color: var(--xp-muted);
+}
+[data-mv2='xcard-chip'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+}
+[data-mv2='xcard-chip'] > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* gold pin / calendar under the category, with street·building·suburb or the event date */
+[data-mv2='xcard-meta'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  color: var(--text-2);
+}
+[data-mv2='xcard-meta'] svg {
+  flex: none;
+  width: var(--icon-sm);
+  height: var(--icon-sm);
+  color: var(--accent);
+}
+[data-mv2='xcard-foot'] {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-width: 0;
+  margin-top: auto;
+  padding-top: var(--space-1);
+}
+[data-mv2='xcard-foot'] > :first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+[data-mv2='xcard-dist'] {
+  flex: none;
+  color: var(--xp-muted);
+  font-weight: var(--fw-semibold);
+}
+/* The crown: a glass circle on a gold ring, riding just above the panel (or the foot of the screen at rest). */
+[data-mv2='explore-crown'] {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
+  z-index: var(--z-xp-crown);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--crown);
+  height: var(--crown);
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-1);
+  pointer-events: auto;
+  cursor: pointer;
+  transform: translate(-50%, calc(var(--xp-vis) * -1));
+  transition: transform var(--dur-slow) var(--ease-enter);
+  animation: mv2-fade-in var(--dur-fast) linear;
+}
+[data-mv2='explore-crown'] img {
+  width: var(--space-7);
+  height: auto;
+}
+/* The sticky nav the crown gives way to while Explore is open: a plain swap, no morph (founder, 2026-11-17). */
+[data-mv2='explore-dock'] {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-4));
+  z-index: var(--z-xp-crown);
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  width: min(calc(var(--hit) * 6), calc(100% - var(--space-7)));
+  height: var(--xp-dock-h);
+  padding: 0 var(--space-2);
+  box-sizing: border-box;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-1);
+  pointer-events: auto;
+  transform: translateX(-50%);
+  animation: mv2-fade-in var(--dur-fast) linear;
+}
+[data-mv2='me-wrap'] {
+  position: relative;
+  display: flex;
+}
+/* the account menu opens over the panel's own cards: a solid surface keeps its words readable (the glass is for the map) */
+[data-mv2='me-wrap'] > div {
+  background: var(--surface-0);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+[data-mv2='explore-nav'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  min-width: var(--hit);
+  min-height: var(--hit);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+}
+[data-mv2='explore-nav'][aria-current='page'] {
+  background: var(--xp-tile-on);
+  color: var(--xp-tile-ink);
+}
+[data-mv2='explore-nav'] svg,
+[data-mv2='desktop-item'] svg {
+  width: var(--space-5);
+  height: var(--space-5);
+}
+[data-mv2='explore-nav'] small,
+[data-mv2='desktop-item'] small {
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='explore-nav'][data-emphasis] svg,
+[data-mv2='desktop-item'][data-emphasis] svg {
+  width: calc(var(--space-5) * 1.15);
+  height: calc(var(--space-5) * 1.15);
+}
+[data-mv2='explore-nav'][data-emphasis][aria-current='page'],
+[data-mv2='desktop-item'][data-emphasis][aria-current='page'] {
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+[data-mv2='explore-grab']:focus-visible,
+[data-mv2='explore-tile']:focus-visible,
+[data-mv2='explore-reset']:focus-visible,
+[data-mv2='xsec-go']:focus-visible,
+[data-mv2='xcard']:focus-visible,
+[data-mv2='explore-crown']:focus-visible,
+[data-mv2='explore-nav']:focus-visible,
+[data-mv2='desktop-crown']:focus-visible,
+[data-mv2='desktop-item']:focus-visible,
+[data-mv2='xarrow']:focus-visible,
+[data-mv2='explore-more']:focus-visible,
+[data-mv2='filter-row']:focus-visible,
+[data-mv2='filter-chip-x']:focus-visible,
+[data-mv2='home-find']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='explore-more'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin: var(--space-4) 0 var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+[data-mv2='explore-more-ring'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--crown);
+  height: var(--crown);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-full);
+  color: var(--accent-ink);
+}
+[data-mv2='explore-more-ring'] svg {
+  width: var(--space-5);
+  height: var(--space-5);
+}
+[data-mv2='explore-more'] small {
+  color: var(--accent-ink);
+  font-size: var(--fs-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='xrow-wrap'] {
+  position: relative;
+}
+[data-mv2='xarrow'] {
+  display: none;
+}
+@media (min-width: 64rem) {
+  @media (pointer: fine) {
+    [data-mv2='xarrow'] {
+      position: absolute;
+      top: 50%;
+      z-index: var(--z-xp-layer);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: var(--space-7);
+      height: var(--space-7);
+      border: 1px solid var(--divider);
+      border-radius: var(--radius-full);
+      background: var(--surface-0);
+      color: var(--text-1);
+      transform: translateY(-50%);
+      cursor: pointer;
+    }
+    [data-mv2='xarrow'][data-dir='prev'] { left: var(--space-2); }
+    [data-mv2='xarrow'][data-dir='next'] { right: var(--space-2); }
+  }
+}
+/* The desktop nav (founder, 2026-11-17): beside the search bar at the top left, its capsule exactly the crown's width. */
+[data-mv2='desktop-nav'] {
+  display: none;
+}
+@media (min-width: 64rem) {
+  [data-mv2='explore-host']:not([data-open]) [data-mv2='desktop-nav'] {
+    position: absolute;
+    left: var(--space-3);
+    top: max(var(--space-3), env(safe-area-inset-top, 0px));
+    z-index: var(--z-xp-rail);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-2);
+    width: var(--crown);
+    pointer-events: auto;
+  }
+  [data-mv2='explore-crown'] {
+    display: none;
+  }
+  /* the search bar starts after the crown, its middle level with the crown's */
+  [data-mv2='home'] [data-mv2='home-top'] {
+    padding-top: calc(max(var(--space-3), env(safe-area-inset-top, 0px)) + (var(--crown) - var(--hit)) / 2);
+  }
+  [data-mv2='home'] [data-mv2='home-bar'] {
+    padding-left: calc(var(--space-3) + var(--crown) + var(--space-3));
+  }
+  /* category chips start under the left edge of the search field (founder, 2026-11-22) */
+  [data-mv2='home'] [data-mv2='home-filters'] {
+    padding-left: calc(var(--space-3) + var(--crown) + var(--space-3));
+  }
+  [data-mv2='home'] [data-mv2='home-filters-wrap']::before {
+    left: calc(var(--space-3) + var(--crown) + var(--space-3));
+  }
+  [data-mv2='home'] [data-mv2='home-filters-arrow'][data-dir='prev'] {
+    left: calc(var(--space-3) + var(--crown) + var(--space-3));
+  }
+}
+[data-mv2='desktop-crown'],
+[data-mv2='desktop-items'] {
+  box-sizing: border-box;
+  width: var(--crown);
+  border: 1px solid var(--divider);
+  background: var(--surface-0);
+  color: var(--text-1);
+  box-shadow: var(--elev-1);
+}
+[data-mv2='desktop-crown'] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--crown);
+  padding: 0;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+[data-mv2='desktop-crown'] img {
+  width: calc(var(--crown) / 2);
+  height: auto;
+}
+[data-mv2='desktop-items'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) 0;
+  border-radius: var(--radius-full);
+}
+[data-mv2='desktop-item'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  width: calc(var(--crown) - var(--space-2));
+  min-height: var(--hit);
+  padding: var(--space-1) 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+}
+[data-mv2='desktop-item'] small {
+  font-size: var(--fs-1);
+}
+[data-mv2='desktop-item'][aria-current='page'] {
+  background: var(--surface-2);
+}
+/* The top bar's round Search button, where the account button was (founder, 2026-11-17). */
+[data-mv2='home-bar'] {
+  justify-content: flex-end;
+}
+[data-mv2='home-find'] {
+  flex: none;
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--hit) + var(--space-1));
+  height: calc(var(--hit) + var(--space-1));
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-full);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  cursor: pointer;
+}
+/* The filter chip (founder, 2026-11-17): small, in the filter's own colour, with its own clear button. */
+[data-mv2='filter-chip'] {
+  flex: 0 1 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 60%;
+  min-height: var(--space-7);
+  padding: 0 0 0 var(--space-3);
+  border: 1px solid var(--chip, var(--accent));
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--chip, var(--accent)) 14%, var(--surface-0));
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='home-bar']:not([data-search]) [data-mv2='filter-chip'] {
+  margin-right: auto;
+}
+[data-mv2='filter-chip-label'] {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+[data-mv2='filter-chip'] [data-mv2='filter-dot'] {
+  background: var(--chip);
+  box-shadow: 0 0 var(--space-2) var(--chip);
+}
+[data-mv2='filter-chip-x'] {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-7);
+  height: var(--space-7);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-1);
+  cursor: pointer;
+}
+[data-mv2='filter-chip-x']::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--hit) - var(--space-7)) / -2);
+}
+/* a pin inside a panel filter glows in its own colour (applyMatch, app/map-v2-pins.jsx) */
+.mv2-pin[data-match] {
+  filter: drop-shadow(0 0 var(--space-2) var(--pin-cat));
+}
+/* Category chips float under the search bar (not inside it): full-bleed scroll past Find, edge fades + arrows
+   (founder, 2026-11-22). */
+[data-mv2='home-filters-wrap'] {
+  position: relative;
+  width: 100%;
+  margin-top: var(--space-1);
+  pointer-events: auto;
+}
+[data-mv2='home-filters'] {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: none;
+  margin: 0;
+  padding: calc((var(--hit) - var(--space-7)) / 2) var(--space-3);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--space-3);
+  scrollbar-width: none;
+  touch-action: pan-x;
+  color: var(--text-1);
+}
+[data-mv2='home-filters']::-webkit-scrollbar {
+  display: none;
+}
+/* Soft edge fades where further scrolling is available */
+[data-mv2='home-filters-wrap']::before,
+[data-mv2='home-filters-wrap']::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--space-7);
+  z-index: var(--z-sticky);
+  pointer-events: none;
+}
+[data-mv2='home-filters-wrap']::before {
+  left: 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--surface-0) 88%, transparent), transparent);
+}
+[data-mv2='home-filters-wrap']::after {
+  right: 0;
+  background: linear-gradient(270deg, color-mix(in srgb, var(--surface-0) 88%, transparent), transparent);
+}
+[data-mv2='home-filters-arrow'] {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-xp-layer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+[data-mv2='home-filters-arrow'][data-dir='prev'] {
+  left: var(--space-2);
+}
+[data-mv2='home-filters-arrow'][data-dir='next'] {
+  right: var(--space-2);
+}
+/* Hide the folding nav while search categories are open (founder, 2026-11-22). */
+body:has([data-mv2='home-top'][data-search]) [data-mv2='nav'],
+body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
+  visibility: hidden;
+  pointer-events: none;
+}
+[data-mv2='filter-row'] {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--space-7);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  color: var(--text-1);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  scroll-snap-align: start;
+  cursor: pointer;
+}
+[data-mv2='filter-row']::after {
+  content: '';
+  position: absolute;
+  inset: calc((var(--hit) - var(--space-7)) / -2) calc(var(--space-1) * -1);
+}
+[data-mv2='filter-row'][aria-checked='true'] {
+  border-color: var(--chip, var(--text-1));
+  background: color-mix(in srgb, var(--chip, var(--text-1)) 16%, var(--surface-0));
+}
+[data-mv2='filter-dot'] {
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  border: 1px solid var(--chip, var(--text-2));
+  border-radius: var(--radius-full);
+  background: transparent;
+  box-shadow: 0 0 var(--space-2) transparent;
+}
+[data-mv2='filter-row'][aria-checked='true'] [data-mv2='filter-dot'] {
+  background: var(--chip, var(--text-1));
+  box-shadow: 0 0 var(--space-2) var(--chip, var(--text-1));
+}
+
+/* ── Pack 09. The map home's levels (founder, 2026-11-18; app/home.jsx, app/map-v2-explore.jsx PinCarousel) ──────
+   Level 2, a pin tapped: the pin carousel rests at the foot (--pp-peek), its cards the Explore row's own, the chosen one
+   in the middle; the crown rides on its top edge. Level 3, the chosen card tapped again: the same box rises (transform
+   only, like the Explore panel) with a sticky bar (Back, Close) and the card's details below the cards. */
+[data-mv2='home'] {
+  /* raised: it stops below the top bar's buttons, so a slice of map and the Search button stay in view */
+  --pp-full: calc(100% - var(--hit) - var(--space-7) - env(safe-area-inset-top, 0px));
+}
+[data-mv2='pinpeek'] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  /* above explore-host so the sticky bar stays tappable when raised (founder, 2026-11-22) */
+  z-index: calc(var(--z-controls) + 3);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  height: var(--pp-full);
+  margin: 0;
+  padding: 0 0 env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid var(--divider);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--xp-sheet);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-2);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  touch-action: none;
+  transform: translateY(calc(100% - var(--pp-peek)));
+  transition: transform var(--dur-slow) var(--ease-enter);
+  animation: mv2-pp-in var(--dur-base) var(--ease-enter) both;
+}
+@keyframes mv2-pp-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+[data-mv2='pinpeek'][hidden] {
+  display: none;
+}
+[data-mv2='pinpeek'][data-raised] {
+  background: var(--surface-1);
+  overflow-y: auto;
+  touch-action: pan-y;
+  transform: translateY(0);
+}
+[data-mv2='home']:not([data-narrow]) [data-mv2='pinpeek'] {
+  left: 50%;
+  right: auto;
+  width: min(var(--xp-max), calc(100% - var(--space-8)));
+  transform: translateX(-50%) translateY(calc(100% - var(--pp-peek)));
+  animation: none;
+}
+[data-mv2='home']:not([data-narrow]) [data-mv2='pinpeek'][data-raised] {
+  transform: translateX(-50%);
+}
+[data-mv2='pinpeek-bar'] {
+  position: sticky;
+  top: 0;
+  /* above cover-foot / details so the handle stays tappable (founder, 2026-11-22) */
+  z-index: var(--z-xp-rail);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--hit);
+  padding: var(--space-1) var(--space-1) 0 var(--space-4);
+  touch-action: none;
+}
+/* lowered: sticky handle pill (drag affordance) + floating Close; status is for the screen reader */
+[data-mv2='pinpeek']:not([data-raised]) [data-mv2='pinpeek-bar'] {
+  position: relative;
+  justify-content: center;
+  min-height: var(--hit);
+  padding: var(--space-1) var(--space-1) 0;
+  background: transparent;
+  border: 0;
+}
+[data-mv2='pinpeek']:not([data-raised]) [data-mv2='pinpeek-status'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+[data-mv2='pinpeek']:not([data-raised]) [data-mv2='pinpeek-close'] {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--elev-1);
+}
+[data-mv2='pinpeek'][data-raised] [data-mv2='pinpeek-bar'] {
+  padding-left: var(--space-1);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--divider);
+}
+[data-mv2='pinpeek-back'],
+[data-mv2='pinpeek-close'] {
+  pointer-events: auto;
+  /* above the centred handle (rail+1) so X / Back stay clickable */
+  z-index: calc(var(--z-xp-rail) + 2);
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle'] {
+  pointer-events: auto;
+  position: absolute;
+  left: 50%;
+  top: var(--space-1);
+  z-index: calc(var(--z-xp-rail) + 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--handle-stack-gap);
+  /* sheet handle is width:100%; keep this a centred pill or it covers Close/Back */
+  width: auto;
+  min-width: calc(var(--hit) * 2);
+  min-height: var(--hit);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  transform: translateX(-50%);
+  cursor: grab;
+  touch-action: none;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle']:active {
+  cursor: grabbing;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle-bar'] {
+  pointer-events: none;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle'] svg {
+  display: none;
+  margin-top: var(--handle-chevron-nudge);
+  opacity: 0.7;
+  pointer-events: none;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='handle'][data-hint='up'] svg {
+  display: block;
+}
+[data-mv2='pinpeek-bar'] [data-mv2='drawer-mark'] {
+  right: calc(var(--hit) + var(--space-2));
+}
+[data-mv2='pinpeek-status'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  pointer-events: none;
+}
+/* Raised pinpeek: keep Explore under it (host is full-bleed and was stealing taps). */
+[data-mv2='home']:has([data-mv2='pinpeek'][data-raised]:not([hidden])) [data-mv2='explore-host'] {
+  z-index: calc(var(--z-controls) + 1);
+}
+/* Lowered carousel: crown rides the top edge and must sit above pinpeek (controls+3) to dismiss. */
+[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden]):not([data-raised])) [data-mv2='explore-host'] {
+  z-index: calc(var(--z-controls) + 4);
+  pointer-events: none;
+}
+[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden]):not([data-raised])) [data-mv2='explore-crown'] {
+  pointer-events: auto;
+}
+[data-mv2='pinpeek-back'],
+[data-mv2='pinpeek-close'] {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-width: var(--hit);
+  min-height: var(--hit);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-1);
+  font: inherit;
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='pinpeek-back']:focus-visible,
+[data-mv2='pinpeek-close']:focus-visible,
+[data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+/* The cards: the chosen one in the middle, its neighbours either side (snap to the middle; the row's padding lets the
+   first and the last reach it). A vertical swipe on them is the panel's (raise / back), a sideways one the row's. */
+[data-mv2='xrow-wrap'][data-peek] {
+  flex: none;
+}
+[data-mv2='xrow'][data-row='peek'] {
+  position: relative;
+  padding-inline: calc(50% - var(--pp-card-w) / 2);
+  padding-bottom: var(--space-4);
+  scroll-padding-inline: calc(50% - var(--pp-card-w) / 2);
+  touch-action: pan-x;
+}
+[data-mv2='pinpeek'][data-raised] [data-mv2='xrow'][data-row='peek'] {
+  touch-action: pan-x pan-y;
+}
+[data-mv2='xrow'][data-row='peek'] [data-mv2='xcard'] {
+  width: var(--pp-card-w);
+  min-height: calc(var(--pp-card-img) + var(--pp-card-body));
+  scroll-snap-align: center;
+}
+[data-mv2='xrow'][data-row='peek'] [data-mv2='xcard-img'] {
+  height: var(--pp-card-img);
+}
+[data-mv2='xrow'][data-row='peek'] [data-mv2='xcard-body'] {
+  min-height: var(--pp-card-body);
+}
+[data-mv2='xrow'][data-row='peek'] [data-mv2='xcard-body'] b {
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+}
+/* category colour ring (not gold) on the chosen preview card */
+[data-mv2='xrow'][data-row='peek'] [data-mv2='xcard'][data-selected] {
+  outline-color: var(--cat-c, var(--accent));
+}
+/* handle already clears the photo; keep a small gap under the bar */
+[data-mv2='pinpeek']:not([data-raised]) [data-mv2='xrow-wrap'][data-peek] {
+  padding-top: 0;
+}
+/* the arrows on every screen here (founder: "swipeable or with left/right arrows"), over the neighbours, never the chosen card */
+[data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow'] {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-xp-layer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--hit);
+  height: var(--hit);
+  padding: 0;
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  box-shadow: var(--elev-1);
+  color: var(--text-1);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+[data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow'][data-dir='prev'] {
+  left: var(--space-2);
+}
+[data-mv2='xrow-wrap'][data-peek] [data-mv2='xarrow'][data-dir='next'] {
+  right: var(--space-2);
+}
+[data-mv2='pinpeek-details'] {
+  flex: none;
+  padding: 0 var(--space-4) var(--space-6);
+  /* no hairline above the title — founder, 2026-11-22 */
+  border-top: 0;
+}
+/* "Connecting the Kingdom" interrupted hairline between profile and nested Explore */
+[data-mv2='slogan-rule'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 var(--space-4);
+  color: var(--text-2);
+  font-family: var(--font-body);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+[data-mv2='slogan-rule-line'] {
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--divider);
+}
+[data-mv2='slogan-rule-text'] {
+  flex: none;
+  max-width: 70%;
+  text-align: center;
+  white-space: nowrap;
+}
+[data-mv2='handle-row'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+[data-mv2='handle-chip'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-6) + var(--space-1));
+  height: calc(var(--space-6) + var(--space-1));
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  color: var(--accent);
+  text-decoration: none;
+}
+[data-mv2='handle-chip']:hover,
+[data-mv2='handle-chip']:focus-visible {
+  border-color: var(--accent);
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+/* Raised pinpeek: 16:9 cover; avatar + copy ~10px above bottom; tiles bottom-right (founder, 2026-11-22) */
+[data-mv2='xhead'][data-hero] {
+  gap: 0;
+  padding: 0 0 var(--space-2);
+}
+[data-mv2='cover-hero'] {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  border-radius: var(--radius-md);
+  overflow: visible;
+  isolation: isolate;
+}
+[data-mv2='cover-hero'] > [data-mv2='card-media'] {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+[data-mv2='cover-hero'] > [data-mv2='card-media'][data-blank] {
+  background: linear-gradient(135deg, var(--surface-2) 0%, var(--surface-1) 100%);
+}
+[data-mv2='cover-hero'] > [data-mv2='card-media'] img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+[data-mv2='cover-hero'] > [data-mv2='card-media'] svg {
+  display: none;
+}
+[data-mv2='cover-scrim'] {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--radius-md);
+  background: var(--cover-scrim);
+  pointer-events: none;
+  z-index: var(--z-sticky);
+}
+[data-mv2='cover-foot'] {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--cover-foot-inset);
+  z-index: var(--z-xp-layer);
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: var(--space-3);
+  pointer-events: none;
+}
+[data-mv2='cover-avatar'] {
+  flex: none;
+  /* slightly larger again (~60 → ~64) */
+  width: calc(var(--space-8) + var(--space-4));
+  height: calc(var(--space-8) + var(--space-4));
+  margin: 0;
+  border-radius: var(--radius-full);
+  border: var(--pin-ring-w) solid var(--surface-0);
+  box-shadow: var(--elev-2);
+  background: var(--surface-0);
+  overflow: hidden;
+  /* gentle hang under the cover edge — kept low so it does not climb the sticky nav */
+  transform: translateY(18%);
+}
+[data-mv2='cover-avatar'] [data-mv2='avatar'] {
+  width: 100%;
+  height: 100%;
+}
+[data-mv2='cover-copy'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  padding-bottom: var(--space-1);
+  padding-right: calc(var(--space-8) + var(--space-4));
+  color: var(--viewer-fg);
+  text-shadow: var(--cover-text-shadow);
+  pointer-events: none;
+}
+[data-mv2='cover-copy'] [data-mv2='name'] {
+  margin: 0;
+  color: inherit;
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.015em;
+}
+[data-mv2='cover-meta'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+}
+[data-mv2='cover-meta'] > [data-mv2='card-chip'] {
+  border-color: var(--on-media-muted);
+  background: var(--on-media-chip);
+  color: var(--viewer-fg);
+}
+[data-mv2='cover-meta'] > [data-mv2='cover-by'] {
+  display: block;
+  width: 100%;
+  padding-left: var(--space-3);
+  color: var(--on-media-muted);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-regular);
+  text-shadow: var(--cover-text-shadow);
+}
+[data-mv2='cover-rail'] {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--cover-foot-inset);
+  z-index: var(--z-xp-layer);
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 55%;
+  pointer-events: none;
+}
+[data-mv2='cover-tile'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--surface-0) 88%, transparent);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+  -webkit-backdrop-filter: blur(var(--cover-tile-blur));
+  backdrop-filter: blur(var(--cover-tile-blur));
+  text-shadow: none;
+}
+[data-mv2='cover-tile'] svg {
+  flex: none;
+  color: var(--accent-ink);
+}
+[data-mv2='xhead'][data-hero] > [data-mv2='handle-row'] {
+  /* room for the slight avatar hang only — no large empty gap */
+  margin-top: calc(var(--space-4) + var(--space-1));
+  padding-right: var(--space-4);
+}
+[data-mv2='sheet-foot'] {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-2);
+}
+[data-mv2='sheet-foot'] > [data-mv2='view-full'] {
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
+  margin-top: 0;
+  padding-inline: var(--space-5);
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--text-1);
+}
+[data-mv2='sheet-foot'] > [data-mv2='view-full']:hover,
+[data-mv2='sheet-foot'] > [data-mv2='view-full']:focus-visible {
+  background: var(--surface-2);
+}
+[data-mv2='report-compact'] {
+  display: flex;
+  justify-content: flex-start;
+  align-self: flex-start;
+  width: auto;
+}
+[data-mv2='report-compact'] [data-mv2='action'] {
+  min-width: 0;
+  min-height: var(--hit);
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-regular);
+  opacity: 0.75;
+}
+[data-mv2='report-compact'] [data-mv2='action'] svg {
+  width: var(--space-3);
+  height: var(--space-3);
+}
+[data-mv2='profile-carousels'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+}
+[data-mv2='profile-row-title'] {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-1);
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-1);
+}
+[data-mv2='hrow'][data-nav='float'] {
+  position: relative;
+}
+[data-mv2='hrow'][data-nav='float'] > [data-mv2='xarrow'] {
+  position: absolute;
+  top: 50%;
+  z-index: var(--z-xp-layer);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: calc(var(--space-6) + var(--space-1));
+  height: calc(var(--space-6) + var(--space-1));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-0);
+  color: var(--text-1);
+  box-shadow: var(--elev-1);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+[data-mv2='hrow'][data-nav='float'] > [data-mv2='xarrow'][data-dir='prev'] {
+  left: var(--space-2);
+}
+[data-mv2='hrow'][data-nav='float'] > [data-mv2='xarrow'][data-dir='next'] {
+  right: var(--space-2);
+}
+[data-mv2='hrow'][data-nav='float'] > [data-mv2='xarrow'][aria-disabled='true'] {
+  opacity: 0.35;
+  pointer-events: none;
+}
+[data-mv2='peek-explore'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  font-family: var(--font-body);
+}
+[data-mv2='peek-explore'] [data-mv2='explore-tiles'] {
+  padding-inline: 0;
+}
+[data-mv2='peek-explore'] [data-mv2='xsec-h'] h3,
+[data-mv2='peek-explore'] [data-mv2='xsec-go'] {
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  line-height: var(--lh-3);
+  font-weight: var(--fw-semibold);
+}
+/* the listing sheet, inline: no box, no motion, no scroller of its own (the raised carousel scrolls) */
+[data-mv2='sheet'][data-inline] {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  height: auto;
+  max-width: none;
+  margin-inline: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  animation: none;
+  touch-action: pan-y;
+}
+[data-mv2='sheet'][data-inline] [data-mv2='scroller'] {
+  overflow: visible;
+  padding-inline: 0;
+}
+/* the crown on the carousel's top edge (lowered); raised, the bar's Close does its job and the crown waits there hidden,
+   so lowering the carousel never sends it gliding up from the foot */
+[data-mv2='home']:has([data-mv2='pinpeek']:not([hidden])) [data-mv2='explore-crown'] {
+  transform: translate(-50%, calc((var(--pp-peek) - env(safe-area-inset-bottom, 0px) - var(--space-4) - var(--crown) / 2) * -1));
+}
+[data-mv2='home']:has([data-mv2='pinpeek'][data-raised]:not([hidden])) [data-mv2='explore-crown'] {
+  visibility: hidden;
+}
+/* the map's corner, credit and controls clear the lowered carousel */
+[data-mv2='home'][data-crown]:has([data-mv2='pinpeek']:not([hidden])) {
+  --explore-h: var(--pp-peek);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-mv2='pinpeek'] {
+    transition: none;
+    animation: none;
   }
 }

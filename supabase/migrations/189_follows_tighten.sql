@@ -1,7 +1,7 @@
 -- ════════════════════════════════════════════════════════════════════
 --  189_follows_tighten: S13 step 4 of 4 (who can read who follows whom). Authored as docs/proposals/s13c-follows-tighten.sql on
---  2026-10-17; applied 2026-10-18 through MCP apply_migration as `189_follows_tighten` on Stephen's yes in chat (pre-apply tag
---  `connect-pre-mig189-follows-tighten`). It waited for migrations 185 and 186 and for PR #137 to be LIVE in production (the four
+--  2026-10-17; applied 2026-10-18 through MCP apply_migration as `189_follows_tighten` on Stephen's yes in chat (no pre-apply
+--  git tag; the file need not be named). It waited for migrations 185 and 186 and for PR #137 to be LIVE in production (the four
 --  readers now ask the count functions or run as the admin client; checked against the production API first).
 --
 --  Before this, anyone holding the public key could list which person follows which Contributor or Place (SELECT policy `true`).

@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { useState } = React;
   const { cx, Avatar, Button, Field, Input, Textarea, Toggle, Segmented, MediaPicker, Empty } = window.UI;
@@ -66,7 +67,7 @@
         h('p', { className: 'text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-3' }, idea.description),
         confirmed
           ? h('div', { className: 'flex items-center gap-2 p-2.5 rounded-xl bg-[#DCFCE7] text-[#15803d]' }, h(Icon, { name: 'CheckCircle2', size: 15 }),
-              h('span', { className: 'text-xs font-bold' }, 'Confirmed Kingdom Project' + (typeof idea.collaborators === 'number' ? ' · ' + idea.collaborators + ' collaborators' : '')))
+              h('span', { className: 'text-xs font-bold' }, W.t('screen.ideas.confirmed') + (typeof idea.collaborators === 'number' ? ' · ' + idea.collaborators + ' collaborators' : '')))
           : inProcess
             ? h(F, null,
                 h('div', { className: 'flex items-center gap-2 p-2.5 rounded-xl bg-[#FEF3C7] text-[#92400E]' }, h(Icon, { name: 'Hammer', size: 15 }),
@@ -74,7 +75,7 @@
                 idea.associatedEventId
                   ? h(Button, { variant: 'soft', size: 'sm', className: 'w-full mt-2', icon: 'Calendar', onClick: () => go('event', { id: idea.associatedEventId }) }, 'View the kickoff event')
                   : (isLead && h(ScheduleKickoff, { idea })),
-                isAdmin && h(Button, { variant: 'success', size: 'sm', className: 'w-full mt-2', icon: 'CheckCircle2', onClick: () => confirmIdea(idea.id) }, 'Mark as Confirmed Kingdom Project'))
+                isAdmin && h(Button, { variant: 'success', size: 'sm', className: 'w-full mt-2', icon: 'CheckCircle2', onClick: () => confirmIdea(idea.id) }, 'Mark as ' + W.t('screen.ideas.confirmed')))
             : h(F, null,
                 h('div', { className: 'flex items-center justify-between mb-1' },
                   h('span', { className: 'text-xs font-bold text-foreground' }, idea.votes.toLocaleString() + ' of ' + idea.threshold.toLocaleString() + ' votes'),
@@ -85,19 +86,16 @@
 
   // Tier ranges mirror the server's validation (spec §4.2): the submitter picks
   // an exact goal within the tier's range; the top two tiers are fixed.
-  const IDEA_TIERS = [
-    { id: 'small_volunteer', label: 'Small Volunteer', min: 1, max: 20 },
-    { id: 'community', label: 'Community', min: 20, max: 100 },
-    { id: 'town', label: 'Town', min: 100, max: 1000 },
-    { id: 'funders_challenge', label: 'Funders Challenge', min: 5000, max: 5000, fixed: true },
-    { id: 'provincial_vision', label: 'Provincial Vision', min: 10000, max: 10000, fixed: true },
-  ];
+  // The world's ladder of goals (configuration `ideas.tiers`).
+  const IDEA_TIERS = (W.configuration.ideas ? W.configuration.ideas.tiers : []).map((t) => ({ id: t.id, label: t.label, min: t.min, max: t.max, fixed: t.fixed }));
+  // The goal a new idea starts on: "community" where the ladder has it, else its first goal.
+  const START_TIER = (IDEA_TIERS.find((t) => t.id === 'community') || IDEA_TIERS[0] || {}).id;
   function IdeaComposer({ onClose }) {
     const { submitIdea } = window.useApp();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [category, setCategory] = useState('');
-    const [tierId, setTierId] = useState('community');
+    const [tierId, setTierId] = useState(START_TIER);
     const [threshold, setThreshold] = useState(50);
     const [busy, setBusy] = useState(false);
     const tier = IDEA_TIERS.find((t) => t.id === tierId);
@@ -118,7 +116,7 @@
       h(Field, { label: 'Description' }, h(Textarea, { value: description, rows: 3, onChange: (e) => setDescription(e.target.value), placeholder: 'Describe the need, the vision, and what collaboration looks like…' })),
       h(Field, { label: 'Category' },
         h('div', { className: 'flex flex-wrap gap-1.5' }, window.DATA.EVENT_CATEGORIES.map((c) =>
-          h('button', { key: c.id, onClick: () => setCategory(category === c.id ? '' : c.id), className: 'px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors', style: category === c.id ? { background: c.hex, color: '#fff', borderColor: c.hex } : { borderColor: 'rgba(212,175,55,0.25)', color: '#7A7060' } }, c.short)))),
+          h('button', { key: c.id, onClick: () => setCategory(category === c.id ? '' : c.id), className: 'px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors', style: category === c.id ? { background: c.hex, color: '#fff', borderColor: c.hex } : { borderColor: 'rgba(242,189,34,0.25)', color: '#7A7060' } }, c.short)))),
       h(Field, { label: 'Project tier' },
         h('div', { className: 'flex flex-wrap gap-1.5' }, IDEA_TIERS.map((t) =>
           h('button', { key: t.id, onClick: () => pickTier(t), className: cx('px-2.5 py-1.5 rounded-xl text-[11px] font-bold border transition-colors', tierId === t.id ? 'gold-gradient text-white border-transparent' : 'border-border text-muted-foreground hover:border-gold/40') }, t.label)))),
@@ -136,7 +134,7 @@
     const map = { voting: 'voting', process: 'inProcess', confirmed: 'confirmed' };
     const list = ideas.filter((i) => i.status === map[tab]);
     return h('div', { className: 'flex-1 flex flex-col overflow-hidden bg-background', 'data-screen': 'community' },
-      h(Header, { icon: 'Lightbulb', title: 'Kingdom Projects', sub: 'Suggest a need. Rally people. Launch it together.',
+      h(Header, { icon: 'Lightbulb', title: W.t('screen.ideas.title'), sub: W.t('screen.ideas.subtitle'),
         right: h(Button, { variant: 'gold', size: 'sm', icon: 'Plus', onClick: () => setComposing((c) => !c) }, 'Suggest a need') }),
       h('div', { className: 'px-4 sm:px-5 py-3 border-b border-border' }, h(Segmented, { options: [{ value: 'voting', label: 'Voting Now' }, { value: 'process', label: 'In Process' }, { value: 'confirmed', label: 'Confirmed' }], value: tab, onChange: setTab })),
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8 px-4 sm:px-5 py-4' },
@@ -151,7 +149,7 @@
               h('p', { className: 'text-xs font-bold leading-relaxed' }, 'See a need in your community? Suggest it and let others rally around it.')),
             h('ol', { className: 'text-xs leading-relaxed space-y-1 pl-6 list-decimal' },
               h('li', null, 'People vote to collaborate until the goal is reached. Larger ideas are reviewed by an admin first.'),
-              h('li', null, 'It becomes a Kingdom Project and everyone who voted is told. Whoever suggested it leads it: they pick the kickoff date, and the voters are connected.')),
+              h('li', null, 'It becomes ' + W.term('ideaProject', 'a') + ' and everyone who voted is told. Whoever suggested it leads it: they pick the kickoff date, and the voters are connected.')),
             h('p', { className: 'text-xs leading-relaxed pl-6' }, 'Voting polls also appear on the Discover map.')),
           list.length === 0 ? h(Empty, { icon: 'Lightbulb', title: 'Nothing here yet', sub: tab === 'voting' ? 'Be the first — suggest a need in your community.' : undefined }) : list.map((i) => h(IdeaCard, { key: i.id, idea: i })))));
   }
@@ -198,22 +196,22 @@
   // allowlist); demo mode toggles the same keys locally.
   const NOTIF_PREFS = [
     ['event_reminders', 'Event reminders', 'Upcoming events you connected to'],
-    ['contributor_updates', 'Broadcasts & updates', 'New events and news from Contributors you follow, and updates from places & events you follow'],
+    ['contributor_updates', 'Broadcasts & updates', 'New events and news from ' + W.term('partner', 'many') + ' you follow, and updates from places & events you follow'],
     ['friends_activity', 'Friends', 'Friend requests & friend activity'],
     ['announcements', 'Announcements', 'Important platform announcements'],
-    ['weekly_digest', 'Weekly digest', 'A weekly summary of Kingdom activity'],
+    ['weekly_digest', 'Weekly digest', W.t('screen.settings.weeklyDigest')],
   ];
   // P2-04: the person's PRIVATE saved list. Only they see it; a listing is never told it was saved. Sorted by name (never by
   // how popular a listing is). A save whose listing is not on the map right now stays saved and is counted in the note.
   function SavedList() {
     const { savedContributors, savedPlaces, contributors, places, toggleSave, go } = window.useApp();
     const rows = [
-      ...contributors.filter((c) => savedContributors.has(c.id)).map((c) => ({ kind: 'contributor', page: 'profile', id: c.id, name: c.name, photo: c.profilePhoto, meta: 'Contributor' })),
+      ...contributors.filter((c) => savedContributors.has(c.id)).map((c) => ({ kind: 'contributor', page: 'profile', id: c.id, name: c.name, photo: c.profilePhoto, meta: W.t('screen.role.partner') })),
       ...places.filter((p) => savedPlaces.has(p.id)).map((p) => ({ kind: 'place', page: 'place', id: p.id, name: p.name, photo: '', meta: 'Place' })),
     ].sort((a, b) => String(a.name).localeCompare(String(b.name)));
     const hidden = savedContributors.size + savedPlaces.size - rows.length;
     if (!rows.length && !hidden) {
-      return h('p', { 'data-saved': 'empty', className: 'text-xs text-muted-foreground' }, 'Nothing saved yet. Tap Save on a Contributor or a Place on the map.');
+      return h('p', { 'data-saved': 'empty', className: 'text-xs text-muted-foreground' }, 'Nothing saved yet. Tap Save on ' + W.term('partner', 'a') + ' or a Place on the map.');
     }
     return h(F, null,
       h('ul', { 'data-saved': 'list', role: 'list', className: 'space-y-2' },
@@ -258,13 +256,13 @@
       h(Header, { icon: 'Settings', title: 'Settings', sub: 'Manage your profile & preferences' }),
       h('div', { id: 'main-scroll', className: 'flex-1 overflow-y-auto pb-28 md:pb-8 px-4 sm:px-5 py-4' },
         h('div', { className: 'max-w-2xl mx-auto space-y-4' },
-          h(Section, { title: 'Profile', sub: 'How you appear across Citizens Connect' },
+          h(Section, { title: 'Profile', sub: 'How you appear across ' + W.term('world') },
             h(Field, { label: 'Cover photo' }, h(MediaPicker, { value: coverPhoto, onChange: setCoverPhoto, aspect: '16/6', label: 'cover', scope: 'event-cover' })),
             h('div', { className: 'flex gap-4 items-end' },
               // 'avatar' scope uploads the file AND persists profiles.avatar_url.
               h('div', { className: 'w-24' }, h(Field, { label: 'Photo' }, h(MediaPicker, { value: profilePhoto, onChange: setProfilePhoto, aspect: '1/1', label: 'photo', scope: 'avatar' }))),
               h('div', { className: 'flex-1 space-y-3' },
-                h(Field, { label: 'Display name', hint: noName ? 'Add your name. Until you do, other people see you as “Citizen”.' : undefined },
+                h(Field, { label: 'Display name', hint: noName ? 'Add your name. Until you do, other people see you as “' + W.term('user', 'One') + '”.' : undefined },
                   h(Input, { value: name, placeholder: noName ? user.name : undefined, onChange: (e) => setName(e.target.value) })))),
             h(Field, { label: 'Bio' }, h(Textarea, { value: bio, rows: 3, onChange: (e) => setBio(e.target.value) })),
             // An uploaded photo is already persisted by /api/avatar; reflect it across
@@ -294,15 +292,15 @@
           // The Contributor call-to-action follows where the person is in the (D-12) flow:
           // waiting for an admin → their Dashboard; turned down → apply again; otherwise → apply.
           isCitizen && isPendingApplicant && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#FEF3C7] to-[#FDE68A]/50 border border-[#D97706]/20' },
-            h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Clock', size: 16, className: 'text-[#92400E]' }), h('p', { className: 'text-sm font-bold text-[#92400E]' }, 'Your Contributor application is being reviewed')),
+            h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Clock', size: 16, className: 'text-[#92400E]' }), h('p', { className: 'text-sm font-bold text-[#92400E]' }, W.t('screen.apply.pendingTitle'))),
             h('p', { className: 'text-xs text-[#92400E]/80 mb-3' }, 'You can finish your profile while you wait. It goes live once an admin approves it.'),
             h(Button, { variant: 'gold', size: 'sm', icon: 'LayoutDashboard', onClick: () => go('dashboard') }, 'Open my application')),
           isCitizen && !isPendingApplicant && h('div', { className: 'p-4 rounded-2xl bg-gradient-to-br from-[#FBF1CC] to-[#FCDD6C]/40 border border-gold/30' },
             h('div', { className: 'flex items-center gap-2 mb-1' }, h(Icon, { name: 'Award', size: 16, className: 'text-gold-dark' }), h('p', { className: 'text-sm font-bold text-gold-dark' }, contributorStatus === 'rejected' ? 'Your last application' : 'Weekly contribution')),
             h('p', { className: 'text-xs text-gold-dark/80 mb-3' }, contributorStatus === 'rejected'
-              ? "Your last Contributor application wasn't approved this time. The reason is in your notifications and email. You're welcome to make those changes and apply again."
-              : 'Citizens can post one community-organised event each week. Want to do more? Apply to become a Contributor.'),
-            h(Button, { variant: 'gold', size: 'sm', icon: 'Crown', onClick: () => go('apply') }, contributorStatus === 'rejected' ? 'Apply again' : 'Apply to become a Contributor')),
+              ? "Your last " + W.term('partner') + " application wasn't approved this time. The reason is in your notifications and email. You're welcome to make those changes and apply again."
+              : W.t('screen.communityEvents.rule') + ' Want to do more? ' + W.t('screen.apply.invite') + '.'),
+            h(Button, { variant: 'gold', size: 'sm', icon: 'Crown', onClick: () => go('apply') }, contributorStatus === 'rejected' ? 'Apply again' : W.t('screen.apply.invite'))),
 
           h(Section, { title: 'Account' },
             h('div', { className: 'flex items-center justify-between' },

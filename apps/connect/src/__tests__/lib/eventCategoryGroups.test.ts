@@ -23,7 +23,8 @@ const FOUNDER: Record<string, string[]> = {
   Serve: ["outreach-missions", "community-upliftment", "care-recovery"],
   "Learn & grow": ["education-equipping", "marriage-family"],
   "Culture & fun": ["arts-culture", "sport-recreation", "social-gatherings", "markets-expos"],
-  Audiences: ["mens-community", "womens-community", "youth-students", "kids", "members-only"],
+  Audiences: ["mens-community", "womens-community", "youth-students", "kids"],
+  Access: ["members-only"],
 };
 
 describe("event groups", () => {
@@ -43,8 +44,8 @@ describe("event groups", () => {
       expect(got).toEqual(slugs.map(() => label));
     }
     expect(eventGroupHeading("care-recovery")).toBe("Serve | Care & Recovery");
-    expect(eventCategoryGroup("members-only")?.label).toBe("Audiences");
-    expect(eventGroupHeading("members-only")).toBe("Audiences | Members Only");
+    expect(eventCategoryGroup("members-only")?.label).toBe("Access");
+    expect(eventGroupHeading("members-only")).toBe("Access | Members Only");
     for (const slug of Object.keys(EVENT_CATEGORY_GROUP)) {
       const name = CATEGORY_LABELS[slug as keyof typeof CATEGORY_LABELS];
       expect(eventGroupHeading(slug)).toBe(eventCategoryGroup(slug)!.label + " | " + name);

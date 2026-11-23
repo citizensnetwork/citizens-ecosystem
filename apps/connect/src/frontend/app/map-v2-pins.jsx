@@ -135,7 +135,9 @@
 
   // Place / Event / Idea keep the old silhouettes; the hairline is a wider dark stroke under the
   // white one, and the glyph colour is picked per fill. Geometry mirrors map.jsx pinSvg.
-  function shapeSvg({ shape, hex, glyph, selected }) {
+  function shapeSvg({ shape, hex, glyph, pinType }) {
+    // Rest size only. Selection grows the pin with a CSS transform, so the SVG is not rebuilt.
+    const selected = false;
     const svg = document.createElementNS(NS, 'svg');
     let w, h, body, gx, gy, gsize;
     if (shape === 'event') {
@@ -157,7 +159,7 @@
       gsize = Math.round(dd * 0.46); gx = c - gsize / 2; gy = c - gsize / 2;
       w = W; h = W;
     }
-    svg.setAttribute('data-cc-pin', shape);
+    svg.setAttribute('data-cc-pin', pinType || shape);
     svg.setAttribute('data-mv2', 'shape-svg');
     svg.setAttribute('width', String(w));
     svg.setAttribute('height', String(h));
@@ -176,44 +178,74 @@
    * deps: { lucideInner(name), icon (glyph name), hex (fill colour), strings (MapV2Strings.pin), onDismissBubble }
    * Returns the node; `.mv2-pin` carries data-state hooks the map toggles later.
    */
-  // Ink marker (approved shell): place 24px circle, event 43px rounded square, contributor 52px circle.
-  // Photos fill the face. No photo draws the category glyph. Gold is the broadcast pulse, not a selection ring.
-  function build(m, deps) {
-    const hex = deps.hex || '#7040b5';
-    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-    const type = m.type === 'idea' ? 'event' : m.type;
-    const root = document.createElement('span');
-    root.className = 'connect-marker marker-' + (m.type === 'place' ? 'place' : type === 'contributor' ? 'contributor' : 'event');
-    root.setAttribute('data-cc-pin', type);
-    if (m.isLive) root.classList.add('broadcasting');
-    root.style.setProperty('--marker-color', hex);
-    root.style.setProperty('--marker-paper', dark ? '#272a25' : '#f7f6f1');
-    root.style.setProperty('--marker-ink', dark ? '#f7f6f1' : '#272a25');
-    const frame = document.createElement('span');
-    frame.className = 'marker-frame';
-    const face = document.createElement('span');
-    const photo = m.type === 'place' ? '' : (m.profilePhoto || m.coverPhoto || '');
+  // Events wear the live disc and tail. Places wear the live filled circle.
+  // Contributors are not a pin: a profile status, shown through its places and events.
+  function discBody(root, m, hex, glyphInner, pinType) {
+    const bodyEl = document.createElement('span');
+    bodyEl.setAttribute('data-mv2', 'body');
+    const tail = document.createElement('span');
+    tail.setAttribute('data-mv2', 'tail');
+    const disc = document.createElement('span');
+    disc.setAttribute('data-mv2', 'disc');
+    disc.setAttribute('data-cc-pin', pinType);
+    disc.appendChild(glyphSvg(glyphInner, 'glyph'));
+    const photo = m.profilePhoto || m.coverPhoto || '';
     if (photo) {
-      face.className = 'marker-face photo-filled';
+      root.classList.add('has-logo');
+      disc.setAttribute('data-cc-logo', '1');
+      const wrap = document.createElement('span');
+      wrap.setAttribute('data-mv2', 'logo-wrap');
+      if (m.kind === 'individual') wrap.setAttribute('data-photo', '1');
       const img = document.createElement('img');
+      img.setAttribute('data-mv2', 'logo');
       img.alt = '';
       img.decoding = 'async';
-      img.setAttribute('data-mv2', 'logo');
+      img.width = 96; img.height = 96;
       img.setAttribute('data-src', photo);
-      img.src = photo;
       img.onload = () => { root.classList.add('is-loaded'); };
-      img.onerror = () => { root.classList.add('is-broken'); face.className = 'marker-face drawn-fallback'; img.remove(); const draw = document.createElement('span'); draw.className = 'marker-drawing'; if (window.ConnectChrome) draw.appendChild(window.ConnectChrome.glyphNode(m.category)); face.appendChild(draw); };
-      face.appendChild(img);
-    } else {
-      face.className = 'marker-face drawn-fallback';
-      const draw = document.createElement('span');
-      draw.className = 'marker-drawing';
-      if (window.ConnectChrome) draw.appendChild(window.ConnectChrome.glyphNode(m.category));
-      face.appendChild(draw);
+      img.onerror = () => { root.classList.add('is-broken'); };
+      wrap.appendChild(img);
+      disc.appendChild(wrap);
+      const badge = document.createElement('span');
+      badge.setAttribute('data-mv2', 'badge');
+      badge.appendChild(glyphSvg(glyphInner, 'badge-glyph'));
+      bodyEl.appendChild(badge);
     }
-    frame.appendChild(face);
-    root.appendChild(frame);
-    // TODO: a small online globe on the pin needs a dedicated online-event field. isLive drives the broadcast pulse only.
+    bodyEl.insertBefore(tail, bodyEl.firstChild);
+    bodyEl.insertBefore(disc, tail.nextSibling);
+    return bodyEl;
+  }
+
+  function build(m, deps) {
+    const hex = deps.hex;
+    const root = document.createElement('div');
+    const disc = m.type === 'event';
+    root.className = 'mv2-pin mv2-pin--' + m.type + (disc ? ' mv2-pin--disc' : '');
+    root.style.setProperty('--pin-cat', hex);
+    root.style.setProperty('--pin-glyph', glyphColor(hex));
+    const glyphInner = deps.lucideInner(deps.icon);
+
+    if (m.type === 'contributor') return root;
+    if (disc) {
+      root.appendChild(discBody(root, m, hex, glyphInner, 'event'));
+    } else if (m.type === 'place') {
+      const bodyEl = document.createElement('span');
+      bodyEl.setAttribute('data-mv2', 'body');
+      bodyEl.appendChild(shapeSvg({ shape: 'place', hex, glyph: glyphInner, pinType: 'place' }));
+      root.appendChild(bodyEl);
+    } else {
+      const bodyEl = document.createElement('span');
+      bodyEl.setAttribute('data-mv2', 'body');
+      bodyEl.appendChild(shapeSvg({ shape: 'idea', hex, glyph: glyphInner, pinType: 'idea' }));
+      root.appendChild(bodyEl);
+    }
+
+    if (m.isLive || m.isBusy) {
+      const dot = document.createElement('span');
+      dot.setAttribute('data-mv2', 'live');
+      dot.setAttribute('aria-hidden', 'true');
+      root.appendChild(dot);
+    }
 
     if (m.broadcast && m.broadcast.message) {
       const b = document.createElement('div');
@@ -234,8 +266,18 @@
       root.appendChild(b);
     }
 
+    if (m.title) {
+      const l = document.createElement('div');
+      l.setAttribute('data-mv2', 'label');
+      l.setAttribute('aria-hidden', 'true'); // the pin's aria-label already carries the name
+      const t = document.createElement('span');
+      t.setAttribute('data-mv2', 'label-text');
+      t.textContent = m.title;
+      l.appendChild(t);
+      root.appendChild(l);
+    }
+
     const count = document.createElement('span');
-    count.className = 'marker-more';
     count.setAttribute('data-mv2', 'count');
     count.setAttribute('aria-hidden', 'true');
     root.appendChild(count);
@@ -244,16 +286,13 @@
 
   // Make a marker's outer element an operable control (called once, when the element is created).
   function makeOperable(wrap, onActivate) {
-    wrap.classList.add('mv2-marker', 'mv2-focusable', 'marker-anchor');
-    const hit = document.createElement('button');
-    hit.type = 'button';
-    hit.className = 'marker-hit';
-    while (wrap.firstChild) hit.appendChild(wrap.firstChild);
-    wrap.appendChild(hit);
-    hit.addEventListener('keydown', (e) => {
+    wrap.classList.add('mv2-marker', 'mv2-focusable');
+    wrap.setAttribute('role', 'button');
+    wrap.setAttribute('tabindex', '0');
+    wrap.setAttribute('aria-haspopup', 'dialog');
+    wrap.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); e.stopPropagation(); onActivate(); }
     });
-    hit.addEventListener('click', (e) => { e.stopPropagation(); onActivate(); });
   }
 
   // Start loading a pin's logo (once). Safe to call repeatedly.
@@ -268,16 +307,30 @@
   // A pin outside the chosen category filter fades back. The attribute goes on the inner root, not the
   // marker's outer element (that one is restyled every frame of a pan).
   function applyDim(wrap, dim) {
-    wrap.classList.toggle('muted', !!dim);
+    const pin = wrap.querySelector('.mv2-pin');
+    if (pin && !!dim !== pin.hasAttribute('data-dim')) { if (dim) pin.setAttribute('data-dim', ''); else pin.removeAttribute('data-dim'); }
+  }
+
+  // A pin INSIDE a filter from the Explore panel glows softly in its own colour (founder, 2026-11-17: "I like the glow,
+  // keep it for all the panel's filters"). Same inner root as applyDim.
+  function applyMatch(wrap, on) {
+    const pin = wrap.querySelector('.mv2-pin');
+    if (pin && !!on !== pin.hasAttribute('data-match')) { if (on) pin.setAttribute('data-match', ''); else pin.removeAttribute('data-match'); }
+  }
+
+  function applyLit(wrap, lit, quiet) {
+    const pin = wrap.querySelector('.mv2-pin');
+    if (!pin) return;
+    pin.classList.toggle('is-lit', !!lit);
+    if (quiet) pin.setAttribute('data-quiet', '');
+    else pin.removeAttribute('data-quiet');
   }
 
   function applySelected(wrap, selected) {
-    const pin = wrap.querySelector('.connect-marker');
-    if (pin) pin.classList.toggle('chosen', !!selected);
-    wrap.classList.toggle('selected', !!selected);
+    const pin = wrap.querySelector('.mv2-pin');
+    if (pin) pin.classList.toggle('is-selected', !!selected);
     wrap.style.zIndex = selected ? '5' : '';
-    const hit = wrap.querySelector('.marker-hit');
-    if (hit) hit.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    wrap.setAttribute('aria-expanded', selected ? 'true' : 'false');
     if (selected) ensureLogo(wrap);
   }
 
@@ -299,7 +352,7 @@
       const c = v.el.querySelector('[data-mv2="count"]');
       if (!c) return;
       const n = heads.get(v.id);
-      const text = n ? '+' + n + ' more' : '';
+      const text = n ? '+' + n : '';
       if (c.textContent !== text) c.textContent = text;
       if (!!n !== c.hasAttribute('data-on')) { if (n) c.setAttribute('data-on', ''); else c.removeAttribute('data-on'); }
     });
@@ -324,6 +377,6 @@
 
   window.MapV2Pins = {
     photoShown, glyphColor, ariaLabelFor, comparePriority, overlapGroups, hiddenLabels,
-    build, makeOperable, ensureLogo, applyDim, applySelected, layoutOnIdle, OVERLAP_PX,
+    build, makeOperable, ensureLogo, applyDim, applyMatch, applySelected, applyLit, layoutOnIdle, OVERLAP_PX,
   };
 })();

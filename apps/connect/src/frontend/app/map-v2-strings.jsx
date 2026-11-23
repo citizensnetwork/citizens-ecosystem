@@ -38,6 +38,8 @@
       message: 'Message',
       by: 'by',
       with: 'with',
+      // interrupted divider under the raised pin-peek profile (founder, 2026-11-22)
+      slogan: 'Connecting the Kingdom',
       counts: (connected, considering) => connected + ' connected · ' + considering + ' considering',
       website: 'Website',
       call: 'Call',
@@ -45,7 +47,7 @@
       viewFull: 'View Full Profile',
       retry: 'Try again',
       tabsLabel: 'More about this listing',
-      tabs: { events: 'Events', news: 'News', today: 'Today', gallery: 'Gallery' },
+      tabs: { events: 'Events', news: 'News', posts: 'Posts', today: 'Today', gallery: 'Gallery' },
       // P2-09: an event two Contributors run together lists the OTHER host(s) under its title
       withHosts: (names) => 'With ' + names,
       // P2-07: the Events tab shows what is coming first; "Recent" is what already happened, newest first
@@ -87,6 +89,7 @@
       news: {
         readMore: 'Read more',
         close: 'Close news post',
+        back: 'Back',
         // The row of the newest posts. "See all" turns it into the full list in place; "Show fewer" puts it back.
         row: {
           label: 'Latest news',
@@ -116,12 +119,11 @@
       tag: { online: 'Online', noFixedPlace: 'No fixed place' },
       alsoReaching: 'Also reaching this area',
       // the globe button on the map (one labelled button, then the list)
-      here: 'Online here',
-      button: (n) => 'Online in this area, ' + n,
-      // under the sheet title: the area being served, never "on the map"
-      subtitle: (area) => 'Serving ' + area + ' \u00b7 not a physical venue',
+      button: (n) => 'Online in this area: ' + n + (n === 1 ? ' listing' : ' listings'),
+      // under the sheet title: honest about what the list is (C21: never "on the map")
+      subtitle: (area) => 'Online or no fixed place · ' + area,
       count: (n) => n + (n === 1 ? ' listing' : ' listings'),
-      closeSheet: 'Close online list',
+      closeSheet: 'Close the online list',
       // the main list is grouped by how specific the area they chose is, then A to Z
       groups: { suburb: 'This suburb', place: 'This city or town', province: 'The whole province' },
       rowMeta: (tag, area) => tag + ' · ' + area,
@@ -264,11 +266,19 @@
       title: 'Explore',
       seeAll: 'See all',
       seeAllLabel: 'See all listings',
-      label: 'Listings near you, closest first',
-      labelCentre: 'Listings near the middle of the map, closest first',
+      label: 'Nearest listings',
+      labelCentre: 'Nearest from the map centre',
       pillsLabel: 'Show on the map',
       search: 'Search events, places, people…',
       clearSearch: 'Clear search',
+      // the round Search button where the account button was (founder, 2026-11-17); on a phone it opens the bar
+      searchButton: 'Search',
+      closeSearch: 'Close search',
+      // the small chip at the top while a filter is on, in that filter's colour, with its own clear button
+      filterChip: (name) => 'Showing ' + name,
+      clearFilter: (name) => 'Clear ' + name,
+      // Event / Place / Contributor labels on preview cards
+      kinds: { event: 'Event', place: 'Place', contributor: 'Contributor' },
       groups: {
         all: 'All',
         worship: 'Churches & worship',
@@ -281,34 +291,95 @@
         ideas: 'Ideas',
       },
       // a card (or a pin) chosen: the card says what the next tap does, in words laid over its picture
-      selectedBadge: 'Tap again to open',
-      selectedAnnounce: (name) => name + ' is chosen. Press it again to open it.',
+      selectedBadge: 'Tap again',
+      selectedAnnounce: (name) => name + ' chosen. Tap again to open.',
+      // the search bar's category chips (founder, 2026-11-18: one small row that swipes sideways)
+      chipsLabel: 'Filter the map by category',
+      // the pin carousel (founder, 2026-11-18): a pin's card and its neighbours at the foot of the map
+      peek: {
+        label: 'Nearby on the map',
+        detailsBadge: 'Open details',
+        detailsCue: 'Open details',
+        // compact distance on the preview card (no "away")
+        dist: {
+          under: '< 100 m',
+          metres: (n) => n + ' m',
+          km: (n) => n + ' km',
+        },
+        prev: 'Previous',
+        next: 'Next',
+        back: 'Back',
+        close: 'Close details',
+        raise: 'Show details',
+        lower: 'Back to cards',
+        details: (name) => 'Details · ' + name,
+      },
       // the panel's own controls (founder, 2026-10-30): the title switches to the category list, the handle lowers the panel
-      chooseCategory: 'Choose a category',
-      backToListings: 'Back to the listings',
+      chooseCategory: 'Categories',
+      backToListings: 'Back',
       categoriesLabel: 'Categories',
       // C40: the list's own switch. "Where to…" is the intent view of the same rows.
-      listLabel: 'Browse the list',
+      listLabel: 'Browse',
       categoriesTab: 'Categories',
       intentsTab: 'Where to…',
       intentsLabel: 'Where to',
       whereTo: (word) => 'Where to ' + word,
-      emptyIntent: (word) => 'Nothing nearby for where to ' + word + '.',
+      emptyIntent: (word) => 'Nothing nearby for ' + word + '.',
       intents: {
         coffee: 'coffee', learn: 'learn', worship: 'worship', run: 'run', reset: 'reset',
         heal: 'heal', parent: 'parent', chill: 'chill', shop: 'shop', serve: 'serve',
       },
-      lower: 'Lower this panel to see more of the map',
-      raise: 'Raise this panel',
+      lower: 'Show more map',
+      raise: 'Raise panel',
       under: 'Under 100 m away',
       metres: (n) => n + ' m away',
       km: (n) => n + ' km away',
       centre: {
-        under: 'Under 100 m from the map centre',
-        metres: (n) => n + ' m from the map centre',
-        km: (n) => n + ' km from the map centre',
+        under: 'Under 100 m from centre',
+        metres: (n) => n + ' m from centre',
+        km: (n) => n + ' km from centre',
       },
-      empty: 'Nothing here yet. Move the map or pick another category.',
+      empty: 'Nothing here. Move the map or change the filter.',
+      // Pack 08: the home sheet. Tiles and tabs stay frosted grey; gold is only the crown's ring.
+      panel: {
+        where: 'Where to…',
+        whereLead: 'Where Christians…',
+        brandMark: 'Citizens Connect',
+        peek: 'Where to…',
+        around: 'Near & now',
+        aroundHint: 'Live and nearby',
+        weekend: 'This weekend',
+        weekendHint: 'Sat & Sun',
+        online: 'Online',
+        onlineHint: 'Join from anywhere',
+        fresh: 'New on Connect',
+        freshHint: 'Added this month',
+        more: 'More nearby',
+        moreHint: 'Closest of every kind',
+        seeAll: 'Explore more',
+        seeAllHint: 'Every type and area',
+        allTypes: 'All types',
+        closeRow: 'Close',
+        rows: 'Rows',
+        scrollLeft: 'Scroll left',
+        scrollRight: 'Scroll right',
+        hideNav: 'Hide nav',
+        showNav: 'Show nav',
+        // the crown (founder, 2026-11-17): it shows and hides Where to…, and with a filter on it clears everything
+        open: 'Where to…',
+        close: 'Hide',
+        reset: 'Clear filters',
+        home: 'Back to map',
+        // the handle
+        raise: 'Show all rows',
+        lower: 'Lower panel',
+        emptyTile: (word) => 'Nothing for ' + word + ' nearby.',
+        emptyRow: 'Nothing in this row yet.',
+        matches: (n, kind) => n + ' ' + kind,
+        kind: { event: 'events', place: 'places', contributor: 'contributors', idea: 'ideas' },
+        dock: 'Connect',
+        nav: { me: 'Me', map: 'Map', central: 'Central', do: 'Do', explore: 'Explore' },
+      },
     },
 
     // Issue #210 part 3: the Discover page that "See all" and the nav's Explore open (app/map-v2-discover.jsx).

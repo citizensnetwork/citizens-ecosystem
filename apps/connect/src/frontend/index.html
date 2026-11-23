@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -25,6 +25,12 @@
 <base href="/" />
 <title>Citizens Connect</title>
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<!-- Home-screen app (founder yes 2026-11-12): the manifest and the iPhone icon. Every path here and inside
+     manifest.json is relative, so it resolves under the base tag above, which is /citizens/connect/ on 219.co.za.
+     The icons are the crown on the manifest's background colour, full-bleed, the crown inside the maskable
+     safe zone. manifestFiles.test.ts fails if a listed file goes missing or a path turns absolute. -->
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -63,12 +69,12 @@
           card: 'rgba(255,255,255,0.82)', 'card-foreground': '#0A0908',
           popover: 'rgba(255,255,255,0.97)',
           primary: '#0A0908', 'primary-foreground': '#FFFFFF',
-          secondary: '#D4AF37', 'secondary-foreground': '#0A0908',
+          secondary: '#F2BD22', 'secondary-foreground': '#0A0908',
           muted: '#EDE8DC', 'muted-foreground': '#7A7060',
           accent: '#FBF1CC', 'accent-foreground': '#0A0908',
-          border: 'rgba(212,175,55,0.22)',
+          border: 'rgba(242,189,34,0.22)',
           destructive: '#c0392b',
-          gold: '#D4AF37', 'gold-light': '#FCDD6C', 'gold-dark': '#836100',
+          gold: '#F2BD22', 'gold-light': '#FCDD6C', 'gold-dark': '#836100',
         },
         fontFamily: {
           sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'sans-serif'],
@@ -84,11 +90,11 @@
 
 <style>
   :root {
-    /* THE gold (founder, 2026-10-31): the crown logo's own colour, sampled from the logo (#D4AF37). One fill gold; the
+    /* THE gold (founder, 2026-10-31): the crown logo's own colour, sampled from the logo (#F2BD22). One fill gold; the
        other values are its roles, never a second gold: --gold-light and --gold-deep are the gradient stops (light and
        amber, never brown), --gold-dark is the INK for gold text, rings and icons (plain gold on white is 1.74:1).
        Same values as Map v2's --accent and --accent-ink (its own stylesheet); a unit test keeps the two in step. */
-    --gold:#D4AF37; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#edeee5;
+    --gold:#F2BD22; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#EDE5D4;
     /* the crown mark's old, separate gold: now the same gold (kept so nothing that reads them breaks) */
     --gold-crown:var(--gold); --gold-crown-light:var(--gold-light); --gold-crown-dark:var(--gold-dark);
   }
@@ -132,8 +138,8 @@
   .scrollbar-none { scrollbar-width: none; }
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(212,175,55,0.4); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(212,175,55,0.7); }
+  ::-webkit-scrollbar-thumb { background: rgba(242,189,34,0.4); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(242,189,34,0.7); }
 
   /* animations */
   @keyframes pinPulse { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(2.4);opacity:0} }
@@ -206,6 +212,9 @@
      lockfile version with SRI — never a floating @2. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="config.js"></script>
+<!-- The world's words, categories and switches (engine step E7): the build bundles this
+     ESM entry into one hashed script. It runs before auth-client.js and the screens. -->
+<script src="engine-world.js"></script>
 
 <!-- Cache-busting for our own no-build scripts. The static host (python
      http.server / Capacitor) sends no cache headers, so browsers serve stale
@@ -213,16 +222,16 @@
      app/*.jsx so the live preview (and deployed clients) always load fresh code. -->
 <script src="auth-client.js?v=20261003a"></script>
 
-<script type="text/babel" src="app/icons.jsx?v=20260826c"></script>
+<script type="text/babel" src="app/icons.jsx?v=20261122m"></script>
 <script type="text/babel" src="app/routes.jsx?v=20261026c"></script>
-<script type="text/babel" src="app/map-v2-lib.jsx?v=20261101c"></script>
+<script type="text/babel" src="app/map-v2-lib.jsx?v=20261122m"></script>
 <script type="text/babel" src="app/saved-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/cohost-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/moments-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/convince-lib.jsx?v=20261018a"></script>
 <script type="text/babel" src="app/serving-areas-lib.jsx?v=20261022b"></script>
 <script type="text/babel" src="app/onboarding-presets-lib.jsx?v=20261101a"></script>
-<script type="text/babel" src="app/data.jsx?v=20261027a"></script>
+<script type="text/babel" src="app/data.jsx?v=20261122m"></script>
 <script type="text/babel" src="app/lets-lib.jsx?v=20261101a"></script>
 <script type="text/babel" src="app/store.jsx?v=20261101b"></script>
 <script type="text/babel" src="app/ui.jsx?v=20261031b"></script>
@@ -232,28 +241,24 @@
 <script type="text/babel" src="app/cohosts.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/moments.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/convince.jsx?v=20261018a"></script>
-<script type="text/babel" src="app/map-v2-strings.jsx?v=20261101c"></script>
+<script type="text/babel" src="app/map-v2-strings.jsx?v=20261122m"></script>
 <script type="text/babel" src="app/serving-areas.jsx?v=20261022a"></script>
 <script type="text/babel" src="app/map-v2-time.jsx?v=20261025a"></script>
 <script type="text/babel" src="app/map-v2-qr.jsx?v=20261019f"></script>
-<script type="text/babel" src="app/map-v2-pins.jsx?v=20261026a"></script>
-<script type="text/babel" src="app/map.jsx?v=20261031a"></script>
+<script type="text/babel" src="app/map-v2-pins.jsx?v=20261117a"></script>
+<script type="text/babel" src="app/map.jsx?v=20261122m"></script>
 <script type="text/babel" src="app/entity-card.jsx?v=20261031a"></script>
 <script type="text/babel" src="app/map-v2-gallery.jsx?v=20261019f"></script>
-<script type="text/babel" src="app/map-v2-news.jsx?v=20261019a"></script>
+<script type="text/babel" src="app/map-v2-news.jsx?v=20261122m"></script>
 <script type="text/babel" src="app/map-v2-card.jsx?v=20261026b"></script>
-<script type="text/babel" src="app/map-v2-row.jsx?v=20261025b"></script>
+<script type="text/babel" src="app/map-v2-row.jsx?v=20261122m"></script>
 <script type="text/babel" src="app/map-v2-nearby.jsx?v=20261025b"></script>
 <script type="text/babel" src="app/map-v2-online.jsx?v=20261026a"></script>
-<script type="text/babel" src="app/map-v2-sheet.jsx?v=20261101b"></script>
-<script type="text/babel" src="app/map-v2-explore.jsx?v=20261101b"></script>
-<script type="text/babel" src="app/connect-chrome.jsx?v=20261110a"></script>
-<script type="text/babel" src="app/connect-previews.jsx?v=20261110b"></script>
-<script type="text/babel" src="app/connect-explore.jsx?v=20261110b"></script>
-<script type="text/babel" src="app/connect-me.jsx?v=20261110b"></script>
+<script type="text/babel" src="app/map-v2-sheet.jsx?v=20261122m"></script>
+<script type="text/babel" src="app/map-v2-explore.jsx?v=20261122m"></script>
 <script type="text/babel" src="app/map-v2-nav.jsx?v=20261026c"></script>
 <script type="text/babel" src="app/map-v2-discover.jsx?v=20261030a"></script>
-<script type="text/babel" src="app/home.jsx?v=20261101b"></script>
+<script type="text/babel" src="app/home.jsx?v=20261122m"></script>
 <script type="text/babel" src="app/kingdom-discovery.jsx?v=20261002b"></script>
 <script type="text/babel" src="app/apply.jsx?v=20261101a"></script>
 <script type="text/babel" src="app/pending-application.jsx?v=20261022a"></script>
@@ -269,7 +274,7 @@
 <script type="text/babel" src="app/intake-upgrade.jsx?v=20261025a"></script>
 <script type="text/babel" src="app/tweaks-panel.jsx?v=20260615b"></script>
 <script type="text/babel" src="app/tweaks.jsx?v=20260826c"></script>
-<script type="text/babel" src="app/shell.jsx?v=20261031a"></script>
+<script type="text/babel" src="app/shell.jsx?v=20261117a"></script>
 <script type="text/babel" src="app/app.jsx?v=20260615b"></script>
 </body>
 </html>

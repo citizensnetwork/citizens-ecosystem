@@ -1,11 +1,13 @@
 -- ════════════════════════════════════════════════════════════════════
 --  202_lets_gatherings
 --
---  NOT APPLIED. The owner (Stephen) applies this file only after an
---  explicit yes in chat naming this file, with a pre-apply git tag
---  pushed first and the security advisor checked afterwards
---  (0 ERROR, no unexpected new finding). Do not apply it from a pull
---  request, and do not apply it to any database from an agent session.
+--  APPLIED (live version 20261101204247, after the founder's yes in chat).
+--  Rule from 2026-11-01: apply after the founder says yes in chat. The
+--  founder does not name the file, and there is no pre-apply git tag.
+--  After applying, run this migration's probe and the security advisor
+--  (0 ERROR, no unexpected new finding). Database, auth and security
+--  changes still need that yes. Do not apply it from an agent session
+--  before that yes.
 --
 --  Number 201 is free on main and is reserved for issue #314
 --  ("Open to collaborate"). This file is 202 so the two do not collide.

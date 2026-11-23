@@ -94,7 +94,9 @@ test.describe("the Apply wizard", () => {
     await expect(page.getByText("Step 1 of 3")).toBeVisible();
     await expect(page.locator("[data-serving-picker]")).toHaveCount(0);
     await expect(page.getByText("Where do you serve?")).toHaveCount(0);
-    expect(db.areaRequests).toEqual([]); // nothing is even fetched for them
+    // Wizard must not load the area tree (no ?parent=). The shell may still reread the public list.
+    expect(db.areaRequests.filter((r) => r.includes("parent="))).toEqual([]);
+    expect(db.calls.filter((c) => c.path === "service-areas")).toEqual([]);
   });
 
   test("saying 'no fixed location' reveals the picker inside the same step; opening ticks nothing; a tick never goes upward", async ({ page }) => {

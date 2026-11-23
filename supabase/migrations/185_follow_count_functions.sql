@@ -1,8 +1,8 @@
 -- ════════════════════════════════════════════════════════════════════
 --  185_follow_count_functions: S13 step 1 of 4 (who can read who follows whom). Authored as
 --  docs/proposals/s13a-follow-count-functions.sql on 2026-10-17; applied the same day through MCP apply_migration as
---  `185_follow_count_functions` on Stephen's yes in chat (one yes per file; pre-apply tag
---  `connect-pre-mig185-follow-count-functions`). Rollback-only probe
+--  `185_follow_count_functions` on Stephen's yes in chat (no pre-apply git tag; the file need not be named).
+--  Rollback-only probe
 --  docs/audit/probes/185_follow_count_functions.probe.sql: 18 of 18 PASS against the live functions, nothing left behind.
 --  Security advisor: 0 ERROR; 5 new WARN (125 -> 130), all by design: follower_count_public (callable by anon and signed-in,
 --  it returns only a bucket), follower_count_exact, recipient_follows_me and count_friends (signed-in only; each checks

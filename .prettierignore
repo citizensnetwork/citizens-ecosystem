@@ -14,3 +14,12 @@ supabase
 
 # Vendored third-party code (patched braces@3.0.3): keeps upstream style so a diff against upstream stays minimal
 packages/braces-patched
+# Vendored third-party code (patched picomatch@2.3.2 and picomatch@4.0.7), for the same reason
+packages/picomatch-2-patched
+packages/picomatch-4-patched
+
+# Engine database line: its SQL is not prettier-managed, and its JSON files are written by tools
+# (the cut, the lock) or kept as one entry per line on purpose. Its README is checked.
+supabase-engine/**/*.json
+# The control-plane line, for the same reasons.
+supabase-control/**/*.json

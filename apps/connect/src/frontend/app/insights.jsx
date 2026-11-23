@@ -4,6 +4,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
+  const W = window.WORLD; // words and categories of this world (engine-world.js)
   const F = React.Fragment;
   const { useState } = React;
   const { cx, Avatar, SmartImage, Button, Segmented, Empty } = window.UI;
@@ -174,7 +175,7 @@
     // audience by category
     const catCounts = {};
     myEvents.forEach((e) => { catCounts[e.category] = (catCounts[e.category] || 0) + e.connectCount; });
-    const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#D4AF37' }; });
+    const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#F2BD22' }; });
 
     return h('div', { className: 'space-y-4 fade-in' },
       real
@@ -223,7 +224,7 @@
                   h('div', { className: 'flex items-center justify-between gap-2 mb-1' },
                     h('p', { className: 'text-xs font-semibold text-foreground truncate' }, e.title),
                     h('span', { className: 'text-xs font-bold text-foreground shrink-0' }, e.connectCount.toLocaleString())),
-                  h('div', { className: 'h-2 rounded-full bg-muted overflow-hidden' }, h('div', { className: 'h-full rounded-full', style: { width: (e.connectCount / topMax * 100) + '%', background: c ? c.hex : '#D4AF37' } }))));
+                  h('div', { className: 'h-2 rounded-full bg-muted overflow-hidden' }, h('div', { className: 'h-full rounded-full', style: { width: (e.connectCount / topMax * 100) + '%', background: c ? c.hex : '#F2BD22' } }))));
             }))),
 
       h('div', { className: 'grid sm:grid-cols-2 gap-4' },
@@ -257,7 +258,7 @@
     // category distribution across all events
     const catCounts = {};
     events.forEach((e) => { catCounts[e.category] = (catCounts[e.category] || 0) + 1; });
-    const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#D4AF37' }; });
+    const catParts = Object.entries(catCounts).map(([id, v]) => { const c = window.DATA.getCategory(id); return { label: c ? c.short : id, value: v, color: c ? c.hex : '#F2BD22' }; });
 
     // growth (6 weeks): real mode = actual events-created-per-week from
     // created_at; demo keeps the synthetic two-series chart.
@@ -270,12 +271,12 @@
         if (age >= 0 && age < 6) weeks[5 - age] += 1;
       });
       growthGroups = ['-5w', '-4w', '-3w', '-2w', '-1w', 'now'];
-      growthSeries = [{ name: 'New events', color: '#D4AF37', data: weeks }];
+      growthSeries = [{ name: 'New events', color: '#F2BD22', data: weeks }];
     } else {
       const ev6 = [3, 4, 6, 8, 10, events.length].map((n, i) => Math.max(1, n - (5 - i)));
       const us6 = WEEKS.slice(0, 6).map((_, i) => 40 + Math.round(seed(i + 3) * 30) + i * 14);
       growthGroups = WEEKS.slice(0, 6);
-      growthSeries = [{ name: 'Events', color: '#D4AF37', data: ev6 }, { name: 'Citizens', color: '#2563EB', data: us6 }];
+      growthSeries = [{ name: 'Events', color: '#F2BD22', data: ev6 }, { name: W.term('user', 'Many'), color: '#2563EB', data: us6 }];
     }
 
     // activity feed: real mode = latest created events (honest, derivable
@@ -301,16 +302,16 @@
         h('button', {
           type: 'button', onClick: () => setTab('citizens'),
           className: 'bg-card rounded-2xl p-3 border border-border text-left hover:border-[#836100] transition-colors min-h-[44px]',
-          'aria-label': viewCount(memberCount, real ? 'member' : 'citizen'),
+          'aria-label': viewCount(memberCount, real ? 'member' : W.term('user').toLocaleLowerCase('en')),
         },
-          h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, real ? 'Members' : 'Citizens'),
+          h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, real ? 'Members' : W.term('user', 'Many')),
           h('p', { className: 'text-xl font-bold mt-1', style: { color: '#16A34A' } }, memberCount)),
         h('button', {
           type: 'button', onClick: () => setTab('contributors'),
           className: 'bg-card rounded-2xl p-3 border border-border text-left hover:border-[#836100] transition-colors min-h-[44px]',
-          'aria-label': viewCount(contributorCount, 'contributor'),
+          'aria-label': viewCount(contributorCount, W.term('partner').toLocaleLowerCase('en')),
         },
-          h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, 'Contributors'),
+          h('p', { className: 'text-[10px] text-muted-foreground font-semibold leading-tight' }, W.term('partner', 'Many')),
           h('p', { className: 'text-xl font-bold mt-1', style: { color: '#9B59B6' } }, contributorCount)),
         KpiCard('Live now', liveNow, '#DC2626', liveNow ? { up: false, text: 'on the map' } : null)),
 

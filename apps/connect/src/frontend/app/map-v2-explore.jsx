@@ -25,7 +25,7 @@
 // ════════════════════════════════════════════════════════════════════
 (function () {
   const h = React.createElement;
-  const { useState, useEffect, useRef, useMemo } = React;
+  const { useState, useEffect, useLayoutEffect, useRef, useMemo } = React;
 
   const ROW_CAP = 20;                // cards in the row: the nearest twenty (plus the selected one, wherever it is)
   const SETTLE_MS = 150;             // rank again only once the map has been still this long (a programmatic pan ends a move every frame)
@@ -264,37 +264,286 @@
       }));
   }
 
+  // Pack 08. Action tiles over the live categories. The founder's twelve come first;
+  // the rest are the categories those twelve do not already cover, so nothing on the map is unsuggested.
+  const TILES = [
+    { id: 'coffee', word: 'Coffee', icon: 'Coffee', categories: ['hospitality-cafes'] },
+    { id: 'church', word: 'Church', icon: 'Church', categories: ['churches-ministries'] },
+    { id: 'worship', word: 'Worship', icon: 'Music', categories: ['church-services', 'conferences-summits'] },
+    { id: 'market', word: 'Market', icon: 'Store', categories: ['markets-expos'] },
+    { id: 'run', word: 'Run', icon: 'Footprints', categories: ['sport-recreation', 'recreation-sport'] },
+    { id: 'social', word: 'Social', icon: 'Users', categories: ['social-gatherings'] },
+    { id: 'relax', word: 'Relax', icon: 'Leaf', categories: ['retreat-healing', 'safe-spaces'] },
+    { id: 'learn', word: 'Learn', icon: 'BookOpen', categories: ['education-equipping', 'education-training'] },
+    { id: 'serve', word: 'Serve', icon: 'HandHeart', categories: ['outreach-missions', 'community-upliftment'] },
+    { id: 'pray', word: 'Pray', icon: 'HeartHandshake', categories: ['worship-prayer'] },
+    { id: 'create', word: 'Create', icon: 'Palette', categories: ['arts-culture', 'arts-creative'] },
+    { id: 'kids', word: 'Kids', icon: 'Candy', categories: ['kids', 'youth-students'] },
+    { id: 'family', word: 'Family', icon: 'Users', categories: ['marriage-family'] },
+    { id: 'care', word: 'Care', icon: 'HeartPulse', categories: ['care-recovery', 'health-wellness', 'clinic', 'rehab-development'] },
+    { id: 'men', word: 'Men', icon: 'User', categories: ['mens-community'] },
+    { id: 'women', word: 'Women', icon: 'UserRound', categories: ['womens-community'] },
+    { id: 'shop', word: 'Shop', icon: 'ShoppingBag', categories: ['retail-shopping', 'christian-businesses'] },
+    { id: 'media', word: 'Media', icon: 'Radio', categories: ['media-broadcasting'] },
+    { id: 'members', word: 'Members', icon: 'KeyRound', categories: ['members-only'] },
+    { id: 'ideas', word: 'Ideas', icon: 'Lightbulb', categories: [], ideas: true },
+  ];
+  const TILE_OF = Object.create(null);
+  TILES.forEach((tile) => {
+    const set = Object.create(null);
+    (tile.categories || []).forEach((id) => { set[id] = true; });
+    TILE_OF[tile.id] = set;
+  });
+  function tileOf(id) {
+    for (let i = 0; i < TILES.length; i++) if (TILES[i].id === id) return TILES[i];
+    return null;
+  }
+  function tileMatches(id, m) {
+    const tile = tileOf(id);
+    const set = id && Object.prototype.hasOwnProperty.call(TILE_OF, id) ? TILE_OF[id] : null;
+    if (!tile || !set || !m) return false;
+    if (tile.ideas) return m.type === 'idea';
+    return typeof m.category === 'string' && Object.prototype.hasOwnProperty.call(set, m.category) && set[m.category] === true;
+  }
+  function tileFor(m) {
+    for (let i = 0; i < TILES.length; i++) if (tileMatches(TILES[i].id, m)) return TILES[i];
+    return null;
+  }
+  // The map home's nav. Do and Central are hidden until they are built out (founder, 2026-11-17); with them gone the
+  // sticky nav keeps Map in the middle (Explore, Map, Me). Me opens the account menu (the top-right person button is a
+  // Search button now), so everything that button held is one tap from the nav.
+  const DOCK = [
+    { id: 'explore', icon: 'Compass', page: 'explore' },
+    { id: 'map', icon: 'Map', close: true, emphasis: true },
+    { id: 'me', icon: 'User', me: true },
+  ];
+  const RAIL = [
+    { id: 'map', icon: 'Map', act: 'map', emphasis: true },
+    { id: 'explore', icon: 'Compass', act: 'open' },
+    { id: 'me', icon: 'User', me: true },
+  ];
+  // The account menu's extra rows on the map home: Let's\u2026 is a Do page, so it is hidden with Do.
+  const ME_EXTRAS = ['messages', 'notifications'];
+
+  // The panel's rows. Each one can take the panel over as a "focus" (founder, 2026-11-17): the panel settles at ONE
+  // height with that row's cards, and stays there while the person taps through cards and tabs.
+  const SECTIONS = ['around', 'weekend', 'online', 'fresh', 'more'];
+  const FINE_MQ = '(min-width: 1024px) and (pointer: fine)';
+  const DESK_MQ = '(min-width: 64rem)';    // the desktop nav beside the search bar takes over from the crown
+  const HOUR = 60 * 60 * 1000;
+  const DAY = 24 * HOUR;
+  const NEW_WINDOW = 30 * DAY;
+
+  function weekendBounds(now) {
+    const d = new Date(now);
+    const day = d.getDay();
+    const sat = new Date(d);
+    if (day === 0) sat.setDate(d.getDate() - 1);
+    else sat.setDate(d.getDate() + ((6 - day + 7) % 7));
+    sat.setHours(0, 0, 0, 0);
+    const end = new Date(sat);
+    end.setDate(sat.getDate() + 1);
+    end.setHours(23, 59, 59, 999);
+    return { start: sat.getTime(), end: end.getTime() };
+  }
+  /** Street-like address fragment (number or road word). Used to prefer building → street → suburb. */
+  function looksStreet(part) {
+    return /^\d/.test(part) || /\b(rd|road|st\.?|street|ave\.?|avenue|dr\.?|drive|ln\.?|lane|way|blvd|boulevard|cres(?:cent)?|close|straat)\b/i.test(part);
+  }
+
   /**
-   * The Explore panel. props: markers (what the map draws), sources ({ events, places, contributors }),
-   * apiRef (the map's), selectedId (the chosen listing), reveal ({ id, focus }: a PIN was tapped, so bring its card into
-   * view; a card tap sends none, and the row stays exactly where it is), hidden (the full listing is open),
-   * pill + onPill(id) + intent + onIntent(id) + ideas + onIdeas() (the category choice, which lives in this panel), min + onMin(bool) (the panel
-   * is lowered to its title strip, so the map's own buttons come back), onOpen(id, type) (a card was tapped),
-   * onSeeAll(), onHeight(px).
-   *
-   * While a listing is chosen the ranking is FROZEN: the map moves to the pin, and the cards must not reshuffle under
-   * the thumb. The panel ranks again the moment nothing is chosen.
+   * Short place line for a preview card: building name if the address has one, else the street,
+   * else the suburb (founder, 2026-11-22). City/town is never shown here.
+   */
+  function placeWhereLine(address, location) {
+    const raw = String(address || location || '').trim();
+    if (!raw) return '';
+    const parts = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (!parts.length) return '';
+    if (parts.length === 1) return parts[0];
+    const local = parts.slice(0, -1);
+    // Building only when it leads the address (before any street); else street, else suburb.
+    if (local[0] && !looksStreet(local[0])) return local[0];
+    const street = local.find(looksStreet);
+    if (street) return street;
+    return local[local.length - 1] || parts[0];
+  }
+
+  /** Event date only on preview cards (no weekday · time). */
+  function eventDateLine(m, rec) {
+    if (!m) return '';
+    const t = Date.parse(m.startsAt || (rec && rec.startsAt) || m.date || (rec && rec.date) || '');
+    if (isNaN(t)) return '';
+    return new Date(t).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  /** Meta under the category: gold pin + where (place) or gold calendar + date (event). */
+  function cardMetaLine(m, rec) {
+    if (!m) return { icon: '', text: '' };
+    if (m.type === 'place') {
+      return { icon: 'MapPin', text: placeWhereLine((rec && rec.address) || m.address, (rec && rec.location) || m.location) };
+    }
+    if (m.type === 'event') return { icon: 'Calendar', text: eventDateLine(m, rec) };
+    return { icon: '', text: '' };
+  }
+  function looksOnline(m, rec) {
+    const bits = [m && m.location, m && m.address, rec && rec.location, rec && rec.address, rec && rec.website];
+    const socials = rec && rec.socials;
+    if (socials && typeof socials === 'object') Object.keys(socials).forEach((k) => { if (typeof socials[k] === 'string') bits.push(socials[k]); });
+    return /online|zoom|livestream|live stream|meet\.google|teams\.microsoft/i.test(bits.filter(Boolean).join(' '));
+  }
+
+  /** Light NE-arrow over the photo: a second tap opens details (founder, 2026-11-22). */
+  function DetailsCue() {
+    const Icon = window.Icon;
+    return h('span', { 'data-mv2': 'xcard-cue', 'aria-hidden': 'true' },
+      Icon ? h(Icon, { name: 'ArrowUpRight', size: 16 }) : null);
+  }
+
+  /**
+   * Shared preview card (Explore rows + pin carousel). Title, then category, then a gold pin/calendar with
+   * building·street·suburb or the event date (no "Place"/"Event" wording). Foot: organiser left, distance right.
+   */
+  function XCard(props) {
+    const m = props.m;
+    const rec = props.rec || {};
+    const group = groupOf(m);
+    const words = props.groupWords || {};
+    const peek = !!props.peek;
+    const kind = m.type === 'event' || m.type === 'place' || m.type === 'contributor' ? m.type : '';
+    const kindIcon = kind === 'event' ? 'Calendar' : (kind === 'place' ? 'MapPin' : (kind === 'contributor' ? 'User' : ''));
+    const raw = rec.coverPhoto || m.coverPhoto || (m.type === 'contributor' ? m.profilePhoto : '') || '';
+    const cover = window.UI && window.UI.safeUrl ? (window.UI.safeUrl(raw) || '') : (/^https?:\/\//i.test(raw) ? raw : '');
+    const Icon = window.Icon;
+    const cat = window.DATA && window.DATA.getItemCategory ? window.DATA.getItemCategory(m) : null;
+    const tile = tileFor(m);
+    const glyph = (tile && tile.icon) || (cat && cat.icon) || kindIcon || 'MapPin';
+    const near = window.MapV2Nearby;
+    const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
+    const meta = cardMetaLine(m, rec);
+    // Every place / event has a contributor owner; "by …" sits indented under the tile body (founder, 2026-11-22).
+    const byWord = (window.MapV2Strings && window.MapV2Strings.sheet && window.MapV2Strings.sheet.by) || 'by';
+    const ownerRaw = (m.ownerName || rec.organizerName || rec.organizer || '').trim();
+    const ownerLine = (kind === 'place' || kind === 'event') && ownerRaw
+      ? (byWord + ' ' + ownerRaw)
+      : '';
+    const catLabel = (cat && cat.name) || (group && words[group]) || '';
+    return h('button', {
+      type: 'button', 'data-mv2': 'xcard', 'data-explore-id': m.id,
+      'data-peek': peek ? '' : undefined,
+      'data-kind': kind || undefined,
+      'data-cat': group || undefined,
+      'data-selected': props.selected ? '' : undefined,
+      'aria-current': props.selected ? 'true' : undefined,
+      onClick: () => props.onOpen && props.onOpen(m.id, m.type),
+    },
+      h('span', { 'data-mv2': 'xcard-img' },
+        cover ? h('img', { src: cover, alt: '' }) : (Icon ? h(Icon, { name: glyph, size: 22 }) : null),
+        m.isLive ? h('span', { 'data-mv2': 'xcard-live' }, h('i', { 'aria-hidden': 'true' }), 'Live') : null,
+        props.selected && props.detailsCue ? h(DetailsCue) : null,
+        props.selected && props.badge ? h('span', { 'data-mv2': 'xcard-badge' }, props.badge) : null,
+        props.selected && props.detailsCue && props.cueLabel
+          ? h('span', { 'data-mv2': 'sr' }, props.cueLabel) : null),
+      h('span', { 'data-mv2': 'xcard-body' },
+        h('span', { 'data-mv2': 'xcard-top' },
+          h('b', null, m.title || ''),
+          catLabel ? h('span', { 'data-mv2': 'xcard-chip' },
+            h('span', { 'data-mv2': 'card-chip-label' }, catLabel)) : null,
+          meta.text ? h('span', { 'data-mv2': 'xcard-meta' },
+            Icon && meta.icon ? h(Icon, { name: meta.icon, size: 12 }) : null,
+            h('span', null, meta.text)) : null),
+        h('span', { 'data-mv2': 'xcard-foot' },
+          ownerLine ? h('small', { 'data-mv2': 'xcard-by' }, ownerLine) : h('span'),
+          dist ? h('small', { 'data-mv2': 'xcard-dist' }, dist) : null)));
+  }
+
+  function XRow(props) {
+    const scroller = useRef(null);
+    const [edges, setEdges] = useState({ l: false, r: false });
+    const measure = () => {
+      const el = scroller.current;
+      if (!el) return;
+      const l = el.scrollLeft > 4;
+      const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+      setEdges((p) => (p.l === l && p.r === r ? p : { l: l, r: r }));
+    };
+    useEffect(() => {
+      measure();
+      const t = setTimeout(measure, 80);
+      return () => clearTimeout(t);
+    }, [props.children && props.children.length]);
+    const nudge = (dir) => {
+      const el = scroller.current;
+      if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+    };
+    // Edge tap rotates the carousel (same language as pinpeek arrows); does not select a card / snap a pin.
+    const onEdgeTap = (e) => {
+      const el = scroller.current;
+      if (!el || !(edges.l || edges.r)) return;
+      const box = el.getBoundingClientRect();
+      const x = e.clientX - box.left;
+      const band = Math.max(48, box.width * 0.18);
+      if (edges.l && x < band) { e.preventDefault(); e.stopPropagation(); nudge(-1); }
+      else if (edges.r && x > box.width - band) { e.preventDefault(); e.stopPropagation(); nudge(1); }
+    };
+    const Icon = window.Icon;
+    const P = S().panel || {};
+    // Always float arrows when the row overflows (phones included) — founder, 2026-11-22 Explore filters.
+    const showArrows = props.arrows !== false;
+    return h('div', { 'data-mv2': 'xrow-wrap' },
+      showArrows && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
+      h('div', {
+        'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure,
+        onClickCapture: onEdgeTap,
+      }, props.children),
+      showArrows && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
+  }
+
+  /**
+   * The home Explore panel (founder, 2026-11-17). Four looks, one element:
+   *   rest   the crown alone at the foot (a phone's default: the map gets the whole screen)
+   *   strip  the handle and the Where to… tiles (the crown's tap; a wide screen's default)
+   *   focus  ONE row taken over: a Where to… tile, or Near and Now… / This weekend / Online / New on Connect / More near
+   *          you. Tabs, a line, and that row's cards, at one fixed height that never changes while the person taps
+   *          through tabs and cards. The map shows the row's pins, glowing.
+   *   open   every row, scrolled (dragged up from any of the others); the crown is the sticky nav.
+   * The panel moves by transform only (never its height), and the crown and the nav swap without a morph, so a phone
+   * does no layout work while it moves. The focus itself (`props.focus`, { kind: 'tile' | 'sec', id }) belongs to the
+   * map screen, which filters the pins with it and owns the filter chip that clears it.
+   * props: markers, ideas, sources, apiRef, selectedId, reveal, hidden, focus, filtered, onFocus(next), onReset(),
+   *        onSectionIds(ids), onOpen(id, type), onSeeAll, onHeight(px), onOpenChange(open), onGo(page, params).
    */
   function Explore(props) {
     const api = props.apiRef;
+    const desk = useMedia(DESK_MQ);
+    const fine = useMedia(FINE_MQ);
+    const [stage, setStage] = useState(() => (matches(DESK_MQ) ? 'strip' : 'rest'));
+    const [rail, setRail] = useState(true);
+    const [me, setMe] = useState('');          // '' | 'rail' | 'dock': where the account menu is open
     const [view, setView] = useState(() => (api && api.current ? api.current.view() : { centre: null, user: null }));
-    const [mode, setMode] = useState('cards');      // 'cards' | 'cats' (the category list)
-    const [list, setList] = useState('groups');    // inside the list: 'groups' | 'intents' ("Where to…")
+    const host = useRef(null);
     const root = useRef(null);
-    const switchBtn = useRef(null);
-    const views = useRef({});
-    const readView = useRef(null);
-    const viewed = useRef(!!(view.centre || view.user));   // the map has told us where it is at least once
-    const chosen = useRef(props.selectedId);
-    chosen.current = props.selectedId;
-    const grab = useRef(null);
+    const tabsRef = useRef(null);
+    const scrollRef = useRef(null);
+    const drag = useRef(null);
     const str = S();
-    const Card = window.MapV2Card;
-    const Row = window.MapV2Row && window.MapV2Row.Row;
+    const P = str.panel || {};
     const Icon = window.Icon;
+    const focus = props.focus || null;
+    const tile = focus && focus.kind === 'tile' ? focus.id : '';
+    const sec = focus && focus.kind === 'sec' ? focus.id : '';
+    // A wide screen has no crown-only rest (its crown heads the nav beside the search bar).
+    // While the pin carousel is up (`peek`, founder 2026-11-18) the panel rests: the carousel has the foot of the map, and the
+    // crown rides on its top edge. The panel's own look comes back exactly as it was when the carousel closes.
+    const base = props.peek ? 'rest' : (stage === 'rest' && desk ? 'strip' : stage);
+    // Rest wins over focus so the handle can minimize the panel while the filter stays on (founder, 2026-11-22).
+    const mode = props.peek ? 'rest'
+      : (base === 'open' ? 'open'
+        : (base === 'rest' ? 'rest'
+          : (focus ? 'focus' : base)));
+    const open = mode === 'open';
+    const setFocus = (next) => { if (props.onFocus) props.onFocus(next); };
 
-    // Rank again when the map settles or the person's position arrives: one state update per settle, never per frame.
-    // A burst of moves (an eased pan ends a move on every frame) is one update, SETTLE_MS after the last.
     useEffect(() => {
       if (!api || !api.current || !api.current.onView) return undefined;
       let timer = null;
@@ -302,186 +551,633 @@
         const v = api.current ? api.current.view() : null;
         if (!v) return;
         lastView = v;
-        // The hold starts only once the panel knows where the map is: a pin tapped before the first reading must not leave
-        // every card without its distance until the choice is cleared.
-        if (chosen.current && viewed.current) return;
-        if (v.centre || v.user) viewed.current = true;
         setView((p) => {
           const same = (a, b) => (a === b) || (a && b && a.lat === b.lat && a.lng === b.lng);
           return same(p.centre, v.centre) && same(p.user, v.user) ? p : v;
         });
       };
-      readView.current = read;
       const later = () => { clearTimeout(timer); timer = setTimeout(read, SETTLE_MS); };
       read();
       const off = api.current.onView(later);
-      return () => { clearTimeout(timer); readView.current = null; off(); };
+      return () => { clearTimeout(timer); off(); };
     }, [api]);
-    useEffect(() => { if (!props.selectedId && readView.current) readView.current(); }, [props.selectedId]);
+
+    useEffect(() => { if (props.onOpenChange) props.onOpenChange(open); }, [open]);
+    useEffect(() => { if (props.onMode) props.onMode(mode); }, [mode]);
+    useEffect(() => {
+      if (!open || props.hidden) return undefined;
+      const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setStage('strip'); } };
+      document.addEventListener('keydown', onKey, true);
+      return () => document.removeEventListener('keydown', onKey, true);
+    }, [open, props.hidden]);
+    // Leaving the full panel puts its rows back at the top, so the strip and the focus always show their own head.
+    useEffect(() => { if (!open && scrollRef.current) scrollRef.current.scrollTop = 0; }, [open]);
+    // How much of the map the panel covers, for the map's corner and controls: read from the CSS (one source of truth).
+    useEffect(() => {
+      if (!props.onHeight) return undefined;
+      const el = host.current;
+      const px = el && !open && window.getComputedStyle ? parseFloat(window.getComputedStyle(el).getPropertyValue('--xp-vis')) : 0;
+      // before the stylesheet has arrived the token reads empty: the strip and the focus still take room
+      props.onHeight(Number.isFinite(px) ? px : (mode === 'strip' || mode === 'focus' ? 1 : 0));
+      return undefined;
+    }, [mode, desk]);
+    useEffect(() => () => { if (props.onHeight) props.onHeight(0); }, []);
+    // Off screen, the panel's buttons leave the tab order and the screen reader (React 18 has no `inert` prop).
+    useEffect(() => {
+      const el = root.current;
+      if (!el) return;
+      if (mode === 'rest') el.setAttribute('inert', '');
+      else el.removeAttribute('inert');
+    }, [mode]);
+    useEffect(() => { if (open || props.hidden) setMe(''); }, [open, props.hidden]);
+    // A tap on empty map (founder, 2026-11-18): back to the crown alone. A focus stays (it is a filter, and its chip says so);
+    // the Where to… strip and the menu fold away. A wide screen's rest is its strip.
+    const restSignal = props.restSignal || 0;
+    useEffect(() => { if (restSignal) { setStage('rest'); setMe(''); } }, [restSignal]);
+    // Close-search (and similar): reopen the Where-to strip under the crown (founder, 2026-11-22).
+    const stripSignal = props.stripSignal || 0;
+    useEffect(() => { if (stripSignal) { setStage('strip'); setMe(''); } }, [stripSignal]);
+
+    // the chosen tab in view, in the middle of its row
+    const tabKey = tile || sec;
+    useEffect(() => {
+      const row = tabsRef.current;
+      if (!row || !tabKey) return undefined;
+      const el = row.querySelector('[data-tab="' + cssId(tabKey) + '"]');
+      if (!el || typeof row.scrollTo !== 'function') return undefined;
+      const left = Math.max(0, el.offsetLeft - row.clientWidth / 2 + el.offsetWidth / 2);
+      row.scrollTo({ left: left, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+      return undefined;
+    }, [tabKey, mode]);
 
     const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
-
-    const origin = view.user || view.centre;
-    const rows = useMemo(() => rank(origin, props.markers, props.selectedId, ROW_CAP),
-      [origin, props.markers, props.selectedId]);
-
-    // Tell the screen how tall the panel is, so the map's own controls and credit sit above it.
-    useEffect(() => {
-      const el = root.current;
-      if (!el || !props.onHeight) return undefined;
-      // hidden under the sheet it measures 0: keep the last height, so the map's controls do not jump as the sheet opens
-      const tell = () => { if (!el.hidden) props.onHeight(el.offsetHeight); };
-      tell();
-      let ro = null;
-      if (typeof ResizeObserver === 'function') { ro = new ResizeObserver(tell); ro.observe(el); }
-      return () => { if (ro) ro.disconnect(); props.onHeight(0); };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    // The view that is not shown cannot be focused or read: `inert`, set by hand (a prop would be read differently by React 18, which the
-    // page loads, and 19, which the unit tests do)
-    useEffect(() => {
-      const on = mode === 'cats';
-      const v = views.current;
-      if (v.cards) { if (on) v.cards.setAttribute('inert', ''); else v.cards.removeAttribute('inert'); }
-      if (v.cats) { if (on) v.cats.removeAttribute('inert'); else v.cats.setAttribute('inert', ''); }
-    }, [mode]);
-
-    // Lowered: the category list has nowhere to show, so the panel comes back to its cards.
-    useEffect(() => { if (props.min) setMode('cards'); }, [props.min]);
-
-    // A new ranking starts again at the nearest card (a scroll, never a layout shift). Runs before the pin's own scroll below.
-    const rankKey = rows.map((r) => r.m.id).join('|');
-    useEffect(() => {
-      const list = root.current && root.current.querySelector("[data-mv2='list']");
-      if (list) list.scrollLeft = 0;
-    }, [rankKey]);
-
-    // A PIN was tapped: bring its card to the row's start (a glide, unless reduced motion), without moving focus
-    // unless the keyboard chose the pin. A card tap never comes here: the row stays exactly where it is.
-    useEffect(() => {
-      const el = root.current;
-      const r = props.reveal;
-      if (!el || !r || !props.selectedId || r.id !== props.selectedId) return;
-      const card = el.querySelector('[data-explore-id="' + cssId(props.selectedId) + '"]');
-      const list = el.querySelector("[data-mv2='list']");
-      if (!card || !list) return;
-      const li = card.closest('li') || card;
-      const gutter = parseFloat(window.getComputedStyle(list).paddingLeft) || 0;
-      const left = li.offsetLeft - list.offsetLeft - gutter;
-      if (typeof list.scrollTo === 'function') list.scrollTo({ left: left, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
-      else list.scrollLeft = left;
-      if (r.focus) {
-        const btn = card.querySelector('button, a');
-        if (btn) btn.focus({ preventScroll: true });
-      }
-    }, [props.reveal, rankKey]);
-
+    // The rows rank from where the map looks, but a focus holds its first origin until it ends: the map moves for the
+    // focus itself (to the town, to a chosen card), and re-ranking then would reorder the cards under the person's finger.
+    // Where-to tiles and Explore section filters rank from the current town view (centre), not GPS — founder 2026-11-22.
+    const liveTown = view.centre || view.user;
+    const liveElse = view.user || view.centre;
+    const live = (focus && (focus.kind === 'tile' || focus.kind === 'sec')) ? liveTown : liveElse;
+    const held = useRef(null);
+    if (!focus) held.current = null;
+    else if (!held.current && live) held.current = live;
+    const origin = (focus && held.current) || live;
+    // where the cards measured from, handed to the sheet a card opens, so its distance says what the card said
+    const measuredFrom = view.user ? view : { centre: origin, user: null };
+    const markers = (Array.isArray(props.markers) ? props.markers : []).filter((m) => m && m.type !== 'contributor');
+    const ideas = Array.isArray(props.ideas) ? props.ideas : [];
+    const pool = markers.concat(ideas.filter((m) => m && markers.every((x) => x.id !== m.id)));
     const distWords = view.user ? str : (str.centre || {});
-    const render = ({ m, meters }) => cardFor({
-      m: m, meters: meters, rec: byKey.get(m.type + ':' + m.id), idPrefix: 'mv2-x-' + m.id, words: distWords,
-      selected: props.selectedId === m.id, badge: str.selectedBadge, onOpen: props.onOpen,
-    });
+    const current = tileOf(tile);
 
-    // The handle: a tap lowers or raises the panel, and so does a short swipe down or up (never a drag that follows the
-    // finger: the panel has two heights). A swipe that ends on the handle must not also count as the tap.
-    const GRAB_PX = 24;
-    const onGrabDown = (e) => { grab.current = { y: e.clientY, swiped: false }; };
+    const ranked = (list, cap) => rank(origin, list, props.selectedId, cap || 12);
+    const tileItems = current ? ranked(pool.filter((m) => tileMatches(current.id, m)), 12) : [];
+    const now = Date.now();
+    const soon = (m) => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= now && t - now <= 6 * HOUR; };
+    const weekend = weekendBounds(now);
+    const rows = {
+      around: ranked(pool.filter((m) => (m.type === 'event' && (m.isLive || soon(m))) || m.type === 'place'), 12),
+      weekend: ranked(pool.filter((m) => m.type === 'event' && (() => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= weekend.start && t <= weekend.end; })()), 12),
+      online: ranked(pool.filter((m) => looksOnline(m, byKey.get(m.type + ':' + m.id))), 12),
+      fresh: ranked(pool.filter((m) => { const t = Date.parse(m.createdAt || ''); return !isNaN(t) && now - t >= 0 && now - t <= NEW_WINDOW; }), 12)
+        .sort((a, b) => Date.parse(b.m.createdAt || '') - Date.parse(a.m.createdAt || '')),
+      more: ranked(pool.filter((m) => m.type !== 'idea'), 16),
+    };
+    const rowTitle = (id) => P[id] || id;
+    const rowHint = (id) => P[id + 'Hint'] || '';
+
+    // A row in focus tells the map which pins it holds (the map keeps them on screen and makes them glow).
+    const secIds = sec && rows[sec] ? rows[sec].map((r) => r.m.id).join('|') : '';
+    useEffect(() => { if (props.onSectionIds) props.onSectionIds(secIds ? secIds.split('|') : []); }, [secIds]);
+
+    const pendingFocus = useRef('');
+    useEffect(() => {
+      const r = props.reveal;
+      if (!r || r.id !== props.selectedId || !r.focus) return undefined;
+      const m = pool.find((x) => x.id === r.id);
+      const next = m ? tileFor(m) : null;
+      if (next) setFocus({ kind: 'tile', id: next.id });
+      setStage((s) => (s === 'rest' ? 'strip' : s));
+      pendingFocus.current = r.id;
+      return undefined;
+    }, [props.reveal]);
+    useEffect(() => {
+      const id = pendingFocus.current;
+      if (!id || mode === 'rest' || !root.current) return undefined;
+      const card = root.current.querySelector('[data-explore-id="' + cssId(id) + '"]');
+      if (card && card.focus) { card.focus({ preventScroll: true }); pendingFocus.current = ''; }
+      return undefined;
+    }, [mode, tile, props.reveal]);
+
+    // A tile or a row taken over: the panel settles at its focus height (from the full panel too).
+    const chooseTile = (id) => { setFocus(tile === id ? null : { kind: 'tile', id: id }); setStage('strip'); };
+    const chooseRow = (id) => { setFocus(sec === id ? null : { kind: 'sec', id: id }); setStage('strip'); };
+    const raise = () => setStage('open');
+    const lower = () => {
+      if (open) { setStage('strip'); return; }
+      // Focus (Where-to or Explore filter): minimize completely, keep the filter (founder, 2026-11-22).
+      if (focus || mode === 'focus') { setStage('rest'); return; }
+      if (!desk) setStage('rest');
+    };
+    // A drag on the handle raises or lowers the panel; a tap (or a screen reader's activation, which sends a click and
+    // no pointer events) toggles it. A drag swallows the click that follows it, so it never toggles twice.
+    const dragged = useRef(false);
+    const onGrabDown = (e) => { drag.current = { y: e.clientY }; dragged.current = false; };
     const onGrabUp = (e) => {
-      const g = grab.current;
-      if (!g) return;
-      const dy = e.clientY - g.y;
-      if (Math.abs(dy) >= GRAB_PX) { g.swiped = true; props.onMin(dy > 0); }
+      const d = drag.current;
+      drag.current = null;
+      if (!d) return;
+      const dy = e.clientY - d.y;
+      if (Math.abs(dy) < 24) return;
+      dragged.current = true;
+      if (dy < 0) raise();
+      else lower();
     };
     const onGrabClick = () => {
-      const g = grab.current;
-      grab.current = null;
-      if (g && g.swiped) return;
-      props.onMin(!props.min);
+      if (dragged.current) { dragged.current = false; return; }
+      // Filter / Where-to focus: tap collapses to crown-only rest and keeps the filter on.
+      if (mode === 'focus' || (focus && mode === 'open')) { setStage('rest'); return; }
+      if (open) lower();
+      else if (focus && mode === 'rest') { setStage('strip'); }
+      else raise();
+    };
+    // The crown: with any filter on, it clears them all and goes home (the map screen snaps to the person's place);
+    // otherwise it shows or hides the Where to… strip.
+    const filtered = !!focus || !!props.filtered;
+    // Above the map's rest (search open, or the pin carousel: `level`, founder 2026-11-18) it goes straight back to the crown
+    // alone, closing every level at once.
+    const onCrown = () => {
+      setMe('');
+      // Minimized-with-filter: first tap reopens the focus panel; second tap (or chip) clears (founder, 2026-11-22).
+      if (filtered) {
+        if (mode === 'rest') { setStage('strip'); return; }
+        if (props.onReset) props.onReset();
+        setStage('rest');
+        return;
+      }
+      if (props.level) { if (props.onLevelReset) props.onLevelReset(); setStage('rest'); return; }
+      setStage((s) => (s === 'rest' ? 'strip' : 'rest'));
+    };
+    const crownLabel = filtered ? (P.reset) : props.level ? P.home : (base === 'rest' ? (P.open) : (P.close));
+    // Crown drag (phone): same snap stages as the pill — pull down lowers / closes; a short tap keeps onCrown.
+    const crownPull = useRef(null);
+    const crownDragged = useRef(false);
+    const onCrownDown = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      crownPull.current = { y: e.clientY, id: e.pointerId };
+      crownDragged.current = false;
+    };
+    const onCrownUp = (e) => {
+      const p = crownPull.current;
+      crownPull.current = null;
+      if (!p || p.id !== e.pointerId) return;
+      const dy = e.clientY - p.y;
+      if (Math.abs(dy) < 24) return;
+      crownDragged.current = true;
+      if (dy > 0) {
+        if (props.level && props.onLevelReset) props.onLevelReset();
+        else lower();
+      } else if (!props.level) {
+        raise();
+      }
+    };
+    const onCrownClick = () => {
+      if (crownDragged.current) { crownDragged.current = false; return; }
+      onCrown();
     };
 
-    const toggleMode = () => {
-      if (props.min) { props.onMin(false); return; }
-      if (mode === 'cats') { setMode('cards'); return; }
-      // Open on the view that matches what is already filtering the cards.
-      setList(props.intent ? 'intents' : 'groups');
-      setMode('cats');
+    // A card in the full panel takes its row over first; the map screen then chooses it (a second tap opens it).
+    const openCard = (row) => (id, type) => {
+      if (open) {
+        if (row === 'tile') setStage('strip');
+        // (a card never turns its row's focus off, even when that row is the focus already: only its tab toggles)
+        else if (SECTIONS.indexOf(row) !== -1) { setFocus({ kind: 'sec', id: row }); setStage('strip'); }
+      }
+      if (props.onOpen) props.onOpen(id, type, measuredFrom);
     };
-    // The two tabs. Arrow keys move between them and do not wrap; Home and End jump to the ends.
-    const onListKey = (e) => {
-      const key = e.key;
-      if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'Home' && key !== 'End') return;
-      e.preventDefault();
-      const id = (key === 'ArrowRight' || key === 'End') ? 'intents' : 'groups';
-      setList(id);
-      const btn = e.currentTarget.querySelector("[data-list='" + id + "']");
-      if (btn && btn.focus) btn.focus();
-    };
-    const backToCards = () => {
-      setMode('cards');
-      if (switchBtn.current) switchBtn.current.focus({ preventScroll: true });
-    };
-    const onKeyDown = (e) => { if (e.key === 'Escape' && mode === 'cats') { e.stopPropagation(); backToCards(); } };
+    const cardDist = (str.peek && str.peek.dist) || distWords;
+    const cards = (id, list) => h(XRow, { id: id, list: list }, list.map((r) => h(XCard, {
+      key: id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
+      groupWords: str.groups, distWords: cardDist,
+      selected: props.selectedId === r.m.id, badge: str.selectedBadge,
+      onOpen: openCard(id),
+    })));
+    const kindOf = current ? pool.find((m) => tileMatches(current.id, m)) : null;
+    const kindPlural = (kindOf && P.kind && P.kind[kindOf.type]) || 'listings';
+    const kindWord = tileItems.length === 1 ? ({ events: 'event', places: 'place', contributors: 'contributor', ideas: 'idea', listings: 'listing' })[kindPlural] || kindPlural : kindPlural;
 
-    const words = str.groups || {};
-    const intentWord = props.intent && str.intents ? str.intents[props.intent] : '';
-    const filter = [];
-    if (intentWord && str.whereTo) filter.push(str.whereTo(intentWord));
-    else if (props.pill && props.pill !== 'all') filter.push(words[props.pill]);
-    if (props.ideas) filter.push(words.ideas);
-    const picked = rows.find((r) => r.m.id === props.selectedId);
-    const cats = mode === 'cats';
+    const tab = (id, word, icon, on, onClick, extra) => h('button', Object.assign({
+      key: id, type: 'button', 'data-mv2': 'explore-tile', 'data-tab': id,
+      role: 'tab', 'aria-selected': on ? 'true' : 'false', onClick: onClick,
+    }, extra), icon && Icon ? h(Icon, { name: icon, size: 16 }) : null, h('span', null, word));
+    // Where to… strip: sideways scroll with edge arrows (same language as card rows).
+    const [tileEdges, setTileEdges] = useState({ l: false, r: false });
+    const measureTiles = () => {
+      const el = tabsRef.current;
+      if (!el) return;
+      const l = el.scrollLeft > 4;
+      const r = el.scrollLeft + el.clientWidth < el.scrollWidth - 4;
+      setTileEdges((p) => (p.l === l && p.r === r ? p : { l: l, r: r }));
+    };
+    useEffect(() => { measureTiles(); }, [mode, tile, sec, open]);
+    const nudgeTiles = (dir) => {
+      const el = tabsRef.current;
+      if (!el) return;
+      el.scrollBy({ left: dir * Math.max(120, el.clientWidth * 0.6), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+    };
+    const tilesShell = (inner) => h('div', { 'data-mv2': 'tiles-wrap' },
+      fine && tileEdges.l ? h('button', {
+        type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft,
+        onClick: () => nudgeTiles(-1),
+      }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
+      inner,
+      fine && tileEdges.r ? h('button', {
+        type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight,
+        onClick: () => nudgeTiles(1),
+      }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
+    const tilesBig = () => h('div', { 'data-mv2': 'where-block' },
+      h('h3', { 'data-mv2': 'where-lead' }, P.whereLead || P.where),
+      tilesShell(h('div', {
+        ref: tabsRef, 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where, onScroll: measureTiles,
+      }, TILES.map((t) => h('button', {
+        key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
+        onClick: () => chooseTile(t.id),
+      }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word))))));
+    const tileTabs = () => tilesShell(h('div', {
+      ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.where, onScroll: measureTiles,
+    }, TILES.map((t) => tab(t.id, t.word, t.icon, tile === t.id, () => chooseTile(t.id), { 'data-tile': t.id }))));
+    const rowTabs = () => tilesShell(h('div', {
+      ref: tabsRef, 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.rows, onScroll: measureTiles,
+    }, SECTIONS.filter((id) => rows[id].length || id === sec).map((id) => tab(id, rowTitle(id), null, sec === id, () => chooseRow(id), { 'data-sec': id }))));
+    // The focus: Back + Close on the corners (subtle), tabs, and the row's cards — same drawer chrome language
+    // as pinpeek (founder, 2026-11-22: no "Live and nearby" / "Close" labels).
+    const focusView = () => {
+      const list = tile ? tileItems : (rows[sec] || []);
+      return h('div', { 'data-mv2': 'xfocus', 'data-focus': tile ? 'tile' : 'sec' },
+        h('div', { 'data-mv2': 'xfocus-chrome' },
+          h('button', {
+            type: 'button', 'data-mv2': 'xfocus-back', 'aria-label': P.closeRow || P.allTypes,
+            onClick: () => setFocus(null),
+          }, Icon ? h(Icon, { name: 'ChevronLeft', size: 18 }) : null),
+          h('button', {
+            type: 'button', 'data-mv2': 'xfocus-close', 'aria-label': P.lower,
+            onClick: () => { setFocus(null); setStage(desk ? 'strip' : 'rest'); },
+          }, Icon ? h(Icon, { name: 'X', size: 18 }) : null)),
+        tile ? tileTabs() : rowTabs(),
+        list.length ? cards(tile ? 'tile' : sec, list)
+          : h('p', { 'data-mv2': 'explore-empty' }, tile ? (P.emptyTile ? P.emptyTile(current ? current.word : '') : '') : (P.emptyRow || '')));
+    };
+    const section = (id) => (rows[id].length ? h('section', { key: id, 'data-mv2': 'xsec', 'data-sec': id, 'aria-label': rowTitle(id) },
+      h('div', { 'data-mv2': 'xsec-h' },
+        h('h3', null, h('button', { type: 'button', 'data-mv2': 'xsec-go', onClick: () => chooseRow(id) }, rowTitle(id))),
+        rowHint(id) ? h('small', null, rowHint(id)) : null),
+      cards(id, rows[id])) : null);
+    const openView = () => [
+      h('div', { key: 'tiles' }, tile ? tileTabs() : tilesBig()),
+      current ? h('div', { key: 'tile', 'data-mv2': 'xsec' },
+        h('div', { 'data-mv2': 'xsec-h' },
+          h('h3', null, current.word),
+          h('small', null, P.matches ? P.matches(tileItems.length, kindWord) : '')),
+        tileItems.length ? cards('tile', tileItems) : h('p', { 'data-mv2': 'explore-empty' }, P.emptyTile ? P.emptyTile(current.word) : '')) : null,
+    ].concat(SECTIONS.map(section), [h('button', {
+      key: 'more-link', type: 'button', 'data-mv2': 'explore-more', 'aria-label': P.seeAll,
+      onClick: () => { if (props.onSeeAll) props.onSeeAll(); },
+    },
+      h('span', { 'data-mv2': 'explore-more-ring' }, Icon ? h(Icon, { name: 'Compass', size: 22 }) : null),
+      h('small', null, P.seeAll))]);
 
-    const emptyLine = intentWord && str.emptyIntent ? str.emptyIntent(intentWord) : str.empty;
-    const cards = rows.length && Row && Card
-      ? h(Row, {
-        // Keyed by SLOT, not by listing: a new ranking (the map moved, a pill changed) refills the same card boxes in
-        // place, so no card ever slides into a new position under the person's eyes (a layout shift).
-        items: rows, keyOf: (r, i) => 'slot' + i, idPrefix: 'mv2-explore', render: render,
-        strings: { label: view.user ? str.label : str.labelCentre },
-      })
-      : h('p', { 'data-mv2': 'explore-empty' }, emptyLine);
+    // Me: the account menu, beside the desktop nav or above the sticky nav.
+    const meItem = (where, item, attrs, lead) => h('div', { key: item.id, 'data-mv2': 'me-wrap' },
+      h('button', Object.assign({
+        type: 'button', 'data-nav': item.id, 'aria-expanded': me === where ? 'true' : 'false', 'aria-haspopup': 'true',
+        onClick: () => setMe((v) => (v === where ? '' : where)),
+      }, attrs), lead, h('small', null, (P.nav && P.nav[item.id]) || item.id)),
+      me === where && window.ProfilePanel ? h(window.ProfilePanel, { anchor: where, extras: ME_EXTRAS, onClose: () => setMe('') }) : null);
+    const navIcon = (item) => (Icon ? h(Icon, { name: item.icon, size: 20 }) : null);
+    const railGo = (item) => {
+      setMe('');
+      if (item.act === 'map') { setStage('strip'); return; }
+      if (item.act === 'open') raise();
+    };
+
+    return h('div', {
+      ref: host, 'data-mv2': 'explore-host', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
+      hidden: props.hidden || undefined,
+    },
+      !open && h('div', { 'data-mv2': 'desktop-nav' },
+        h('button', {
+          type: 'button', 'data-mv2': 'desktop-crown', 'aria-expanded': rail ? 'true' : 'false',
+          'aria-label': props.level ? P.home : (rail ? P.hideNav : P.showNav),
+          onClick: () => {
+            setMe('');
+            // the desktop crown is the crown too: above the map's rest it goes back to it, and only then folds the nav
+            if (props.level && props.onLevelReset) { props.onLevelReset(); return; }
+            setRail((v) => !v);
+          },
+        }, window.CrownMark ? h(window.CrownMark, { size: 26 }) : (Icon ? h(Icon, { name: 'Crown', size: 22 }) : null)),
+        rail && h('nav', { 'data-mv2': 'desktop-items', 'aria-label': P.dock }, RAIL.map((item) => (item.me
+          ? meItem('rail', item, { 'data-mv2': 'desktop-item' }, navIcon(item))
+          : h('button', {
+            key: item.id, type: 'button', 'data-mv2': 'desktop-item', 'data-nav': item.id,
+            'data-emphasis': item.emphasis ? '' : undefined,
+            'aria-current': item.act === 'map' ? 'page' : undefined,
+            onClick: () => railGo(item),
+          }, navIcon(item), h('small', null, (P.nav && P.nav[item.id]) || item.id)))))),
+      h('div', { 'data-mv2': 'explore-scrim', onClick: () => setStage('strip') }),
+      h('section', {
+        ref: root, 'data-mv2': 'explore', 'data-mode': mode, 'data-open': open ? '' : undefined, 'data-tabbed': tile ? '' : undefined,
+        'aria-label': str.title,
+      },
+        h('div', {
+          'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
+          'aria-label': open ? (P.lower) : (P.raise),
+          // Lowest visible strip: flat bar + slight up chevron; focus/open: flat bar only (founder, 2026-11-22).
+          'data-hint': (mode === 'strip' || mode === 'rest') ? 'up' : undefined,
+          onPointerDown: onGrabDown, onPointerUp: onGrabUp, onClick: onGrabClick,
+          onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (open) lower(); else raise(); } },
+        },
+          h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' },
+            h('span', { 'data-mv2': 'handle-bar' }),
+            (mode === 'strip' || mode === 'rest') && Icon
+              ? h(Icon, { name: 'ChevronUp', size: 12 }) : null),
+          h('span', { 'data-mv2': 'drawer-mark', 'aria-hidden': 'true' }, P.brandMark || '')),
+        h('div', { 'data-mv2': 'explore-scroll', ref: scrollRef },
+          mode === 'focus' ? focusView() : mode === 'open' ? openView() : tilesBig())),
+      // The crown and the sticky nav swap outright (founder, 2026-11-17: the morph was slow on a phone).
+      !open ? h('button', {
+        type: 'button', 'data-mv2': 'explore-crown', 'aria-label': crownLabel,
+        'data-filtered': filtered ? '' : undefined,
+        onPointerDown: onCrownDown, onPointerUp: onCrownUp, onClick: onCrownClick,
+        onPointerCancel: () => { crownPull.current = null; },
+      }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)) : null,
+      open ? h('nav', { 'data-mv2': 'explore-dock', 'aria-label': P.dock },
+        DOCK.map((item) => {
+          const lead = navIcon(item);
+          if (item.me) return meItem('dock', item, { 'data-mv2': 'explore-nav' }, lead);
+          return h('button', {
+            key: item.id, type: 'button', 'data-mv2': 'explore-nav', 'data-nav': item.id,
+            'data-emphasis': item.emphasis ? '' : undefined,
+            'aria-current': item.id === 'explore' ? 'page' : undefined,
+            onClick: () => {
+              setMe('');
+              if (item.close) { setStage(desk ? 'strip' : 'rest'); return; }
+              if (item.page && props.onGo) props.onGo(item.page, {});
+            },
+          }, lead, h('small', null, (P.nav && P.nav[item.id]) || item.id));
+        })) : null);
+  }
+
+  // ── The pin carousel (founder, 2026-11-18; polish 2026-11-22) ─────────
+  // A pin tapped on the map home opens a row of cards at the foot of the map: that pin centred among its province
+  // neighbours (nearest alternating left/right), with wrap so either swipe direction always has a card. The same cards
+  // as the Explore row (XCard). Swiping, the arrows or a tap on a neighbour choose a card, and its pin lights on the
+  // map. A second tap on the chosen card raises the panel, with that card's details (the listing sheet, inline) below
+  // the cards. The levels and their history entries belong to the map screen (home.jsx); this component only draws
+  // them and reports what was asked.
+
+  /**
+   * The carousel's order for the province pool: the tapped pin in the middle, then its nearest neighbours alternating
+   * right then left (so a swipe either way has a card), at most `cap` cards in all. `visible` (ids; null = every one
+   * in `markers`) still scopes the pool when given. Ideas never appear. Returns markers.
+   */
+  function peekOrder(target, markers, visible, cap) {
+    if (!target) return [];
+    const max = Number.isFinite(cap) && cap > 0 ? Math.floor(cap) : ROW_CAP;
+    const vis = Array.isArray(visible) ? new Set(visible) : null;
+    const pool = (Array.isArray(markers) ? markers : [])
+      .filter((m) => m && m.id !== target.id && m.type !== 'idea' && (!vis || vis.has(m.id)));
+    const others = rank(target, pool, null, Math.max(0, max - 1)).slice(0, Math.max(0, max - 1)).map((r) => r.m);
+    // nearest alternate onto the right, then the left, so the target sits with neighbours either side
+    const out = [target];
+    for (let i = 0; i < others.length; i++) {
+      if (i % 2 === 0) out.push(others[i]);
+      else out.unshift(others[i]);
+    }
+    return out;
+  }
+
+  /** Which card's middle is closest to `mid` (the row's middle, in the row's scroll coordinates)? -1 for no cards. */
+  function nearestIndex(centres, mid) {
+    let best = -1;
+    let gap = Infinity;
+    (centres || []).forEach((c, i) => { const d = Math.abs(c - mid); if (d < gap) { gap = d; best = i; } });
+    return best;
+  }
+
+  const SWIPE_SETTLE_MS = 140;   // a swipe has ended once the row has been still this long (snap and momentum included)
+  const PULL_PX = 36;            // a vertical pull this long on the panel raises it or steps back
+  /**
+   * props: items (markers, in order), index, raised, origin + distWords (the cards' distance), sources (indexSources()),
+   *        hidden, focusCard (a counter: move focus to the chosen card, for a pin chosen from the keyboard), onIndex(i),
+   *        onRaise(), onBack(), onClose(), details(m) (the node under the cards when raised), returnFocus(id) (it closed
+   *        with focus inside: `id` is the card that was chosen last).
+   */
+  function PinCarousel(props) {
+    const items = Array.isArray(props.items) ? props.items : [];
+    const n = items.length;
+    const index = Math.max(0, Math.min(n - 1, props.index || 0));
+    const raised = !!props.raised;
+    const root = useRef(null);
+    const row = useRef(null);
+    const indexRef = useRef(index);
+    indexRef.current = index;
+    const touched = useRef(false);     // the person's own finger, wheel or trackpad moved the row
+    const settle = useRef(null);
+    const fromSwipe = useRef(false);
+    const mounted = useRef(false);
+    const pull = useRef(null);
+    const swipeStart = useRef(null);
+    const swallow = useRef(false);
+    const back = useRef(props.onBack);
+    back.current = props.onBack;
+    const giveBack = useRef(props.returnFocus);
+    giveBack.current = props.returnFocus;
+    const lastId = useRef('');
+    const str = S();
+    const P = str.peek || {};
+    const Icon = window.Icon;
+    const near = window.MapV2Nearby;
+    const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
+    const current = items[index] || null;
+    lastId.current = current ? current.id : '';
+
+    // the chosen card in the middle of the row, unless the person's own swipe chose it (the row is already there)
+    const centreCard = (i, smooth) => {
+      const el = row.current;
+      const card = el && el.children[i];
+      if (!card || typeof el.scrollTo !== 'function') return;
+      const left = Math.max(0, card.offsetLeft - (el.clientWidth - card.offsetWidth) / 2);
+      el.scrollTo({ left: left, behavior: smooth && !matches(REDUCED_MQ) ? 'smooth' : 'auto' });
+    };
+    const order = items.map((m) => m.id).join('|');
+    useEffect(() => {
+      if (fromSwipe.current) { fromSwipe.current = false; return; }
+      centreCard(index, mounted.current);
+      mounted.current = true;
+    }, [index, order]);
+    useEffect(() => {
+      if (!props.focusCard || !row.current) return;
+      const card = row.current.children[indexRef.current];
+      if (card && card.focus) card.focus({ preventScroll: true });
+    }, [props.focusCard]);
+    useEffect(() => () => clearTimeout(settle.current), []);
+    // A layout effect: its clean-up runs while the carousel is still in the page, so focus can still be found inside it
+    // (by the time a plain effect's clean-up runs, the removed cards have already dropped focus to the page).
+    useLayoutEffect(() => {
+      const el = root.current;
+      return () => { if (el && el.contains(document.activeElement) && giveBack.current) giveBack.current(lastId.current); };
+    }, []);
+    // Escape steps back one level, like Back (not while a full sheet is open over the carousel: that one takes it)
+    useEffect(() => {
+      if (props.hidden) return undefined;
+      const onKey = (e) => { if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); if (back.current) back.current(); } };
+      document.addEventListener('keydown', onKey);
+      return () => document.removeEventListener('keydown', onKey);
+    }, [props.hidden]);
+
+    const onRowScroll = () => {
+      if (!touched.current) return;
+      clearTimeout(settle.current);
+      settle.current = setTimeout(() => {
+        touched.current = false;
+        const el = row.current;
+        if (!el) return;
+        const centres = Array.prototype.map.call(el.children, (c) => c.offsetLeft + c.offsetWidth / 2);
+        const i = nearestIndex(centres, el.scrollLeft + el.clientWidth / 2);
+        if (i !== -1 && i !== indexRef.current) { fromSwipe.current = true; props.onIndex(i); }
+      }, SWIPE_SETTLE_MS);
+    };
+    const touch = () => { touched.current = true; };
+
+    // Snap stages stay; only the handle pill (and the crown on the phone) starts a vertical pull (founder, 2026-11-22).
+    // Do not setPointerCapture on pointerdown: capture on the section steals the click from Back / handle / Close.
+    const onPullDown = (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      const fromHandle = e.target.closest && (
+        e.target.closest("[data-mv2='handle']") ||
+        e.target.closest("[data-mv2='handle-bar']") ||
+        e.target.closest("[data-mv2='pinpeek-bar']") ||
+        e.target.closest("[data-mv2='explore-crown']")
+      );
+      if (!fromHandle) return;
+      // Back / Close own their clicks — do not start a pull from them.
+      if (e.target.closest && e.target.closest("[data-mv2='pinpeek-back'], [data-mv2='pinpeek-close']")) return;
+      pull.current = { x: e.clientX, y: e.clientY, id: e.pointerId, captured: false };
+    };
+    const onPullMove = (e) => {
+      const p = pull.current;
+      if (!p || p.id !== e.pointerId || p.captured) return;
+      const dx = e.clientX - p.x;
+      const dy = e.clientY - p.y;
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      p.captured = true;
+      if (e.currentTarget && e.currentTarget.setPointerCapture) {
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* capture is optional */ }
+      }
+    };
+    const onPullUp = (e) => {
+      const p = pull.current;
+      pull.current = null;
+      if (!p || p.id !== e.pointerId) return;
+      const dx = e.clientX - p.x;
+      const dy = e.clientY - p.y;
+      // Short press on the handle / sticky bar = tap → step down (founder, 2026-11-22).
+      if (Math.hypot(dx, dy) < 24) {
+        swallow.current = true;
+        setTimeout(() => { swallow.current = false; }, 50);
+        if (props.onBack) props.onBack();
+        return;
+      }
+      if (Math.abs(dy) < PULL_PX || Math.abs(dy) < 1.5 * Math.abs(dx)) return;
+      swallow.current = true;
+      setTimeout(() => { swallow.current = false; }, 0);
+      if (dy < 0) { if (!raised) props.onRaise(); } else props.onBack();
+    };
+
+    const tap = (id) => {
+      if (swallow.current) return;
+      const i = items.findIndex((m) => m.id === id);
+      if (i === -1) return;
+      if (i !== index) { props.onIndex(i); return; }
+      if (!raised) props.onRaise();
+    };
+    // wrap: province items loop, so either direction always has a neighbour when there is more than one
+    const step = (d) => { if (n > 1) props.onIndex((index + d + n) % n); };
+    const meters = (m) => (props.origin && near ? near.metersBetween(props.origin, m) : NaN);
+    const iconBtn = (attrs, icon, word) => h('button', Object.assign({ type: 'button' }, attrs),
+      Icon ? h(Icon, { name: icon, size: 18 }) : null, word ? h('span', null, word) : null);
 
     return h('section', {
-      ref: root, 'data-mv2': 'explore', 'data-mode': mode, 'data-min': props.min ? '' : undefined,
-      'aria-labelledby': 'mv2-explore-title', hidden: props.hidden || undefined, onKeyDown: onKeyDown,
+      ref: root, 'data-mv2': 'pinpeek', 'data-raised': raised ? '' : undefined, hidden: props.hidden || undefined,
+      'aria-label': P.label,
+      onPointerDown: onPullDown, onPointerMove: onPullMove, onPointerUp: onPullUp,
+      onPointerCancel: () => { pull.current = null; },
     },
-      h('button', {
-        type: 'button', 'data-mv2': 'explore-grab', 'aria-expanded': props.min ? 'false' : 'true', 'aria-label': props.min ? str.raise : str.lower,
-        onPointerDown: onGrabDown, onPointerUp: onGrabUp, onPointerCancel: () => { grab.current = null; }, onClick: onGrabClick,
-      }, h('span', { 'data-mv2': 'explore-grab-bar', 'aria-hidden': 'true' })),
-      h('div', { 'data-mv2': 'explore-head' },
-        h('h2', { id: 'mv2-explore-title', 'data-mv2': 'explore-title' },
-          // named "Explore" (the heading and the region keep that name); what it does is its description
-          h('button', {
-            ref: switchBtn, type: 'button', 'data-mv2': 'explore-switch', 'aria-expanded': cats ? 'true' : 'false', 'aria-controls': 'mv2-explore-body',
-            'aria-describedby': 'mv2-explore-hint', onClick: toggleMode,
-          }, h('span', null, str.title), Icon ? h(Icon, { name: 'ChevronDown', size: 18 }) : null)),
-        h('span', { id: 'mv2-explore-hint', 'data-mv2': 'sr' }, cats ? str.backToListings : str.chooseCategory),
-        filter.length ? h('span', { 'data-mv2': 'explore-filter' }, filter.join(' · ')) : null,
-        h('button', { type: 'button', 'data-mv2': 'explore-all', 'aria-label': str.seeAllLabel, onClick: props.onSeeAll }, str.seeAll)),
-      // both views share one box, so the panel is as tall for the list as for the cards (nothing above the map moves)
-      h('div', { id: 'mv2-explore-body', 'data-mv2': 'explore-body' },
-        h('div', { ref: (el) => { views.current.cards = el; }, 'data-mv2': 'explore-view', 'data-view': 'cards', 'aria-hidden': cats ? 'true' : undefined }, cards),
-        h('div', { ref: (el) => { views.current.cats = el; }, 'data-mv2': 'explore-view', 'data-view': 'cats', 'data-list': list, inert: '', 'aria-hidden': cats ? undefined : 'true' },
-          h('div', { 'data-mv2': 'list-switch', role: 'tablist', 'aria-label': str.listLabel, onKeyDown: onListKey },
-            h('button', {
-              type: 'button', role: 'tab', id: 'mv2-tab-groups', 'data-mv2': 'intent-tab', 'data-list': 'groups',
-              'aria-selected': list === 'groups' ? 'true' : 'false', 'aria-controls': 'mv2-explore-list',
-              onClick: () => setList('groups'),
-            }, str.categoriesTab),
-            h('button', {
-              type: 'button', role: 'tab', id: 'mv2-tab-intents', 'data-mv2': 'intent-tab', 'data-list': 'intents',
-              'aria-selected': list === 'intents' ? 'true' : 'false', 'aria-controls': 'mv2-explore-list',
-              onClick: () => setList('intents'),
-            }, str.intentsTab)),
-          h('div', {
-            role: 'tabpanel', id: 'mv2-explore-list',
-            'aria-labelledby': list === 'intents' ? 'mv2-tab-intents' : 'mv2-tab-groups',
-          }, list === 'intents'
-            ? h(Intents, { value: props.intent || null, onPick: (id) => { if (props.onIntent) props.onIntent(id); backToCards(); } })
-            : h(Categories, { value: props.pill, ideas: props.ideas, onPick: (id) => { props.onPill(id); backToCards(); }, onIdeas: props.onIdeas })))),
-      h('div', { 'data-mv2': 'sr', role: 'status', 'aria-live': 'polite' }, picked ? str.selectedAnnounce(picked.m.title) : ''));
+      h('div', { 'data-mv2': 'pinpeek-bar' },
+        raised ? iconBtn({
+          'data-mv2': 'pinpeek-back',
+          // Back = one level (raised → cards → closed via onBack).
+          onClick: (e) => {
+            e.stopPropagation();
+            if (swallow.current) { swallow.current = false; return; }
+            if (props.onBack) props.onBack();
+          },
+        }, 'ChevronLeft', P.back) : null,
+        h('span', { 'data-mv2': 'pinpeek-status', role: 'status', 'aria-live': 'polite' },
+          current ? h('span', { 'data-mv2': 'sr' }, current.title || '') : null),
+        h('button', {
+          type: 'button', 'data-mv2': 'handle',
+          'aria-label': P.lower || P.back || '',
+          // Lowest (cards) shows flat bar + slight up chevron; raised is flat only (founder, 2026-11-22).
+          'data-hint': raised ? undefined : 'up',
+          // Handle = minimize / step down (same as Back). Tap is handled in onPullUp; click is the keyboard fallback.
+          onClick: (e) => {
+            if (swallow.current) { swallow.current = false; return; }
+            e.stopPropagation();
+            if (props.onBack) props.onBack();
+          },
+        },
+          h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }),
+          !raised && Icon ? h(Icon, { name: 'ChevronUp', size: 12 }) : null),
+        h('span', { 'data-mv2': 'drawer-mark', 'aria-hidden': 'true' },
+          (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.panel
+            && window.MapV2Strings.explore.panel.brandMark) || ''),
+        iconBtn({
+          // X = close the whole carousel / go home.
+          'data-mv2': 'pinpeek-close', 'aria-label': P.close,
+          onClick: (e) => {
+            e.stopPropagation();
+            if (swallow.current) { swallow.current = false; return; }
+            if (props.onClose) props.onClose();
+          },
+        }, 'X')),
+      h('div', { 'data-mv2': 'xrow-wrap', 'data-peek': '' },
+        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.prev, onClick: () => step(-1) }, 'ChevronLeft') : null,
+        h('div', {
+          ref: row, 'data-mv2': 'xrow', 'data-row': 'peek', onScroll: onRowScroll,
+          onPointerDownCapture: touch, onTouchStart: (e) => {
+            touch();
+            if (e.touches && e.touches[0]) swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, index: indexRef.current };
+          }, onTouchEnd: (e) => {
+            const start = swipeStart.current;
+            swipeStart.current = null;
+            if (!start || !e.changedTouches || !e.changedTouches.length || n < 2) return;
+            const dx = e.changedTouches[0].clientX - start.x;
+            const dy = e.changedTouches[0].clientY - start.y;
+            if (Math.abs(dx) <= Math.abs(dy)) return;
+            if (start.index === 0 && dx > 40) { touched.current = false; props.onIndex(n - 1); }
+            else if (start.index === n - 1 && dx < -40) { touched.current = false; props.onIndex(0); }
+          }, onWheel: touch,
+        }, items.map((m, i) => h(XCard, {
+          key: 'peek:' + m.id, m: m, meters: meters(m), rec: byKey.get(m.type + ':' + m.id),
+          groupWords: str.groups, distWords: props.distWords || {},
+          peek: true, selected: i === index,
+          detailsCue: !raised, cueLabel: P.detailsCue || P.detailsBadge || '',
+          onOpen: tap,
+        }))),
+        n > 1 ? iconBtn({ 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.next, onClick: () => step(1) }, 'ChevronRight') : null),
+      raised && current && props.details ? h('div', {
+        'data-mv2': 'pinpeek-details', role: 'region', 'aria-label': P.details ? P.details(current.title || '') : '',
+      }, props.details(current)) : null);
   }
 
   // An id inside an attribute selector: listing ids are uuids or slugs, but never trust that.
@@ -490,11 +1186,104 @@
     return window.CSS && window.CSS.escape ? window.CSS.escape(s) : s.replace(/["\\]/g, '\\$&');
   }
 
+  /**
+   * Nested Explore inside the raised pin peek (founder, 2026-11-22): the same Where to… tiles, Near & now /
+   * New / Nearby rows and Explore button as the default pull-up, below the profile. Choosing a tile or row
+   * focuses that block in this panel (and filters the map); clearing focus returns to the browse layout.
+   * props: markers, sources, origin, focus, distWords, selectedId, onFocus, onOpen(id, type), onSeeAll().
+   */
+  function PeekExplore(props) {
+    const str = S();
+    const P = str.panel || {};
+    const Icon = window.Icon;
+    const focus = props.focus || null;
+    const tile = focus && focus.kind === 'tile' ? focus.id : '';
+    const sec = focus && focus.kind === 'sec' ? focus.id : '';
+    const byKey = useMemo(() => indexSources(props.sources), [props.sources]);
+    const origin = props.origin || null;
+    const markers = (Array.isArray(props.markers) ? props.markers : []).filter((m) => m && m.type !== 'idea' && m.type !== 'contributor');
+    const pool = markers;
+    const ranked = (list, cap) => rank(origin, list, props.selectedId, cap || 12);
+    const current = tileOf(tile);
+    const tileItems = current ? ranked(pool.filter((m) => tileMatches(current.id, m)), 12) : [];
+    const now = Date.now();
+    const soon = (m) => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= now && t - now <= 6 * HOUR; };
+    const weekend = weekendBounds(now);
+    const rows = {
+      around: ranked(pool.filter((m) => (m.type === 'event' && (m.isLive || soon(m))) || m.type === 'place'), 12),
+      weekend: ranked(pool.filter((m) => m.type === 'event' && (() => { const t = Date.parse(m.startsAt || ''); return !isNaN(t) && t >= weekend.start && t <= weekend.end; })()), 12),
+      online: ranked(pool.filter((m) => looksOnline(m, byKey.get(m.type + ':' + m.id))), 12),
+      fresh: ranked(pool.filter((m) => { const t = Date.parse(m.createdAt || ''); return !isNaN(t) && now - t >= 0 && now - t <= NEW_WINDOW; }), 12)
+        .sort((a, b) => Date.parse(b.m.createdAt || '') - Date.parse(a.m.createdAt || '')),
+      more: ranked(pool.filter((m) => m.type !== 'idea'), 16),
+    };
+    const setFocus = (next) => { if (props.onFocus) props.onFocus(next); };
+    const chooseTile = (id) => setFocus(tile === id ? null : { kind: 'tile', id: id });
+    const chooseRow = (id) => setFocus(sec === id ? null : { kind: 'sec', id: id });
+    const rowTitle = (id) => P[id] || id;
+    const rowHint = (id) => P[id + 'Hint'] || '';
+    const distWords = props.distWords || str;
+    const cards = (id, list) => h(XRow, { id: id, fine: true, list: list }, list.map((r) => h(XCard, {
+      key: 'nest:' + id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
+      groupWords: str.groups, distWords: distWords,
+      selected: props.selectedId === r.m.id,
+      onOpen: (cid, ctype) => props.onOpen && props.onOpen(cid, ctype),
+    })));
+    const tab = (id, word, icon, on, onClick, extra) => h('button', Object.assign({
+      key: id, type: 'button', 'data-mv2': 'explore-tile', 'data-tab': id,
+      role: 'tab', 'aria-selected': on ? 'true' : 'false', onClick: onClick,
+    }, extra), icon && Icon ? h(Icon, { name: icon, size: 16 }) : null, h('span', null, word));
+
+    if (tile || sec) {
+      const list = tile ? tileItems : (rows[sec] || []);
+      return h('div', { 'data-mv2': 'peek-explore', 'data-focus': tile ? 'tile' : 'sec' },
+        h('div', { 'data-mv2': 'xfocus', 'data-focus': tile ? 'tile' : 'sec' },
+          h('div', { 'data-mv2': 'xfocus-chrome' },
+            h('button', {
+              type: 'button', 'data-mv2': 'xfocus-back', 'aria-label': P.closeRow || P.allTypes,
+              onClick: () => setFocus(null),
+            }, Icon ? h(Icon, { name: 'ChevronLeft', size: 18 }) : null),
+            h('button', {
+              type: 'button', 'data-mv2': 'xfocus-close', 'aria-label': P.lower,
+              onClick: () => setFocus(null),
+            }, Icon ? h(Icon, { name: 'X', size: 18 }) : null)),
+          tile
+            ? h('div', { 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.where },
+              TILES.map((t) => tab(t.id, t.word, t.icon, tile === t.id, () => chooseTile(t.id), { 'data-tile': t.id })))
+            : h('div', { 'data-mv2': 'explore-tiles', 'data-tabs': '', role: 'tablist', 'aria-label': P.rows },
+              SECTIONS.filter((id) => rows[id].length || id === sec).map((id) => tab(id, rowTitle(id), null, sec === id, () => chooseRow(id), { 'data-sec': id }))),
+          list.length ? cards(tile ? 'tile' : sec, list)
+            : h('p', { 'data-mv2': 'explore-empty' }, tile ? (P.emptyTile ? P.emptyTile(current ? current.word : '') : '') : (P.emptyRow || ''))));
+    }
+
+    return h('div', { 'data-mv2': 'peek-explore' },
+      h('div', { 'data-mv2': 'where-block' },
+        h('h3', { 'data-mv2': 'where-lead' }, P.whereLead || P.where),
+        h('div', { 'data-mv2': 'explore-tiles', role: 'list', 'aria-label': P.where },
+          TILES.map((t) => h('button', {
+            key: t.id, type: 'button', 'data-mv2': 'explore-tile', 'data-tile': t.id, 'data-tab': t.id,
+            onClick: () => chooseTile(t.id),
+          }, Icon ? h(Icon, { name: t.icon, size: 24 }) : null, h('span', null, t.word))))),
+      SECTIONS.map((id) => (rows[id].length ? h('section', { key: id, 'data-mv2': 'xsec', 'data-sec': id, 'aria-label': rowTitle(id) },
+        h('div', { 'data-mv2': 'xsec-h' },
+          h('h3', null, h('button', { type: 'button', 'data-mv2': 'xsec-go', onClick: () => chooseRow(id) }, rowTitle(id))),
+          rowHint(id) ? h('small', null, rowHint(id)) : null),
+        cards(id, rows[id])) : null)),
+      h('button', {
+        type: 'button', 'data-mv2': 'explore-more', 'aria-label': P.seeAll,
+        onClick: () => { if (props.onSeeAll) props.onSeeAll(); },
+      },
+        h('span', { 'data-mv2': 'explore-more-ring' }, Icon ? h(Icon, { name: 'Compass', size: 22 }) : null),
+        h('small', null, P.seeAll)));
+  }
+
   /** True on a phone-width screen, where the folding nav sits at the foot (the home screen clears room for it). */
   const useNarrow = () => useMedia(NARROW_MQ);
 
   window.MapV2Explore = {
-    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore,
+    ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore, SECTIONS,
+    peekOrder, nearestIndex, PinCarousel, PeekExplore,
+    placeWhereLine, eventDateLine, cardMetaLine, looksStreet,
     lastView: () => lastView,
   };
 })();

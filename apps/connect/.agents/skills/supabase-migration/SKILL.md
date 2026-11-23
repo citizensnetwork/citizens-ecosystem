@@ -36,10 +36,15 @@ END $$;
 ```
 
 ## Applying (MCP not always available — fallback is Supabase SQL editor)
+
+Apply to the live database only after the founder says yes in chat. Database, auth and
+security changes still need that yes. The founder does not name the file, and there is
+no pre-apply git tag. After applying, run that migration's probe and the security advisor.
+
 ```
 mcp_supabase_apply_migration name:"NNN_description"
 -- then verify:
-mcp_supabase_get_advisors type:"security"   -- baseline must not worsen (84 WARN)
+mcp_supabase_get_advisors type:"security"   -- 0 ERROR, no unexpected new finding
 ```
 
 ## Common Pitfalls
