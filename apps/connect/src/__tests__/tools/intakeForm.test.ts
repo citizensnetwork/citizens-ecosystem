@@ -48,7 +48,8 @@ describe("intake.html join page", () => {
     const document = window.document;
     expect(document.querySelector(".mark")?.textContent).toBe("219.");
     expect(document.querySelector(".word")?.textContent).toBe("Citizens");
-    expect(document.querySelector(".mark")?.getAttribute("href")).toBe("https://219.co.za/citizens");
+    expect(document.querySelector(".mark")?.getAttribute("href")).toBe("https://219.co.za/");
+    expect(document.querySelector("footer")?.textContent).toMatch(/Citizens apps/);
     expect(document.querySelector(".top")?.tagName).toBe("HEADER");
 
     const sections = [...document.querySelectorAll<HTMLElement>("[data-step]")];

@@ -134,19 +134,88 @@
     text-transform: uppercase;
     color: var(--muted);
   }
-  .joining select {
-    font: inherit;
+  .picker { position: relative; display: inline-block; }
+  .picker-full { display: block; width: 100%; margin-top: 0.4rem; }
+  .picker-native {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .picker-face {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 44px;
+    margin: 0;
+    padding: 0 2.6rem 0 1rem;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background-color: var(--white);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.4 6 6.2 11 1.4' stroke='%23272a25' stroke-opacity='.4' stroke-width='1.25' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1.05rem center;
+    background-size: 12px 8px;
+    color: var(--ink);
+    font-size: 1rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1;
+    text-align: left;
+    text-transform: none;
+  }
+  .joining .picker-face {
+    width: auto;
+    min-width: 9.75rem;
+    height: 44px;
+    border-radius: 999px;
+    padding: 0 2.7rem 0 1.05rem;
+    background-position: right 1.15rem center;
     font-size: 0.95rem;
     font-weight: 600;
-    letter-spacing: 0;
-    text-transform: none;
-    color: var(--ink);
+  }
+  .picker-face:focus-visible { border-color: var(--ink); }
+  .picker-menu {
+    position: absolute;
+    z-index: 25;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 100%;
+    width: max-content;
+    max-width: min(24rem, 80vw);
+    margin: 0;
+    padding: 0.35rem;
+    list-style: none;
     background: var(--white);
     border: 1px solid var(--line);
-    border-radius: 999px;
-    min-height: 44px;
-    padding: 0 0.9rem;
+    border-radius: 16px;
+    box-shadow: 0 12px 35px #272a2509;
   }
+  .picker-option {
+    display: block;
+    width: 100%;
+    min-height: 40px;
+    padding: 0.55rem 0.8rem;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 0.95rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.3;
+    text-align: left;
+    text-transform: none;
+  }
+  .picker-menu li + li .picker-option { box-shadow: inset 0 1px 0 #272a2512; }
+  .picker-option[aria-selected="true"] { background: var(--paper); }
+  .picker-option:hover:not(:disabled) { background: color-mix(in srgb, var(--paper) 65%, white); }
+  .picker-option:disabled { color: var(--muted); cursor: default; }
   .note {
     margin: 0.85rem 0 0;
     padding: 1rem 1.1rem;
@@ -201,12 +270,22 @@
   }
   .section-lead { margin: 0 0 0.2rem; color: var(--muted); }
 
-  label, .check { font-weight: 600; }
-  .field { margin-top: 0.95rem; }
+  .field > label,
+  .field > span {
+    display: block;
+    margin: 0;
+    color: var(--ink);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1.35;
+    text-transform: none;
+  }
+  .field { margin-top: 1.65rem; }
   .hint { margin: 0.35rem 0 0; color: var(--muted); font-size: 12.5px; font-weight: 500; }
   .count { margin: 0.3rem 0 0; color: var(--muted); font-size: 12px; text-align: right; }
 
-  input[type="text"], input[type="email"], input[type="tel"], input[type="url"], textarea, select.full {
+  input[type="text"], input[type="email"], input[type="tel"], input[type="url"], textarea {
     display: block;
     width: 100%;
     margin-top: 0.4rem;
@@ -221,7 +300,7 @@
   textarea { min-height: 7rem; resize: vertical; }
   input:focus, textarea:focus, select:focus { border-color: var(--ink); outline: none; }
 
-  .pair { display: grid; gap: 0.4rem 0.8rem; }
+  .pair { display: grid; gap: 1.65rem 0.8rem; }
   @media (min-width: 640px) {
     .pair { grid-template-columns: 1fr 1fr; }
   }
@@ -242,10 +321,10 @@
     display: flex;
     gap: 0.7rem;
     align-items: flex-start;
-    margin-top: 0.9rem;
+    margin-top: 1.35rem;
     font-weight: 500;
   }
-  .check input { width: 1.15rem; height: 1.15rem; margin-top: 0.2rem; accent-color: var(--ink); flex: none; }
+  .check input { width: 1.15rem; height: 1.15rem; margin-top: 0.45rem; accent-color: var(--ink); flex: none; }
   .check span { font-weight: 500; }
 
   details { margin-top: 0.9rem; }
@@ -310,7 +389,7 @@
 <body>
 <a class="skip" href="#join">Skip to the form</a>
 <header class="top">
-  <a class="mark" href="https://219.co.za/citizens">219<span>.</span></a>
+  <a class="mark" href="https://219.co.za/">219<span>.</span></a>
   <a class="word" href="https://219.co.za/citizens">Citizens</a>
 </header>
 
@@ -319,8 +398,9 @@
   <h1 data-copy="hero">Take your place.</h1>
   <p class="lede" data-copy="lede">A minute here is enough to be added to Citizens Connect. Everything after that makes you easier to find.</p>
 
-  <label class="joining" for="app">Joining
-    <select id="app">
+  <div class="joining">
+    <span id="app-label">Joining</span>
+    <select id="app" aria-labelledby="app-label">
       <option value="connect">Connect</option>
       <option value="wear">Wear</option>
       <option value="vision" disabled>Vision — soon</option>
@@ -329,7 +409,7 @@
       <option value="move" disabled>Move — soon</option>
       <option value="impact" disabled>Impact — soon</option>
     </select>
-  </label>
+  </div>
   <p id="app-note" class="note" hidden></p>
 
   <noscript><p class="note">This form needs JavaScript to send your details.</p></noscript>
@@ -382,8 +462,8 @@
           <p class="hint">Individual means a person serving in their own name.</p>
         </div>
         <div class="field">
-          <label for="category">What you mainly do</label>
-          <select id="category" class="full" data-phrase="primary category">
+          <label id="category-label" for="category">What you mainly do</label>
+          <select id="category" class="full" data-phrase="primary category" aria-labelledby="category-label">
             <option value="">Choose one</option>
             <option>Church</option>
             <option>Outreach / Mission</option>
@@ -580,8 +660,8 @@
   </section>
 
   <footer>
-    <a href="https://219.co.za/citizens">219.</a>
-    · Citizens · Connecting the Kingdom
+    <a href="https://219.co.za/">219.</a>
+    · Citizens apps · Connecting the Kingdom
   </footer>
 </main>
 <iframe name="intake-frame" id="intake-frame" hidden title=""></iframe>
@@ -695,6 +775,7 @@
     document.documentElement.setAttribute("data-platform", app);
     var select = document.getElementById("app");
     if (select && select.value !== app) select.value = app;
+    if (select && select.syncPicker) select.syncPicker();
     applyCopy(app);
     document.querySelectorAll("[data-only]").forEach(function (el) {
       el.hidden = el.getAttribute("data-only") !== app;
@@ -978,6 +1059,105 @@
     img.replaceWith(shown);
   }
 
+  function dressSelect(select) {
+    var picker = document.createElement("div");
+    picker.className = "picker" + (select.classList.contains("full") ? " picker-full" : "");
+    select.parentNode.insertBefore(picker, select);
+    picker.appendChild(select);
+    select.classList.add("picker-native");
+    select.tabIndex = -1;
+
+    var face = document.createElement("button");
+    face.type = "button";
+    face.className = "picker-face";
+    face.setAttribute("aria-haspopup", "listbox");
+    face.setAttribute("aria-expanded", "false");
+
+    var menu = document.createElement("ul");
+    menu.className = "picker-menu";
+    menu.hidden = true;
+    menu.setAttribute("role", "listbox");
+
+    function nameFor(text) {
+      var label = document.querySelector("[id='" + (select.getAttribute("aria-labelledby") || "") + "']");
+      var title = label ? label.textContent.replace(/\s+/g, " ").trim() : "";
+      return title ? title + ", " + text : text;
+    }
+
+    function syncFace() {
+      var chosen = select.options[select.selectedIndex];
+      var text = chosen ? chosen.textContent : "";
+      face.textContent = text;
+      face.setAttribute("aria-label", nameFor(text));
+    }
+
+    function close() {
+      menu.hidden = true;
+      face.setAttribute("aria-expanded", "false");
+      picker.classList.remove("is-open");
+    }
+
+    function paint() {
+      menu.textContent = "";
+      Array.prototype.forEach.call(select.options, function (opt) {
+        var item = document.createElement("li");
+        var choice = document.createElement("button");
+        choice.type = "button";
+        choice.className = "picker-option";
+        choice.textContent = opt.textContent;
+        choice.setAttribute("role", "option");
+        choice.disabled = opt.disabled;
+        if (opt.disabled) choice.setAttribute("aria-disabled", "true");
+        if (opt === select.options[select.selectedIndex]) choice.setAttribute("aria-selected", "true");
+        choice.addEventListener("click", function () {
+          if (opt.disabled) return;
+          select.value = opt.value;
+          select.dispatchEvent(new Event("change", { bubbles: true }));
+          syncFace();
+          close();
+        });
+        item.appendChild(choice);
+        menu.appendChild(item);
+      });
+    }
+
+    function open() {
+      document.querySelectorAll(".picker.is-open").forEach(function (openPicker) {
+        if (openPicker !== picker && openPicker.closeMenu) openPicker.closeMenu();
+      });
+      paint();
+      menu.hidden = false;
+      face.setAttribute("aria-expanded", "true");
+      picker.classList.add("is-open");
+    }
+
+    face.addEventListener("click", function () {
+      if (menu.hidden) open();
+      else close();
+    });
+    select.addEventListener("change", syncFace);
+    picker.closeMenu = close;
+    select.syncPicker = syncFace;
+    picker.appendChild(face);
+    picker.appendChild(menu);
+    syncFace();
+  }
+
+  function dressSelects() {
+    document.querySelectorAll("select").forEach(dressSelect);
+    document.addEventListener("click", function (event) {
+      document.querySelectorAll(".picker.is-open").forEach(function (picker) {
+        if (!picker.contains(event.target) && picker.closeMenu) picker.closeMenu();
+      });
+    });
+    document.addEventListener("keydown", function (event) {
+      if (event.key !== "Escape") return;
+      document.querySelectorAll(".picker.is-open").forEach(function (picker) {
+        if (picker.closeMenu) picker.closeMenu();
+      });
+    });
+  }
+
   function init() {
     var requested = queryApp();
     var draft = readDraft();
@@ -1050,6 +1230,7 @@
       preview(document.getElementById("cover"), document.getElementById("cover-preview"));
     });
     window.addEventListener("message", onMessage);
+    dressSelects();
     ready = true;
   }
 
