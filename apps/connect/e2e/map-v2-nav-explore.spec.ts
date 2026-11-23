@@ -209,7 +209,7 @@ test.describe("desktop", () => {
     await expect(page.locator("[data-mv2='nav-toggle']")).toHaveCount(0);
     await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
     const rail = (await page.locator(".cn-rail").boundingBox())!;
-    const mark = (await page.locator(".cn-rail-crown").boundingBox())!;
+    const mark = (await page.locator(".cn-rail-brand").boundingBox())!;
     expect(rail.width).toBeLessThan(80);
     expect(mark.x).toBeGreaterThanOrEqual(rail.x - 2);
     expect(mark.x + mark.width).toBeLessThanOrEqual(rail.x + rail.width + 8);

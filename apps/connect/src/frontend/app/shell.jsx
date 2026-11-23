@@ -343,9 +343,8 @@
         React.createElement(Icon, { name: 'LogOut', size: 12 }), 'Exit'));
   }
 
-  // One rail for the whole app. Closed on the map: the crown sits in the middle and
-  // Me, Explore, Map stack upward in gold. Open on every other screen. Let's and
-  // Kingdom Projects live under Do. Messages live inside Me.
+  // One rail. The crown stays at the top; the words beside it hide when the rail
+  // is closed. Me, Explore, Map keep that order, and Do sits under them.
   const RAIL_DO = [
     { page: 'lets', label: 'Let\u2019s\u2026' },
     { page: 'community', label: 'Kingdom Projects' },
@@ -383,23 +382,21 @@
       className: 'cn-rail', 'data-open': showLabels ? 'true' : 'false', 'aria-label': 'Connect',
     },
       React.createElement('button', {
-        type: 'button', className: 'cn-rail-do' + (door || page === 'lets' || page === 'community' ? ' on' : ''),
-        'aria-label': 'Do', 'aria-expanded': door ? 'true' : 'false',
-        onClick: () => setDoor((v) => !v),
-      }, icon('Do'), showLabels ? React.createElement('small', { className: 'cn-rail-label' }, 'Do') : null),
-      door && React.createElement('div', { className: 'cn-rail-door cn-glass', role: 'menu', 'aria-label': 'Do' },
-        RAIL_DO.map((row) => React.createElement('button', {
-          key: row.page, type: 'button', role: 'menuitem', onClick: () => { setDoor(false); app.go(row.page); },
-        }, row.label))),
-      showLabels && React.createElement('button', {
         type: 'button', className: 'cn-rail-brand', 'aria-label': 'Citizens Connect', onClick: goMap,
       },
         window.CrownMark ? React.createElement(window.CrownMark, { size: 36 }) : null,
-        React.createElement('span', null, React.createElement('b', null, 'Citizens'), React.createElement('small', null, 'Connect'))),
-      React.createElement('div', { className: 'cn-rail-crown', 'aria-hidden': 'true' },
-        window.CrownMark ? React.createElement(window.CrownMark, { size: 28 }) : null),
+        React.createElement('span', { className: 'cn-rail-word' }, React.createElement('b', null, 'Citizens'), React.createElement('small', null, 'Connect'))),
       React.createElement('div', { className: 'cn-rail-stack' },
-        item('me', 'Me'), item('explore', 'Explore'), item('map', 'Map')));
+        item('me', 'Me'), item('explore', 'Explore'), item('map', 'Map'),
+        React.createElement('button', {
+          type: 'button', className: 'cn-rail-do' + (door || page === 'lets' || page === 'community' ? ' on' : ''),
+          'aria-label': 'Do', 'aria-expanded': door ? 'true' : 'false',
+          onClick: () => setDoor((v) => !v),
+        }, icon('Do'), React.createElement('small', { className: 'cn-rail-label' }, 'Do'))),
+      door && React.createElement('div', { className: 'cn-rail-door cn-glass', role: 'menu', 'aria-label': 'Do' },
+        RAIL_DO.map((row) => React.createElement('button', {
+          key: row.page, type: 'button', role: 'menuitem', onClick: () => { setDoor(false); app.go(row.page); },
+        }, row.label))));
   }
 
   function Shell() {
