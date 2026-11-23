@@ -211,7 +211,7 @@
           h('label', null, 'Website', h('input', { placeholder: 'Your site, if you have one', value: site, onChange: (e) => setSite(e.target.value) })),
           h('label', null, 'WhatsApp', h('input', { value: wa, onChange: (e) => setWa(e.target.value) })),
           h('button', {
-            type: 'button', className: 'cn-primary cs-plate', style: { '--acc': '#d4af37' },
+            type: 'button', className: 'cn-primary cs-plate', style: { '--acc': '#f2bd22' },
             onClick: () => onSave({ name: name.trim(), bio: about, homeArea: home, website: site, instagram: ig, whatsapp: wa, seenBy: seen }),
           }, 'Save'))));
   }
@@ -243,6 +243,7 @@
     ['announcements', 'When a conversation is waiting', ''],
     ['friends_activity', 'Friend requests', 'When someone would like to walk with you'],
     ['event_reminders', 'Events near you', 'A gentle note, never a flood'],
+    ['contributor_updates', 'Broadcasts & updates', 'New events and news from Contributors you follow, and updates from places & events you follow'],
     ['weekly_digest', 'Weekly guide', 'One summary each Monday'],
   ];
 
@@ -297,13 +298,22 @@
           },
         }, h('b', null, o), h('span', { className: 'ps-radio' }))));
     }
-    const saved = (app.places || []).filter((p) => app.savedPlaces && app.savedPlaces.has && app.savedPlaces.has(p.id));
+    const savedPlaces = (app.places || []).filter((p) => app.savedPlaces && app.savedPlaces.has && app.savedPlaces.has(p.id)).map((p) => ({ id: p.id, name: p.name, kind: 'place', page: 'place', address: p.address, category: p.category }));
+    const savedPeople = (app.contributors || []).filter((c) => app.savedContributors && app.savedContributors.has && app.savedContributors.has(c.id)).map((c) => ({ id: c.id, name: c.name, kind: 'contributor', page: 'profile', address: c.location, category: c.category }));
+    const saved = savedPlaces.concat(savedPeople);
     const row = (title, sub, control) => h('div', { className: 'ps-row cn-glass' }, h('span', null, h('b', null, title), sub ? h('small', null, sub) : null), control);
+    const applyLabel = (window.WORLD && window.WORLD.t && window.WORLD.t('screen.apply.invite')) || 'Apply to become a Contributor';
     return h('div', { className: 'ps-settings' },
       app.isPendingApplicant ? h('section', { className: 'ps-section' },
         h('h2', null, 'Become a Contributor'),
         h('p', null, 'Your Contributor application is being reviewed'),
+        h('p', null, 'It goes live once an admin approves it.'),
         h('button', { type: 'button', className: 'cn-text', onClick: () => app.go('dashboard') }, 'Open my application')) : null,
+      !app.isPendingApplicant && app.contributorStatus === 'rejected' ? h('section', { className: 'ps-section' },
+        h('p', null, "Your last application wasn't approved this time. The reason is in your notifications and email."),
+        h('button', { type: 'button', className: 'cn-primary', onClick: () => app.go('apply') }, 'Apply again')) : null,
+      !app.isContributor && !app.isPendingApplicant && app.contributorStatus !== 'rejected' ? h('section', { className: 'ps-section' },
+        h('button', { type: 'button', className: 'cn-primary', onClick: () => app.go('apply') }, applyLabel)) : null,
       h('section', { className: 'ps-section' }, h('h2', null, 'Account'),
         h('button', { type: 'button', className: 'ps-row cn-glass', onClick: () => setDetail('Cover and profile photo') },
           h('span', null, h('b', null, 'Cover and profile photo'), h('small', null, 'Change it from the profile editor on Me.')))),
@@ -320,11 +330,11 @@
         h('button', { type: 'button', className: 'ps-row cn-glass', onClick: () => setDetail('Who can message me') }, h('span', null, h('b', null, 'Who can message me'), h('small', null, who)))),
       h('section', { className: 'ps-section' }, h('h2', null, 'Saved places'),
         h('p', null, 'Only you can see this list. A listing is never told you saved it.'),
-        saved.length ? h('div', { className: 'ps-list cn-glass' }, saved.slice().sort((a, b) => String(a.name).localeCompare(String(b.name))).map((p) => h('div', { key: p.id, className: 'ps-row ps-saved', 'data-saved': 'row' },
-          h('button', { type: 'button', 'data-saved': 'open', onClick: () => app.go('place', { id: p.id }) },
+        saved.length ? h('div', { className: 'ps-list cn-glass' }, saved.slice().sort((a, b) => String(a.name).localeCompare(String(b.name))).map((p) => h('div', { key: p.kind + p.id, className: 'ps-row ps-saved', 'data-saved': 'row' },
+          h('button', { type: 'button', 'data-saved': 'open', onClick: () => app.go(p.page, { id: p.id }) },
             h('i', { style: { background: (window.ConnectChrome && window.ConnectChrome.groupHex && window.ConnectChrome.groupHex(p.category)) || '#687d20' } }),
             h('span', null, h('b', { 'data-saved': 'name' }, p.name), p.address ? h('small', null, p.address) : null)),
-          h('button', { type: 'button', 'data-saved': 'remove', 'aria-label': 'Remove ' + p.name + ' from your saved list', onClick: () => app.toggleSave && app.toggleSave('place', p.id, p.name) }, '×'))))
+          h('button', { type: 'button', 'data-saved': 'remove', 'aria-label': 'Remove ' + p.name + ' from your saved list', onClick: () => app.toggleSave && app.toggleSave(p.kind, p.id, p.name) }, '×'))))
           : h('p', { 'data-saved': 'empty' }, 'Nothing saved yet.')),
       h('section', { className: 'ps-section ps-appearance' }, h('h2', null, 'Appearance'),
         h('div', { className: 'ps-row cn-glass' },

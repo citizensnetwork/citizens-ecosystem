@@ -135,7 +135,7 @@ const SLUGS={"worship-prayer": "praying-hands", "church-services": "church", "co
   }
   function Crown() {
     return h('svg', {
-      width: '100%', viewBox: '0 0 240 130', fill: 'none', stroke: '#d4af37', strokeWidth: '7', strokeLinecap: 'round', 'aria-hidden': 'true',
+      width: '100%', viewBox: '0 0 240 130', fill: 'none', stroke: '#f2bd22', strokeWidth: '7', strokeLinecap: 'round', 'aria-hidden': 'true',
     },
       h('path', { d: 'M13 43 Q72 88 120 96 Q168 88 227 43 L208 105 Q140 87 120 12 Q100 87 32 105 Z', strokeLinejoin: 'miter' }),
       h('path', { d: 'M32 119 Q120 106 208 119' }));
