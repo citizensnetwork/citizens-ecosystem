@@ -145,7 +145,10 @@ describe("intake.html join page", () => {
     }));
     expect((document.getElementById("thanks") as HTMLElement).hidden).toBe(false);
     expect((document.getElementById("card") as HTMLElement).hidden).toBe(true);
-    expect(document.querySelector("#thanks h2")?.textContent).toMatch(/on the list/i);
+    expect((document.getElementById("intro") as HTMLElement).hidden).toBe(true);
+    expect(document.querySelector("#thanks h1")?.textContent).toMatch(/on the list/i);
+    expect(document.getElementById("also-link")?.textContent).toMatch(/Wear/);
+    expect(document.getElementById("also-link")?.getAttribute("href")).toMatch(/[?&]app=wear/);
 
     const select = document.getElementById("app") as HTMLSelectElement;
     select.value = "wear";

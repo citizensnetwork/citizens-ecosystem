@@ -381,6 +381,30 @@
   }
   footer a { font-weight: 600; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 
+  .thanks h1 { max-width: 12ch; }
+  .thanks h1:focus { outline: none; }
+  .also {
+    margin-top: 2.75rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+  }
+  .also-label {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .also .lede { margin-top: 0.65rem; max-width: 42ch; }
+  .also-actions { margin: 1.15rem 0 0; }
+  .also .btn {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+  }
+  .also .hint { margin-top: 0.9rem; }
+
   @media (prefers-reduced-motion: reduce) {
     * { scroll-behavior: auto !important; }
   }
@@ -394,23 +418,25 @@
 </header>
 
 <main class="wrap" id="join">
-  <p class="eyebrow">Join</p>
-  <h1 data-copy="hero">Take your place.</h1>
-  <p class="lede" data-copy="lede">A minute here is enough to be added to Citizens Connect. Everything after that makes you easier to find.</p>
+  <div id="intro">
+    <p class="eyebrow">Join</p>
+    <h1 data-copy="hero">Take your place.</h1>
+    <p class="lede" data-copy="lede">A minute here is enough to be added to Citizens Connect. Everything after that makes you easier to find.</p>
 
-  <div class="joining">
-    <span id="app-label">Joining</span>
-    <select id="app" aria-labelledby="app-label">
-      <option value="connect">Connect</option>
-      <option value="wear">Wear</option>
-      <option value="vision" disabled>Vision — soon</option>
-      <option value="learn" disabled>Learn — soon</option>
-      <option value="play" disabled>Play — soon</option>
-      <option value="move" disabled>Move — soon</option>
-      <option value="impact" disabled>Impact — soon</option>
-    </select>
+    <div class="joining">
+      <span id="app-label">Joining</span>
+      <select id="app" aria-labelledby="app-label">
+        <option value="connect">Connect</option>
+        <option value="wear">Wear</option>
+        <option value="vision" disabled>Vision — soon</option>
+        <option value="learn" disabled>Learn — soon</option>
+        <option value="play" disabled>Play — soon</option>
+        <option value="move" disabled>Move — soon</option>
+        <option value="impact" disabled>Impact — soon</option>
+      </select>
+    </div>
+    <p id="app-note" class="note" hidden></p>
   </div>
-  <p id="app-note" class="note" hidden></p>
 
   <noscript><p class="note">This form needs JavaScript to send your details.</p></noscript>
 
@@ -654,9 +680,16 @@
     </form>
   </div>
 
-  <section id="thanks" hidden>
-    <h2>You're on the list.</h2>
-    <p id="thanks-body"></p>
+  <section id="thanks" class="thanks" hidden>
+    <p class="eyebrow">Received</p>
+    <h1 id="thanks-title" tabindex="-1">You're on the list.</h1>
+    <p class="lede" id="thanks-body"></p>
+    <div class="also">
+      <p class="also-label">Also contribute</p>
+      <p class="lede">Apply to another Citizens app whenever you're ready. It opens a fresh form.</p>
+      <p class="also-actions"><a class="btn primary" id="also-link" href="?app=wear">Apply to Wear</a></p>
+      <p class="hint">Vision, Learn, Play, Move and Impact aren't open yet.</p>
+    </div>
   </section>
 
   <footer>
@@ -694,7 +727,7 @@
       listingLabel: "Name people should see",
       listingHint: "The ministry, business, or your own name — exactly as it should appear.",
       permission: "I am authorised to represent this listing and I consent to Citizens publishing the listing details above publicly on Citizens Connect.",
-      thanks: "Thank you. You're on the list. Nothing goes live until it's reviewed. We'll email you at the address you gave when your listing is ready. Sign in with that same email — we'll send a 6-digit code — and confirm the listing is yours."
+      thanks: "Nothing goes live until it's reviewed. We'll email the address you gave when the listing is ready. Sign in with that same email — we'll send a 6-digit code — and confirm the listing is yours."
     },
     wear: {
       hero: "Bring your brand in.",
@@ -702,7 +735,7 @@
       listingLabel: "Brand name",
       listingHint: "The brand name, exactly as it should appear.",
       permission: "I am authorised to represent this brand and I consent to Citizens keeping these details and contacting me about Citizens Wear.",
-      thanks: "Thank you. You're on the list for Citizens Wear. Nothing is published until it's reviewed, and we'll be in touch at the address you gave."
+      thanks: "Nothing is published until it's reviewed. We'll be in touch at the address you gave."
     }
   };
 
@@ -948,15 +981,35 @@
     });
   }
 
+  function otherHref(app) {
+    try {
+      var url = new URL(location.href);
+      url.hash = "";
+      url.searchParams.set("app", app);
+      url.searchParams.delete("platform");
+      return url.toString();
+    } catch (err) {
+      return "?app=" + app;
+    }
+  }
+
   function showThanks(result) {
     var copy = COPY[currentApp] || COPY.connect;
     var extra = "";
     var skipped = result && result.photosSkipped || [];
     if (skipped.length) extra = " We couldn't store " + skipped.join(" and ") + ". It can be added later.";
     document.getElementById("thanks-body").textContent = copy.thanks + extra;
+    var other = currentApp === "wear" ? "connect" : "wear";
+    var link = document.getElementById("also-link");
+    link.textContent = other === "wear" ? "Apply to Wear" : "Apply to Connect";
+    link.href = otherHref(other);
+    document.getElementById("intro").hidden = true;
     document.getElementById("card").hidden = true;
+    var skip = document.querySelector(".skip");
+    if (skip) skip.hidden = true;
     document.getElementById("thanks").hidden = false;
-    document.getElementById("thanks").querySelector("h2").focus();
+    document.title = "You're on the list";
+    document.getElementById("thanks-title").focus();
     try { sessionStorage.removeItem(DRAFT_KEY); } catch (err) { /* ignore */ }
   }
 
