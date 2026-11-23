@@ -127,9 +127,10 @@ Deploy it once, after the script above is pasted:
 5. Share that URL. Add `?app=wear` or `?app=connect` when a button on that app should open the
    matching form. `?app=vision` (and Learn, Play, Move, Impact) stays on Connect and says that app
    isn't open yet. The page is white, black and gold; Wear shifts the gold to Wear's own accent.
-   A saved submission replaces the form with **You're on the list.** The row is on the
-   **Form Responses 1** tab, with **Source** `web-form` and **Approve** left unticked. `/dev` writes
-   only while you are signed in as the script owner. The link other people use is `/exec`.
+   A saved submission replaces the form with **You're on the list.** The page asks the script
+   for that result, because Google's reply frame often cannot tell the form itself. The row is on
+   the **Form Responses 1** tab, with **Source** `web-form` and **Approve** left unticked. `/dev`
+   writes only while you are signed in as the script owner. The link other people use is `/exec`.
 
 Until this deployment exists, opening the file from the repo shows the form but cannot write to the
 sheet. Re-paste `intake.html` into the Apps Script file `intakepage` when the page changes, and deploy

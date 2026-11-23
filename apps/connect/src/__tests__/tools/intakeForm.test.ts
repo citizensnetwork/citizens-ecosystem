@@ -130,6 +130,7 @@ describe("intake.html join page", () => {
     (opened.window.document.querySelector("[data-finish]") as HTMLButtonElement).click();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(devPosts[0]?.getAttribute("action")).toBe(devUrl);
+
     expect(posts[0].querySelector<HTMLInputElement>('input[name="reply"]')?.value).toBe("html");
     const body = JSON.parse(posts[0].querySelector<HTMLInputElement>('input[name="payload"]')?.value || "{}");
     expect(body.app).toBe("connect");
@@ -138,6 +139,13 @@ describe("intake.html join page", () => {
     expect(body.answers["organisation / ministry name"]).toBe("Example Fellowship");
     expect(body.answers["primary category"]).toBe("Church");
     expect(body.nonce).toMatch(/^[a-f0-9]{32}$/);
+    dom.window.dispatchEvent(new dom.window.MessageEvent("message", {
+      origin: "null",
+      data: { source: "citizens-intake", nonce: body.nonce, result: { ok: true, app: "connect" } },
+    }));
+    expect((document.getElementById("thanks") as HTMLElement).hidden).toBe(false);
+    expect((document.getElementById("card") as HTMLElement).hidden).toBe(true);
+    expect(document.querySelector("#thanks h2")?.textContent).toMatch(/on the list/i);
 
     const select = document.getElementById("app") as HTMLSelectElement;
     select.value = "wear";

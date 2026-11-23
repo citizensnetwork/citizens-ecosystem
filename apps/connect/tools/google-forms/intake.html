@@ -712,6 +712,7 @@
   var sending = false;
   var pendingNonce = "";
   var timer = 0;
+  var pollTimer = 0;
 
   function allowedExec(value) {
     return EXEC_RE.test(String(value || ""));
@@ -989,6 +990,51 @@
       showProblem("We could not confirm that this was saved. Please try once more. If Form Responses 1 already has a row with Source web-form, leave it.");
     }, 25000);
     form.submit();
+    watchResult();
+  }
+
+  function applyResult(result) {
+    if (!pendingNonce) return;
+    window.clearTimeout(timer);
+    window.clearTimeout(pollTimer);
+    pendingNonce = "";
+    sending = false;
+    setBusy(false);
+    if (result && result.ok) showThanks(result);
+    else showProblem((result && result.error) || "We could not save this. Please try again.");
+  }
+
+  // The posted reply runs inside Google's frame and often cannot tell this page.
+  // The page itself can ask the script, which stored the result under the nonce.
+  function watchResult() {
+    var g = window.google;
+    var runner = g && g.script && g.script.run;
+    if (!runner) return;
+    var n = pendingNonce;
+    var tries = 0;
+    var tick = function () {
+      if (!n || pendingNonce !== n) return;
+      tries += 1;
+      if (tries > 40) return;
+      try {
+        runner
+          .withSuccessHandler(function (result) {
+            if (pendingNonce !== n) return;
+            if (!result) {
+              pollTimer = window.setTimeout(tick, 800);
+              return;
+            }
+            applyResult(result);
+          })
+          .withFailureHandler(function () {
+            if (pendingNonce === n) pollTimer = window.setTimeout(tick, 800);
+          })
+          .intakeResult(n);
+      } catch (err) {
+        if (pendingNonce === n) pollTimer = window.setTimeout(tick, 800);
+      }
+    };
+    pollTimer = window.setTimeout(tick, 400);
   }
 
   function finish() {
@@ -1021,14 +1067,12 @@
   function onMessage(event) {
     var data = event.data;
     if (!data || data.source !== "citizens-intake") return;
-    if (event.origin !== "https://script.google.com" && event.origin !== "https://script.googleusercontent.com") return;
+    // A sandboxed Apps Script frame reports its origin as the string "null".
+    var origin = event.origin || "";
+    var fromScript = origin === "https://script.google.com" || origin === "https://script.googleusercontent.com" || origin === "null";
+    if (!fromScript) return;
     if (!pendingNonce || data.nonce !== pendingNonce) return;
-    window.clearTimeout(timer);
-    sending = false;
-    setBusy(false);
-    var result = data.result || {};
-    if (result.ok) showThanks(result);
-    else showProblem(result.error || "We could not save this. Please try again.");
+    applyResult(data.result || {});
   }
 
   var previewUrl = { logo: "", cover: "" };

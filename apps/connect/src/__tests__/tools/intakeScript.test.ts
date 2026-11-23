@@ -45,6 +45,7 @@ type Script = {
   appendWebRow_: (sheet: unknown, record: { app: string; answers: Record<string, string> }) => number;
   checkWebImage_: (image: { mime: string; base64: string }) => { error?: boolean; mime?: string; bytes?: number[] };
   doPost: (e: { parameter?: Record<string, string> }) => { html?: string; text?: string };
+  intakeResult: (nonce: string) => { ok: boolean; app?: string; error?: string } | null;
 };
 
 let fetchCalls: { url: string; opts: Record<string, unknown> }[];
@@ -146,7 +147,7 @@ function load(): Script {
   const names = Object.keys(google);
   const factory = new Function(
     ...names,
-    `${SRC}\nreturn { post_, columns_, buildPayload_, autoUpdateLevel_, sendWelcome_, intakeOutcome_, pollOutcome_, refreshStatuses, processRow_, awaitingStatus_, isOpenStatus_, isFinishedStatus_, slugFromUrl_, setup, Q, WEB_EXTRA, WEB_KINDS, WEB_CATEGORIES, WEB_APPS, parseWebIntake_, appendWebRow_, checkWebImage_, doPost };`,
+    `${SRC}\nreturn { post_, columns_, buildPayload_, autoUpdateLevel_, sendWelcome_, intakeOutcome_, pollOutcome_, refreshStatuses, processRow_, awaitingStatus_, isOpenStatus_, isFinishedStatus_, slugFromUrl_, setup, Q, WEB_EXTRA, WEB_KINDS, WEB_CATEGORIES, WEB_APPS, parseWebIntake_, appendWebRow_, checkWebImage_, doPost, intakeResult };`,
   );
   return factory(...names.map((n) => google[n as keyof typeof google])) as Script;
 }
@@ -800,6 +801,8 @@ describe("intake.gs join page", () => {
       parameter: { payload: JSON.stringify(essentials(script)), reply: "html" },
     }));
     expect(out).toMatchObject({ source: "citizens-intake", nonce: NONCE, result: { ok: true, app: "connect" } });
+    expect(script.intakeResult(NONCE)).toMatchObject({ ok: true, app: "connect" });
+    expect(script.intakeResult("not-a-real-nonce")).toBeNull();
     expect(theSheet.grid).toHaveLength(2);
     expect(fetchCalls).toHaveLength(0);
     expect(sentMail).toHaveLength(0);

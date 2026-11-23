@@ -1054,6 +1054,22 @@ function wantsHtml_(e) {
   return !!(e && e.parameter && e.parameter.reply === 'html');
 }
 
+/** The join page asks for this after it posts. The frame reply often never arrives. */
+function rememberResult_(nonce, result) {
+  if (!nonce) return;
+  try {
+    CacheService.getScriptCache().put('web-result-' + nonce, JSON.stringify(result), 180);
+  } catch (err) { /* the frame can still deliver it */ }
+}
+
+function intakeResult(nonce) {
+  if (!safeNonce_(nonce)) return null;
+  var raw = null;
+  try { raw = CacheService.getScriptCache().get('web-result-' + nonce); } catch (err) { return null; }
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (err) { return null; }
+}
+
 function htmlReply_(nonce, result) {
   var payload = JSON.stringify({ source: 'citizens-intake', nonce: nonce || '', result: result }).replace(/</g, '\\u003c');
   // Google nests this page inside its own frame, so tell every parent. The join page
@@ -1160,18 +1176,21 @@ function doGet() {
 /** Web app: append one sheet row. Deploy as "execute as me", anyone even anonymous. */
 function doPost(e) {
   var nonce = '';
+  var body;
   try {
     var out = receiveWebIntake_(e);
     nonce = out.nonce || '';
-    return respond_(e, nonce, out.body);
+    body = out.body;
   } catch (err) {
     var detail = err && err.message ? String(err.message).replace(/\s+/g, ' ').slice(0, 240) : '';
     Logger.log('web intake: ' + (detail || 'failed'));
-    return respond_(e, nonce, {
+    body = {
       ok: false,
       error: detail ? 'We could not save this. ' + detail : 'We could not save this just now. Please try again in a minute.',
-    });
+    };
   }
+  rememberResult_(nonce, body);
+  return respond_(e, nonce, body);
 }
 
 /** Run from the editor after deploying, to show the public link. */
