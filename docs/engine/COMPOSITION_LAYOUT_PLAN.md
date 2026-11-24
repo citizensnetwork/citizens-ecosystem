@@ -50,9 +50,7 @@ composer that sits on top of the engine’s existing configuration contract.
 - Core / always available when the feature is on: `map`, `explore`, `me`, `discover` (alias
   while Explore settles), `messages`, `notifications`, `settings`
 - Feature-gated: `gatherings`, `ideasBoard`, partner portal entry, admin entry
-- Optional later (not C1): a single `externalLink` kind *if* the engine owner entitles it —
-  one href, labelled, opens in-app browser or new tab. Default: off. Not required for the
-  pilot.
+- Pilot option: an entitled `externalLink` slot. Support embedding where the provider allows it, with an external link available where feasible.
 
 **Explore section kinds:**
 
@@ -170,8 +168,8 @@ UI segmentation and admin screens. No Sonnet (standing founder rule).
 | **C0** | **Inventory and freeze the catalogue.** List every rail item, Explore block and Preview carousel on `main` after the pack/rail facelift; name section kinds and sources; mark which are Citizens-only. | Opus 5.5 high | Current shell on `main` | `docs/engine/COMPOSITION_INVENTORY.md`; catalogue frozen for C1 |
 | **C1** | **Contract extension (minor).** Add `layout.explore`, `layout.preview`, richer `layout.navigation` to `@engine/config`; Citizens + sample configs; parity tests that encode today’s UI. | **Fable 5.2 high** | C0; E3 package exists | Package + tests green; README “Not in the contract yet” updated |
 | **C2** | **Segment Connect renderers.** Rail, Explore, Preview become “map over `WORLD.layout.*`”; delete hard-coded section order from JSX. Pixel-identical to pre-C2 (e2e). | Opus 5.5 xhigh | C1 | One PR per surface (rail → Explore → Preview), each with e2e |
-| **C3** | **Citizens-first use.** Founder (or admin) can reorder Explore / Preview / nav by editing the Citizens configuration (file or internal tool) and redeploying / publishing. Proves priority swapping without a tenant UI. | Opus 5.5 high | C2 | Runbook: “change Explore order”; one real reorder verified on production or preview |
-| **C4** | **Tenant composition admin (staff UI).** Inside the tenant’s admin: lists to show/hide, drag-reorder, rename (vocabulary keys or override strings). No canvas. Validates through the same schema. | Opus 5.5 high | C3; tenant project exists (after E8 for the pilot) | Staff can change composition without a deploy; audit or revision bump |
+| **C3** | **Citizens-first use.** Only the founder can reorder Explore / Preview / nav by editing the Citizens configuration (file or internal tool) and redeploying / publishing. Proves priority swapping without a tenant UI. | Opus 5.5 high | C2 | Runbook: “change Explore order”; one real reorder verified on production or preview |
+| **C4** | **Tenant composition admin (staff UI).** Inside the tenant’s admin: lists to show/hide, drag-reorder, rename (vocabulary keys or override strings). No canvas. Validates through the same schema. | Opus 5.5 high | C3; tenant project exists (after E8 for the pilot) | Staff can change composition without a deploy, with pilot Preview editing restricted to tenant owners; audit or revision bump |
 | **C5** | **Entitlements and limits.** Caps: max nav items, max Explore sections, which kinds/sources a plan may use; Superuser sets entitlements in the control plane. | Fable 5.2 high (validation) then Opus for any console fields | C1; E6 entitlements tables | Cheap plan cannot enable every source |
 | **C6** | **Pilot-ready check.** Sample tenant config differs from Citizens on purpose (flat Explore, fewer carousels, renamed nav); e2e against sample; short staff guide. | Opus 5.5 high | C4 or at least C3 + hand-edited config | Pilot staff guide; no Citizens framing in the sample world |
 
@@ -182,7 +180,7 @@ UI segmentation and admin screens. No Sonnet (standing founder rule).
 
 - Visual page builder / WYSIWYG canvas
 - Per-tenant custom React or CSS upload
-- Arbitrary nav URLs as a default (optional entitled `externalLink` only after C4)
+- Arbitrary nav URLs as a default (optional entitled `externalLink` for the pilot)
 - Composition of Vision, Wear or Central
 - Paying for composition as its own SKU (pricing stays on the engine plan)
 
@@ -259,7 +257,7 @@ ideas the prompt never listed.
 - Two carousels that differ only by source or density → one kind with parameters.
 - Different copy for Citizens vs a tenant → vocabulary / title key, not a forked component.
 - E5 / E6 security / E8–E10 in flight elsewhere → prefer C0 inventory or C2 against the
-  current contract; do not collide on schema unless the founder prioritises C1.
+  current contract; do not collide on schema unless the founder prioritises C1. Start C0 only when the founder is ready.
 - If an unprompted improvement is small and reversible, ship it with the note; if it is
   large or irreversible, propose it in chat with one recommended option and one fallback.
 
@@ -274,20 +272,15 @@ discovery; inventing commercial terms or naming a real tenant in-repo.
 
 ---
 
-## 6. Open questions for the founder
+## 6. Founder decisions
 
-Answer when C0 starts; none blocks reading this plan.
+1. **Connect navigation.** Keep Let’s and Ideas grouped under the Do menu in Connect.
+2. **Citizens editing at C3.** Only the founder can edit the shared Citizens layout for now. The UI can still adapt to each viewer’s most frequent activity.
+3. **Pilot Preview.** Only tenant owners can configure the Preview layout for their audience.
+4. **Pilot navigation.** Allow external links where feasible, including a radio tenant’s Listen Live link. Support embedding where the provider allows it.
+5. **Explore order in v1.** Reuse the existing map prominence code as a signal for ordering Explore sections.
 
-1. **Do menu:** stay a grouped parent (`do` with children) in the nav document, or flatten
-   Let’s / Ideas as ordinary nav slots?
-2. **Who edits Citizens’ composition at C3?** Founder-only via PR/config file, or an internal
-   admin screen on Connect immediately?
-3. **Preview customisation depth for the pilot:** reorder/hide only, or also add carousels
-   from the source list?
-4. **External links in nav:** forbid until after the pilot, or entitle for the pilot radio
-   tenant (e.g. “Listen live”)?
-5. **Priority vs prominence:** should Explore section order eventually consider the existing
-   map prominence scores, or stay a pure manual order for v1 of composition?
+C0 is deferred until the founder is ready to start.
 
 ---
 
@@ -302,8 +295,7 @@ Answer when C0 starts; none blocks reading this plan.
 
 **Tenant (C4 + C6):**
 
-- Tenant staff can show/hide, reorder and rename within the catalogue from an admin UI (or,
-  until that UI ships, from a published configuration revision).
+- Tenant staff can show/hide, reorder and rename within the catalogue. In the pilot, only tenant owners can make these changes to Preview.
 - Sample (or pilot) world differs from Citizens in nav labels and Explore order; no Citizens
   product name on those surfaces.
 - Validation refuses unknown kinds/sources; entitlements can hide kinds the plan does not
@@ -320,6 +312,6 @@ Answer when C0 starts; none blocks reading this plan.
 | Framing to strip from shared UI | [`BOUNDARY_INVENTORY.md`](./BOUNDARY_INVENTORY.md) |
 | This composition track | This file; next write `COMPOSITION_INVENTORY.md` at C0 |
 
-**Next step after founder accepts this plan:** run **C0** on current `main` (rail + pack
+**Next step when the founder starts C0:** run **C0** on current `main` (rail + pack
 Explore + Preview), then schedule **C1** on Fable beside remaining E7 work — without
 blocking E8–E10.
