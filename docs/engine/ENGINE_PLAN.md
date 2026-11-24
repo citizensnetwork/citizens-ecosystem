@@ -151,6 +151,12 @@ Order: E1 and E2 can run together. Then E3. E4 runs throughout. E5 follows E1 an
 follows E3. Then E8, E9 and E10 in turn. Citizens' own v1 priorities (Contributor readiness before recruiting) keep their place. Engine
 work runs beside them, not in front of them.
 
+**Composition layout (adaptable nav / Explore / Preview):** a constrained composer on top of the
+configuration contract — catalogue of section kinds and nav slots; show/hide, reorder, rename; no
+page builder. Plan: [`COMPOSITION_LAYOUT_PLAN.md`](./COMPOSITION_LAYOUT_PLAN.md) (steps C0–C6). It
+weaves into E4 and E7; it must not interrupt E5, E6 security, E8, E9 or E10. Citizens-ready at C3;
+tenant staff UI at C4 after the pilot world exists.
+
 ---
 
 ## 7. Open questions for the founder (answered 2026-11-11)
