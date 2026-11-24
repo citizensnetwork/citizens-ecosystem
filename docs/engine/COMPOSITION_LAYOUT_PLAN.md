@@ -194,60 +194,83 @@ These rules apply to every session that touches composition, the gold rail, Expl
 or `@engine/config` layout fields. They sit beside ENGINE_PLAN §5 and the standing
 instructions; they do not replace VISION.md.
 
+**Founder intent (2026-11-24):** agents are not limited to what the prompt already named.
+They are expected to notice better options, propose and (when §5.3 allows) ship improvements
+that speed delivery, refine UX, strengthen security, cut waste, and move Citizens and the
+rentable engine toward adaptable composition — even when the founder did not think of that
+move first. Record non-obvious choices in the session journal.
+
 ### 5.1 Standing goals agents must serve
 
 1. **Citizens first as the reference world.** Any composition change must keep Citizens’
-   current UX reproducible from configuration.
+   current UX reproducible from configuration (or improve it deliberately and say so).
 2. **Tenant worlds stay nameless of Citizens.** No Kingdom / Citizen / Contributor copy in
    shared renderers; vocabulary and title keys only.
 3. **Catalogue over canvas.** Prefer a new *kind* or *source* in the closed lists over a
    one-off JSX branch for one screen.
-4. **Priority is data.** If the founder wants “more important” content higher, that is
-   section order and source choice — not a new algorithm unless asked.
+4. **Priority is data.** “More important” content higher means section order and source
+   choice first; invent a ranking algorithm only when manual order is clearly not enough,
+   and say why in the PR.
+5. **End goal over prompt literalism.** If a path the founder did not name clearly serves
+   adaptable UI for Citizens and tenants (faster, safer, clearer, cheaper to operate), the
+   agent should take it or propose it — not wait for a second ask.
 
 ### 5.2 Permission granted (do without waiting)
 
 Agents **may and should** take initiative to:
 
-- Extract a hard-coded rail item, Explore block or Preview carousel into the catalogue when
-  touching that file for another reason (leave the Citizens config pixel-identical).
-- Propose a new **section kind** or **source** when the same JSX pattern appears twice; add it
-  only with tests and a Citizens default that preserves today’s UI.
-- Reorder sample-tenant Explore to prove differentiation (never invent a real tenant’s
-  branding in-repo).
-- Refuse a PR direction that is a mini page-builder; rewrite the approach as catalogue +
-  document and say so in the PR.
-- Wire new facelift UI to `WORLD` / layout fields in the same PR when cheap (E4 ∩ C2).
-- Extend parity tests when a label or order would otherwise drift silently.
+- **Innovate inside the goal:** suggest and implement catalogue kinds, sources, defaults,
+  empty states, staff copy, Explore priority orders, and small UX refinements that were not
+  in the prompt, when they make composition more useful or Citizens discovery stronger.
+- **Speed the path:** extract hard-coded rail / Explore / Preview blocks into the catalogue
+  when touching those files; wire facelift UI to `WORLD` / layout in the same PR when cheap
+  (E4 ∩ C2); batch obvious follow-ons instead of opening a second session for glue.
+- **Refine and improve:** tighten labels, density, accessibility, mobile hit targets, and
+  section defaults; remove dead hard-coding; extend parity / e2e when order or labels would
+  otherwise drift.
+- **Secure more:** refuse open URL / unvalidated sources; keep entitlements as the ceiling;
+  flag RLS, secret, or cross-tenant risks in composition admin paths; prefer structural
+  isolation already decided in ADR-001 over new shared tables.
+- **Be more effective:** collapse duplicate JSX into one kind with parameters; rewrite a
+  page-builder-shaped request as catalogue + document in the PR; reorder the sample tenant
+  to prove differentiation (never invent a real tenant’s branding in-repo).
+- **Surprise with options:** when several approaches fit, pick the one that best serves
+  adaptable composition *and* leave a short note (PR or journal) naming the alternatives
+  considered — so the founder can reverse a call without re-deriving it.
 
-### 5.3 Ask first (do not invent)
+### 5.3 Ask first (hard gates only)
 
 Agents **must stop and ask the founder** before:
 
 - Adding `externalLink` or any open URL field to nav
 - Removing a core nav slot from Citizens’ default
-- Introducing a section kind that needs a new table, RPC or migration
+- Introducing a section kind that needs a **new table, RPC or migration**
 - Changing entitlements defaults for the pilot
 - Building a drag-drop canvas or third-party page-builder dependency
 - Storing a real tenant’s composition document in this public repository
+- Anything that spends money, changes production auth, or applies a live migration
 
-### 5.4 Intuition cues (when stuck, choose the smaller door)
+Everything else that stays inside the catalogue + Citizens parity bar is **go**, including
+ideas the prompt never listed.
 
-- If a request sounds like “make Explore feel more like Instagram for this tenant,” translate
-  it to: which section kinds, which order, which sources — then implement that document.
-- If two carousels differ only by source or density, they are one kind with parameters — not
-  two kinds.
-- If Citizens and a tenant need different copy on the same section, that is a vocabulary /
-  title key — not a fork of the component.
-- If E5/E6/E8/E10 is in flight in another session, do not start C1 schema edits that collide;
-  do C0 inventory or C2 segmentation against the current contract instead.
+### 5.4 Intuition cues
+
+- Translate vague UX wishes into kinds, order and sources — then ship that document.
+- Two carousels that differ only by source or density → one kind with parameters.
+- Different copy for Citizens vs a tenant → vocabulary / title key, not a forked component.
+- E5 / E6 security / E8–E10 in flight elsewhere → prefer C0 inventory or C2 against the
+  current contract; do not collide on schema unless the founder prioritises C1.
+- If an unprompted improvement is small and reversible, ship it with the note; if it is
+  large or irreversible, propose it in chat with one recommended option and one fallback.
 
 ### 5.5 Creativity budget
 
-Agents may be creative inside the catalogue: naming kinds clearly, choosing sensible defaults,
-suggesting Explore priority orders that serve discovery (nearby and happening-before-static),
-and writing staff-facing empty states. Creativity that expands the product into a general
-site builder is out of bounds.
+**In bounds:** new catalogue entries, better defaults, discovery-oriented Explore order
+(nearby and happening before static), staff empty states, security hardening of the admin
+path, performance of section renderers, tests that lock parity.
+
+**Out of bounds:** a general site builder; silent product pivots away from map-first
+discovery; inventing commercial terms or naming a real tenant in-repo.
 
 ---
 
