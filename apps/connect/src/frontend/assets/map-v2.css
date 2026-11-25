@@ -44,6 +44,8 @@
 
   /* pins: white border plus a dark hairline and the shadow, so a pin separates from a light map */
   --pin-border: #ffffff;
+  --pin-neutral: #5f615c;               /* a pin before it is tapped (founder, 2026-11-25) */
+  --pin-neutral-ink: #f7f6f1;
   --pin-hairline: rgba(10, 9, 8, 0.62);
   --pin-label: #171310;
   --pin-label-halo: rgba(255, 255, 255, 0.95);
@@ -234,6 +236,8 @@
   --error: #ff8f80;
 
   --pin-border: #ffffff;
+  --pin-neutral: #a9aba4;
+  --pin-neutral-ink: #242624;
   --pin-hairline: rgba(255, 255, 255, 0);
   --pin-label: #f7f4ee;
   --pin-label-halo: rgba(10, 9, 8, 0.9);
@@ -356,6 +360,20 @@
 }
 .mv2-pin[data-quiet] {
   opacity: var(--dim-opacity);
+}
+/* Every pin is neutral until it is tapped (founder, 2026-11-25): only the chosen pin (and the one a card lights) wears
+   its category colour, the same colour its card takes. The pin's own colour is set inline on .mv2-pin; its parts read it
+   from the body, so the body holds the neutral pair instead. */
+.mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='body'] {
+  --pin-cat: var(--pin-neutral);
+  --pin-glyph: var(--pin-neutral-ink);
+}
+/* a place's and an idea's shape is an SVG with its colour in attributes: CSS outranks a presentation attribute */
+.mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='shape'] {
+  fill: var(--pin-neutral);
+}
+.mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='shape-svg'] > g {
+  stroke: var(--pin-neutral-ink);
 }
 
 /* contributor: disc on a tail */
@@ -4457,8 +4475,13 @@ a[data-mv2='card2'],
   position: absolute;
   inset: calc((var(--hit) - var(--space-7)) / -2);
 }
-/* a pin inside a panel filter glows in its own colour (applyMatch, app/map-v2-pins.jsx) */
+/* a pin inside a panel filter glows gold while it is still neutral, in its own colour once chosen (applyMatch,
+   app/map-v2-pins.jsx) */
 .mv2-pin[data-match] {
+  filter: drop-shadow(0 0 var(--space-2) var(--accent));
+}
+.mv2-pin[data-match].is-selected,
+.mv2-pin[data-match].is-lit {
   filter: drop-shadow(0 0 var(--space-2) var(--pin-cat));
 }
 /* Category chips float under the search bar (not inside it): full-bleed scroll past Find, edge fades + arrows

@@ -398,6 +398,17 @@ test.describe("Where to… on a phone: centred, coloured cards and the panel und
     // the chosen card is tinted with its pin's colour; the others stay plain
     const tinted = await row(page).locator("[data-mv2='xcard'][data-selected]").evaluate((e) => getComputedStyle(e).backgroundColor);
     expect(tinted).not.toBe(plain);
+    // and the map's pins stay neutral until chosen: only the chosen card's pin wears its colour (founder, 2026-11-25)
+    const chosenId = (await row(page).locator("[data-mv2='xcard'][data-selected]").getAttribute("data-explore-id"))!;
+    const fills = await page.evaluate((cid) => {
+      const fill = (el: Element | null) => (el ? getComputedStyle(el).fill : "");
+      const chosen = fill(document.querySelector(`.maplibregl-marker[data-cc-id="${cid}"] [data-mv2='shape']`));
+      const other = [...document.querySelectorAll(".maplibregl-marker[data-cc-id] [data-mv2='shape']")]
+        .find((el) => !el.closest(`[data-cc-id="${cid}"]`));
+      return { chosen, other: fill(other || null) };
+    }, chosenId);
+    expect(fills.other).toBe("rgb(95, 97, 92)");
+    expect(fills.chosen).not.toBe(fills.other);
   });
 
   test("the focus row takes a finger like the rest of the panel: up raises, down lowers, sideways scrolls the cards", async ({ page }) => {
