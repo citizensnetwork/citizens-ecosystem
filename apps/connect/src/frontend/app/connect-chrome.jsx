@@ -86,14 +86,38 @@ const SLUGS={"worship-prayer": "praying-hands", "church-services": "church", "co
     });
     return best;
   }
+  // Remember, for this visit, the city the map last looked at: Explore reads it after the map has gone (QA 2026-11-25,
+  // CCQA-0002). Attached once per map (map.jsx fires 'cc-map-ready' when it creates one); session storage only.
+  function rememberArea(map) {
+    if (!map || !map.getCenter) return;
+    const c = map.getCenter();
+    try { window.sessionStorage.setItem('cc_area_last', cityNear(c.lat, c.lng)); } catch (e) { /* private mode */ }
+  }
+  window.addEventListener('cc-map-ready', () => {
+    const map = window.__ccMap;
+    if (!map || map.__ccAreaHook) return;
+    map.__ccAreaHook = true;
+    rememberArea(map);
+    map.on('moveend', () => rememberArea(map));
+  });
+
   function useArea() {
     const [area, setArea] = useState('');
     useEffect(() => {
+      // The map is unmounted off the home screen (Explore, Me): remember the last city it looked at for this visit, so
+      // Explore can keep to it (QA 2026-11-25, CCQA-0002). Session only; nothing about the person leaves the browser.
       const read = () => {
         const map = window.__ccMap;
-        if (!map || !map.getCenter) return;
-        const c = map.getCenter();
-        const next = cityNear(c.lat, c.lng);
+        let next = '';
+        if (map && map.getCenter) {
+          const c = map.getCenter();
+          next = cityNear(c.lat, c.lng);
+          try { window.sessionStorage.setItem('cc_area_last', next); } catch (e) { /* private mode */ }
+        } else {
+          try { next = window.sessionStorage.getItem('cc_area_last') || ''; } catch (e) { next = ''; }
+          if (!CITIES.some((x) => x.name === next)) next = '';
+        }
+        if (!next) return;
         setArea((prev) => (prev === next ? prev : next));
       };
       read();

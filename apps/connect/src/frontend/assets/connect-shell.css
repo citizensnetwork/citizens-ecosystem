@@ -1490,3 +1490,11 @@
   .explore-page .explore-hero p{display:none}
   .explore-page .explore-hero .cn-eyebrow{font-size:10px}
 }
+
+/* Explore: the city it is showing, and an honest empty state with a way out (QA 2026-11-25, CCQA-0002/0003) */
+.explore-scope{margin:0 0 10px;font-size:13px;opacity:.8}
+.explore-scope .cn-text{margin-left:4px;font-weight:600;text-decoration:underline}
+.explore-empty{margin:6px 0 16px;padding:14px 16px;border-radius:19px}
+.explore-empty p{margin:0 0 10px;font-size:14px;font-weight:600}
+.explore-empty .cn-actions{display:flex;flex-wrap:wrap;gap:8px}
+.explore-empty .cn-actions button{padding:8px 12px;border-radius:999px;border:1px solid currentColor;background:transparent;font-size:13px;font-weight:600;cursor:pointer}

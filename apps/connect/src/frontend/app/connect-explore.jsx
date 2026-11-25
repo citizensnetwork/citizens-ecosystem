@@ -3,6 +3,16 @@
   const h = React.createElement;
   const { useState, useMemo } = React;
 
+  // QA 2026-11-25 (CCQA-0002/0003). Search words match the title, kind, category, description, where and who; case and
+  // accents are ignored, and every word must match (so "coffee hatfield" finds a coffee place in Hatfield).
+  const fold = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  function matchesQuery(item, query) {
+    const words = fold(query).split(/\s+/).filter(Boolean);
+    if (!words.length) return true;
+    const blob = fold([item.title, item.groupLabel, item.group, item.category, item.detail, item.location, item.host].join(' '));
+    return words.every((w) => blob.indexOf(w) !== -1);
+  }
+
   function Page({ onPick }) {
     const app = window.useApp();
     const chrome = window.ConnectChrome;
@@ -10,16 +20,27 @@
     const [category, setCategory] = useState('All');
     const [all, setAll] = useState('');
     const [picked, setPicked] = useState('');
+    const [wide, setWide] = useState(false);
     const area = chrome.useArea();
     const cities = (chrome && chrome.CITIES) || [];
     const rows = useMemo(() => (window.ConnectPreviews ? window.ConnectPreviews.listingsFrom(app, 'all', '') : []), [app.events, app.places, app.contributors]);
     const groups = (chrome && chrome.GROUPS) || [];
-    const matched = rows.filter((i) => {
-      const name = i.groupLabel || '';
-      const catOk = category === 'All' || name === category || i.group === category;
-      const blob = (i.title + ' ' + name + ' ' + (i.detail || '')).toLowerCase();
-      return catOk && blob.indexOf(query.toLowerCase()) !== -1;
-    });
+    // The city the page is about: the one chosen here, else the one the map is looking at. Listings are scoped to
+    // CITY_RADIUS_KM around it unless the person widens to all of South Africa. A listing with no pin is never hidden:
+    // it sits in its own group below.
+    const L = window.CCLocation;
+    const cityName = picked || area;
+    const city = cities.find((c) => c.name === cityName) || null;
+    const radius = (L && L.CITY_RADIUS_KM) || 35;
+    const scopeOf = (i) => (L ? L.cityScope(i, city, radius) : 'in');
+    const pinned = rows.filter((i) => scopeOf(i) !== 'nopin' && (wide || !city || scopeOf(i) === 'in'));
+    const unpinned = rows.filter((i) => scopeOf(i) === 'nopin');
+    const catOk = (i) => category === 'All' || (i.groupLabel || '') === category || i.group === category;
+    const matched = pinned.filter((i) => catOk(i) && matchesQuery(i, query));
+    const onlineMatched = unpinned.filter((i) => catOk(i) && matchesQuery(i, query));
+    const searching = !!query.trim() || category !== 'All';
+    const nothing = searching && !matched.length && !onlineMatched.length;
+    const clearSearch = () => { setQuery(''); setCategory('All'); setAll(''); };
     const cover = rows.find((i) => i.image);
     const pick = (item) => {
       if (onPick) onPick(item);
@@ -57,6 +78,7 @@
             onChange: (e) => {
               const city = cities.find((c) => c.name === e.target.value);
               setPicked(e.target.value);
+              setWide(false);
               if (!city) return;
               try {
                 window.sessionStorage.setItem('cc_area_pick', JSON.stringify(city));
@@ -72,7 +94,21 @@
           h('div', { className: 'cn-row' },
             h('h2', null, all || 'Happening around you'),
             h('button', { type: 'button', className: 'cn-text', onClick: () => setAll(all ? '' : 'All around you') }, all ? 'Show fewer' : 'See all →')),
+          city ? h('p', { className: 'explore-scope', 'data-cc': 'explore-scope' },
+            wide ? 'Showing all of South Africa. ' : 'Showing ' + city.name + ': ' + matched.length + (matched.length === 1 ? ' listing' : ' listings') + ' within ' + radius + ' km. ',
+            h('button', { type: 'button', className: 'cn-text', onClick: () => setWide(!wide) }, wide ? 'Back to ' + city.name : 'Widen to all South Africa')) : null,
+          nothing ? h('div', { className: 'explore-empty cn-glass', role: 'status', 'aria-live': 'polite', 'data-cc': 'explore-empty' },
+            h('p', null, query.trim()
+              ? 'Nothing for \u201c' + query.trim() + '\u201d' + (city && !wide ? ' in ' + city.name : '') + ' yet.'
+              : 'Nothing in ' + category + (city && !wide ? ' in ' + city.name : '') + ' yet.'),
+            h('div', { className: 'cn-actions' },
+              h('button', { type: 'button', onClick: clearSearch }, 'Clear the search'),
+              city && !wide ? h('button', { type: 'button', onClick: () => setWide(true) }, 'Widen to all South Africa') : null,
+              h('button', { type: 'button', onClick: () => app.go('apply') }, 'Add a listing'))) : null,
           h('div', { className: all ? 'explore-grid' : 'photo-carousel' }, matched.map(tile)),
+          onlineMatched.length ? h('section', { 'data-cc': 'explore-online' },
+            h('div', { className: 'cn-row' }, h('h2', null, 'Online and serving across South Africa')),
+            h('div', { className: 'photo-carousel' }, onlineMatched.map(tile))) : null,
           h('div', { className: 'cn-row' },
             h('h2', null, 'Explore what’s possible'),
             h('button', { type: 'button', className: 'cn-text', onClick: () => { setCategory('All'); setAll(''); } }, 'All categories →')),
@@ -97,8 +133,8 @@
             h('div', { className: 'cn-row' },
               h('h2', null, g.name),
               h('button', { type: 'button', className: 'cn-text', onClick: () => { setCategory(g.name); setAll(g.name); } }, 'See all →')),
-            h('div', { className: 'photo-carousel' }, rows.filter((i) => i.group === g.id).map(tile)))))));
+            h('div', { className: 'photo-carousel' }, pinned.concat(unpinned).filter((i) => i.group === g.id).map(tile)))))));
   }
 
-  window.ConnectExplore = { Page };
+  window.ConnectExplore = { Page, matchesQuery };
 })();
