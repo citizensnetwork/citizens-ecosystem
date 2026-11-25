@@ -161,30 +161,22 @@
      render replaces it. -->
 <div id="root"><div class="cc-boot" role="status" aria-label="Opening Citizens Connect"><img src="assets/citizens-crown.png?v=20261003a" alt="" width="72" height="39" /><span class="cc-boot-ring" aria-hidden="true"></span><p class="cc-boot-words" aria-hidden="true">Connecting the Kingdom</p></div><noscript><p class="cc-boot-words">Citizens Connect needs JavaScript to run.</p></noscript></div>
 
-<!-- lucide PINNED. @latest is a moving target and its UMD icon-node shape
-     has changed across releases (0.44x shipped ['svg', attrs, children] where
-     1.x ships a flat child list) — icons.jsx now tolerates both, but the app's
-     icon set should never change under us on someone else's release day.
-     In <body>, after the boot screen (QA plan PR F1): only the app bundle reads window.lucide, and a parser-blocking
-     112 KB script in <head> held back the first paint on a slow phone connection. -->
-<script src="https://unpkg.com/lucide@1.34.0/dist/umd/lucide.js"></script>
+<!-- The libraries, from our own origin (QA plan PR F2, 2026-11-25), each a placeholder the build points at
+     vendor/<name>.<hash>.js (scripts/frontend-vendor.js; @citizens/frontend-build `scripts`). They used to come from
+     unpkg and jsDelivr: three more origins to reach on a slow phone connection before the guest button, and bytes
+     OSV-Scanner never saw. Now they are the lockfile-pinned npm packages' own files:
+       - lucide 1.34.0, trimmed to the icons the source names (app/icons.jsx reads window.lucide.icons[name]);
+         an icon must be NAMED literally in the source, never assembled ('Arrow' + dir), or it is left out;
+       - React and ReactDOM 18.3.1, the production UMD builds (npm aliases react-umd / react-dom-umd, because the
+         Next app's own react is 19, which has no UMD build);
+       - supabase-js, its UMD build: it runs on the page that holds people's sign-in sessions.
+     All in <body>, after the boot screen, so the first paint never waits for them (PR F1). -->
+<script src="vendor/lucide.js"></script>
+<script src="vendor/react.js"></script>
+<script src="vendor/react-dom.js"></script>
 
-<!-- React/ReactDOM: DEVELOPMENT builds here, for local no-build dev (full React
-     warnings); the build (@citizens/frontend-build) ships each data-prod-* twin
-     instead. Unlike supabase-js below, these React hashes are NOT build-checked:
-     npm React is 19 (the API), which has no UMD build to compare against. The
-     page keeps the 18.3.1 UMD. If you change a React URL, recompute its hash
-     from the fetched bytes:
-     curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
-<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous" data-prod-src="https://unpkg.com/react@18.3.1/umd/react.production.min.js" data-prod-integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z"></script>
-<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous" data-prod-src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js" data-prod-integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1"></script>
-<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
-
-<!-- Supabase auth: UMD client + runtime config + browser auth wrapper.
-     Plain scripts (run before Babel transforms the app below). supabase-js runs
-     on the page that holds users' auth sessions, so it is pinned to the exact
-     lockfile version with SRI — never a floating @2. -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<!-- Supabase auth: the client (above), runtime config, and the browser auth wrapper. -->
+<script src="vendor/supabase.js"></script>
 <script src="config.js"></script>
 <!-- The world's words, categories and switches (engine step E7): the build bundles this
      ESM entry into one hashed script. It runs before auth-client.js and the screens. -->

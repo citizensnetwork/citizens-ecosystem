@@ -43,6 +43,8 @@ const { basePathFromEnv } = require('@citizens/ecosystem');
 const frontendConfig = require('./frontend-config');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { compileFrontendStyles, copyFontFiles } = require('./frontend-styles');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { vendorScripts } = require('./frontend-vendor');
 
 // `next dev`/`next build` load .env.local themselves, but this script runs
 // as a PLAIN node process (a separate step before `next build` in the
@@ -102,6 +104,8 @@ async function main() {
   // Tailwind (compiled here at build time, not by a CDN in every visitor's browser), the self-hosted fonts and the
   // boot screen: one stylesheet, linked where index.html's <link href="assets/tailwind.css"> stands (QA plan PR F1).
   const styles = await compileFrontendStyles({ rootDir, esbuild });
+  // React, ReactDOM, supabase-js and the lucide icons the app names, from our own origin (QA plan PR F2).
+  const vendor = vendorScripts(rootDir);
   const result = buildFrontend({
     esbuild,
     rootDir,
@@ -130,9 +134,11 @@ async function main() {
     // (their own file so a test can run the real configuration into a temp directory).
     ...frontendConfig,
     stylesheets: [{ href: 'assets/tailwind.css', css: styles.css }],
+    scripts: vendor.scripts,
   });
   copyFontFiles(result.dest, styles.fontFiles);
   console.log(`[build-frontend] Copied ${styles.fontFiles.length} font files → ${path.basename(result.dest)}/vendor/fonts/`);
+  console.log(`[build-frontend] lucide: ${vendor.iconNames.length} icons named in the source`);
 }
 
 main().catch((error) => {

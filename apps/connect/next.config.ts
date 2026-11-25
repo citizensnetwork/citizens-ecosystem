@@ -6,12 +6,21 @@ import type { NextConfig } from "next";
 // the compiler preserves; two levels up from apps/connect is the monorepo root.
 const outputFileTracingRoot = __dirname.replace(/\\/g, "/").split("/").slice(0, -2).join("/");
 
-// CDN domains required by the static HTML frontend (loaded via <script> / <link> tags).
-// These are only needed when the frontend is served from the same Next.js project
-// (i.e. after scripts/build-frontend.js copies it into public/). Tailwind and the fonts are compiled and served
-// from our own origin since QA plan PR F1 (2026-11-25); React, supabase-js and lucide follow in PR F2.
-const FRONTEND_SCRIPT_CDN = "https://unpkg.com https://cdn.jsdelivr.net";
-const FRONTEND_STYLE_CDN  = "https://unpkg.com";
+// The static HTML frontend loads every script, style and font from this origin since QA plan PRs F1 and F2
+// (2026-11-25): Tailwind is compiled and the fonts, React, supabase-js and lucide are served from the build. No CDN
+// is left in script-src or style-src.
+
+// Content-hashed build outputs (scripts/build-frontend.js, @citizens/frontend-build): the name changes whenever the
+// bytes do, so a browser may keep them for a year without asking again. Only names that carry a 10-hex hash match:
+// index.html, config.js, maplibre-loader.js and the vendored MapLibre files must always be revalidated.
+const HASHED = "[a-z][a-z0-9-]*\\.[0-9a-f]{10}";
+const IMMUTABLE_SOURCES = [
+  `/:file(${HASHED}\\.js)`, // auth-client, capacitor-bridge, engine-world
+  `/app/:file(${HASHED}\\.js)`, // the screens' bundle
+  `/assets/:file(${HASHED}\\.css)`, // compiled Tailwind
+  `/vendor/:file(${HASHED}\\.js)`, // React, ReactDOM, supabase-js, lucide
+  `/vendor/fonts/:file(${HASHED}\\.woff2)`, // the self-hosted fonts
+];
 const FRONTEND_IMG_CDN    = "https://images.unsplash.com";
 
 // First path segments of the frontend's single-segment screens (see rewrites() below).
@@ -186,8 +195,8 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               // 'unsafe-eval' is required by Next.js React Refresh in development.
               // CDN domains are needed for the static HTML frontend (React/Babel/MapLibre via unpkg).
-              `script-src 'self' 'unsafe-inline' ${FRONTEND_SCRIPT_CDN}${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
-              `style-src 'self' 'unsafe-inline' ${FRONTEND_STYLE_CDN}`,
+              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+              "style-src 'self' 'unsafe-inline'",
               `img-src 'self' data: blob: ${FRONTEND_IMG_CDN} https://xyiajtrvhlxaeplsiajj.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://api.maptiler.com https://basemaps.cartocdn.com`,
               "font-src 'self'",
               "media-src 'self' blob: https://xyiajtrvhlxaeplsiajj.supabase.co",
@@ -200,6 +209,11 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      // Hashed build outputs: cached for a year (QA plan PR F2). After the security rule, which stays first.
+      ...IMMUTABLE_SOURCES.map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      })),
       // CORS for `/api/*` moved to src/middleware.ts (multi-origin allow-list:
       // deployed frontend + Capacitor shells + localhost dev — addendum §B2).
       // Static headers can only echo ONE origin, which broke the mobile shells.

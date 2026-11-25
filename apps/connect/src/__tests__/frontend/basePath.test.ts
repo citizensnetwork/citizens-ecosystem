@@ -101,7 +101,13 @@ describe("next.config.ts basePath", () => {
     // (found by a real `next start` probe). "/citizens/connect/:path*" matches it.
     for (const raw of [undefined, "/citizens/connect"]) {
       const rules = await (await load(raw)).headers!();
-      expect(rules.map((r) => r.source), JSON.stringify(raw)).toEqual(["/:path*"]);
+      // the security rule first; after it only the year-long cache rules for content-hashed files (QA plan PR F2)
+      expect(rules[0].source, JSON.stringify(raw)).toBe("/:path*");
+      for (const rule of rules.slice(1)) {
+        expect(rule.source).toMatch(/^\/(?:[a-z]+\/)*:file\(/);
+        expect(rule.source).not.toContain("(.*)");
+        expect(rule.headers).toEqual([{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }]);
+      }
       const keys = rules[0].headers.map((h) => h.key);
       expect(keys).toEqual(
         expect.arrayContaining(["Content-Security-Policy", "Strict-Transport-Security", "X-Frame-Options"]),

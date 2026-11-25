@@ -112,6 +112,12 @@ export interface BuildFrontendOptions {
    * ("assets/tailwind.css"). Default: [] (output unchanged).
    */
   stylesheets?: { href: string; css: string }[];
+  /**
+   * Scripts the host vendored or generated (Connect's React, supabase-js and trimmed lucide). Each is written
+   * as `<dir>/<name>.<hash>.js` and replaces its own placeholder `<script src="<src>">`, which must appear
+   * exactly once. `src` is relative and lower-case ("vendor/react.js"). Default: [] (output unchanged).
+   */
+  scripts?: { src: string; code: string }[];
   /** Env source. Default: process.env. */
   env?: Record<string, string | undefined>;
   /** Default: console.log */
@@ -133,6 +139,8 @@ export interface BuildFrontendResult {
   browserBundleFiles: Record<string, string>;
   /** Each `stylesheets` href → its content-hashed path ("assets/tailwind.<hash>.css"). */
   stylesheetFiles: Record<string, string>;
+  /** Each `scripts` src → its content-hashed path ("vendor/react.<hash>.js"). */
+  scriptFiles: Record<string, string>;
   /** The resolved config object written to dest/config.js. */
   config: Record<string, string>;
   /** Every CDN script URL whose pin + SRI hash was checked against node_modules. */
@@ -198,6 +206,8 @@ export declare function rewriteIndexHtml(
     browserBundleFiles?: Record<string, string>;
     /** Placeholder stylesheet href → hashed href; each placeholder must be linked exactly once. */
     stylesheetFiles?: Record<string, string>;
+    /** Placeholder script src → hashed src; each placeholder must be loaded exactly once. */
+    scriptFiles?: Record<string, string>;
     basePath?: string;
   },
 ): string;
