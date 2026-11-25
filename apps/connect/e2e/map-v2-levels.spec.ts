@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, openMap, mapSettled, makeSeed, FIXED_NOW } from "./support/map-v2";
+import { mockMapNetwork, openMap, mapSettled, makeSeed, FIXED_NOW, centreOnE2eTown } from "./support/map-v2";
 
 // The map home's levels (founder, 2026-11-18): 0 the crown alone; 1 the search bar open with ONE row of small category
 // chips; 2 a pin tapped, its card and its neighbours in the pin carousel; 3 the chosen card tapped again, the carousel
@@ -337,18 +337,22 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await climb();
       await page.locator("[data-mv2='pinpeek-bar']").getByRole("button", { name: "Back", exact: true }).click();
       await expect(peek(page)).not.toHaveAttribute("data-raised", "");
-      // lowered, the crown rides the carousel's top edge (a phone) or heads the nav beside the search bar (desktop)
-      const crown = size.name === "phone" ? page.locator("[data-mv2='explore-crown']") : page.locator("[data-mv2='desktop-crown']");
+      // lowered: on a phone the nav rides just above the carousel's top edge and the crown floats top-left (founder,
+      // 2026-11-25); on a desktop the crown heads the nav beside the search bar
+      const crown = size.name === "phone" ? page.locator(".cn-phone-crown-btn") : page.locator(".cn-rail-brand");
       if (size.name === "phone") {
         // both slide by transform: measure once neither moves
         await expect.poll(async () => {
           const top = await still(page);
-          const c = (await crown.boundingBox())!;
-          return Math.abs(c.y + c.height / 2 - top);
+          const d = (await page.locator("[data-mv2='explore-dock']").boundingBox())!;
+          return Math.abs(d.y + d.height + 8 - top);
         }, { timeout: 5_000 }).toBeLessThan(6);
       }
       await crown.click();
       await reset();
+      // the phone's crown is home and reset (founder, 2026-11-25): it also takes the camera back to the person's place,
+      // which in this fixture is the country overview, so come back to the fixture town for the pins
+      if (size.name === "phone") await centreOnE2eTown(page);
 
       // a tap on bare map, from the carousel (re-measure pins: the climb may have moved the camera)
       const openPins = await visiblePins(page);
@@ -361,7 +365,7 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await reset();
       // from the Where to… strip too (a phone: a wide screen rests on its strip)
       if (size.name === "phone") {
-        await page.locator("[data-mv2='explore-crown']").click();
+        await page.locator("[data-mv2='explore-nudge']").click();
         await expect(page.locator("[data-mv2='explore-host']")).toHaveAttribute("data-mode", "strip");
         const spot1 = (await bareMap(page))!;
         await page.mouse.click(spot1.x, spot1.y);
@@ -371,11 +375,8 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       // Re-check pins after the long climb (camera may have drifted; soft-centre / dive centre).
       const panPins = await visiblePins(page);
       if (panPins.length === 0) {
-        await page.evaluate(() => {
-          const m = (window as unknown as { __ccMap: MapLike }).__ccMap;
-          const c = m.getCenter();
-          m.jumpTo({ center: [c.lng, c.lat], zoom: Math.max(m.getZoom(), 13.6) }, { originalEvent: {} });
-        });
+        // the camera may have drifted off the fixtures: come back to the fixture town, where the pins are
+        await centreOnE2eTown(page);
         await idle(page);
       }
       const panPins2 = panPins.length > 0 ? panPins : await visiblePins(page);

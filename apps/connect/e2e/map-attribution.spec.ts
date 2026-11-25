@@ -116,5 +116,7 @@ test("the location picker (Become a Contributor) shows the logo and the © MapTi
   await expect(picker).toHaveCount(1, { timeout: 15_000 });
   await expectLogoLink(page);
   await expect(picker.locator(".maplibregl-ctrl-attrib")).toHaveCount(1);
+  // the form scrolls under its own sticky Continue bar: bring the picker into the middle of the screen first
+  await picker.evaluate((el) => el.scrollIntoView({ block: "center" }));
   expect((await logoState(page)).uncovered).toBe(true);
 });

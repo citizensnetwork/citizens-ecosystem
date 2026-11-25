@@ -232,7 +232,8 @@ describe("the page", () => {
     expect(build.indexOf("'lets-lib.jsx'")).toBeGreaterThan(build.indexOf("'data.jsx'"));
     expect(build.indexOf("'lets.jsx'")).toBeLessThan(build.indexOf("'shell.jsx'"));
     expect(shell).toContain("page: 'lets'");
-    expect(shell).not.toContain("label: 'Kingdom Projects'");
+    // Let's… and Kingdom Projects sit under Do (rail and phone nav alike)
+    expect(shell).toMatch(/RAIL_DO = \[\s*\{ page: 'lets'[^}]*\},\s*\{ page: 'community', label: 'Kingdom Projects' \}/);
     expect(shell).toContain("case 'lets'");
     expect(shell).toContain("case 'community'");
     const profiles = read("src/frontend/app/profiles.jsx");

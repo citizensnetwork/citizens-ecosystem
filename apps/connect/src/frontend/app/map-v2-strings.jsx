@@ -379,6 +379,10 @@
         kind: { event: 'events', place: 'places', contributor: 'contributors', idea: 'ideas' },
         dock: 'Connect',
         nav: { me: 'Me', map: 'Map', central: 'Central', do: 'Do', explore: 'Explore' },
+        // Do's menu (Let's… and Kingdom Projects sit under Do)
+        door: { label: 'Do', lets: 'Let\u2019s\u2026', community: 'Kingdom Projects' },
+        // the phone's arrow under the nav (founder, 2026-11-25)
+        nudge: 'More to explore: Where to…',
       },
     },
 

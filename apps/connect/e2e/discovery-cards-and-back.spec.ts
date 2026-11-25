@@ -467,7 +467,8 @@ test.describe("One profile entry point", () => {
     expect(me!.y).toBeGreaterThanOrEqual(0);
     expect(me!.height).toBeGreaterThan(200);
     expect(me!.y + 40).toBeLessThanOrEqual(vp.height);
-    await page.locator("[data-rail-item='explore']").click();
+    // a phone has no rail (founder, 2026-11-25): Explore is in the floating nav
+    await page.locator("[data-mv2='explore-nav'][data-nav='explore']").click();
     await expect(page.locator('[data-screen="explore"]')).toBeVisible();
   });
 
@@ -487,9 +488,10 @@ test.describe("One profile entry point", () => {
     await expect(screen.getByRole("group", { name: "Show on the map" })).toHaveCount(0);
     await expect(screen.getByRole("button", { name: "Your account" })).toHaveCount(0);
     await expect(screen.getByRole("button", { name: "Search", exact: true })).toBeVisible();
-    // a phone rests on the crown, which shows the Where to… tiles; a wide screen shows them from the start
-    const crown = screen.locator("[data-mv2='explore-crown']");
-    if (await crown.isVisible()) await crown.click();
+    // a phone rests on the nav over its nudge, which shows the Where to… tiles; a tablet rests on the crown; a wide screen
+    // shows them from the start
+    const opener = screen.locator("[data-mv2='explore-nudge'], [data-mv2='explore-crown']").first();
+    if (await opener.isVisible()) await opener.click();
     const tiles = screen.locator("[data-mv2='explore-tiles']");
     await expect(tiles.getByRole("button", { name: "Coffee", exact: true })).toBeVisible();
     await expect(tiles.getByRole("button", { name: "Church", exact: true })).toBeVisible();

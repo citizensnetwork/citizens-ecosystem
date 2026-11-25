@@ -9,8 +9,9 @@ type Seed = { contributors: Row[]; places: Row[]; events: Row[] };
 const seedOf = () => makeSeed({ contributors: 8, places: 8, events: 6, now: FIXED_NOW, spread: 0.02, seed: 23 }) as unknown as Seed;
 
 const page$ = (page: Page) => page.locator("[data-mv2='discover']");
-const toggle = (page: Page) => page.locator("[data-rail-item='explore']");
-const nav = (page: Page) => page.locator(".cn-rail");
+// A phone has no rail (founder, 2026-11-25): Explore is in the floating nav, on the map and off it.
+const toggle = (page: Page) => page.locator("[data-mv2='explore-nav'][data-nav='explore']");
+const nav = (page: Page) => page.locator("[data-mv2='explore-dock']");
 const GROUPS = ["Churches & worship", "Serve & care", "Culture & fun", "Learn & grow", "Audiences", "Business"];
 
 async function network(page: Page) {
@@ -48,7 +49,7 @@ test.describe("on a phone", () => {
     await network(page);
     await openMap(page, "/", 5);
     await openExploreAll(page, "tap");
-    await page.locator("[data-rail-item='explore']").tap();
+    await toggle(page).tap();
     await expect(page).toHaveURL(/\/explore$/);
     await expect(page$(page)).toBeVisible();
     await toggle(page).tap();

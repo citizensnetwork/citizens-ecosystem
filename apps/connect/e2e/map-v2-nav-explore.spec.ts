@@ -17,6 +17,11 @@ async function open(page: Page) {
 }
 
 const crown = (page: Page) => page.locator("[data-mv2='explore-crown']");
+// A phone (founder, 2026-11-25): no rail; the crown floats top-left (home and reset), and the nav stands where the crown
+// stood, over a nudge that shows Where to…
+const topCrown = (page: Page) => page.locator(".cn-phone-crown-btn");
+const nudge = (page: Page) => page.locator("[data-mv2='explore-nudge']");
+const dock = (page: Page) => page.locator("[data-mv2='explore-dock']");
 const sheet = (page: Page) => page.locator("[data-mv2='explore']");
 const zoom = (page: Page) => page.evaluate(() => (window as unknown as { __ccMap: { getZoom(): number } }).__ccMap.getZoom());
 /** How much of the panel is on screen (it slides by transform, so its box runs past the bottom edge). */
@@ -42,10 +47,18 @@ async function mapIdle(page: Page) {
 test.describe("the map home on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("rests on the gold-ringed crown alone, with a Search button where the account button was", async ({ page }) => {
+  test("rests on the nav over the nudge, the gold-ringed crown top-left, and a Search button top-right; no rail", async ({ page }) => {
     await open(page);
-    await expect(crown(page)).toBeVisible();
+    await expect(crown(page)).toHaveCount(0);
+    await expect(page.locator(".cn-rail")).toHaveCount(0);
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
+    await expect(dock(page)).toBeVisible();
+    await expect(dock(page)).toHaveAttribute("data-rest", "");
+    await expect(dock(page).locator("[data-nav]")).toHaveCount(4);
+    const d = (await dock(page).boundingBox())!;
+    const n = (await nudge(page).boundingBox())!;
+    expect(n.y).toBeGreaterThanOrEqual(d.y + d.height - 2);
+    expect(844 - (n.y + n.height)).toBeLessThan(16);
     expect(await settled(page)).toBeLessThanOrEqual(0);
     await expect(page.locator("[data-mv2='nav-toggle']")).toHaveCount(0);
     await expect(page.locator("button.gold-gradient")).toHaveCount(0);
@@ -53,10 +66,14 @@ test.describe("the map home on a phone", () => {
     await expect(page.getByRole("button", { name: "Your account" })).toHaveCount(0);
     // the search bar is folded into its button until it is tapped
     await expect(page.locator("[data-mv2='home-search']")).toHaveCount(0);
-    const box = (await crown(page).boundingBox())!;
-    expect(box.width).toBeGreaterThan(48);
+    const box = (await topCrown(page).boundingBox())!;
+    expect(box.x).toBeLessThan(20);
+    expect(box.y).toBeLessThan(30);
+    expect(box.width).toBeGreaterThanOrEqual(44);
     expect(box.width).toBeLessThan(56);
-    const border = await crown(page).evaluate((e) => getComputedStyle(e).borderTopColor);
+    // the map keeps the crown alone: the Citizens · Connect words are for the other screens
+    await expect(page.locator(".cn-phone-word")).toHaveCount(0);
+    const border = await page.locator(".cn-phone-crown").evaluate((e) => getComputedStyle(e).borderTopColor);
     const [r, g, b] = border.match(/\d+/g)!.map(Number);
     expect(r).toBeGreaterThan(200);
     expect(g).toBeGreaterThan(150);
@@ -68,9 +85,9 @@ test.describe("the map home on a phone", () => {
     await expect(page.locator("[data-mv2='home-search']")).toHaveCount(0);
   });
 
-  test("the crown shows only the Where to… tiles under a bare handle, and hides them again", async ({ page }) => {
+  test("the nudge shows only the Where to… tiles under a bare handle; the nav rides above them; Map hides them", async ({ page }) => {
     await open(page);
-    await crown(page).click();
+    await nudge(page).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
     expect(await settled(page)).toBe(152);
     await expect(page.getByRole("button", { name: "Coffee", exact: true })).toBeVisible();
@@ -78,16 +95,19 @@ test.describe("the map home on a phone", () => {
     await expect(sheet(page).getByRole("heading", { name: "Where Christians…" })).toBeVisible();
     await expect(sheet(page).getByText(/near you/i)).toHaveCount(0);
     await expect(page.locator("[data-mv2='explore-handle']")).toBeVisible();
-    // the crown rides just above the strip
-    const c = (await crown(page).boundingBox())!;
+    // the nav rides just above the strip, and the nudge has gone
+    await expect(nudge(page)).toHaveCount(0);
+    await page.waitForTimeout(400);
+    const c = (await dock(page).boundingBox())!;
     expect(844 - (c.y + c.height)).toBeGreaterThan(152);
-    await crown(page).click();
+    await dock(page).locator("[data-nav='map']").click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
+    await expect(nudge(page)).toBeVisible();
   });
 
   test("a tile settles the panel at one height: tabs, its cards, the town around it, glowing pins and a chip", async ({ page }) => {
     await open(page);
-    await crown(page).click();
+    await nudge(page).click();
     await page.getByRole("button", { name: "Coffee", exact: true }).click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "focus");
     const height = await settled(page);
@@ -124,7 +144,7 @@ test.describe("the map home on a phone", () => {
 
   test("a card's first tap glows its pin 25% above the middle; the second opens its preview", async ({ page }) => {
     await open(page);
-    await crown(page).click();
+    await nudge(page).click();
     await page.getByRole("button", { name: "Market", exact: true }).click();
     const height = await settled(page);
     const card = page.locator("[data-row='tile'] [data-mv2='xcard']").first();
@@ -148,31 +168,34 @@ test.describe("the map home on a phone", () => {
     await expect(page.locator("[data-mv2='sheet']")).toBeVisible();
   });
 
-  test("with a filter on, the crown clears it and comes back to rest", async ({ page }) => {
+  test("with a filter on, the top-left crown clears it and comes back to rest", async ({ page }) => {
     await open(page);
-    await crown(page).click();
+    await nudge(page).click();
     await page.getByRole("button", { name: "Coffee", exact: true }).click();
     await expect(page.locator("[data-mv2='filter-chip']")).toBeVisible();
-    await page.getByRole("button", { name: "Clear filters" }).click();
+    await topCrown(page).click();
     await expect(page.locator("[data-mv2='filter-chip']")).toHaveCount(0);
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
     await expect(page.locator(".mv2-pin[data-match]")).toHaveCount(0);
   });
 
-  test("the handle opens every row; a row's title takes it over; the sticky nav is Explore, Map, Me", async ({ page }) => {
+  test("the handle opens every row and the nav glides to the foot; Me, then the crown, comes home", async ({ page }) => {
     await open(page);
-    await crown(page).click();
+    await nudge(page).click();
     await page.getByRole("button", { name: "Show all rows" }).click();
     await expect(sheet(page)).toHaveAttribute("data-open", "");
-    await expect(page.locator("[data-mv2='explore-dock']")).toBeVisible();
-    await expect(page.locator(".cn-rail")).toHaveCSS("width", "0px");
-    await page.locator("[data-mv2='explore-nav'][data-nav='me']").click();
+    await expect(dock(page)).toBeVisible();
+    await expect(dock(page)).not.toHaveAttribute("data-ride", "");
+    await dock(page).locator("[data-nav='me']").click();
     await expect(page.locator(".me-page")).toBeVisible();
     await expect(page.getByRole("button", { name: "Messages" })).toBeVisible();
-    await page.locator("[data-rail-item='map']").click();
+    // off the map: the same nav, and the crown with its words
+    await expect(page.locator(".cn-phone-dock [data-nav='me']")).toHaveAttribute("aria-current", "page");
+    await expect(page.locator(".cn-phone-word")).toBeVisible();
+    await topCrown(page).click();
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
-    await crown(page).click();
+    await nudge(page).click();
     await page.getByRole("button", { name: "Show all rows" }).click();
 
     await page.getByRole("button", { name: "Near & now" }).click();
@@ -190,13 +213,48 @@ test.describe("the map home on a phone", () => {
     await expect(page.locator("[data-screen='explore']")).toBeVisible();
   });
 
-  test("Map in the sticky nav goes back to the crown", async ({ page }) => {
+  test("Map in the nav goes back to rest, over the nudge", async ({ page }) => {
     await open(page);
-    await crown(page).click();
+    await nudge(page).click();
     await page.getByRole("button", { name: "Show all rows" }).click();
-    await page.locator("[data-mv2='explore-nav'][data-nav='map']").click();
+    await dock(page).locator("[data-nav='map']").click();
     await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
-    await expect(crown(page)).toBeVisible();
+    await expect(nudge(page)).toBeVisible();
+    await expect(dock(page)).toHaveAttribute("data-rest", "");
+  });
+
+  test("Do opens Let's… and Kingdom Projects from the nav", async ({ page }) => {
+    await open(page);
+    await dock(page).locator("[data-nav='do']").click();
+    await page.getByRole("menuitem", { name: "Kingdom Projects" }).click();
+    await expect(page.locator(".cn-phone-dock [data-nav='do']")).toHaveAttribute("aria-current", "page");
+  });
+});
+
+test.describe("Me on a phone (founder, 2026-11-25)", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("one column that fits the screen, and a Me / Calendar switch with a month calendar", async ({ page }) => {
+    await open(page);
+    await dock(page).locator("[data-nav='me']").click();
+    await expect(page.locator(".me-page")).toBeVisible();
+    const fits = await page.locator(".connect-scroll").evaluate((e) => e.scrollWidth <= e.clientWidth + 1);
+    expect(fits).toBe(true);
+    // the calendar card is behind the switch, not squeezed beside the profile
+    await expect(page.locator(".me-calendar")).toBeHidden();
+    const tiles = page.locator(".me-space-links button");
+    const first = (await tiles.first().boundingBox())!;
+    const last = (await tiles.last().boundingBox())!;
+    expect(Math.abs(first.y - last.y)).toBeLessThan(2);
+    expect(last.x + last.width).toBeLessThanOrEqual(390);
+
+    await page.getByRole("tab", { name: "Calendar" }).click();
+    await expect(page.locator(".me-space-links")).toBeHidden();
+    await expect(page.locator(".mc-cal-month")).toHaveCount(12);
+    await expect(page.locator(".mc-cal-month h3").first()).toHaveText("October");
+    await expect(page.locator(".mc-cal-day[aria-current='date']")).toHaveAttribute("data-day", "2026-10-10");
+    await page.getByRole("tab", { name: "Me" }).click();
+    await expect(page.locator(".me-space-links")).toBeVisible();
   });
 });
 

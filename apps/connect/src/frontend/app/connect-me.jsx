@@ -88,12 +88,98 @@
     return groups;
   }
 
+  // ── The phone's month calendar (founder, 2026-11-25) ──
+  // Months scroll down from this one, each name large; today wears a soft gold; an event is a bar in each of its days
+  // (every day it runs, up to a month). A day with events opens its list under that month. Dates are read in SAST.
+  const CAL_MONTHS = 12;
+  const CAL_SPAN_MAX = 31;
+  const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+  const DAY_MS = 86400000;
+  let sastDay = null;   // one formatter for every cell (en-CA writes YYYY-MM-DD)
+  function sastKey(t) {
+    if (!sastDay) sastDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg', year: 'numeric', month: '2-digit', day: '2-digit' });
+    return sastDay.format(new Date(t));
+  }
+  function eventDays(events) {
+    const byDay = new Map();
+    const seen = new Set();
+    (events || []).forEach((e) => {
+      if (!e || (e.id && seen.has(e.id))) return;
+      if (e.id) seen.add(e.id);
+      const start = Date.parse(e.startsAt || e.date || '');
+      if (Number.isNaN(start)) return;
+      const endRaw = Date.parse(e.endsAt || '');
+      const end = Number.isNaN(endRaw) || endRaw < start ? start : Math.min(endRaw, start + (CAL_SPAN_MAX - 1) * DAY_MS);
+      const last = sastKey(end);
+      for (let t = start, n = 0; n < CAL_SPAN_MAX; t += DAY_MS, n++) {
+        const key = sastKey(t);
+        if (!byDay.has(key)) byDay.set(key, []);
+        byDay.get(key).push(e);
+        if (key === last) break;
+      }
+    });
+    return byDay;
+  }
+  function MonthCalendar({ events, onOpen }) {
+    const [picked, setPicked] = useState('');
+    const byDay = React.useMemo(() => eventDays(events), [events]);
+    const todayKey = sastKey(Date.now());
+    const y0 = Number(todayKey.slice(0, 4));
+    const m0 = Number(todayKey.slice(5, 7)) - 1;
+    const tint = (e) => (window.ConnectChrome && window.ConnectChrome.groupHex && window.ConnectChrome.groupHex(e.category)) || '';
+    const months = [];
+    for (let i = 0; i < CAL_MONTHS; i++) {
+      const y = y0 + Math.floor((m0 + i) / 12);
+      const m = (m0 + i) % 12;
+      const first = new Date(Date.UTC(y, m, 1));
+      const lead = (first.getUTCDay() + 6) % 7;   // Monday first
+      const count = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+      const prefix = y + '-' + String(m + 1).padStart(2, '0') + '-';
+      const cells = [];
+      for (let k = 0; k < lead; k++) cells.push(h('span', { key: 'b' + k, className: 'mc-cal-day blank', 'aria-hidden': 'true' }));
+      for (let d = 1; d <= count; d++) {
+        const key = prefix + String(d).padStart(2, '0');
+        const list = byDay.get(key) || [];
+        const label = jhb(new Date(Date.UTC(y, m, d, 10)), { weekday: 'long', day: 'numeric', month: 'long' })
+          + (list.length ? ', ' + list.length + (list.length === 1 ? ' event' : ' events') : '');
+        cells.push(h('button', {
+          key: key, type: 'button', 'data-day': key, 'aria-label': label,
+          'aria-pressed': list.length ? picked === key : undefined,
+          'aria-current': key === todayKey ? 'date' : undefined,
+          disabled: !list.length || undefined,
+          className: 'mc-cal-day' + (key === todayKey ? ' today' : '') + (picked === key ? ' picked' : ''),
+          onClick: () => setPicked((p) => (p === key ? '' : key)),
+        },
+        h('b', null, d),
+        list.slice(0, 2).map((e, n) => h('i', { key: (e.id || n) + '', style: tint(e) ? { '--bar': tint(e) } : null }, e.title || 'Gathering')),
+        list.length > 2 ? h('small', null, '+' + (list.length - 2)) : null));
+      }
+      const open = picked && picked.indexOf(prefix) === 0 ? (byDay.get(picked) || []) : [];
+      months.push(h('section', { key: prefix, className: 'mc-cal-month', 'aria-label': jhb(first, { month: 'long', year: 'numeric' }) },
+        h('h3', null, jhb(first, { month: 'long' }), y !== y0 ? h('small', null, String(y)) : null),
+        h('div', { className: 'mc-cal-grid', role: 'group' },
+          WEEKDAYS.map((w, n) => h('span', { key: 'w' + n, className: 'mc-cal-wd', 'aria-hidden': 'true' }, w)),
+          cells),
+        open.length ? h('div', { className: 'mc-cal-list' }, open.map((e, n) => h('button', {
+          key: (e.id || n) + '', type: 'button', style: tint(e) ? { '--bar': tint(e) } : null,
+          onClick: () => { if (e.id && onOpen) onOpen(e.id); },
+        }, h('b', null, e.title || 'Gathering'), h('small', null, [e.time, e.location].filter(Boolean).join(' · '))))) : null));
+    }
+    return h('div', { className: 'mc-cal', 'aria-label': 'Your calendar, month by month' },
+      byDay.size ? null : h('p', { className: 'mc-cal-empty' }, 'Nothing on your calendar yet. Events you connect to appear here.'),
+      months);
+  }
+
   function Personal({ app, listing, shown, onSpace, onEdit, onStatus, onExplore, onContrib, vibe, setVibe, status }) {
+    // A phone shows Me or the calendar, switched under the name; a wide screen shows both side by side (CSS).
+    const [view, setView] = useState('me');
     const name = shown.name || 'Citizen';
     const seen = shown.seenBy === 'Everyone' ? 'seen by everyone on Connect' : 'seen by friends';
     const unread = app.unreadMsgs || 0;
     const notices = (app.notifications || []).filter((n) => !n.read).slice(0, 4);
-    const mine = (app.connected && app.ownEvents) ? app.ownEvents.concat((app.events || []).filter((e) => app.connected.has && app.connected.has(e.id))) : (app.ownEvents || []);
+    const mine = React.useMemo(() => ((app.connected && app.ownEvents)
+      ? app.ownEvents.concat((app.events || []).filter((e) => app.connected.has && app.connected.has(e.id)))
+      : (app.ownEvents || [])), [app.ownEvents, app.events, app.connected]);
     const months = agendaGroups(mine);
     const links = [
       ['Instagram', shown.instagram],
@@ -119,8 +205,20 @@
         h('button', { type: 'button', className: 'cn-round', 'aria-label': 'Edit your personal profile', onClick: onEdit }, h(Glyph, { name: 'pencil' }))),
       shown.bio ? h('p', { className: 'me-bio' }, shown.bio) : null,
       links.length ? h('div', { className: 'me-links' }, h('div', { className: 'mc-link-chips' }, links.map((row) => h('span', { key: row[0] }, row[1])))) : null,
-      h('div', { className: 'me-columns' },
+      h('div', { className: 'me-view cn-glass', role: 'tablist', 'aria-label': 'Show' },
+        [['me', 'Me'], ['calendar', 'Calendar']].map((v) => h('button', {
+          key: v[0], type: 'button', role: 'tab', 'aria-selected': view === v[0], className: view === v[0] ? 'on' : '',
+          onClick: () => setView(v[0]),
+        }, v[0] === 'me' && window.ConnectChrome
+          ? h('span', { className: 'inline-icon' }, h(window.ConnectChrome.Icon, { kind: 'Me' }))
+          : h(Glyph, { name: 'calendar' }), v[1]))),
+      view === 'calendar' ? h(MonthCalendar, { events: mine, onOpen: (id) => app.go('event', { id: id }) }) : null,
+      h('div', { className: 'me-columns', 'data-view': view },
         h('div', { className: 'me-left' },
+          // A guest browses freely; signing in is one tap from Me (it used to sit in the account menu).
+          !app.authed && app.showSignIn ? h('div', { className: 'me-signin cn-glass' },
+            h('span', null, h('b', null, 'You are browsing as a guest'), h('small', null, 'Sign in to save, follow and message as yourself.')),
+            h('button', { type: 'button', className: 'cn-primary', onClick: () => app.showSignIn() }, 'Sign in')) : null,
           h('div', { className: 'me-space-links', 'aria-label': 'Messages, friends and settings' },
             [['Messages', unread ? unread + ' waiting' : 'Conversations', 'messages'], ['Friends', 'People you walk with', 'friends'], ['Settings', 'Make it yours', 'settings']].map((c) =>
               h('button', { key: c[0], type: 'button', className: 'cn-glass', onClick: () => onSpace(c[0]) },
@@ -344,7 +442,9 @@
       app.isAdmin ? h('section', { className: 'ps-section' }, h('h2', null, 'Administration'),
         h('button', { type: 'button', className: 'ps-row cn-glass', onClick: () => app.go('admin') },
           h('span', null, h('b', null, 'Admin dashboard'), h('small', null, 'Applications, membership, moderation, insights and audit log')))) : null,
-      app.signOut ? h('button', { type: 'button', className: 'cn-text', onClick: () => app.signOut() }, 'Sign Out') : null,
+      app.authed
+        ? (app.signOut ? h('button', { type: 'button', className: 'cn-text', onClick: () => app.signOut() }, 'Sign Out') : null)
+        : (app.showSignIn ? h('button', { type: 'button', className: 'cn-text', onClick: () => app.showSignIn() }, 'Sign in') : null),
       h('button', { type: 'button', className: 'cn-text', onClick: onBack }, 'Back to Me'));
   }
 
@@ -513,11 +613,11 @@
       .concat(app.ownEvents || [])
       .concat((app.events || []).filter((e) => app.connected && app.connected.has && app.connected.has(e.id)));
     if (panel === 'Calendar') {
-      return h('div', { className: 'connect-scroll', 'data-screen': 'profile' },
+      return h('div', { className: 'connect-scroll me-panel', 'data-screen': 'profile' },
         h(CalendarPanel, { events: mine, onClose: () => setPanel(''), onExplore: () => app.go('explore') }));
     }
     if (panel) {
-      return h('div', { className: 'connect-scroll', 'data-screen': panel === 'Settings' ? 'settings' : 'profile' },
+      return h('div', { className: 'connect-scroll me-panel', 'data-screen': panel === 'Settings' ? 'settings' : 'profile' },
         h(Space, { start: panel, app, onBack: () => setPanel('') }));
     }
     return h('div', { className: 'connect-scroll', 'data-screen': 'profile' },
@@ -541,5 +641,5 @@
         statusOpen ? h(StatusPanel, { status, setStatus, onClose: () => setStatusOpen(false) }) : null));
   }
 
-  window.ConnectMe = { Page };
+  window.ConnectMe = { Page, MonthCalendar, eventDays };
 })();

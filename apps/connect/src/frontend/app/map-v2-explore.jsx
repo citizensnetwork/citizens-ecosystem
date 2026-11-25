@@ -331,6 +331,8 @@
   const SECTIONS = ['around', 'weekend', 'online', 'fresh', 'more'];
   const FINE_MQ = '(min-width: 1024px) and (pointer: fine)';
   const DESK_MQ = '(min-width: 64rem)';    // the desktop nav beside the search bar takes over from the crown
+  // A phone (founder, 2026-11-25): the app shell has no rail there, and the full nav stands where the crown stood.
+  const PHONE_MQ = '(max-width: 767px)';
   const HOUR = 60 * 60 * 1000;
   const DAY = 24 * HOUR;
   const NEW_WINDOW = 30 * DAY;
@@ -518,6 +520,7 @@
     const api = props.apiRef;
     const desk = useMedia(DESK_MQ);
     const fine = useMedia(FINE_MQ);
+    const phone = useMedia(PHONE_MQ);
     const [stage, setStage] = useState(() => (matches(DESK_MQ) ? 'strip' : 'rest'));
     const [rail, setRail] = useState(true);
     const [me, setMe] = useState('');          // '' | 'rail' | 'dock': where the account menu is open
@@ -527,7 +530,6 @@
     const root = useRef(null);
     const tabsRef = useRef(null);
     const scrollRef = useRef(null);
-    const drag = useRef(null);
     const str = S();
     const P = str.panel || {};
     const Icon = window.Icon;
@@ -603,8 +605,15 @@
     useEffect(() => {
       const min = () => { setFocus(null); setMe(''); setStage(desk ? 'strip' : 'rest'); };
       window.addEventListener('cc-rail-map', min);
-      return () => window.removeEventListener('cc-rail-map', min);
+      // The phone's top-left crown: home, with every panel folded (the map screen clears the filters itself).
+      window.addEventListener('cc-crown-home', min);
+      return () => {
+        window.removeEventListener('cc-rail-map', min);
+        window.removeEventListener('cc-crown-home', min);
+      };
     }, [desk]);
+    // The Do menu folds whenever the panel changes its look.
+    useEffect(() => { setDoor(false); }, [mode]);
 
     // the chosen tab in view, in the middle of its row
     const tabKey = tile || sec;
@@ -845,6 +854,19 @@
       if (crownDragged.current) { crownDragged.current = false; return; }
       onCrown();
     };
+    // The phone's nudge under the nav (founder, 2026-11-25): a tap or a pull up shows the Where to… strip.
+    const nudgePull = useRef(null);
+    const onNudgeDown = (e) => { nudgePull.current = { y: e.clientY, id: e.pointerId }; };
+    const onNudgeUp = (e) => {
+      const p = nudgePull.current;
+      nudgePull.current = null;
+      if (p && p.id === e.pointerId && p.y - e.clientY > 24) { crownDragged.current = true; setStage('strip'); }
+    };
+    const onNudgeClick = () => {
+      if (crownDragged.current) { crownDragged.current = false; return; }
+      setMe('');
+      setStage('strip');
+    };
 
     // A card in the full panel takes its row over first; the map screen then chooses it (a second tap opens it).
     const openCard = (row) => (id, type) => {
@@ -1012,16 +1034,26 @@
         h('div', { 'data-mv2': 'explore-scroll', ref: scrollRef },
           mode === 'focus' ? focusView() : mode === 'open' ? openView() : tilesBig())),
       // The crown and the sticky nav swap outright (founder, 2026-11-17: the morph was slow on a phone).
-      !open ? h('button', {
+      !open && !phone ? h('button', {
         type: 'button', 'data-mv2': 'explore-crown', 'aria-label': crownLabel,
         'data-filtered': filtered ? '' : undefined,
         onPointerDown: onCrownDown, onPointerUp: onCrownUp, onClick: onCrownClick,
         onPointerCancel: () => { crownPull.current = null; },
       }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)) : null,
-      open ? h('nav', { 'data-mv2': 'explore-dock', 'aria-label': P.dock },
-        door && h('div', { 'data-mv2': 'dock-door', className: 'cn-glass', role: 'menu', 'aria-label': 'Do' },
-          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('lets', {}); } }, 'Let\u2019s\u2026'),
-          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('community', {}); } }, 'Kingdom Projects')),
+      // A phone keeps the nav up in every look: riding where the crown rode (`data-ride`), and at rest lifted over the
+      // nudge. Opened, it moves down to the foot as the sticky nav. One element, so it glides (transform only).
+      phone && mode === 'rest' && !props.peek ? h('button', {
+        type: 'button', 'data-mv2': 'explore-nudge', 'aria-label': P.nudge,
+        onPointerDown: onNudgeDown, onPointerUp: onNudgeUp, onClick: onNudgeClick,
+        onPointerCancel: () => { nudgePull.current = null; },
+      }, Icon ? h(Icon, { name: 'ChevronUp', size: 18 }) : null) : null,
+      open || phone ? h('nav', {
+        'data-mv2': 'explore-dock', 'aria-label': P.dock,
+        'data-ride': phone && !open ? '' : undefined, 'data-rest': phone && mode === 'rest' ? '' : undefined,
+      },
+        door && h('div', { 'data-mv2': 'dock-door', className: 'cn-glass', role: 'menu', 'aria-label': P.door.label },
+          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('lets', {}); } }, P.door.lets),
+          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('community', {}); } }, P.door.community)),
         DOCK.map((item) => {
           const lead = navIcon(item);
           if (item.me) return meItem('dock', item, { 'data-mv2': 'explore-nav' }, lead);
@@ -1034,7 +1066,11 @@
               setMe('');
               if (item.door) { setDoor((v) => !v); return; }
               setDoor(false);
-              if (item.close) { setStage(desk ? 'strip' : 'rest'); return; }
+              if (item.close) {
+                if (props.level && props.onLevelReset) props.onLevelReset();
+                setStage(desk ? 'strip' : 'rest');
+                return;
+              }
               if (item.page && props.onGo) props.onGo(item.page, {});
             },
           }, lead, h('small', null, (P.nav && P.nav[item.id]) || item.id));

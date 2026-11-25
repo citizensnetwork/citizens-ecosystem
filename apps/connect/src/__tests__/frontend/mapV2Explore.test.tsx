@@ -326,26 +326,71 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id")).toBe("three");
   });
 
-  it("hides Do and Central, keeps Map in the middle, and Me opens the account menu with Messages and Alerts", () => {
+  it("the sticky nav is Me, Explore, Map and Do (no Central): Me and Explore are pages, Do opens its menu, Map rests", () => {
     const onGo = vi.fn();
     render(React.createElement(Harness, { onGo }));
     fireEvent.click(screen.getByRole("button", { name: P().open }));
     fireEvent.click(screen.getByRole("button", { name: P().raise }));
     const dock = screen.getByRole("navigation", { name: P().dock });
-    expect([...dock.querySelectorAll("[data-nav]")].map((b) => b.getAttribute("data-nav"))).toEqual(["explore", "map", "me"]);
-    expect(document.querySelector("[data-nav='do']")).toBeNull();
+    expect([...dock.querySelectorAll("[data-nav]")].map((b) => b.getAttribute("data-nav"))).toEqual(["me", "explore", "map", "do"]);
     expect(document.querySelector("[data-nav='central']")).toBeNull();
     // the crown has given way to the nav outright
     expect(document.querySelector("[data-mv2='explore-crown']")).toBeNull();
-    const me = dock.querySelector("[data-nav='me']")!;
-    fireEvent.click(me);
-    expect(me.getAttribute("aria-expanded")).toBe("true");
-    const menu = screen.getByTestId("me-menu");
-    expect(menu.getAttribute("data-anchor")).toBe("dock");
-    expect(menu.getAttribute("data-extras")).toBe("messages,notifications");
+    fireEvent.click(dock.querySelector("[data-nav='me']")!);
+    expect(onGo).toHaveBeenLastCalledWith("profile", {});
+    fireEvent.click(dock.querySelector("[data-nav='explore']")!);
+    expect(onGo).toHaveBeenLastCalledWith("explore", {});
+    const door = dock.querySelector("[data-nav='do']")!;
+    fireEvent.click(door);
+    expect(door.getAttribute("aria-expanded")).toBe("true");
+    const P2 = P() as unknown as { door: { lets: string; community: string } };
+    fireEvent.click(screen.getByRole("menuitem", { name: P2.door.community }));
+    expect(onGo).toHaveBeenLastCalledWith("community", {});
+    expect(screen.queryByRole("menu")).toBeNull();
     fireEvent.click(dock.querySelector("[data-nav='map']")!);
     expect(mode()).toBe("rest");
     expect(document.querySelector("[data-mv2='explore-crown']")).toBeTruthy();
+  });
+
+  describe("on a phone (founder, 2026-11-25): the nav stands where the crown stood", () => {
+    const real = window.matchMedia;
+    beforeEach(() => {
+      (window as unknown as { matchMedia: unknown }).matchMedia = (q: string) => ({
+        matches: q === "(max-width: 767px)", media: q, addEventListener: () => {}, removeEventListener: () => {},
+      });
+    });
+    afterEach(() => { (window as unknown as { matchMedia: unknown }).matchMedia = real; });
+
+    it("rests on the nav over the nudge, with no crown; the nudge shows Where to…; opening moves the same nav down", () => {
+      const onGo = vi.fn();
+      render(React.createElement(Harness, { onGo }));
+      expect(mode()).toBe("rest");
+      expect(document.querySelector("[data-mv2='explore-crown']")).toBeNull();
+      const dock = () => document.querySelector("[data-mv2='explore-dock']")!;
+      expect(dock().hasAttribute("data-ride")).toBe(true);
+      expect(dock().hasAttribute("data-rest")).toBe(true);
+      const first = dock();
+      fireEvent.click(screen.getByRole("button", { name: (P() as unknown as { nudge: string }).nudge }));
+      expect(mode()).toBe("strip");
+      expect(dock().hasAttribute("data-rest")).toBe(false);
+      expect(document.querySelector("[data-mv2='explore-nudge']")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: P().raise }));
+      expect(mode()).toBe("open");
+      // one element throughout, so it glides rather than swaps
+      expect(dock()).toBe(first);
+      expect(dock().hasAttribute("data-ride")).toBe(false);
+      fireEvent.click(dock().querySelector("[data-nav='me']")!);
+      expect(onGo).toHaveBeenLastCalledWith("profile", {});
+    });
+
+    it("the top-left crown's signal folds every panel back to rest", () => {
+      render(React.createElement(Harness));
+      fireEvent.click(screen.getByRole("button", { name: (P() as unknown as { nudge: string }).nudge }));
+      fireEvent.click(screen.getByRole("button", { name: P().raise }));
+      expect(mode()).toBe("open");
+      act(() => { window.dispatchEvent(new Event("cc-crown-home")); });
+      expect(mode()).toBe("rest");
+    });
   });
 
   it("puts every live category on exactly one tile", () => {
@@ -542,10 +587,16 @@ describe("the stylesheet and the wiring", () => {
     expect(read("src/frontend/app/shell.jsx")).toContain("SHOW_CREATE_ON_MAP = false");
   });
 
-  it("the folding nav is the only nav: no bottom bar is left in the shell", () => {
+  it("one nav per width: the rail on a wide screen, the floating crown and nav on a phone, and no bottom bar", () => {
     const shell = read("src/frontend/app/shell.jsx");
-    expect(shell).toContain("React.createElement(window.MapV2Nav)");
+    expect(shell).toContain("wide ? React.createElement(AppRail) : React.createElement(PhoneChrome)");
+    expect(shell).toContain("new Event('cc-crown-home')");
     expect(shell).not.toContain("BottomNav");
+    const home = read("src/frontend/app/home.jsx");
+    expect(home).toContain("window.addEventListener('cc-crown-home', home)");
+    const css = read("src/frontend/assets/map-v2.css");
+    expect(css).toMatch(/\[data-mv2='explore-dock'\]\[data-ride\] \{\s*transform: translate\(-50%, calc\(var\(--xp-vis\) \* -1\)\);/);
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\[data-mv2='explore-nudge'\] \{\s*animation: none;/);
   });
 });
 

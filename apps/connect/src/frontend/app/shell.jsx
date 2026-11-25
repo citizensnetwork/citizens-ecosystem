@@ -400,14 +400,82 @@
             }, row.label))))));
   }
 
+  // ── The phone's chrome (founder, 2026-11-25): no side rail on a phone. ──
+  // The crown floats in the top-left corner on every screen and takes the person home: the map, every panel
+  // closed and every filter cleared ('cc-crown-home', which home.jsx and the Explore panel answer). Off the map the
+  // Citizens · Connect words sit beside it, and the same floating nav the map uses (Me, Explore, Map, Do) sits at
+  // the foot. On the map the Explore panel draws that nav itself, where the crown used to be.
+  const PHONE_DOCK = [
+    { id: 'me', label: 'Me', kind: 'Me' },
+    { id: 'explore', label: 'Explore', kind: 'Explore' },
+    { id: 'map', label: 'Map', kind: 'Map' },
+    { id: 'do', label: 'Do', kind: 'Do' },
+  ];
+  // The screens drawn by placed() (CurrentPage): their own scroller runs under the floating nav.
+  const PLACED = ['explore', 'settings', 'profile'];
+  // Step-by-step forms keep their own Continue bar at the foot, so the floating nav stands aside there (the crown stays).
+  const FLOWS = ['apply', 'onboarding', 'intake-upgrade'];
+  function crownHome(app, onMap) {
+    // Off the map, the map screen mounts fresh: at rest, with no filter. On it, the screen and its panel reset themselves.
+    if (onMap) window.dispatchEvent(new Event('cc-crown-home'));
+    else app.go('home', {});
+  }
+  function PhoneChrome() {
+    const app = window.useApp();
+    const nav = app.nav || { page: 'home', params: {} };
+    const page = nav.page || 'home';
+    const onMap = page === 'home';
+    const flow = FLOWS.indexOf(page) !== -1;
+    const [door, setDoor] = useState(false);
+    useEffect(() => { setDoor(false); }, [page]);
+    const chrome = window.ConnectChrome;
+    const icon = (kind) => (chrome ? React.createElement('span', { className: 'inline-icon' }, React.createElement(chrome.Icon, { kind: kind })) : null);
+    const current = page === 'explore' ? 'explore'
+      : (page === 'profile' && !(nav.params && nav.params.id) ? 'me'
+        : (RAIL_DO.some((r) => r.page === page) ? 'do' : ''));
+    const goItem = (id) => {
+      if (id === 'do') { setDoor((v) => !v); return; }
+      setDoor(false);
+      if (id === 'map') { app.go('home', {}); return; }
+      if (id === 'explore') { app.go('explore'); return; }
+      if (id === 'me') app.go('profile', {});
+    };
+    return React.createElement(React.Fragment, null,
+      React.createElement('div', { className: 'cn-phone-crown', 'data-words': onMap ? undefined : '' },
+        React.createElement('button', {
+          type: 'button', className: 'cn-phone-crown-btn', 'aria-label': 'Citizens Connect: back to the map',
+          onClick: () => crownHome(app, onMap),
+        }, window.CrownMark ? React.createElement(window.CrownMark, { size: 30 }) : null),
+        onMap ? null : React.createElement('span', { className: 'cn-phone-word', 'aria-hidden': 'true' },
+          React.createElement('b', null, 'Citizens'), React.createElement('small', null, 'Connect'))),
+      onMap || flow ? null : React.createElement('nav', { className: 'cn-phone-dock', 'data-mv2': 'explore-dock', 'aria-label': 'Connect' },
+        door && React.createElement('div', { 'data-mv2': 'dock-door', className: 'cn-glass', role: 'menu', 'aria-label': 'Do' },
+          RAIL_DO.map((row) => React.createElement('button', {
+            key: row.page, type: 'button', role: 'menuitem', onClick: () => { setDoor(false); app.go(row.page); },
+          }, row.label))),
+        PHONE_DOCK.map((it) => React.createElement('button', {
+          key: it.id, type: 'button', 'data-mv2': 'explore-nav', 'data-nav': it.id,
+          'data-emphasis': it.id === 'map' ? '' : undefined,
+          'aria-current': current === it.id ? 'page' : undefined,
+          'aria-expanded': it.id === 'do' ? (door ? 'true' : 'false') : undefined,
+          onClick: () => goItem(it.id),
+        }, icon(it.kind), React.createElement('small', null, it.label)))));
+  }
+
   function Shell() {
     const { createKind, createEditing, authed, guestMode, authResolved, nav } = window.useApp();
+    const wide = window.ConnectChrome && window.ConnectChrome.useWide ? window.ConnectChrome.useWide() : true;
     const onMap = nav && nav.page === 'home';
     // Signed out: the landing — but while a probable session is still resolving,
     // the loading splash instead, so a returning member sees no "sign in" flash.
     if (!authed && !guestMode) return React.createElement(authResolved ? window.AuthScreen : window.LoadingSplash);
-    return React.createElement('div', { className: 'connect-app', 'data-rail': onMap ? 'closed' : 'open' },
-      React.createElement(AppRail),
+    return React.createElement('div', {
+      className: 'connect-app', 'data-rail': onMap ? 'closed' : 'open', 'data-phone': wide ? undefined : '',
+      'data-page': nav && nav.page ? nav.page : 'home',
+      'data-placed': PLACED.indexOf(nav && nav.page) !== -1 && !(nav.params && nav.params.id) ? '' : undefined,
+      'data-flow': FLOWS.indexOf(nav && nav.page) !== -1 ? '' : undefined,
+    },
+      wide ? React.createElement(AppRail) : React.createElement(PhoneChrome),
       React.createElement('main', { className: 'connect-app-main' },
         React.createElement(AssistBanner),
         React.createElement(CurrentPage)),

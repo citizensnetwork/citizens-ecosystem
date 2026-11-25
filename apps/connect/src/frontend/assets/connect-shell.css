@@ -1403,17 +1403,81 @@
 }
 [data-mv2='home'] [data-mv2='home-filters-wrap']::before{left:0}
 [data-mv2='home'] [data-mv2='home-filters-arrow'][data-dir='prev']{left:var(--space-2)}
-/* On a phone the map's rail slides away. The crown stays at the foot, and the preview's own bar carries the gold icons. */
+/* A phone has no rail (founder, 2026-11-25). The crown floats top-left on every screen (home and reset), with the
+   Citizens · Connect words beside it off the map; the floating nav (Me, Explore, Map, Do) stands where the crown stood. */
+.connect-app{--phone-crown-z:45;--phone-dock-clear:calc(var(--xp-dock-h) + var(--space-4) * 2 + env(safe-area-inset-bottom,0px));--phone-crown-clear:calc(max(var(--space-3),env(safe-area-inset-top,0px)) + var(--hit) + var(--space-2));--phone-word-ink:#272a25}
+[data-theme='dark'] .connect-app{--phone-word-ink:#f7f6f1}
 @media(max-width:767px){
-  .cn-rail,.cn-rail[data-open='true']{flex-basis:64px;width:64px;align-items:center;padding:16px 8px 18px}
-  .cn-rail[data-open='true'] .cn-rail-stack{align-items:center}
-  .cn-rail[data-open='true'] .cn-rail-btn,.cn-rail[data-open='true'] .cn-rail-do,.cn-rail[data-open='true'] .cn-rail-brand{grid-template-columns:48px 0fr}
-  .cn-rail-word,.cn-rail-label{display:none !important}
-  .connect-app[data-rail='closed'] .cn-rail{flex-basis:0;width:0;min-width:0;padding:0;border-width:0;opacity:0;overflow:hidden}
-  [data-mv2='explore-nav'],[data-mv2='explore-nav'] svg,[data-mv2='explore-dock'] .inline-icon{color:#f2bd22}
+  [data-mv2='explore-nav'],[data-mv2='explore-nav'] svg,[data-mv2='explore-dock'] .inline-icon{color:var(--accent)}
   [data-mv2='explore-nav'] .inline-icon{inline-size:22px;width:22px;height:22px;display:grid;place-items:center}
   [data-mv2='explore-nav'] .inline-icon svg{width:22px;height:22px}
   [data-mv2='dock-door']{position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%);display:grid;gap:4px;min-width:180px;padding:8px;border-radius:18px;z-index:2}
   [data-mv2='dock-door'] button{border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:600;color:#272a25}
+  .cn-phone-crown{position:fixed;left:var(--space-3);top:max(var(--space-3),env(safe-area-inset-top,0px));z-index:var(--phone-crown-z);display:flex;align-items:center;height:var(--hit);border:1px solid var(--accent);border-radius:var(--radius-full);background:var(--glass-bg);-webkit-backdrop-filter:blur(var(--glass-blur));backdrop-filter:blur(var(--glass-blur));box-shadow:var(--elev-1)}
+  .cn-phone-crown-btn{display:grid;place-items:center;width:var(--hit);height:100%;margin:0;padding:0;border:0;border-radius:var(--radius-full);background:transparent;cursor:pointer}
+  .cn-phone-crown-btn:focus-visible{outline:var(--focus-w) solid var(--focus-ring);outline-offset:var(--focus-offset)}
+  .cn-phone-word{display:flex;flex-direction:column;justify-content:center;padding:0 var(--space-4) 0 0;margin-left:calc(var(--space-1) * -1);line-height:1;pointer-events:none;font-family:'Plus Jakarta Sans',ui-sans-serif,system-ui,sans-serif}
+  .cn-phone-word b{font-size:14px;font-weight:600;letter-spacing:-.01em;color:var(--phone-word-ink)}
+  .cn-phone-word small{margin-top:3px;font-size:9px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+  .connect-app .cn-phone-dock{position:fixed;z-index:var(--phone-crown-z)}
+  /* Off the map the page's own scroller runs under the floating nav; other screens keep a clear band for it. */
+  .connect-app[data-phone][data-placed] .connect-scroll{padding-bottom:var(--phone-dock-clear)}
+  .connect-app[data-phone]:not([data-placed]):not([data-flow]):not([data-page='home']) .connect-app-main{padding-bottom:var(--phone-dock-clear)}
+  /* The crown floats over a screen that opens on a picture (your Me cover, the Explore hero); every other screen gives
+     it a slim band of its own, so it never covers a title. */
+  .connect-app[data-phone]:not([data-page='home']):not([data-page='explore']):not([data-placed][data-page='profile']) .connect-app-main{padding-top:var(--phone-crown-clear)}
+  .connect-app[data-phone][data-page='profile'] .connect-scroll.me-panel{padding-top:var(--phone-crown-clear)}
+  /* The open map search starts after the crown, its middle level with the crown's. */
+  [data-mv2='home'] [data-mv2='home-bar']{padding-left:calc(var(--space-3) + var(--hit) + var(--space-2))}
 }
 [data-theme='dark'] [data-mv2='dock-door'] button{color:#f7f6f1}
+/* Me on a phone (founder, 2026-11-25): one column. A Me / Calendar switch sits under the name, and the calendar is a
+   month view that scrolls month by month. A wide screen keeps both columns and never shows the switch. */
+.me-view,.mc-cal{display:none}
+.connect-placed.phone-review .me-view{display:inline-flex;gap:3px;margin:0 0 6px;padding:4px;border-radius:999px}
+.me-view button{display:inline-flex;align-items:center;gap:7px;min-height:var(--hit);padding:6px 16px 6px 12px;border:1px solid transparent;border-radius:999px;background:none;color:#272a25b3;font-size:13px!important;font-weight:500;cursor:pointer}
+.me-view button.on{background:#fffdf8;border-color:#272a2526;color:#272a25;font-weight:600}
+.me-view .inline-icon{inline-size:18px;color:#f2bd22}
+[data-theme='dark'] .me-view button{color:#f7f6f1b3}
+[data-theme='dark'] .me-view button.on{background:#2c2e2c;border-color:#f7f6f114;color:#f7f6f1}
+.connect-placed.phone-review .me-page{padding-top:8px}
+.connect-placed.phone-review .me-page:has(>.me-role){padding-top:var(--phone-crown-clear)}
+.phone-review .me-columns{grid-template-columns:minmax(0,1fr);gap:0}
+.phone-review .me-columns[data-view='me'] .me-calendar,.phone-review .me-columns[data-view='calendar']{display:none}
+.phone-review .me-identity{margin:-25px 4px 16px}
+.phone-review .me-identity h1{overflow-wrap:anywhere}
+.me-avatar:not(.has-photo){display:grid;place-items:center;padding:0;font-size:20px;font-weight:600}
+.me-avatar-edit{right:-2px;bottom:-2px;inline-size:22px;border-radius:50%;background:#f7f6f1;box-shadow:0 0 0 1px #f2bd2250}
+.me-avatar-edit .inline-icon{inline-size:12px}
+[data-theme='dark'] .me-avatar .me-avatar-edit{background:#242624;box-shadow:0 0 0 1px #f2bd2250}
+.phone-review .me-space-links button{min-width:0}
+.phone-review .me-space-links b,.phone-review .me-space-links small{max-width:100%;overflow-wrap:anywhere}
+.connect-placed.phone-review .mc-cal{display:grid;gap:28px;margin:10px 0 0}
+.mc-cal-empty{margin:0;font-size:13px;color:#272a2599}
+.mc-cal-month h3{display:flex;align-items:baseline;gap:8px;margin:0 0 12px 2px;font-size:28px;font-weight:700;letter-spacing:-.02em;line-height:1.1;color:#272a25}
+.mc-cal-month h3 small{font-size:13px;font-weight:600;color:#272a2599}
+.mc-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.mc-cal-wd{text-align:center;font-size:11px;font-weight:600;color:#272a2599;padding-bottom:2px}
+.mc-cal-day{display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:0;aspect-ratio:1/1.15;padding:4px 3px;border:0;border-radius:12px;background:transparent;color:#272a25;text-align:left;font:inherit;cursor:pointer}
+.mc-cal-day:disabled{cursor:default;opacity:1}
+.mc-cal-day b{font-size:12px;font-weight:600;line-height:1;padding:2px 3px}
+.mc-cal-day i{display:block;min-width:0;padding:1px 4px;border-radius:999px;background:var(--bar,#f2bd22);color:#f7f6f1;font-style:normal;font-size:9px;font-weight:600;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-cal-day small{font-size:9px;font-weight:600;color:#272a2599;padding-left:3px}
+.mc-cal-day.today{background:#f2bd2224;box-shadow:inset 0 0 0 1px #f2bd2255}
+.mc-cal-day.today b{color:#272a25}
+.mc-cal-day.picked{box-shadow:inset 0 0 0 1.5px #272a25}
+.mc-cal-day:focus-visible{outline:var(--focus-w) solid var(--focus-ring);outline-offset:var(--focus-offset)}
+.mc-cal-list{display:grid;gap:6px;margin:10px 0 0}
+.mc-cal-list button{display:grid;gap:2px;width:100%;padding:10px 12px 10px 14px;border:0;border-left:3px solid var(--bar,#f2bd22);border-radius:12px;background:#fffdf8;color:#272a25;text-align:left;font:inherit;cursor:pointer}
+.mc-cal-list b{font-size:13px;font-weight:600}
+.mc-cal-list small{font-size:11px;color:#272a2599}
+[data-theme='dark'] .mc-cal-month h3,[data-theme='dark'] .mc-cal-day,[data-theme='dark'] .mc-cal-day.today b,[data-theme='dark'] .mc-cal-list button{color:#f7f6f1}
+[data-theme='dark'] .mc-cal-month h3 small,[data-theme='dark'] .mc-cal-wd,[data-theme='dark'] .mc-cal-day small,[data-theme='dark'] .mc-cal-empty,[data-theme='dark'] .mc-cal-list small{color:#f7f6f199}
+[data-theme='dark'] .mc-cal-day.today{background:#f2bd222e;box-shadow:inset 0 0 0 1px #f2bd2266}
+[data-theme='dark'] .mc-cal-day.picked{box-shadow:inset 0 0 0 1.5px #f7f6f1}
+[data-theme='dark'] .mc-cal-list button{background:#2c2e2c}
+.me-signin{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 0;padding:12px 14px;border-radius:19px}
+.me-signin span{display:grid;gap:2px;min-width:0}
+.me-signin b{font-size:13px;font-weight:600}
+.me-signin small{font-size:11px;opacity:.6}
+.me-signin .cn-primary{flex:none;width:auto;margin:0}

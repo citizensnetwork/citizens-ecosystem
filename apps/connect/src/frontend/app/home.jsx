@@ -478,6 +478,14 @@
       window.addEventListener('cc-rail-map', min);
       return () => window.removeEventListener('cc-rail-map', min);
     }, []);
+    // The phone's top-left crown (founder, 2026-11-25): home and reset, every filter, search and carousel cleared.
+    const resetHomeRef = useRef(resetHome);
+    resetHomeRef.current = resetHome;
+    useEffect(() => {
+      const home = () => resetHomeRef.current();
+      window.addEventListener('cc-crown-home', home);
+      return () => window.removeEventListener('cc-crown-home', home);
+    }, []);
     useEffect(() => {
       if (!searchOpen) { setFilterEdges({ l: false, r: false }); return undefined; }
       measureFilters();
