@@ -160,7 +160,9 @@ test.describe("the map home on a phone", () => {
     await card.click();
     await expect(card).toHaveAttribute("data-selected", "");
     await expect(page.locator("[data-mv2='sheet']")).toHaveCount(0);
-    expect(await settled(page)).toBe(height);
+    // the first tap also shows the card's quick details under the row, so the panel grows to hold them (founder, 2026-11-25)
+    await expect(page.locator("[data-mv2='xdetails']")).toBeVisible();
+    expect(await settled(page)).toBeGreaterThan(height);
     await expect(page.locator(`[data-cc-id='${id}'] .mv2-pin.is-lit`)).toBeAttached();
     // the map keeps its distance, so every Where to… option stays in view (founder, 2026-11-25)
     await page.waitForTimeout(600);

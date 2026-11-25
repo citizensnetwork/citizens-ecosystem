@@ -345,6 +345,8 @@
       empty: 'Nothing here. Move the map or change the filter.',
       // Pack 08: the home sheet. Tiles and tabs stay frosted grey; gold is only the crown's ring.
       panel: {
+        // Where to…: the chosen card's quick details under the row (founder, 2026-11-25); its button opens the full drawer
+        details: { label: (name) => name + ', quick details', full: 'View full details' },
         where: 'Where to…',
         whereLead: 'Where Christians…',
         brandMark: 'Citizens Connect',

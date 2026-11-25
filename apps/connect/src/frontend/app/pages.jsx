@@ -12,11 +12,13 @@
   // Every Header-based screen carries the SAME top-right account control the
   // map and Kingdom Exploration do — one profile entry point, one corner, no
   // duplicate in the bottom bar (where its panel used to open off-screen).
+  // QA 2026-11-25 (CCQA-0008): a long title (Kingdom Projects at 390 px) wraps to two lines instead of being cut, and at
+  // 400 px or less the screen's own action takes a row of its own under the title (the account control stays in its corner).
   function Header({ icon, title, sub, right }) {
-    return h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0 flex items-center gap-3' },
+    return h('div', { className: 'px-4 sm:px-5 pt-5 pb-4 border-b border-border glass-strong shrink-0 flex flex-wrap items-center gap-x-3 gap-y-2', 'data-cc': 'page-header' },
       icon && h('div', { className: 'w-10 h-10 rounded-2xl bg-accent flex items-center justify-center shrink-0' }, h(Icon, { name: icon, size: 18, className: 'text-gold-dark' })),
-      h('div', { className: 'flex-1 min-w-0' }, h('h2', { className: 'text-xl text-foreground leading-none truncate' }, title), sub && h('p', { className: 'text-xs text-muted-foreground mt-0.5 truncate' }, sub)),
-      right,
+      h('div', { className: 'flex-1 min-w-0' }, h('h2', { className: 'text-xl text-foreground leading-tight line-clamp-2 break-words' }, title), sub && h('p', { className: 'text-xs text-muted-foreground mt-0.5 truncate' }, sub)),
+      right && h('div', { className: 'shrink-0 max-[400px]:order-last max-[400px]:basis-full', 'data-cc': 'page-header-action' }, right),
       h(window.AccountButton, { variant: 'inline' }));
   }
 
