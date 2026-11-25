@@ -380,7 +380,9 @@ describe("where the button is wired", () => {
     expect(build.indexOf("'ui.jsx'")).toBeLessThan(build.indexOf("'report.jsx'"));
     expect(build.indexOf("'report.jsx'")).toBeLessThan(build.indexOf("'auth.jsx'"));
     expect(html).toContain("app/report.jsx?v=20261026a");
-    expect(html).toContain('href="assets/report.css?v=20261026a"');
+    // its stylesheet is joined into the page's one compiled stylesheet, in its old place (QA plan PR F3)
+    expect(read("scripts/frontend-styles.js")).toContain("'assets/report.css'");
+    expect(html).not.toContain('href="assets/report.css');
     expect(html).not.toContain("map-v2.css");
   });
 

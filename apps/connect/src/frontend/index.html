@@ -8,7 +8,9 @@
      own two-finger gestures (touch-action), so the page does not zoom under them. The Capacitor phone
      app keeps the old block (maximum-scale=1) until it has been tested on a phone: the tag below puts
      it back there only, in viewport.js (the first script, right after the base tag below, so its address resolves
-     under the base path; a file, not an inline script, so the CSP needs no 'unsafe-inline', QA plan PR F3).
+     under the base path; a file, not an inline script, so the CSP needs no 'unsafe-inline', QA plan PR F3). It is
+     async: a parser-blocking script here cost a whole round trip (about 150 ms on a slow phone connection) before
+     anything else loaded, and on the web it changes nothing; in the native shell the file is local and runs at once.
      The native bridge sets window.Capacitor at document start, before it runs; if anything there fails the
      page stays zoomable. -->
 <!-- Every screen has its own URL now (/discover, /e/<id>, /dashboard/events, ...), and the
@@ -16,7 +18,7 @@
      style and vendor paths below would resolve under those paths (/e/app/store.jsx) and
      404. next.config.ts rewrites an explicit list of paths here, never a catch-all. -->
 <base href="/" />
-<script src="viewport.js"></script>
+<script src="viewport.js" async></script>
 <title>Citizens Connect</title>
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
 <!-- Home-screen app (founder yes 2026-11-12): the manifest and the iPhone icon. Every path here and inside
@@ -43,14 +45,13 @@
      longer competes with the sign-in landing on a slow phone connection. -->
 <link href="vendor/maplibre-gl/maplibre-gl.css" rel="stylesheet" />
 <script type="module" src="maplibre-loader.js"></script>
-<link href="assets/base.css" rel="stylesheet" />
-<!-- Report dialog. Both maps: Map v2's stylesheet stays behind the flag. -->
-<link href="assets/report.css?v=20261026a" rel="stylesheet" />
-<link href="assets/listing-claim.css?v=20261021a" rel="stylesheet" />
-<!-- Tailwind, compiled at build time (QA plan PR F1, item S3; config: ../../tailwind.config.cjs), with the self-hosted
-     fonts and the boot screen below. The build writes assets/tailwind.<hash>.css and points this tag at it. It stays
-     LAST in <head>: the Play CDN it replaces injected its rules here, after the rules above, and the screens were
-     styled against that order (the two sheets the app adds itself at runtime still come after it). -->
+<!-- The page's one stylesheet after MapLibre's, built by scripts/frontend-styles.js as assets/tailwind.<hash>.css:
+     assets/base.css (the tokens, glass, the map container; inline here until QA plan PR F3), assets/report.css (the
+     report dialog), assets/listing-claim.css, then Tailwind compiled at build time (QA plan PR F1, item S3; config:
+     ../../tailwind.config.cjs) with the self-hosted fonts and the boot screen below. That is the order the separate
+     links had, so the cascade is unchanged, in one request instead of four. Tailwind stays LAST: the Play CDN it
+     replaced injected its rules here, and the screens were styled against that order (the two sheets the app adds
+     itself at runtime still come after it). -->
 <link href="assets/tailwind.css" rel="stylesheet" />
 </head>
 <body>

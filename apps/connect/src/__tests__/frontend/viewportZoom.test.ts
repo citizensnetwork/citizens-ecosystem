@@ -50,6 +50,8 @@ describe("the viewport tag (R9: the website can be pinch zoomed)", () => {
     const [tag] = viewportTags();
     const first = page.scripts[0];
     expect(first.getAttribute("src")).toBe("viewport.js");
+    // async: never a parser-blocking round trip in <head> on the web, where it changes nothing (QA plan PR F3)
+    expect(first.hasAttribute("async")).toBe(true);
     expect(viewportJs).toContain("isNativePlatform");
     // after <base>, so the relative address resolves under the base path on any deep link
     const base = page.querySelector("base")!;

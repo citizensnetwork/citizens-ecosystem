@@ -350,7 +350,9 @@ describe("how the store and the page are wired", () => {
     expect(html.indexOf("app/listing-claim.jsx")).toBeLessThan(html.indexOf("app/auth.jsx"));
     expect(build.indexOf("'ui.jsx'")).toBeLessThan(build.indexOf("'listing-claim.jsx'"));
     expect(build.indexOf("'listing-claim.jsx'")).toBeLessThan(build.indexOf("'shell.jsx'"));
-    expect(html).toContain('href="assets/listing-claim.css?v=20261021a"');
+    // its stylesheet is joined into the page's one compiled stylesheet, in its old place (QA plan PR F3)
+    expect(read("scripts/frontend-styles.js")).toContain("'assets/listing-claim.css'");
+    expect(html).not.toContain('href="assets/listing-claim.css');
     expect(html).toContain("app/listing-claim.jsx?v=20261021a");
   });
 

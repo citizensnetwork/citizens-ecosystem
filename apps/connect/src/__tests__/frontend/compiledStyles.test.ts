@@ -108,6 +108,17 @@ describe("the compiled stylesheet", () => {
     }
   });
 
+  it("joins base, report and listing-claim in front of Tailwind, in the order their links had (PR F3)", () => {
+    const at = (needle: string) => css.indexOf(needle);
+    const base = at("--gold-crown:");
+    const report = at("cc-report-scrim-in");
+    const claim = at("cc-claim-scrim-in");
+    const preflight = at("--tw-border-spacing-x");
+    for (const [name, pos] of Object.entries({ base, report, claim, preflight })) expect(pos, name).toBeGreaterThan(-1);
+    expect([base, report, claim, preflight]).toEqual([...[base, report, claim, preflight]].sort((a, b) => a - b));
+    expect(index).not.toMatch(/href="assets\/(?:base|report|listing-claim)\.css/);
+  });
+
   it("styles the boot screen", () => {
     expect(css).toMatch(/\.cc-boot\{/);
     expect(css).toMatch(/\.cc-boot-ring\{/);
