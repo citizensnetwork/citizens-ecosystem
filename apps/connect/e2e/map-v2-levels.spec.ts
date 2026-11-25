@@ -123,10 +123,14 @@ async function shot(page: Page, name: string) {
 }
 /** Wait for the carousel to stop sliding (it moves by a transform transition). */
 async function still(page: Page) {
+  // Settled = the same top for four reads in a row (~180 ms). Two equal reads can come before a slide has even begun
+  // (a slow CI machine), and a drag started then lands on a handle that is about to move.
   let last = -1;
-  for (let i = 0; i < 40; i++) {
+  let same = 0;
+  for (let i = 0; i < 60; i++) {
     const top = await peek(page).evaluate((e) => Math.round(e.getBoundingClientRect().top));
-    if (top === last) return top;
+    same = top === last ? same + 1 : 0;
+    if (same >= 3) return top;
     last = top;
     await page.waitForTimeout(60);
   }
