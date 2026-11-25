@@ -156,17 +156,14 @@
     };
   }
 
-  // window.maplibregl now comes from a <script type="module"> in index.html
-  // (v6 dropped its UMD build, GHSA-jrc7-96c5-q579 security bump — see that
-  // file for why). Module scripts are deferred relative to the classic
-  // scripts that boot this app, so `window.maplibregl` is NOT guaranteed to
-  // exist yet the first time a map component's mount effect runs — unlike
-  // the old synchronous UMD <script>, which always finished before any later
-  // tag. `cb` fires once maplibregl is ready, immediately if it already is;
-  // the returned function cancels a pending wait (call it from cleanup if the
-  // component unmounts before maplibregl loads).
+  // window.maplibregl comes from maplibre-loader.js (v6 dropped its UMD build, GHSA-jrc7-96c5-q579 security bump; see
+  // index.html), which imports it on demand: the first map to mount asks for it here, or the page's load event
+  // does (QA plan PR F1). So `window.maplibregl` is NOT guaranteed to exist the first time a map component's mount
+  // effect runs. `cb` fires once maplibregl is ready, immediately if it already is; the returned function cancels a
+  // pending wait (call it from cleanup if the component unmounts before maplibregl loads).
   function whenMaplibreReady(cb) {
     if (window.maplibregl) { cb(); return () => {}; }
+    if (window.ccLoadMaplibre) window.ccLoadMaplibre().catch(() => {}); // the interval below sees it arrive
     const id = setInterval(() => {
       if (window.maplibregl) { clearInterval(id); cb(); }
     }, 30);
@@ -286,35 +283,6 @@
     const dy = typeof pad === 'object' ? (pad.top - pad.bottom) / 2 : 0;
     mp.jumpTo({ center: SOUTH_AFRICA, zoom: COUNTRY_ZOOM }, { originalEvent: {} });
     if (dy) mp.easeTo({ center: SOUTH_AFRICA, zoom: COUNTRY_ZOOM, offset: [0, dy], duration: 0 }, { originalEvent: {} });
-  }
-
-  // Frame the data: fit every pin, but never zoom out past the point where at least one type of pin is still drawn.
-  function frameData(mp, items, el) {
-    const b = new window.maplibregl.LngLatBounds(items[0].coords, items[0].coords);
-    let outermost = Infinity;   // the lowest gate among the types actually present
-    items.forEach(({ m, coords }) => {
-      b.extend(coords);
-      const gate = ZOOM_GATES[m.type];
-      outermost = Math.min(outermost, gate === undefined ? 0 : gate);
-    });
-    const pad = framePadding(el);
-    mp.fitBounds(b, { padding: pad, maxZoom: 13, duration: 0 });
-    // Data spread across the whole country frames out past every gate and
-    // would open on a blank map. Never zoom out further than the point where
-    // at least one type of pin is still drawn — and centre on THOSE pins, not
-    // on the middle of the data (which can be an empty stretch of country,
-    // with the pins that are drawn cropped off the edge).
-    if (mp.getZoom() < outermost) {
-      const shown = new window.maplibregl.LngLatBounds();
-      items.forEach(({ m, coords }) => {
-        const gate = ZOOM_GATES[m.type];
-        if ((gate === undefined ? 0 : gate) <= outermost) shown.extend(coords);
-      });
-      // centred in what is left visible between the overlays (Map v2's home, #210), not in the middle of the screen,
-      // which there is the top edge of the Explore row
-      const dy = typeof pad === 'object' ? (pad.top - pad.bottom) / 2 : 0;
-      mp.easeTo({ center: shown.getCenter(), zoom: outermost, offset: [0, dy], duration: 0 });
-    }
   }
 
   function StylizedMap({ markers, filterCategory, selectedId, litId, apiRef, onSelect, onDismissBubble, onZoomBandChange }) {

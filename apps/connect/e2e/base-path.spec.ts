@@ -94,6 +94,16 @@ const screen = (page: Page) => page.evaluate(() => document.querySelector("[data
 const go = (page: Page, name: string, params?: Record<string, unknown>) =>
   page.evaluate(([n, p]) => (window as unknown as { __cc: { go: (n: string, p?: unknown) => void } }).__cc.go(n as string, p), [name, params]);
 const underBase = (p: string) => p === BASE || p.startsWith(`${BASE}/`);
+/**
+ * MapLibre loads on demand since QA plan PR F1 (maplibre-loader.js): when the map asks, or at the page's load event,
+ * and the map's own reads (service areas, ...) follow once it arrives. Waiting for MapLibre proves the deferred import
+ * resolves under the prefix; waiting for the network to go quiet keeps a reload from cutting a request short (an
+ * aborted request, which watch() rightly counts).
+ */
+async function mapLibreLoaded(page: Page) {
+  await page.waitForFunction(() => !!(window as unknown as { maplibregl?: unknown }).maplibregl, null, { timeout: 15_000 });
+  await page.waitForLoadState("networkidle", { timeout: 15_000 });
+}
 
 // ── what the page asked for, and what the server answered ─────────────
 
@@ -217,10 +227,12 @@ test.describe("Every kind of screen opens directly and survives a reload, under 
       await expect(page.locator(`[data-screen="${name}"]`)).toBeVisible({ timeout: 15_000 });
       expect(underBase(path(page)), path(page)).toBe(true);
       const before = path(page);
+      await mapLibreLoaded(page);
 
       await page.reload();
       await expect(page.locator(`[data-screen="${name}"]`)).toBeVisible({ timeout: 15_000 });
       expect(path(page)).toBe(before);
+      await mapLibreLoaded(page);
       seen.expectClean();
     });
   }
@@ -231,6 +243,7 @@ test.describe("Every kind of screen opens directly and survives a reload, under 
     await page.goto(`${BASE}/dashboard/events`);
     await expect(page.getByRole("button", { name: "Create Event" })).toBeVisible({ timeout: 15_000 });
     expect(path(page)).toBe(`${BASE}/dashboard/events`);
+    await mapLibreLoaded(page);
 
     await page.reload();
     await expect(page.getByRole("button", { name: "Create Event" })).toBeVisible({ timeout: 15_000 });
@@ -240,6 +253,7 @@ test.describe("Every kind of screen opens directly and survives a reload, under 
     await page.getByRole("button", { name: "news", exact: true }).click();
     await expect(page.getByRole("button", { name: "+ New post" })).toBeVisible();
     expect(path(page)).toBe(`${BASE}/dashboard/news`);
+    await mapLibreLoaded(page);
     seen.expectClean();
   });
 
@@ -248,9 +262,11 @@ test.describe("Every kind of screen opens directly and survives a reload, under 
     await openDemo(page, "admin");
     await page.goto(`${BASE}/admin/reports`);
     await expect(page.locator('[data-screen="admin"]')).toBeVisible({ timeout: 15_000 });
+    await mapLibreLoaded(page);
     await page.reload();
     await expect(page.locator('[data-screen="admin"]')).toBeVisible({ timeout: 15_000 });
     expect(path(page)).toBe(`${BASE}/admin/reports`);
+    await mapLibreLoaded(page);
     seen.expectClean();
   });
 

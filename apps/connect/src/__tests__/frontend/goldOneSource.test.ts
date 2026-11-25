@@ -1,6 +1,6 @@
 /**
  * One gold (founder decision, 2026-10-31): the crown logo's own colour, #F2BD22, is Connect's only fill gold, and every
- * place that writes a gold value (the Tailwind config and `:root` in index.html, Map v2's tokens, the map pins, the PWA
+ * place that writes a gold value (the Tailwind config, `:root` in index.html, Map v2's tokens, the map pins, the PWA
  * manifest) agrees on it. Gold text and small icons use the dark ink #836100; a gradient is light, the crown, then amber
  * (never a brown end stop); a label on a gold fill is near-black, never white. The contrast pairs themselves are in
  * `scripts/map-v2/contrast.mjs` (asserted by mapV2Tokens.test.ts); this file keeps the sources from drifting apart again.
@@ -13,6 +13,8 @@ import { analyseRepo, isFillGold } from "../../../scripts/design/drift.mjs";
 const APP = process.cwd();
 const read = (rel: string) => readFileSync(join(APP, rel), "utf8");
 const index = read("src/frontend/index.html");
+// The Tailwind theme left index.html for its own file when the Play CDN went (QA plan PR F1, 2026-11-25).
+const tailwind = read("tailwind.config.cjs");
 const mapCss = read("src/frontend/assets/map-v2.css");
 
 const CROWN = "#f2bd22";
@@ -45,14 +47,14 @@ describe("one gold: the crown's colour", () => {
   });
 
   it("every token source agrees on the crown gold and on the ink", () => {
-    // the Tailwind config and :root in index.html
-    expect(decl(index, "gold")).toBe(CROWN);
-    expect(decl(index, "secondary")).toBe(CROWN);
+    // the Tailwind config, and :root in index.html
+    expect(decl(tailwind, "gold")).toBe(CROWN);
+    expect(decl(tailwind, "secondary")).toBe(CROWN);
+    expect(decl(tailwind, "gold-light")).toBe(LIGHT);
+    expect(decl(tailwind, "gold-dark")).toBe(INK);
     expect(decl(index, "--gold")).toBe(CROWN);
-    expect(decl(index, "gold-light")).toBe(LIGHT);
     expect(decl(index, "--gold-light")).toBe(LIGHT);
     expect(decl(index, "--gold-deep")).toBe(AMBER);
-    expect(decl(index, "gold-dark")).toBe(INK);
     expect(decl(index, "--gold-dark")).toBe(INK);
     // Map v2: light and dark
     const dark = /\[data-theme='dark'\]\s*\{([\s\S]*?)\n\}/.exec(mapCss)![1];

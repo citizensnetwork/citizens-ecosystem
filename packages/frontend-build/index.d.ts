@@ -105,6 +105,13 @@ export interface BuildFrontendOptions {
    * Default: [] (output unchanged).
    */
   browserBundles?: string[];
+  /**
+   * Stylesheets the host generated (Connect's compiled Tailwind). Each is written as
+   * `<dir>/<name>.<hash>.css` and replaces its own placeholder `<link href="<href>">` in
+   * index.html, which must appear exactly once. `href` is relative and lower-case
+   * ("assets/tailwind.css"). Default: [] (output unchanged).
+   */
+  stylesheets?: { href: string; css: string }[];
   /** Env source. Default: process.env. */
   env?: Record<string, string | undefined>;
   /** Default: console.log */
@@ -124,6 +131,8 @@ export interface BuildFrontendResult {
   capacitorBridgeFile: string;
   /** Each `browserBundles` entry → its content-hashed filename (lives in dest/). */
   browserBundleFiles: Record<string, string>;
+  /** Each `stylesheets` href → its content-hashed path ("assets/tailwind.<hash>.css"). */
+  stylesheetFiles: Record<string, string>;
   /** The resolved config object written to dest/config.js. */
   config: Record<string, string>;
   /** Every CDN script URL whose pin + SRI hash was checked against node_modules. */
@@ -187,6 +196,8 @@ export declare function rewriteIndexHtml(
     capacitorBridgeFile: string;
     /** `browserBundles` entry → hashed filename; each replaces its own tag (exactly one). */
     browserBundleFiles?: Record<string, string>;
+    /** Placeholder stylesheet href → hashed href; each placeholder must be linked exactly once. */
+    stylesheetFiles?: Record<string, string>;
     basePath?: string;
   },
 ): string;

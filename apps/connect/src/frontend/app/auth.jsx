@@ -76,8 +76,9 @@
   // ── Loading splash — shown instead of the landing while a session that is
   //    probably there is still being resolved (see `authResolved` in store.jsx),
   //    so a returning member never sees "sign in" flash past. Ported from Wear's
-  //    auth-loading gate (app.jsx: crown 56 + ring spinner). Inline styles only:
-  //    it paints before Tailwind's Play CDN has generated any class (S3).
+  //    auth-loading gate (app.jsx: crown 56 + ring spinner). Inline styles only, and
+  //    the same crown, ring and wash as the boot screen in index.html (.cc-boot), which
+  //    it replaces: change one, change the other, or the hand-over jumps.
   function LoadingSplash() {
     return h('div', {
       role: 'status', 'aria-label': W.t('screen.loading'), 'data-screen-label': 'Loading',

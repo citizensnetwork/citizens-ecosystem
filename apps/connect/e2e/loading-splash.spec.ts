@@ -25,11 +25,12 @@ const LANDING = '[aria-label="Continue with Google"]';
 async function watchScreens(page: Page) {
   await page.addInitScript(
     ([splash, landing]) => {
-      const w = window as unknown as { __seen: { splash: boolean; landing: boolean } };
-      w.__seen = { splash: false, landing: false };
+      const w = window as unknown as { __seen: { splash: boolean; landing: boolean; boot: boolean } };
+      w.__seen = { splash: false, landing: false, boot: false };
       const look = () => {
         if (document.querySelector(splash)) w.__seen.splash = true;
         if (document.querySelector(landing)) w.__seen.landing = true;
+        if (document.querySelector(".cc-boot")) w.__seen.boot = true;
       };
       new MutationObserver(look).observe(document, { childList: true, subtree: true });
     },
@@ -38,7 +39,7 @@ async function watchScreens(page: Page) {
 }
 
 const seen = (page: Page) =>
-  page.evaluate(() => (window as unknown as { __seen: { splash: boolean; landing: boolean } }).__seen);
+  page.evaluate(() => (window as unknown as { __seen: { splash: boolean; landing: boolean; boot: boolean } }).__seen);
 
 /**
  * A citizen with nothing to claim stays put. Without this the catch-all's 200
@@ -111,6 +112,9 @@ test.describe("Loading splash", () => {
     // The landing carries the same crown, as an image.
     await expect(page.locator("img[src*='citizens-crown']").first()).toBeVisible();
     expect((await seen(page)).splash).toBe(false);
+    // The pre-React boot screen (index.html, PR F1) painted first and React's first render replaced it.
+    expect((await seen(page)).boot).toBe(true);
+    await expect(page.locator(".cc-boot")).toHaveCount(0);
   });
 
   test("a hung session lookup falls back to the landing after the safety timeout", async ({ page }) => {

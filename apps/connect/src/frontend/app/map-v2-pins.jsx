@@ -18,10 +18,12 @@
 //    · "+N" overlap badge and label collision hiding run when the map goes
 //      IDLE, never per frame.
 //    · Inner nodes carry NO class attribute (data-mv2="..." instead; only the root
-//      pin has classes): the Tailwind Play CDN re-reads the classes under every
-//      element whose attributes change, and a marker's style changes on every
+//      pin has classes): the Tailwind Play CDN re-read the classes under every
+//      element whose attributes changed, and a marker's style changes on every
 //      frame of a pan. Measured 2026-10-10 on 150 pins at CPU x4: classes on every
-//      inner node cost +31 ms p95 per frame (127 ms with, 96 ms without).
+//      inner node cost +31 ms p95 per frame (127 ms with, 96 ms without). Tailwind
+//      is compiled at build time since 2026-11-25 (QA plan PR F1); the rule stays,
+//      as fewer attributes are still less work per frame.
 //  Styles live in assets/map-v2.css (tokens only). Colours come from the
 //  category data; text/glyph colour is chosen per fill for >= 4.5:1.
 // ════════════════════════════════════════════════════════════════════

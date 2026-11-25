@@ -54,3 +54,14 @@ The last files to arrive before the button, in a typical cold phone run: the app
 - **F3:** no speed change; the CSP can then drop the CDN hosts and `'unsafe-inline'` in `script-src`.
 
 Re-measure after each PR with `node apps/connect/scripts/measure-cold-entry.mjs` and compare with the table above.
+
+## After F1 (local e2e, 2026-11-25)
+
+`e2e/cold-entry.spec.ts` on the same throttled phone profile, one worker, the app served by the local dev server (gzip; production sends Brotli), the CDN scripts from the internet:
+
+| Build                                                                                      | Cold: first paint | Cold: guest button |
+| ------------------------------------------------------------------------------------------ | ----------------- | ------------------ |
+| F0 (Play CDN, Google Fonts, lucide in `<head>`)                                            | 3.9 s             | 3.9 s              |
+| F1 (compiled Tailwind, self-hosted fonts, boot screen, lucide after it, MapLibre deferred) | **0.62 s**        | **3.13 to 3.19 s** |
+
+First paint is inside its 1.5 s budget, and CI enforces it from F1. The guest button is still just over 3 s; most of what remains is the whole lucide icon set (112 KB) and three CDN origins, which F2 removes. CI enforces the guest budget from F2. Re-measure live after each deploy with `node apps/connect/scripts/measure-cold-entry.mjs`.
