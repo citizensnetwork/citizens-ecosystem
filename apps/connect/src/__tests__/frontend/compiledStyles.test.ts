@@ -12,86 +12,106 @@
  *  - the boot screen in #root mirrors the React LoadingSplash (same crown size), so the hand-over does not jump;
  *  - MapLibre loads through maplibre-loader.js, not with the page.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { createRequire } from "node:module";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { describe, it, expect, beforeAll } from 'vitest';
+import { createRequire } from 'node:module';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const APP = process.cwd();
-const require = createRequire(join(APP, "package.json"));
-const index = readFileSync(join(APP, "src/frontend/index.html"), "utf8");
-const head = index.slice(0, index.indexOf("</head>"));
+const require = createRequire(join(APP, 'package.json'));
+const index = readFileSync(join(APP, 'src/frontend/index.html'), 'utf8');
+const head = index.slice(0, index.indexOf('</head>'));
+/** Every host an absolute http(s) URL in the page names (tags and comments alike: a commented-out link still counts). */
+const hostsIn = (html: string) =>
+  [...html.matchAll(/https?:\/\/[^\s"'<>)]+/g)].map((m) => new URL(m[0]).hostname);
 
-describe("index.html: no Play CDN, no Google Fonts, the compiled sheet last in <head>", () => {
-  it("loads neither the Tailwind Play CDN nor an inline tailwind.config", () => {
-    expect(index).not.toMatch(/cdn\.tailwindcss\.com/);
+describe('index.html: no Play CDN, no Google Fonts, the compiled sheet last in <head>', () => {
+  it('loads neither the Tailwind Play CDN nor an inline tailwind.config', () => {
+    expect(hostsIn(index)).not.toContain('cdn.tailwindcss.com');
     expect(index).not.toMatch(/tailwind\.config\s*=/);
   });
 
-  it("links no Google Fonts", () => {
-    expect(index).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
+  it('links no Google Fonts', () => {
+    expect(hostsIn(index)).not.toContain('fonts.googleapis.com');
+    expect(hostsIn(index)).not.toContain('fonts.gstatic.com');
   });
 
-  it("links the compiled stylesheet once, as the last stylesheet of <head>", () => {
+  it('links the compiled stylesheet once, as the last stylesheet of <head>', () => {
     expect(index.match(/<link href="assets\/tailwind\.css" rel="stylesheet" \/>/g)).toHaveLength(1);
-    const sheets = [...head.matchAll(/<link [^>]*rel="stylesheet"[^>]*>|<style>/g)].map((m) => m[0]);
+    const sheets = [...head.matchAll(/<link [^>]*rel="stylesheet"[^>]*>|<style>/g)].map(
+      (m) => m[0],
+    );
     expect(sheets.at(-1)).toBe('<link href="assets/tailwind.css" rel="stylesheet" />');
   });
 
-  it("loads MapLibre on demand through maplibre-loader.js, with no inline module", () => {
+  it('loads MapLibre on demand through maplibre-loader.js, with no inline module', () => {
     expect(index).toContain('<script type="module" src="maplibre-loader.js"></script>');
     expect(index).not.toMatch(/<script type="module">/);
-    const loader = readFileSync(join(APP, "src/frontend/maplibre-loader.js"), "utf8");
+    const loader = readFileSync(join(APP, 'src/frontend/maplibre-loader.js'), 'utf8');
     expect(loader).toContain("import('./vendor/maplibre-gl/maplibre-gl.mjs')");
-    expect(readFileSync(join(APP, "src/frontend/app/map.jsx"), "utf8")).toMatch(/window\.ccLoadMaplibre\(\)/);
+    expect(readFileSync(join(APP, 'src/frontend/app/map.jsx'), 'utf8')).toMatch(
+      /window\.ccLoadMaplibre\(\)/,
+    );
   });
 
   it("paints a boot screen in #root that mirrors the React LoadingSplash's crown", () => {
-    const boot = /<div id="root"><div class="cc-boot" role="status" aria-label="([^"]+)"><img src="assets\/citizens-crown\.png\?v=(\w+)" alt="" width="72" height="39" \/>/.exec(index);
+    const boot =
+      /<div id="root"><div class="cc-boot" role="status" aria-label="([^"]+)"><img src="assets\/citizens-crown\.png\?v=(\w+)" alt="" width="72" height="39" \/>/.exec(
+        index,
+      );
     expect(boot).not.toBeNull();
     // a different name from the React splash ("Loading Citizens Connect"), which e2e/loading-splash.spec.ts watches for
-    expect(boot?.[1]).toBe("Opening Citizens Connect");
-    const auth = readFileSync(join(APP, "src/frontend/app/auth.jsx"), "utf8");
+    expect(boot?.[1]).toBe('Opening Citizens Connect');
+    const auth = readFileSync(join(APP, 'src/frontend/app/auth.jsx'), 'utf8');
     // the same crown file (and cache key) and the same size as LoadingSplash's h(CrownMark, { size: 72 })
     expect(auth).toContain(`/assets/citizens-crown.png?v=${boot?.[2]}`);
     expect(auth).toMatch(/function LoadingSplash\(\)[\s\S]{0,600}h\(CrownMark, \{ size: 72 \}\)/);
   });
 });
 
-describe("the compiled stylesheet", () => {
-  let css = "";
+describe('the compiled stylesheet', () => {
+  let css = '';
   let fontFiles: { from: string; to: string }[] = [];
 
   beforeAll(async () => {
-    const { compileFrontendStyles } = require("./scripts/frontend-styles.js");
-    ({ css, fontFiles } = await compileFrontendStyles({ rootDir: APP, esbuild: require("esbuild") }));
+    const { compileFrontendStyles } = require('./scripts/frontend-styles.js');
+    ({ css, fontFiles } = await compileFrontendStyles({
+      rootDir: APP,
+      esbuild: require('esbuild'),
+    }));
   }, 60_000);
 
   it("is compiled by Tailwind 3.4.17, the Play CDN's version", () => {
-    expect(require("tailwindcss/package.json").version).toBe("3.4.17");
+    expect(require('tailwindcss/package.json').version).toBe('3.4.17');
   });
 
-  it("carries the theme the inline config had", () => {
+  it('carries the theme the inline config had', () => {
     expect(css).toMatch(/\.bg-gold\{[^}]*background-color:rgb\(242 189 34/);
     expect(css).toMatch(/\.text-gold-dark\{[^}]*color:rgb\(131 97 0/);
     expect(css).toMatch(/\.font-brand\{font-family:Manrope,/);
     expect(css).toMatch(/html,:host\{[^}]*font-family:Plus Jakarta Sans,/); // preflight puts the theme sans on the page
   });
 
-  it("has utilities the screens use, and preflight", () => {
-    for (const cls of [".absolute", ".rounded-full", ".text-muted-foreground", ".hover\\:shadow-xl:hover"]) {
+  it('has utilities the screens use, and preflight', () => {
+    for (const cls of [
+      '.absolute',
+      '.rounded-full',
+      '.text-muted-foreground',
+      '.hover\\:shadow-xl:hover',
+    ]) {
       expect(css).toContain(cls);
     }
     expect(css).toMatch(/--tw-border-spacing-x/); // preflight's reset, as the Play CDN injected it
   });
 
-  it("serves the three families from our own origin, Latin and Latin Extended", () => {
+  it('serves the three families from our own origin, Latin and Latin Extended', () => {
     const faces = css.match(/@font-face\{[^}]*\}/g) ?? [];
     expect(faces).toHaveLength(8); // Jakarta, Manrope: 2 subsets; Playfair: 2 subsets x normal and italic
-    for (const family of ["Plus Jakarta Sans", "Playfair Display", "Manrope"]) {
+    for (const family of ['Plus Jakarta Sans', 'Playfair Display', 'Manrope']) {
       expect(faces.some((f) => f.includes(`font-family:${family};`))).toBe(true);
     }
-    for (const face of faces) expect(face).toMatch(/url\(\.\.\/vendor\/fonts\/[a-z0-9-]+\.[0-9a-f]{10}\.woff2\)/);
+    for (const face of faces)
+      expect(face).toMatch(/url\(\.\.\/vendor\/fonts\/[a-z0-9-]+\.[0-9a-f]{10}\.woff2\)/);
     expect(fontFiles).toHaveLength(8);
     for (const f of fontFiles) {
       expect(existsSync(f.from)).toBe(true);
@@ -99,7 +119,7 @@ describe("the compiled stylesheet", () => {
     }
   });
 
-  it("styles the boot screen", () => {
+  it('styles the boot screen', () => {
     expect(css).toMatch(/\.cc-boot\{/);
     expect(css).toMatch(/\.cc-boot-ring\{/);
     expect(css).toMatch(/@keyframes cc-boot-spin/);
