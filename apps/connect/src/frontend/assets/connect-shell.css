@@ -1498,3 +1498,11 @@
 .explore-empty p{margin:0 0 10px;font-size:14px;font-weight:600}
 .explore-empty .cn-actions{display:flex;flex-wrap:wrap;gap:8px}
 .explore-empty .cn-actions button{padding:8px 12px;border-radius:999px;border:1px solid currentColor;background:transparent;font-size:13px;font-weight:600;cursor:pointer}
+
+/* Explore: date chips and the weekend shelf (QA 2026-11-25, CCQA-0005) */
+.explore-when{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.explore-when button{padding:7px 12px;border-radius:999px;border:1px solid rgba(36,38,36,.25);background:transparent;font-size:13px;font-weight:600;cursor:pointer}
+.explore-when button.active{background:#242624;color:#f7f6f1;border-color:#242624}
+[data-theme='dark'] .explore-when button{border-color:rgba(247,246,241,.3)}
+[data-theme='dark'] .explore-when button.active{background:#f7f6f1;color:#242624}
+.explore-weekend{margin:0 0 8px}
