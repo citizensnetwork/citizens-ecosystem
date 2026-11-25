@@ -1479,3 +1479,14 @@
 .me-signin b{font-size:13px;font-weight:600}
 .me-signin small{font-size:11px;opacity:.6}
 .me-signin .cn-primary{flex:none;width:auto;margin:0}
+
+/* QA 2026-11-25 (CCQA-0008), founder: on a phone the Explore hero is a slim band, so the first results show at once.
+   The title stays on one line and the subtitle steps aside; desktop keeps the full hero. */
+@media (max-width:767px){
+  .explore-page .explore-hero{height:136px}
+  .explore-page .explore-hero>div:last-child{left:16px;right:16px;bottom:28px}
+  .explore-page .explore-hero h1{margin:2px 0 0;font-size:18px;line-height:1.2}
+  .explore-page .explore-hero h1 br{display:none}
+  .explore-page .explore-hero p{display:none}
+  .explore-page .explore-hero .cn-eyebrow{font-size:10px}
+}

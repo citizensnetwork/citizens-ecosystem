@@ -654,6 +654,8 @@
         onReset: resetHome,
         onOpenChange: onPanel,
         onOpen: tapCard, onSeeAll: () => app.go('explore'), onHeight: onExploreHeight,
+        // Where to…: the quick details' button opens the full drawer straight away (what the card's third tap does)
+        onFull: (id, t) => openPeek(id, t, false, { raised: true }),
         onGo: (page, params) => app.go(page, params),
       }),
       // Levels 2 and 3: the pin carousel, and the chosen card's details below it once raised (the listing sheet, inline).

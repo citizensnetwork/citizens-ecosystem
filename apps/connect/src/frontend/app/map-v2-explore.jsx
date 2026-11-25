@@ -462,6 +462,31 @@
           dist ? h('small', { 'data-mv2': 'xcard-dist' }, dist) : null)));
   }
 
+  // Where to…: the chosen card's quick details, under the row (founder, 2026-11-25). The first tap chooses the card and
+  // opens this; the map stays put so every option is still in view. When, where, how far and who, and one button to the
+  // full details drawer. The second tap on the card still zooms in to its pin, the third still opens the drawer.
+  function XDetails(props) {
+    const m = props.m;
+    if (!m) return null;
+    const rec = props.rec || {};
+    const Icon = window.Icon;
+    const W = props.words || {};
+    const near = window.MapV2Nearby;
+    const dist = Number.isFinite(props.meters) && near ? near.distanceText(props.meters, props.distWords || {}) : '';
+    const meta = cardMetaLine(m, rec);
+    const whereText = m.type === 'event' ? placeWhereLine((rec && rec.address) || m.address, (rec && rec.location) || m.location) : '';
+    const owner = (m.ownerName || rec.organizerName || rec.organizer || '').trim();
+    const line = (icon, text) => (text ? h('p', { 'data-mv2': 'xdetails-line' }, Icon ? h(Icon, { name: icon, size: 14 }) : null, h('span', null, text)) : null);
+    return h('section', { 'data-mv2': 'xdetails', 'aria-label': W.label ? W.label(m.title || '') : undefined, 'aria-live': 'polite' },
+      h('b', { 'data-mv2': 'xdetails-title' }, m.title || ''),
+      line(meta.icon || 'Info', meta.text),
+      line('MapPin', whereText),
+      line('Navigation', dist),
+      line('User', owner),
+      h('button', { type: 'button', 'data-mv2': 'xdetails-full', onClick: () => props.onFull && props.onFull(m.id, m.type) },
+        W.full || '', Icon ? h(Icon, { name: 'ArrowRight', size: 14 }) : null));
+  }
+
   function XRow(props) {
     const scroller = useRef(null);
     const [edges, setEdges] = useState({ l: false, r: false });
@@ -1061,7 +1086,14 @@
           }, Icon ? h(Icon, { name: 'X', size: 18 }) : null)),
         tile ? tileTabs() : rowTabs(),
         list.length ? cards(tile ? 'tile' : sec, list)
-          : h('p', { 'data-mv2': 'explore-empty' }, tile ? (P.emptyTile ? P.emptyTile(current ? current.word : '') : '') : (P.emptyRow || '')));
+          : h('p', { 'data-mv2': 'explore-empty' }, tile ? (P.emptyTile ? P.emptyTile(current ? current.word : '') : '') : (P.emptyRow || '')),
+        tile ? (() => {
+          const r = list.find((x) => x.m.id === props.selectedId);
+          return r ? h(XDetails, {
+            key: 'details:' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
+            distWords: cardDist, words: P.details, onFull: props.onFull,
+          }) : null;
+        })() : null);
     };
     const section = (id) => (rows[id].length ? h('section', { key: id, 'data-mv2': 'xsec', 'data-sec': id, 'aria-label': rowTitle(id) },
       h('div', { 'data-mv2': 'xsec-h' },

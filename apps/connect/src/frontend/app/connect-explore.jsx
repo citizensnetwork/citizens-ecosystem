@@ -46,7 +46,7 @@
           h('div', { className: 'cover-shade' }),
           h('div', null,
             h('span', { className: 'cn-eyebrow' }, 'Citizens Connect · Explore'),
-            h('h1', null, 'Discover more', h('br'), 'of the Kingdom', h('br'), 'around you.'),
+            h('h1', null, 'Discover more ', h('br'), 'of the Kingdom ', h('br'), 'around you.'),
             h('p', null, 'Find people, places and possibilities.'))),
         h('div', { className: 'explore-search cn-glass' },
           h('span', { className: 'inline-icon' }, chrome && h(chrome.Icon || 'span', { kind: 'search' })),

@@ -187,6 +187,7 @@
   --crown: 52px;                            /* the home button: a glass circle on a 1px gold ring */
   --xp-strip: 152px;                        /* handle + Where Christians… lead + tiles (founder, 2026-11-22) */
   --xp-focus: 340px;                        /* one row in focus: tabs, a line, taller preview cards */
+  --xp-focus-details: 520px;                /* the same, with a Where to… card's quick details under the row */
   --xp-card-w: 156px;                       /* the panel's preview cards */
   --xp-card-img: 88px;
   --z-xp-layer: 1;                          /* inside the Explore host: the panel, a row's arrows */
@@ -3500,6 +3501,10 @@ a[data-mv2='card2'],
 [data-mv2='home'][data-crown]:has([data-mv2='explore-host'][data-mode='focus']) {
   --explore-h: var(--xp-focus);
 }
+/* Where to…: a chosen card's quick details sit under the row (founder, 2026-11-25), so the focus panel grows to hold them */
+[data-mv2='home']:has([data-mv2='xdetails']) {
+  --xp-focus: var(--xp-focus-details);
+}
 [data-mv2='explore-host'] {
   --xp-vis: 0px;
   position: absolute;
@@ -4011,6 +4016,54 @@ a[data-mv2='card2'],
   font-size: var(--fs-2);
   font-weight: var(--fw-semibold);
   line-height: var(--lh-2);
+}
+/* Where to…: the chosen card's quick details under the row (founder, 2026-11-25) */
+[data-mv2='xdetails'] {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-2) var(--space-5) var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--xp-tile-line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text-1);
+}
+[data-mv2='xdetails-title'] {
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='xdetails-line'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  color: var(--text-2);
+}
+[data-mv2='xdetails-line'] svg {
+  flex: 0 0 auto;
+}
+[data-mv2='xdetails-full'] {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--hit);
+  margin-top: var(--space-1);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--focus-ring);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='xdetails-full']:focus-visible {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 [data-mv2='xcard-by'] {
   display: block;
