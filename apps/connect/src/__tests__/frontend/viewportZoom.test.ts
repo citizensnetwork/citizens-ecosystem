@@ -3,8 +3,8 @@
  *
  * `src/frontend/index.html` is served as the website AND bundled into the Capacitor phone app. The
  * viewport tag no longer carries `maximum-scale=1` (a low-vision citizen can zoom the page, WCAG 1.4.4),
- * and a tiny inline script puts the old block back inside the native shell only, until the app has been
- * tested on a phone. This file pins both halves; e2e/pinch-zoom.spec.ts proves them in a real browser
+ * and a tiny script (viewport.js, the page's first script; inline until QA plan PR F3, when the CSP dropped
+ * 'unsafe-inline') puts the old block back inside the native shell only, until the app has been tested on a phone. This file pins both halves; e2e/pinch-zoom.spec.ts proves them in a real browser
  * with real touch.
  */
 import { describe, it, expect } from "vitest";
@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const html = readFileSync(join(process.cwd(), "src/frontend/index.html"), "utf8");
+const viewportJs = readFileSync(join(process.cwd(), "src/frontend/viewport.js"), "utf8");
 // read by a real HTML parser (jsdom), never by a regular expression over the markup
 const page = new DOMParser().parseFromString(html, "text/html");
 const viewportTags = () => Array.from(page.querySelectorAll('meta[name="viewport"]'));
@@ -19,11 +20,9 @@ const viewportTags = () => Array.from(page.querySelectorAll('meta[name="viewport
 const WEB_CONTENT = "width=device-width, initial-scale=1, viewport-fit=cover";
 const NATIVE_CONTENT = "width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover";
 
-/** The inline script that follows the viewport tag (the first script in the file with no src). */
+/** The script that follows the viewport tag: viewport.js. */
 function nativeScript(): string {
-  const inline = Array.from(page.scripts).find((sc) => !sc.hasAttribute("src"));
-  if (!inline || !inline.textContent) throw new Error("no inline script in index.html");
-  return inline.textContent;
+  return viewportJs;
 }
 
 /** Run the inline script against a stub page and return the viewport tag's content afterwards. */
@@ -47,11 +46,14 @@ describe("the viewport tag (R9: the website can be pinch zoomed)", () => {
     expect(content).not.toContain("user-scalable");
   });
 
-  it("the inline script is the first script on the page, after the tag (so the native block is in place before anything else runs)", () => {
+  it("viewport.js is the first script on the page, after the tag (so the native block is in place before anything else runs)", () => {
     const [tag] = viewportTags();
     const first = page.scripts[0];
-    expect(first.hasAttribute("src")).toBe(false);
-    expect(first.textContent).toContain("isNativePlatform");
+    expect(first.getAttribute("src")).toBe("viewport.js");
+    expect(viewportJs).toContain("isNativePlatform");
+    // after <base>, so the relative address resolves under the base path on any deep link
+    const base = page.querySelector("base")!;
+    expect(base.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // the tag comes before it in the document
     expect(tag.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
