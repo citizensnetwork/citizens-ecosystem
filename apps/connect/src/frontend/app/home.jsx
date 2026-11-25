@@ -67,7 +67,9 @@
     });
   }
 
-  const CARD_ZOOM = 14;     // a card never lands on a map zoomed out further than this: the pin has to be seen
+  // A card tap zooms in to its pin (founder, 2026-11-25): close enough for the pin's name and photo (map.jsx shows both
+  // from 15), unless the person is closer already.
+  const CARD_ZOOM = 15.5;
   // A Where to… tile or a row in focus shows its town, not its province (founder, 2026-11-17): every pin is drawn from 9.5.
   const TOWN_ZOOM = 11;
   // Pins kept for a Where-to / section focus: metro-scale around the camera town (founder, 2026-11-23).
@@ -440,7 +442,7 @@
       if (selected === id) { openPeek(id, t, false, { raised: true }); return; }
       chosen.current = { id, type: t };
       setSelected(id); setSelType(t); setLitId(id);
-      if (mapApi.current && mapApi.current.focusLifted) mapApi.current.focusLifted(CARD_ZOOM);
+      if (mapApi.current && mapApi.current.focusLifted) mapApi.current.focusLifted(CARD_ZOOM, id);
     };
     // The filter chip: what is on, in its colour, and a clear button. A tile takes the colour of its group.
     const chip = (() => {

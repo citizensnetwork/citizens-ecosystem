@@ -486,7 +486,7 @@
       const box = card.getBoundingClientRect();
       const left = Math.max(0, el.scrollLeft + (box.left - row.left) - (el.clientWidth - box.width) / 2);
       el.scrollTo({ left: left, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
-    }, [props.selectedId]);
+    }, [props.selectedId, (props.list || []).map((r) => r.m.id).join('|')]);
     const nudge = (dir) => {
       const el = scroller.current;
       if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
@@ -1132,16 +1132,13 @@
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
           'aria-label': open ? (P.lower) : (P.raise),
-          // Strip / focus: up chevron — swipe or tap to see the rest (founder, 2026-11-23). Open: flat only.
-          'data-hint': (mode === 'strip' || mode === 'rest' || mode === 'focus') ? 'up' : undefined,
           onPointerDown: onGrabDown, onPointerMove: onPanelMove, onPointerUp: onGrabUp,
           onPointerCancel: onPanelCancel, onClick: onGrabClick,
           onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (open) lower(); else raise(); } },
         },
+          // a bare bar: the gold nudge under the nav says there is more (founder, 2026-11-25: the chevron is gone)
           h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' },
-            h('span', { 'data-mv2': 'handle-bar' }),
-            (mode === 'strip' || mode === 'rest') && Icon
-              ? h(Icon, { name: 'ChevronUp', size: 12 }) : null),
+            h('span', { 'data-mv2': 'handle-bar' })),
           h('span', { 'data-mv2': 'drawer-mark', 'aria-hidden': 'true' }, P.brandMark || '')),
         h('div', { 'data-mv2': 'explore-scroll', ref: scrollRef },
           mode === 'focus' ? focusView() : mode === 'open' ? openView() : tilesBig())),

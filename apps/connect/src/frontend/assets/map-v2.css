@@ -3588,13 +3588,6 @@ a[data-mv2='card2'],
   background: currentColor;
   opacity: 0.7;
 }
-[data-mv2='explore-handle'] svg {
-  display: none;
-  margin-top: var(--handle-chevron-nudge);
-}
-[data-mv2='explore-grab'][data-hint='up'] [data-mv2='explore-handle'] svg {
-  display: block;
-}
 [data-mv2='explore'][data-open] [data-mv2='explore-handle'] {
   opacity: 0.28;
 }

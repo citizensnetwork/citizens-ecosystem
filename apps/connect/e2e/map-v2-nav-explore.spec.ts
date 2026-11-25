@@ -337,6 +337,9 @@ test.describe("strokes, pulls and the province lift on a phone (founder, 2026-11
     await third.click();
     await expect(third).toHaveAttribute("data-selected", "");
     await expect.poll(() => centred(id3), { timeout: 3_000 }).toBeLessThan(4);
+    // and the map zooms in to its pin, close enough for the pin's name and photo (founder, 2026-11-25)
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __ccMap: { getZoom(): number } }).__ccMap.getZoom()), { timeout: 4_000 })
+      .toBeGreaterThanOrEqual(15.5);
     const id1 = (await cards.nth(1).getAttribute("data-explore-id"))!;
     // press the pin itself (it may sit under the panel on a small screen)
     await page.locator(`.maplibregl-marker[data-cc-id="${id1}"]`).evaluate((el) => (el as HTMLElement).click());

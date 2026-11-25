@@ -648,10 +648,12 @@
         // Founder, 2026-11-17: whatever the map brings into focus (an area, a card's pin) sits FOCUS_LIFT of the map's height
         // above the middle, so it stays clear of the Explore panel at the foot. `offset` moves the point, not the camera's
         // padding, so nothing else on the map shifts.
-        focusLifted(minZoom) {
+        // `id` names the card's pin outright: on the first frame of a new choice selectedRef may still hold the last one.
+        focusLifted(minZoom, id) {
           requestAnimationFrame(() => {
             const mp = mapRef.current;
-            const mk = selectedRef.current ? markerObjs.current.get(selectedRef.current) : null;
+            const target = id || selectedRef.current;
+            const mk = target ? markerObjs.current.get(target) : null;
             if (!mp || !mk) return;
             userMovedRef.current = true;
             const to = { center: mk.getLngLat(), offset: liftOffset(containerRef.current), duration: window.MapV2.dur('slow'), essential: true };

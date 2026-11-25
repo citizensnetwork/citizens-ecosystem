@@ -247,7 +247,8 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(screen.getByRole("heading", { name: P().whereLead })).toBeTruthy();
     expect(document.querySelector("[data-mv2='explore-peek']")).toBeNull();
     expect(document.querySelector("[data-mv2='explore-handle']")).toBeTruthy();
-    expect(document.querySelector("[data-mv2='explore-grab']")!.getAttribute("data-hint")).toBe("up");
+    // no chevron on the handle: the gold nudge under the nav says there is more (founder, 2026-11-25)
+    expect(document.querySelector("[data-mv2='explore-handle'] svg")).toBeNull();
     expect(document.querySelector("[data-mv2='drawer-mark']")!.textContent).toBe(P().brandMark);
     fireEvent.click(screen.getByRole("button", { name: P().close }));
     expect(mode()).toBe("rest");
