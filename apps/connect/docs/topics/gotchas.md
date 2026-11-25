@@ -126,3 +126,18 @@
   (`d2c21ea`, #224) each app skips a docs-only commit, and skips a commit that does not touch that app or a shared
   package it depends on. If the diff cannot be trusted, the app still builds. A skipped deploy is canceled before the
   build, which is expected. GitHub Actions still runs. Docs-only edits wait for the twice-daily docs batch.
+
+## Journal-era traps (added by the fold of 2026-11-25; sources verbatim in `../journal/2026-11.md`)
+
+- **Merging:** sessions may merge once CI is green without the founder naming each PR (founder, 2026-11-03); not covered: applying migrations, deleting data, DNS or nameservers, plan upgrades, PRs on hold. The repository has **no required checks**, so `gh pr merge --auto` merges at once even with CI running: wait for green yourself. Merging PRs seconds apart cancels `main`'s CI on the earlier commits; read the newest run.
+- **Two green PRs can break `main` together** when one changes a Connect value that the other's `@engine/config` parity test compares; update `packages/engine-config/src/configs/citizens.ts` in the same PR.
+- **Cloud sessions:** `gh` has an invalid token (reads of a public repo work unauthenticated with curl); the GitHub MCP `add_issue_comment` can post to the locked journal; the Supabase MCP tools are refused; the sandbox cannot reach the frontend CDNs, so local e2e needs stand-ins (contributor-approval:366 and map-attribution:110 fail there on `main` too).
+- **Panel gestures:** the Explore panel and the pin card row read fingers from non-passive touch events on their section (Chrome cancels pointer drags on natively scrolling rows); unit tests must fire touch events. jsdom gives panels `offsetHeight` 0: guard any share-of-height rule.
+- **Pins:** place and idea pins are SVGs with fill and stroke attributes; recolour them with CSS `fill`/`stroke`, not `--pin-cat`. Token `--pin-line` replaced `--pin-neutral`.
+- **map.jsx** may contain only one `pitch:`; `map-v2.css` bans raw px and raw `z-index` in component rules (use `--z-*` tokens and rem media queries such as 47.9375rem).
+- **Overlays:** give focus back on close in a `useLayoutEffect` clean-up; a sheet that focuses its own title while sliding in fires `focus` below the screen edge, so "raise on focus" ignores `tabindex="-1"`; use `overflow: clip`, not `hidden`, on fixed screens.
+- **Vercel:** the dashboard Redeploy box "Use project's Ignore Build Step" is ticked by default and cancels the build; untick it. A session cannot create a Vercel project (403, emailed code). The free plan builds one deployment at a time; the cap of 100 a day is per project, not all or nothing.
+- **Builds:** `pnpm build` rewrites `apps/hub` and `apps/wear` `next-env.d.ts`; restore them before `format:check`. A plain `pnpm install` can rewrite unrelated lockfile lines; check with `--frozen-lockfile`. `pnpm update` rewrites package.json ranges. Run `pnpm turbo run test:coverage --force` before pushing when a test reads another package's files.
+- **Redirects on Vercel:** an empty optional parameter (`:rest*`) becomes a trailing slash; use required parameters only. Google sign-in returns to origin + base path + "/": keep the slash.
+- **Events:** an event's pin is the first MapTiler hit for its free text, and a re-save only re-geocodes when the text changes (C58 PR A).
+- **Known flaky e2e specs** (pass alone, fail under load): map-v2-discover:94, map-v2-listing-sheet:187/192, map-attribution:93, map-v2-sheet-tabbed:225, map-v2-sideways-rows:154, map-v2-save:132, map-v2-online:123, admin-citizens:96.
