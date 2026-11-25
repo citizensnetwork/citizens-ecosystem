@@ -240,6 +240,13 @@ test.describe("Me on a phone (founder, 2026-11-25)", () => {
     await expect(page.locator(".me-page")).toBeVisible();
     const fits = await page.locator(".connect-scroll").evaluate((e) => e.scrollWidth <= e.clientWidth + 1);
     expect(fits).toBe(true);
+    // the crown has a band of its own: the cover starts under it with the same space below as above, and the page
+    // scrolls below the band, so nothing ever slides beneath the crown (founder, 2026-11-25)
+    const crownBox = (await page.locator(".cn-phone-crown").boundingBox())!;
+    const cover = (await page.locator(".me-page .cn-cover").boundingBox())!;
+    expect(Math.round(cover.y - (crownBox.y + crownBox.height))).toBe(Math.round(crownBox.y));
+    const scroller = (await page.locator(".connect-scroll").boundingBox())!;
+    expect(scroller.y).toBeGreaterThanOrEqual(crownBox.y + crownBox.height);
     // the calendar card is behind the switch, not squeezed beside the profile
     await expect(page.locator(".me-calendar")).toBeHidden();
     const tiles = page.locator(".me-space-links button");

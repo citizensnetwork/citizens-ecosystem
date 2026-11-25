@@ -1405,7 +1405,7 @@
 [data-mv2='home'] [data-mv2='home-filters-arrow'][data-dir='prev']{left:var(--space-2)}
 /* A phone has no rail (founder, 2026-11-25). The crown floats top-left on every screen (home and reset), with the
    Citizens · Connect words beside it off the map; the floating nav (Me, Explore, Map, Do) stands where the crown stood. */
-.connect-app{--phone-crown-z:45;--phone-dock-clear:calc(var(--xp-dock-h) + var(--space-4) * 2 + env(safe-area-inset-bottom,0px));--phone-crown-clear:calc(max(var(--space-3),env(safe-area-inset-top,0px)) + var(--hit) + var(--space-2));--phone-word-ink:#272a25}
+.connect-app{--phone-crown-z:45;--phone-dock-clear:calc(var(--xp-dock-h) + var(--space-4) * 2 + env(safe-area-inset-bottom,0px));--phone-crown-clear:calc(max(var(--space-3),env(safe-area-inset-top,0px)) + var(--hit) + var(--space-3));--phone-word-ink:#272a25}
 [data-theme='dark'] .connect-app{--phone-word-ink:#f7f6f1}
 @media(max-width:767px){
   [data-mv2='explore-nav'],[data-mv2='explore-nav'] svg,[data-mv2='explore-dock'] .inline-icon{color:var(--accent)}
@@ -1423,10 +1423,9 @@
   /* Off the map the page's own scroller runs under the floating nav; other screens keep a clear band for it. */
   .connect-app[data-phone][data-placed] .connect-scroll{padding-bottom:var(--phone-dock-clear)}
   .connect-app[data-phone]:not([data-placed]):not([data-flow]):not([data-page='home']) .connect-app-main{padding-bottom:var(--phone-dock-clear)}
-  /* The crown floats over a screen that opens on a picture (your Me cover, the Explore hero); every other screen gives
-     it a slim band of its own, so it never covers a title. */
-  .connect-app[data-phone]:not([data-page='home']):not([data-page='explore']):not([data-placed][data-page='profile']) .connect-app-main{padding-top:var(--phone-crown-clear)}
-  .connect-app[data-phone][data-page='profile'] .connect-scroll.me-panel{padding-top:var(--phone-crown-clear)}
+  /* Off the map the crown has a band of its own (founder, 2026-11-25): the screen, and everything that scrolls in it,
+     starts below the crown, with the same space under the crown as above it. Nothing slides beneath it. */
+  .connect-app[data-phone]:not([data-page='home']) .connect-app-main{padding-top:var(--phone-crown-clear)}
   /* The open map search starts after the crown, its middle level with the crown's. */
   [data-mv2='home'] [data-mv2='home-bar']{padding-left:calc(var(--space-3) + var(--hit) + var(--space-2))}
 }
@@ -1440,8 +1439,7 @@
 .me-view .inline-icon{inline-size:18px;color:#f2bd22}
 [data-theme='dark'] .me-view button{color:#f7f6f1b3}
 [data-theme='dark'] .me-view button.on{background:#2c2e2c;border-color:#f7f6f114;color:#f7f6f1}
-.connect-placed.phone-review .me-page{padding-top:8px}
-.connect-placed.phone-review .me-page:has(>.me-role){padding-top:var(--phone-crown-clear)}
+.connect-placed.phone-review .me-page{padding-top:0}
 .phone-review .me-columns{grid-template-columns:minmax(0,1fr);gap:0}
 .phone-review .me-columns[data-view='me'] .me-calendar,.phone-review .me-columns[data-view='calendar']{display:none}
 .phone-review .me-identity{margin:-25px 4px 16px}

@@ -613,11 +613,11 @@
       .concat(app.ownEvents || [])
       .concat((app.events || []).filter((e) => app.connected && app.connected.has && app.connected.has(e.id)));
     if (panel === 'Calendar') {
-      return h('div', { className: 'connect-scroll me-panel', 'data-screen': 'profile' },
+      return h('div', { className: 'connect-scroll', 'data-screen': 'profile' },
         h(CalendarPanel, { events: mine, onClose: () => setPanel(''), onExplore: () => app.go('explore') }));
     }
     if (panel) {
-      return h('div', { className: 'connect-scroll me-panel', 'data-screen': panel === 'Settings' ? 'settings' : 'profile' },
+      return h('div', { className: 'connect-scroll', 'data-screen': panel === 'Settings' ? 'settings' : 'profile' },
         h(Space, { start: panel, app, onBack: () => setPanel('') }));
     }
     return h('div', { className: 'connect-scroll', 'data-screen': 'profile' },
