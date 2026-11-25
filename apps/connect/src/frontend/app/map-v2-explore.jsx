@@ -438,6 +438,8 @@
       'data-cat': group || undefined,
       'data-selected': props.selected ? '' : undefined,
       'aria-current': props.selected ? 'true' : undefined,
+      // the card's pin colour (map.jsx fills the pin with the same category hex; ideas are gold), for the chosen look
+      style: cat && cat.hex ? { '--card-pin': cat.hex } : undefined,
       onClick: () => props.onOpen && props.onOpen(m.id, m.type),
     },
       h('span', { 'data-mv2': 'xcard-img' },
@@ -491,16 +493,6 @@
       const el = scroller.current;
       if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
     };
-    // Edge tap rotates the carousel (same language as pinpeek arrows); does not select a card / snap a pin.
-    const onEdgeTap = (e) => {
-      const el = scroller.current;
-      if (!el || !(edges.l || edges.r)) return;
-      const box = el.getBoundingClientRect();
-      const x = e.clientX - box.left;
-      const band = Math.max(48, box.width * 0.18);
-      if (edges.l && x < band) { e.preventDefault(); e.stopPropagation(); nudge(-1); }
-      else if (edges.r && x > box.width - band) { e.preventDefault(); e.stopPropagation(); nudge(1); }
-    };
     const Icon = window.Icon;
     const P = S().panel || {};
     // Always float arrows when the row overflows (phones included) — founder, 2026-11-22 Explore filters.
@@ -509,7 +501,6 @@
       showArrows && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
       h('div', {
         'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure,
-        onClickCapture: onEdgeTap,
       }, props.children),
       showArrows && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
   }
@@ -770,8 +761,8 @@
     const onPanelDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (mode === 'rest') return;
-      // A finger on the open panel is the touch pull's (below): the browser's own scrolling would cancel this one.
-      if (mode === 'open' && e.pointerType === 'touch' && !(e.target.closest && e.target.closest("[data-mv2='explore-grab']"))) return;
+      // A finger on the panel is the touch pull's (below): the browser's own scrolling would cancel this one.
+      if (e.pointerType === 'touch') return;
       if (e.target.closest && e.target.closest("[data-mv2='explore-grab']")) return;
       // Where-to tiles own horizontal pan-x; only start a panel pull once the move is clearly vertical.
       if (mode === 'open') {
@@ -822,23 +813,30 @@
       else lower();
     };
     const onPanelUp = (e) => { finishPanelPull(e); };
-    // The open panel's content scrolls natively, and a native scroll cancels pointer drags. So a finger that goes down
-    // with the content at its top and moves down drags the panel itself (founder, 2026-11-25): it follows the finger,
-    // a flick lowers it at once, and a long pull takes it all the way down. Any other move is left to the scroll.
-    const openRef = useRef(open);
-    openRef.current = open;
-    const lowerRef = useRef(null);
-    lowerRef.current = (far) => { if (far && !desk) { setStage('rest'); return; } lower(); };
+    // A finger on the panel (founder, 2026-11-25). Its rows scroll natively, and a native scroll cancels pointer drags, so a
+    // finger is read from touch events, with the first clear move deciding: sideways belongs to the card rows; up or down
+    // drags the panel with the finger. On the strip and a focus row both ways work (up raises, down lowers); on the open
+    // panel only down, and only with its rows at their top. A flick moves it at once (speed from the last 100 ms), and
+    // on the open panel a long pull takes it all the way down. The grab keeps its own pointer pull.
+    const pull = useRef({});
+    pull.current = { panelX: panelX, xpVis: xpVis, clear: clearPanelDrag, raise: raise, lower: lower, desk: desk, setStage: setStage };
+    const modeRef = useRef(mode);
+    modeRef.current = mode;
     useEffect(() => {
+      const el = root.current;
       const sc = scrollRef.current;
-      if (!sc) return undefined;
+      if (!el) return undefined;
       let t = null;
       const start = (e) => {
         t = null;
-        if (!openRef.current || e.touches.length !== 1) return;
-        if (sc.scrollTop > 0) return;
+        const m = modeRef.current;
+        if (m === 'rest' || e.touches.length !== 1) return;
+        if (e.target.closest && e.target.closest("[data-mv2='explore-grab']")) return;
+        if (m === 'open' && sc && sc.scrollTop > 0) return;
         const p0 = e.touches[0];
-        t = { x: p0.clientX, y: p0.clientY, pulling: false, decided: false, dy: 0, trail: [[e.timeStamp || Date.now(), 0]] };
+        const H = el.offsetHeight;
+        const vis = m === 'open' ? H : pull.current.xpVis(m === 'focus' ? 'focus' : 'strip');
+        t = { m: m, x: p0.clientX, y: p0.clientY, H: H, base: Math.max(0, H - vis), decided: false, pulling: false, dy: 0, trail: [[e.timeStamp || Date.now(), 0]] };
       };
       const move = (e) => {
         if (!t) return;
@@ -848,26 +846,26 @@
         if (!t.decided) {
           if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
           t.decided = true;
-          if (dy <= 0 || Math.abs(dx) > Math.abs(dy) || sc.scrollTop > 0) { t = null; return; }
+          if (Math.abs(dx) > Math.abs(dy)) { t = null; return; }
+          if (t.m === 'open' && (dy <= 0 || (sc && sc.scrollTop > 0))) { t = null; return; }
           t.pulling = true;
           panelPull.current = null;
         }
         if (!t.pulling) return;
         if (e.cancelable) e.preventDefault();
-        t.dy = Math.max(0, dy);
-        const now = e.timeStamp || Date.now();
-        t.trail.push([now, t.dy]);
+        t.dy = t.m === 'open' ? Math.max(0, dy) : dy;
+        t.trail.push([e.timeStamp || Date.now(), t.dy]);
         if (t.trail.length > 6) t.trail.shift();
-        const el = root.current;
-        if (!el) return;
+        const y = Math.max(0, Math.min(t.H, t.base + t.dy));
         el.style.transition = 'none';
-        el.style.transform = panelX() + 'translateY(' + t.dy + 'px)';
+        el.style.transform = pull.current.panelX() + 'translateY(' + y + 'px)';
       };
       const end = (e) => {
         const g = t;
         t = null;
         if (!g || !g.pulling) return;
-        clearPanelDrag();
+        const api = pull.current;
+        api.clear();
         // only the last 100 ms count: a finger that stopped before lifting is not a flick
         const last = (e && e.timeStamp) || Date.now();
         const recent = g.trail.filter((p) => last - p[0] <= 100);
@@ -875,19 +873,23 @@
         const b = recent[recent.length - 1];
         // px per ms, down is positive; a flick can land its moves in the same millisecond, which is as fast as it gets
         const speed = a && b && b !== a ? (b[1] - a[1]) / Math.max(1, b[0] - a[0]) : 0;
-        const H = (root.current && root.current.offsetHeight) || 600;
-        if (g.dy > H * 0.55) lowerRef.current(true);
-        else if (speed > 0.45 || g.dy > 80) lowerRef.current(false);
+        if (g.m === 'open') {
+          if (g.H > 0 && g.dy > g.H * 0.55 && !api.desk) api.setStage('rest');
+          else if (speed > 0.45 || g.dy > 80) api.lower();
+          return;
+        }
+        if (speed < -0.45 || g.dy < -60) api.raise();
+        else if (speed > 0.45 || g.dy > 60) api.lower();
       };
-      sc.addEventListener('touchstart', start, { passive: true });
-      sc.addEventListener('touchmove', move, { passive: false });
-      sc.addEventListener('touchend', end);
-      sc.addEventListener('touchcancel', end);
+      el.addEventListener('touchstart', start, { passive: true });
+      el.addEventListener('touchmove', move, { passive: false });
+      el.addEventListener('touchend', end);
+      el.addEventListener('touchcancel', end);
       return () => {
-        sc.removeEventListener('touchstart', start);
-        sc.removeEventListener('touchmove', move);
-        sc.removeEventListener('touchend', end);
-        sc.removeEventListener('touchcancel', end);
+        el.removeEventListener('touchstart', start);
+        el.removeEventListener('touchmove', move);
+        el.removeEventListener('touchend', end);
+        el.removeEventListener('touchcancel', end);
       };
     }, []);
     const onGrabUp = (e) => { finishPanelPull(e); };
@@ -1475,8 +1477,7 @@
         h('button', {
           type: 'button', 'data-mv2': 'handle',
           'aria-label': P.lower || P.back || '',
-          // Lowest (cards) shows flat bar + slight up chevron; raised is flat only (founder, 2026-11-22).
-          'data-hint': raised ? undefined : 'up',
+          // A bare bar in every look (founder, 2026-11-25: the chevron is gone; the gold nudge carries the hint).
           // Handle = minimize / step down (same as Back). Tap is handled in onPullUp; click is the keyboard fallback.
           onClick: (e) => {
             if (swallow.current) { swallow.current = false; return; }
@@ -1484,8 +1485,7 @@
             if (props.onBack) props.onBack();
           },
         },
-          h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }),
-          !raised && Icon ? h(Icon, { name: 'ChevronUp', size: 12 }) : null),
+          h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' })),
         h('span', { 'data-mv2': 'drawer-mark', 'aria-hidden': 'true' },
           (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.panel
             && window.MapV2Strings.explore.panel.brandMark) || ''),

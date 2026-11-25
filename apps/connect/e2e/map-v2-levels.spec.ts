@@ -376,7 +376,9 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
         await expect(page.locator("[data-mv2='explore-host']")).toHaveAttribute("data-mode", "rest");
       }
       // a pan is not a tap: it leaves the carousel where it is
-      // Re-check pins after the long climb (camera may have drifted; soft-centre / dive centre).
+      // Re-check pins after the long climb (camera may have drifted; soft-centre / dive centre), once the map is still:
+      // a pin measured mid-glide is no longer under that point when it is tapped.
+      await idle(page);
       const panPins = await visiblePins(page);
       if (panPins.length === 0) {
         // the camera may have drifted off the fixtures: come back to the fixture town, where the pins are

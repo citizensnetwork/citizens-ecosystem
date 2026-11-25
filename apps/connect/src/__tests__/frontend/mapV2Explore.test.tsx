@@ -851,31 +851,33 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
       expect(mode()).toBe("rest");
     });
 
+    // A finger on the panel is read from touch events (founder, 2026-11-25): native scrolling cancels pointer drags.
+    const finger = (el: Element, x: number, ys: number[], dx = 0) => {
+      fireEvent.touchStart(el, { touches: [{ clientX: x, clientY: ys[0] }] });
+      ys.slice(1).forEach((y, i) => fireEvent.touchMove(el, { touches: [{ clientX: x + (dx * (i + 1)) / (ys.length - 1), clientY: y }] }));
+      fireEvent.touchEnd(el, { touches: [] });
+    };
     it("a vertical swipe on the strip content raises the panel; a short tap on a tile does not", () => {
       render(React.createElement(X.Explore, { ...base }));
       fireEvent.click(screen.getByRole("button", { name: P().open }));
       expect(mode()).toBe("strip");
-      const panel = document.querySelector("[data-mv2='explore']")!;
       const tile = document.querySelector("[data-mv2='explore-tile']")!;
       // short press: not a raise
-      fireEvent.pointerDown(tile, { clientX: 120, clientY: 500, pointerId: 1, pointerType: "touch" });
-      fireEvent.pointerUp(panel, { clientX: 120, clientY: 502, pointerId: 1, pointerType: "touch" });
+      finger(tile, 120, [500, 502]);
+      expect(mode()).toBe("strip");
+      // a sideways swipe belongs to the tiles
+      finger(tile, 120, [520, 518, 516], -120);
       expect(mode()).toBe("strip");
       // vertical swipe up on the tiles raises
-      fireEvent.pointerDown(tile, { clientX: 120, clientY: 520, pointerId: 2, pointerType: "touch" });
-      fireEvent.pointerMove(panel, { clientX: 122, clientY: 480, pointerId: 2, pointerType: "touch" });
-      fireEvent.pointerUp(panel, { clientX: 122, clientY: 440, pointerId: 2, pointerType: "touch" });
+      finger(tile, 120, [520, 480, 440]);
       expect(mode()).toBe("open");
     });
 
     it("open at scroll-top: a continued downward swipe lowers (does not stick / reload)", () => {
       render(React.createElement(X.Explore, { ...base }));
       fireEvent.click(screen.getByRole("button", { name: P().open }));
-      const panel = document.querySelector("[data-mv2='explore']")!;
       const tile = document.querySelector("[data-mv2='explore-tile']")!;
-      fireEvent.pointerDown(tile, { clientX: 120, clientY: 520, pointerId: 1, pointerType: "touch" });
-      fireEvent.pointerMove(panel, { clientX: 122, clientY: 480, pointerId: 1, pointerType: "touch" });
-      fireEvent.pointerUp(panel, { clientX: 122, clientY: 440, pointerId: 1, pointerType: "touch" });
+      finger(tile, 120, [520, 480, 440]);
       expect(mode()).toBe("open");
       // The open panel's rows scroll natively, which cancels pointer drags on a phone, so a finger pull there is read
       // from touch events (founder, 2026-11-25): down from the top of the rows drags the panel and lowers it.
@@ -902,10 +904,13 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
       rerender(React.createElement(X.Explore, { ...base, focus: { kind: "tile", id: "coffee" } }));
       expect(mode()).toBe("focus");
       const panel = document.querySelector("[data-mv2='explore']")!;
-      fireEvent.pointerDown(panel, { clientX: 120, clientY: 520, pointerId: 3, pointerType: "touch" });
-      fireEvent.pointerMove(panel, { clientX: 122, clientY: 480, pointerId: 3, pointerType: "touch" });
-      fireEvent.pointerUp(panel, { clientX: 122, clientY: 440, pointerId: 3, pointerType: "touch" });
+      finger(panel, 120, [520, 480, 440]);
       expect(mode()).toBe("open");
+      // and down from the open panel's top, then down again from the focus, minimizes it with the filter kept
+      finger(panel, 120, [200, 260, 330]);
+      expect(mode()).toBe("focus");
+      finger(panel, 120, [200, 260, 330]);
+      expect(mode()).toBe("rest");
     });
 
     it("the desktop crown resets the levels too, and only folds the nav at the map's rest", () => {

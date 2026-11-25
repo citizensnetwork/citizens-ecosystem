@@ -140,7 +140,6 @@
   --cover-foot-inset: 10px;            /* title / tiles sit this far above the cover bottom edge */
 
   --handle-stack-gap: 1px;             /* bar + chevron in the grab handle */
-  --handle-chevron-nudge: calc(var(--focus-w) * -1);
   --report-compact-h: calc(var(--space-6) + var(--space-1)); /* 28px: quiet Report under hero */
   --qr-paper: #ffffff;               /* a QR code is always black on white, in either look */
   --qr-card-w: 360px;
@@ -3886,6 +3885,10 @@ a[data-mv2='card2'],
   outline: var(--focus-w) solid var(--text-1);
   outline-offset: calc(var(--space-1) * -1);
 }
+/* The chosen card takes its pin's colour at half strength (founder, 2026-11-25), in every card row. */
+[data-mv2='xcard'][data-selected] {
+  background: color-mix(in srgb, var(--card-pin, var(--accent)) 50%, var(--surface-1));
+}
 [data-mv2='xcard-img'] {
   position: relative;
   flex: none;
@@ -4743,15 +4746,6 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
 }
 [data-mv2='pinpeek-bar'] [data-mv2='handle-bar'] {
   pointer-events: none;
-}
-[data-mv2='pinpeek-bar'] [data-mv2='handle'] svg {
-  display: none;
-  margin-top: var(--handle-chevron-nudge);
-  opacity: 0.7;
-  pointer-events: none;
-}
-[data-mv2='pinpeek-bar'] [data-mv2='handle'][data-hint='up'] svg {
-  display: block;
 }
 [data-mv2='pinpeek-bar'] [data-mv2='drawer-mark'] {
   right: calc(var(--hit) + var(--space-2));
