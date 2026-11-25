@@ -1356,6 +1356,8 @@
         e.target.closest("[data-mv2='handle-bar']")
       ));
       const inBody = !!(e.target.closest && e.target.closest("[data-mv2='pinpeek-body']"));
+      // A finger off the bar is the touch pull's (below): the body's native scrolling would cancel this one.
+      if (e.pointerType === 'touch' && !onBar) return;
       const el = root.current;
       if (!el) return;
       const H = el.offsetHeight;
@@ -1440,6 +1442,84 @@
     };
     const onPullUp = (e) => { finishPeekPull(e); };
     const onPullCancel = () => { pull.current = null; clearPeekDrag(); };
+    // A finger on the cards or the raised details (founder, 2026-11-25), read from touch events like the Explore panel:
+    // the first clear move decides. Sideways stays with the card row. Lowered, up raises and down closes; raised, a pull
+    // down from the top of the details follows the finger, and a flick or a long pull steps back to the cards. The bar
+    // keeps its pointer pull, and the buttons keep their taps.
+    const touchApi = useRef({});
+    touchApi.current = { raised: raised, peekPx: peekPx, peekX: peekX, clear: clearPeekDrag, onBack: props.onBack, onRaise: props.onRaise };
+    useEffect(() => {
+      const el = root.current;
+      if (!el) return undefined;
+      const SKIP = "[data-mv2='pinpeek-bar'], [data-mv2='handle'], [data-mv2='pinpeek-back'], [data-mv2='pinpeek-close'], [data-mv2='xarrow'], [data-mv2='handle-chip']";
+      let t = null;
+      const start = (e) => {
+        t = null;
+        if (e.touches.length !== 1 || (e.target.closest && e.target.closest(SKIP))) return;
+        const api = touchApi.current;
+        const sc = body.current;
+        if (api.raised && sc && sc.scrollTop > 0) return;
+        const p0 = e.touches[0];
+        const H = el.offsetHeight;
+        t = {
+          raised: api.raised, x: p0.clientX, y: p0.clientY, H: H, mid: Math.max(0, H - api.peekPx()),
+          base: api.raised ? 0 : Math.max(0, H - api.peekPx()), decided: false, pulling: false, dy: 0,
+          trail: [[e.timeStamp || Date.now(), 0]],
+        };
+      };
+      const move = (e) => {
+        if (!t) return;
+        const p0 = e.touches[0];
+        const dx = p0.clientX - t.x;
+        const dy = p0.clientY - t.y;
+        if (!t.decided) {
+          if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+          t.decided = true;
+          const sc = body.current;
+          if (Math.abs(dx) > Math.abs(dy) || (t.raised && (dy <= 0 || (sc && sc.scrollTop > 0)))) { t = null; return; }
+          t.pulling = true;
+          pull.current = null;
+        }
+        if (!t.pulling) return;
+        if (e.cancelable) e.preventDefault();
+        t.dy = t.raised ? Math.max(0, dy) : dy;
+        t.trail.push([e.timeStamp || Date.now(), t.dy]);
+        if (t.trail.length > 6) t.trail.shift();
+        el.style.transition = 'none';
+        el.style.transform = touchApi.current.peekX() + 'translateY(' + Math.max(0, Math.min(t.H, t.base + t.dy)) + 'px)';
+      };
+      const end = (e) => {
+        const g = t;
+        t = null;
+        if (!g || !g.pulling) return;
+        const api = touchApi.current;
+        api.clear();
+        swallow.current = true;
+        setTimeout(() => { swallow.current = false; }, 0);
+        // only the last 100 ms count: a finger that stopped before lifting is not a flick
+        const last = (e && e.timeStamp) || Date.now();
+        const recent = g.trail.filter((p) => last - p[0] <= 100);
+        const a = recent[0];
+        const b = recent[recent.length - 1];
+        const speed = a && b && b !== a ? (b[1] - a[1]) / Math.max(1, b[0] - a[0]) : 0;   // px per ms, down positive
+        if (g.raised) {
+          if (speed > 0.45 || g.dy > 80 || (g.mid > 0 && g.dy > g.mid / 2)) { if (api.onBack) api.onBack(); }
+          return;
+        }
+        if (speed < -0.45 || g.dy < -60) { if (api.onRaise) api.onRaise(); }
+        else if (speed > 0.45 || g.dy > 60) { if (api.onBack) api.onBack(); }
+      };
+      el.addEventListener('touchstart', start, { passive: true });
+      el.addEventListener('touchmove', move, { passive: false });
+      el.addEventListener('touchend', end);
+      el.addEventListener('touchcancel', end);
+      return () => {
+        el.removeEventListener('touchstart', start);
+        el.removeEventListener('touchmove', move);
+        el.removeEventListener('touchend', end);
+        el.removeEventListener('touchcancel', end);
+      };
+    }, []);
 
     const tap = (id) => {
       if (swallow.current) return;

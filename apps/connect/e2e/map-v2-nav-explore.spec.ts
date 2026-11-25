@@ -302,6 +302,30 @@ test.describe("strokes, pulls and the province lift on a phone (founder, 2026-11
     await expect(sheet(page)).not.toHaveAttribute("data-open", "");
   });
 
+  test("the raised card details follow a finger pulled down from their top; a flick steps back to the cards", async ({ page }) => {
+    await open(page);
+    const id = await page.locator(".maplibregl-marker[data-cc-id]").first().getAttribute("data-cc-id");
+    await page.locator(`.maplibregl-marker[data-cc-id="${id}"]`).evaluate((el) => (el as HTMLElement).click());
+    const peek = page.locator("[data-mv2='pinpeek']");
+    await expect(peek).toBeVisible();
+    await peek.locator("[data-mv2='xcard'][data-selected]").click();
+    await expect(peek).toHaveAttribute("data-raised", "");
+    await page.waitForTimeout(500);
+    const cdp = await touchSession(page);
+    const body = (await peek.locator("[data-mv2='pinpeek-body']").boundingBox())!;
+    const at = { x: body.x + body.width / 2, y: body.y + 60 };
+    // held: the details move with the finger
+    const top0 = (await peek.boundingBox())!.y;
+    await swipe(cdp, at, 70, { hold: true });
+    expect((await peek.boundingBox())!.y - top0).toBeGreaterThan(50);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] } as never);
+    await expect(peek).toHaveAttribute("data-raised", "");
+    await page.waitForTimeout(400);
+    await flickTouch(cdp, at, 60);
+    await expect(peek).not.toHaveAttribute("data-raised", "");
+    await expect(peek).toBeVisible();
+  });
+
   test("coming in from the country view to province scale lifts Where to…; it stays as the map zooms in; empty map folds it", async ({ page }) => {
     await open(page);
     expect(await mode(page)).toBe("rest");
@@ -398,17 +422,18 @@ test.describe("Where to… on a phone: centred, coloured cards and the panel und
     // the chosen card is tinted with its pin's colour; the others stay plain
     const tinted = await row(page).locator("[data-mv2='xcard'][data-selected]").evaluate((e) => getComputedStyle(e).backgroundColor);
     expect(tinted).not.toBe(plain);
-    // and the map's pins stay neutral until chosen: only the chosen card's pin wears its colour (founder, 2026-11-25)
     const chosenId = (await row(page).locator("[data-mv2='xcard'][data-selected]").getAttribute("data-explore-id"))!;
-    const fills = await page.evaluate((cid) => {
-      const fill = (el: Element | null) => (el ? getComputedStyle(el).fill : "");
-      const chosen = fill(document.querySelector(`.maplibregl-marker[data-cc-id="${cid}"] [data-mv2='shape']`));
+    // and the map's pins are outlines (no fill, a black outline on the light map) until chosen: only the chosen card's pin
+    // wears its colour (founder, 2026-11-25)
+    const pins = await page.evaluate((cid) => {
+      const look = (el: Element | null) => (el ? { fill: getComputedStyle(el).fill, stroke: getComputedStyle(el).stroke } : null);
+      const chosen = look(document.querySelector(`.maplibregl-marker[data-cc-id="${cid}"] [data-mv2='shape']`));
       const other = [...document.querySelectorAll(".maplibregl-marker[data-cc-id] [data-mv2='shape']")]
         .find((el) => !el.closest(`[data-cc-id="${cid}"]`));
-      return { chosen, other: fill(other || null) };
+      return { chosen, other: look(other || null) };
     }, chosenId);
-    expect(fills.other).toBe("rgb(95, 97, 92)");
-    expect(fills.chosen).not.toBe(fills.other);
+    expect(pins.other).toEqual({ fill: "rgba(0, 0, 0, 0)", stroke: "rgb(36, 38, 36)" });
+    expect(pins.chosen!.fill).not.toBe("rgba(0, 0, 0, 0)");
   });
 
   test("the focus row takes a finger like the rest of the panel: up raises, down lowers, sideways scrolls the cards", async ({ page }) => {

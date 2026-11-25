@@ -754,19 +754,20 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     fireEvent.pointerUp(panel, { clientX: 100, clientY: 402, pointerId: 1, pointerType: "touch" });
     expect(calls.onBack).toHaveBeenCalledTimes(1);
     expect(calls.onRaise).not.toHaveBeenCalled();
+    // A finger on the cards is read from touch events (founder, 2026-11-25): the row's native scrolling cancels pointer drags.
+    const finger = (el: Element, pts: [number, number][]) => {
+      fireEvent.touchStart(el, { touches: [{ clientX: pts[0][0], clientY: pts[0][1] }] });
+      pts.slice(1).forEach(([x, y]) => fireEvent.touchMove(el, { touches: [{ clientX: x, clientY: y }] }));
+      fireEvent.touchEnd(el, { touches: [] });
+    };
     // a short press on a card is not a step-down (cards keep their tap-to-raise)
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 2, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 100, clientY: 402, pointerId: 2, pointerType: "touch" });
+    finger(card, [[100, 400], [100, 402]]);
     expect(calls.onBack).toHaveBeenCalledTimes(1);
     // a vertical card pull raises (restored after handle-only was too tight)
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 3, pointerType: "touch" });
-    fireEvent.pointerMove(panel, { clientX: 104, clientY: 360, pointerId: 3, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 104, clientY: 330, pointerId: 3, pointerType: "touch" });
+    finger(card, [[100, 400], [104, 360], [104, 330]]);
     expect(calls.onRaise).toHaveBeenCalledTimes(1);
     // a sideways move on a card does not raise (the row keeps pan-x)
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 400, pointerId: 4, pointerType: "touch" });
-    fireEvent.pointerMove(panel, { clientX: 160, clientY: 404, pointerId: 4, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 220, clientY: 408, pointerId: 4, pointerType: "touch" });
+    finger(card, [[100, 400], [160, 404], [220, 408]]);
     expect(calls.onRaise).toHaveBeenCalledTimes(1);
     fireEvent.pointerDown(handle, { clientX: 100, clientY: 400, pointerId: 5, pointerType: "touch" });
     fireEvent.pointerMove(panel, { clientX: 104, clientY: 360, pointerId: 5, pointerType: "touch" });
@@ -777,9 +778,7 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     fireEvent.pointerUp(panel, { clientX: 100, clientY: 380, pointerId: 6, pointerType: "touch" });
     expect(calls.onBack).toHaveBeenCalledTimes(2);
     // Preview body/cards: swipe down also closes (not handle-only) — founder, 2026-11-23.
-    fireEvent.pointerDown(card, { clientX: 100, clientY: 300, pointerId: 7, pointerType: "touch" });
-    fireEvent.pointerMove(panel, { clientX: 100, clientY: 360, pointerId: 7, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 100, clientY: 420, pointerId: 7, pointerType: "touch" });
+    finger(card, [[100, 300], [100, 360], [100, 420]]);
     expect(calls.onBack).toHaveBeenCalledTimes(3);
     unmount();
   });
@@ -790,18 +789,20 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
     const bodyEl = document.querySelector("[data-mv2='pinpeek-body']") as HTMLElement;
     const details = screen.getByTestId("details");
     const bar = document.querySelector("[data-mv2='pinpeek-bar']")!;
+    // A finger on the details is read from touch events (founder, 2026-11-25): native scrolling cancels pointer drags.
     // scrolled: content owns the swipe
     Object.defineProperty(bodyEl, "scrollTop", { configurable: true, get: () => 40 });
-    fireEvent.pointerDown(details, { clientX: 100, clientY: 300, pointerId: 1, pointerType: "touch" });
-    fireEvent.pointerMove(panel, { clientX: 100, clientY: 360, pointerId: 1, pointerType: "touch" });
-    fireEvent.pointerUp(panel, { clientX: 100, clientY: 400, pointerId: 1, pointerType: "touch" });
+    fireEvent.touchStart(details, { touches: [{ clientX: 100, clientY: 300 }] });
+    fireEvent.touchMove(details, { touches: [{ clientX: 100, clientY: 360 }] });
+    fireEvent.touchEnd(details, { touches: [] });
     expect(calls.onBack).not.toHaveBeenCalled();
     // Fresh gesture at scroll-top + down → lower (founder, 2026-11-23). Follows the finger, snaps on release.
     Object.defineProperty(bodyEl, "scrollTop", { configurable: true, get: () => 0 });
-    fireEvent.pointerDown(details, { clientX: 100, clientY: 300, pointerId: 2, pointerType: "touch" });
-    fireEvent.pointerMove(panel, { clientX: 100, clientY: 360, pointerId: 2, pointerType: "touch" });
+    fireEvent.touchStart(details, { touches: [{ clientX: 100, clientY: 300 }] });
+    fireEvent.touchMove(details, { touches: [{ clientX: 100, clientY: 360 }] });
     expect((panel as HTMLElement).style.transform).toMatch(/translateY/);
-    fireEvent.pointerUp(panel, { clientX: 100, clientY: 400, pointerId: 2, pointerType: "touch" });
+    fireEvent.touchMove(details, { touches: [{ clientX: 100, clientY: 400 }] });
+    fireEvent.touchEnd(details, { touches: [] });
     expect(calls.onBack).toHaveBeenCalledTimes(1);
     expect((panel as HTMLElement).style.transform).toBe("");
     fireEvent.pointerDown(bar, { clientX: 100, clientY: 80, pointerId: 3, pointerType: "touch" });

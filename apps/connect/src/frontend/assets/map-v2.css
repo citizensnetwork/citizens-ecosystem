@@ -44,8 +44,7 @@
 
   /* pins: white border plus a dark hairline and the shadow, so a pin separates from a light map */
   --pin-border: #ffffff;
-  --pin-neutral: #5f615c;               /* a pin before it is tapped (founder, 2026-11-25) */
-  --pin-neutral-ink: #f7f6f1;
+  --pin-line: #242624;                  /* a pin before it is tapped: an outline, no fill (founder, 2026-11-25) */
   --pin-hairline: rgba(10, 9, 8, 0.62);
   --pin-label: #171310;
   --pin-label-halo: rgba(255, 255, 255, 0.95);
@@ -236,8 +235,7 @@
   --error: #ff8f80;
 
   --pin-border: #ffffff;
-  --pin-neutral: #a9aba4;
-  --pin-neutral-ink: #242624;
+  --pin-line: #f7f6f1;
   --pin-hairline: rgba(255, 255, 255, 0);
   --pin-label: #f7f4ee;
   --pin-label-halo: rgba(10, 9, 8, 0.9);
@@ -361,19 +359,30 @@
 .mv2-pin[data-quiet] {
   opacity: var(--dim-opacity);
 }
-/* Every pin is neutral until it is tapped (founder, 2026-11-25): only the chosen pin (and the one a card lights) wears
-   its category colour, the same colour its card takes. The pin's own colour is set inline on .mv2-pin; its parts read it
-   from the body, so the body holds the neutral pair instead. */
+/* Every pin is an outline until it is tapped (founder, 2026-11-25): no fill, its outline and glyph in black on the light
+   map and white on the dark one. Only the chosen pin (and the one a card lights) wears its category colour, the same
+   colour its card takes. The pin's colour is set inline on .mv2-pin; its parts read it from the body, so the body holds
+   the outline look instead. */
 .mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='body'] {
-  --pin-cat: var(--pin-neutral);
-  --pin-glyph: var(--pin-neutral-ink);
+  --pin-cat: transparent;
+  --pin-glyph: var(--pin-line);
+  --pin-border: var(--pin-line);
+}
+.mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='tail'] {
+  border-top-color: var(--pin-line);
+}
+.mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='disc'] {
+  box-shadow: none;
 }
 /* a place's and an idea's shape is an SVG with its colour in attributes: CSS outranks a presentation attribute */
 .mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='shape'] {
-  fill: var(--pin-neutral);
+  fill: transparent;
 }
 .mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='shape-svg'] > g {
-  stroke: var(--pin-neutral-ink);
+  stroke: var(--pin-line);
+}
+.mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='shape-hair'] {
+  stroke: none;
 }
 
 /* contributor: disc on a tail */
