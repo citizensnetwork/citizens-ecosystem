@@ -18,7 +18,7 @@ beforeAll(() => {
   P = loadFrontend("map-v2-pins.jsx").MapV2Pins as Pins;
 });
 
-const many = (n: number, shown = true) => Array.from({ length: n }, (_, i) => ({ id: "p" + i, shown, dist: n - i }));
+const many = (n: number, shown = true): Entry[] => Array.from({ length: n }, (_, i) => ({ id: "p" + i, shown, dist: n - i }));
 
 describe("chooseTabStops", () => {
   it("never offers a pin that is off the screen or covered", () => {

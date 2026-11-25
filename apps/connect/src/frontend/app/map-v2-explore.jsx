@@ -1130,7 +1130,8 @@
         'aria-label': str.title,
         onPointerDown: onPanelDown, onPointerMove: onPanelMove, onPointerUp: onPanelUp,
         onPointerCancel: onPanelCancel,
-        onFocus: (e) => revealInRow(e.target, root.current),
+        // now, and again one frame later: the browser's own focus scroll can land after this handler and undo it
+        onFocus: (e) => { const t = e.target; revealInRow(t, root.current); requestAnimationFrame(() => { if (document.activeElement === t) revealInRow(t, root.current); }); },
       },
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
@@ -1717,6 +1718,11 @@
   // buttons. Sideways only: the panel's own vertical scroller must not move (an overflow-hidden box can still be scrolled).
   function revealInRow(el, stop) {
     if (!el || !el.getBoundingClientRect) return;
+    // keyboard focus only: a finger or mouse focuses the button just before its click lands, and moving the row then
+    // would pull the card out from under the tap (the founder's Where to… taps rely on the card staying put)
+    let byKey = false;
+    try { byKey = el.matches(':focus-visible'); } catch { byKey = false; }
+    if (!byKey) return;
     let row = el.parentElement;
     while (row && row !== stop) {
       const ox = window.getComputedStyle(row).overflowX;

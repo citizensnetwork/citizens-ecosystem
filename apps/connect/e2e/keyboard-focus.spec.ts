@@ -51,6 +51,8 @@ for (const size of [
       let pins = 0;
       for (let i = 0; i < 40; i++) {
         await page.keyboard.press("Tab");
+        // measure what a person sees: after the next two frames (the browser's focus scroll and the app's own settle there)
+        await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null)))));
         const s = await focusedStop(page);
         if (!s) continue;
         if (s.pin) pins += 1;
