@@ -278,10 +278,11 @@ describe('theme', () => {
 
   const css = raw(`${CONNECT}/src/frontend/assets/map-v2.css`);
   const darkStart = css.indexOf("[data-theme='dark'] {");
-  const html = raw(`${CONNECT}/src/frontend/index.html`);
-  const shellRoot = html.slice(
-    html.indexOf(':root {'),
-    html.indexOf('* { -webkit-tap-highlight-color'),
+  // The shell's tokens: index.html's inline <style> until QA plan PR F3, assets/base.css since (no inline styles).
+  const base = raw(`${CONNECT}/src/frontend/assets/base.css`);
+  const shellRoot = base.slice(
+    base.indexOf(':root {'),
+    base.indexOf('* { -webkit-tap-highlight-color'),
   );
   const lightBlock = css.slice(css.indexOf(':root {'), darkStart);
   const darkBlock = css.slice(darkStart, css.indexOf('}', darkStart));

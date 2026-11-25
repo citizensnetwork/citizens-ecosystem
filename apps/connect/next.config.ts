@@ -44,6 +44,44 @@ if (rawBasePath !== "" && rawBasePath !== "/" && rawBasePath.replace(/\/$/, "") 
 }
 const basePath = rawBasePath === "" || rawBasePath === "/" ? "" : BASE_PATH;
 
+// ── Content-Security-Policy ──
+// The directives both policies share: where images, media, connections and workers may come from, and what may frame
+// or post the page. Only scripts and styles differ between the enforced policy and the strict one.
+const CSP_SHARED = [
+  `img-src 'self' data: blob: ${FRONTEND_IMG_CDN} https://xyiajtrvhlxaeplsiajj.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://api.maptiler.com https://basemaps.cartocdn.com`,
+  "font-src 'self'",
+  "media-src 'self' blob: https://xyiajtrvhlxaeplsiajj.supabase.co",
+  "connect-src 'self' https://xyiajtrvhlxaeplsiajj.supabase.co wss://xyiajtrvhlxaeplsiajj.supabase.co https://nominatim.openstreetmap.org https://api.maptiler.com https://tile.openstreetmap.org https://basemaps.cartocdn.com",
+  "worker-src 'self' blob:",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+];
+// Enforced today. 'unsafe-eval' is for Next.js React Refresh in development only.
+const ENFORCED_CSP = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  ...CSP_SHARED,
+].join("; ");
+// Where browsers report violations of the strict policy (src/app/api/csp-report): under the base path, like every API.
+const CSP_REPORT_PATH = `${basePath}/api/csp-report`;
+// The strict policy (QA plan PR F3; QA finding CCQA-0007). The page carries no inline script and no <style> element,
+// so scripts and stylesheets come from this origin only; React and MapLibre still set element styles, so only the
+// style ATTRIBUTE may be inline. src/__tests__/frontend/csp.test.ts fails if 'unsafe-inline' or a host comes back.
+const STRICT_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  // older browsers without the -elem/-attr split fall back to this one
+  "style-src 'self' 'unsafe-inline'",
+  "style-src-elem 'self'",
+  "style-src-attr 'unsafe-inline'",
+  "object-src 'none'",
+  ...CSP_SHARED,
+  `report-uri ${CSP_REPORT_PATH}`,
+  "report-to csp",
+].join("; ");
+
 // The addresses that existed before the shared domain keep working while the prefix is on. The rule is packages/
 // ecosystem's oldAddressRules("connect", basePath); like the base path above it is copied here, and
 // src/__tests__/frontend/basePath.test.ts fails if the copy and the package ever disagree. Both lists are empty
@@ -189,24 +227,11 @@ const nextConfig: NextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",
           },
-          {
-            key: "Content-Security-Policy",
-            value: [
-              "default-src 'self'",
-              // 'unsafe-eval' is required by Next.js React Refresh in development.
-              // CDN domains are needed for the static HTML frontend (React/Babel/MapLibre via unpkg).
-              `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
-              "style-src 'self' 'unsafe-inline'",
-              `img-src 'self' data: blob: ${FRONTEND_IMG_CDN} https://xyiajtrvhlxaeplsiajj.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://api.maptiler.com https://basemaps.cartocdn.com`,
-              "font-src 'self'",
-              "media-src 'self' blob: https://xyiajtrvhlxaeplsiajj.supabase.co",
-              "connect-src 'self' https://xyiajtrvhlxaeplsiajj.supabase.co wss://xyiajtrvhlxaeplsiajj.supabase.co https://nominatim.openstreetmap.org https://api.maptiler.com https://tile.openstreetmap.org https://basemaps.cartocdn.com",
-              "worker-src 'self' blob:",
-              "frame-ancestors 'none'",
-              "base-uri 'self'",
-              "form-action 'self'",
-            ].join("; "),
-          },
+          { key: "Content-Security-Policy", value: ENFORCED_CSP },
+          // The strict policy, reported but not enforced for a week (QA plan PR F3, founder 2026-11-25): what it would
+          // block goes to /api/csp-report. The enforcing PR moves it into Content-Security-Policy.
+          { key: "Content-Security-Policy-Report-Only", value: STRICT_CSP },
+          { key: "Reporting-Endpoints", value: `csp="${CSP_REPORT_PATH}"` },
         ],
       },
       // Hashed build outputs: cached for a year (QA plan PR F2). After the security rule, which stays first.

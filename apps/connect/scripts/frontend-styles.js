@@ -25,6 +25,13 @@ const FONT_FACES = [
   { family: 'Manrope', pkg: '@fontsource-variable/manrope', styles: ['wght.css'] },
 ];
 const SUBSETS = new Set(['latin', 'latin-ext']);
+/**
+ * The page's own stylesheets that stood, in this order, right before the Tailwind link in <head> (QA plan PR F3). They
+ * are joined in front of the compiled Tailwind in the one hashed file, so the cascade order is exactly what it was and
+ * a first visit makes three requests fewer (each one a round trip on a slow phone connection). The sources stay
+ * separate files in src/frontend/assets/, where the design checks read them.
+ */
+const LEADING_STYLESHEETS = ['assets/base.css', 'assets/report.css', 'assets/listing-claim.css'];
 /** Where the font files go, relative to the output root; the stylesheet lives in assets/, one level down. */
 const FONT_DIR = 'vendor/fonts';
 
@@ -109,7 +116,10 @@ async function compileFrontendStyles({ rootDir, esbuild }) {
   const result = await postcss([tailwindcss({ ...config, content: config.content.map((g) => path.join(rootDir, g)) })]).process(input, {
     from: undefined,
   });
-  const { code } = await esbuild.transform(result.css, { loader: 'css', minify: true });
+  const leading = LEADING_STYLESHEETS.map((rel) =>
+    fs.readFileSync(path.join(rootDir, 'src', 'frontend', ...rel.split('/')), 'utf8'),
+  ).join('\n');
+  const { code } = await esbuild.transform(`${leading}\n${result.css}`, { loader: 'css', minify: true });
   return { css: code, fontFiles: fonts.files };
 }
 
@@ -121,4 +131,4 @@ function copyFontFiles(dest, fontFiles) {
   for (const { from, to } of fontFiles) fs.copyFileSync(from, path.join(dest, ...to.split('/')));
 }
 
-module.exports = { compileFrontendStyles, copyFontFiles, FONT_DIR };
+module.exports = { compileFrontendStyles, copyFontFiles, FONT_DIR, LEADING_STYLESHEETS };

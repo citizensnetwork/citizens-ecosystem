@@ -7,22 +7,18 @@
      a low-vision believer needs and WCAG 1.4.4 asks for. The map and the Map v2 sheet still own their
      own two-finger gestures (touch-action), so the page does not zoom under them. The Capacitor phone
      app keeps the old block (maximum-scale=1) until it has been tested on a phone: the tag below puts
-     it back there only. The native bridge sets window.Capacitor at document start, before this runs;
-     if anything here fails the page stays zoomable. -->
-<script>
-(function () {
-  try {
-    var c = window.Capacitor;
-    var native = (c && typeof c.isNativePlatform === 'function' && c.isNativePlatform()) || location.protocol === 'capacitor:';
-    if (native) document.querySelector('meta[name="viewport"]').setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover');
-  } catch (e) { /* stay zoomable */ }
-})();
-</script>
+     it back there only, in viewport.js (the first script, right after the base tag below, so its address resolves
+     under the base path; a file, not an inline script, so the CSP needs no 'unsafe-inline', QA plan PR F3). It is
+     async: a parser-blocking script here cost a whole round trip (about 150 ms on a slow phone connection) before
+     anything else loaded, and on the web it changes nothing; in the native shell the file is local and runs at once.
+     The native bridge sets window.Capacitor at document start, before it runs; if anything there fails the
+     page stays zoomable. -->
 <!-- Every screen has its own URL now (/discover, /e/<id>, /dashboard/events, ...), and the
      server serves this same file for all of them. Without a base, the relative script,
      style and vendor paths below would resolve under those paths (/e/app/store.jsx) and
      404. next.config.ts rewrites an explicit list of paths here, never a catch-all. -->
 <base href="/" />
+<script src="viewport.js" async></script>
 <title>Citizens Connect</title>
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
 <!-- Home-screen app (founder yes 2026-11-12): the manifest and the iPhone icon. Every path here and inside
@@ -49,110 +45,13 @@
      longer competes with the sign-in landing on a slow phone connection. -->
 <link href="vendor/maplibre-gl/maplibre-gl.css" rel="stylesheet" />
 <script type="module" src="maplibre-loader.js"></script>
-<style>
-  :root {
-    /* THE gold (founder, 2026-10-31): the crown logo's own colour, sampled from the logo (#F2BD22). One fill gold; the
-       other values are its roles, never a second gold: --gold-light and --gold-deep are the gradient stops (light and
-       amber, never brown), --gold-dark is the INK for gold text, rings and icons (plain gold on white is 1.74:1).
-       Same values as Map v2's --accent and --accent-ink (its own stylesheet); a unit test keeps the two in step. */
-    --gold:#F2BD22; --gold-light:#FCDD6C; --gold-deep:#E3A00A; --gold-dark:#836100; --map-bg:#EDE5D4;
-    /* the crown mark's old, separate gold: now the same gold (kept so nothing that reads them breaks) */
-    --gold-crown:var(--gold); --gold-crown-light:var(--gold-light); --gold-crown-dark:var(--gold-dark);
-  }
-  * { -webkit-tap-highlight-color: transparent; }
-  html, body, #root { height: 100%; }
-  html { overscroll-behavior: none; }
-  body {
-    margin: 0; background: #F7F4EE; color: #0A0908;
-    font-family: 'Plus Jakarta Sans', sans-serif; -webkit-font-smoothing: antialiased;
-    overscroll-behavior: none;
-  }
-  .font-display { font-family: 'Playfair Display', serif; }
-  h1,h2,h3,h4 { font-family: 'Playfair Display', serif; font-weight: 600; line-height: 1.25; margin: 0; }
-
-  /* glassmorphism */
-  .glass {
-    background: rgba(255,255,255,0.72);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255,255,255,0.5);
-  }
-  .glass-strong {
-    background: rgba(255,255,255,0.9);
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
-  }
-  /* A gold fill: light, then the crown, then amber (no brown end stop). Its label is NEAR-BLACK, never white:
-     white on these stops is 1.5 to 2.3:1, near-black is 8.8 to 14.9:1. The rules after it make that true for every
-     existing `text-white` on a gold fill (the shared Button, avatars, the hero cards, badges) without touching them. */
-  .gold-gradient { background: linear-gradient(135deg,var(--gold-light) 0%,var(--gold) 55%,var(--gold-deep) 100%); }
-  .gold-gradient, .bg-gold, .bg-secondary { color: var(--accent-contrast, #0A0908); }
-  .gold-gradient.text-white, .bg-gold.text-white, .bg-secondary.text-white,
-  .gold-gradient [class*="text-white"], .bg-gold [class*="text-white"], .bg-secondary [class*="text-white"] { color: var(--accent-contrast, #0A0908); }
-  /* Gold TEXT is the ink: a vivid gold on white or cream is 1.5 to 1.7:1. The gradient-filled text classes keep
-     their names and are now flat ink; `text-gold` (small icons, labels, the required star) reads as the ink too. */
-  .gold-text, .crown-gold-text { color: var(--gold-dark); background: none; -webkit-text-fill-color: currentColor; }
-  :root .text-gold { color: var(--gold-dark); }
-  /* a gold border that marks focus on an input is the ink too (3:1 or more), not the vivid gold (1.74:1) */
-  :root [class*="focus:border-gold"]:focus, :root [class*="focus-within:border-gold"]:focus-within { border-color: var(--gold-dark); }
-
-  .scrollbar-none::-webkit-scrollbar { display: none; }
-  .scrollbar-none { scrollbar-width: none; }
-  ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(242,189,34,0.4); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(242,189,34,0.7); }
-
-  /* animations */
-  @keyframes pinPulse { 0%{transform:scale(1);opacity:.4} 100%{transform:scale(2.4);opacity:0} }
-
-  /* The map container must FILL its positioned parent. maplibre-gl.css sets
-     `.maplibregl-map { position: relative }`, which has the same specificity
-     as Tailwind's `.absolute`, so which one wins is decided purely by
-     stylesheet order. The compiled Tailwind sheet is linked last in <head>
-     (where the Play CDN used to inject its rules), so `absolute` wins there;
-     this rule, after the maplibre <link>, settles it whatever the order. */
-  .cc-map { position: absolute; inset: 0; }
-
-  /* MapLibre overrides â€” keep our glass overlays above the canvas, mute default chrome */
-  /* 74 px: above the phone's bottom navigation, and low enough that the © credit sits below the bottom-left
-     zoom hint instead of under it (the hint dropped to the credit's height when the Map Key was removed). */
-  .maplibregl-ctrl-bottom-right { margin-bottom: 74px; }
-  /* The © MapTiler / © OpenStreetMap credit is required on every map (MapTiler terms, the OSM licence), so it
-     stays, but small and quiet: the same translucent near-black pill and white type as the MapTiler logo
-     (map.jsx), not a long white bar. Selectors match maplibre-gl.css's own specificity (the old one-class
-     font-size rule never applied). The "i" button is MapLibre's dark icon, inverted to read on the pill. */
-  .maplibregl-map .maplibregl-ctrl.maplibregl-ctrl-attrib,
-  .maplibregl-map .maplibregl-ctrl-attrib.maplibregl-compact { font-size:9px; line-height:14px; background-color:rgba(23,19,16,.62); color:#fff; }
-  .maplibregl-map .maplibregl-ctrl-attrib a { color:#fff; }
-  .maplibregl-map .maplibregl-ctrl-attrib .maplibregl-ctrl-attrib-button { background-color:transparent; filter:invert(1); }
-  .bubble-bob { animation: bubbleBob .9s ease-in-out infinite alternate; }
-  @keyframes bubbleBob { from{transform:translateY(0)} to{transform:translateY(-4px)} }
-  .fade-in { animation: fadeIn .3s ease-out; }
-  @keyframes fadeIn { from{transform:translateY(6px)} to{transform:translateY(0)} }
-  .slide-up { animation: slideUp .42s cubic-bezier(.32,.72,0,1); }
-  @keyframes slideUp { from{transform:translateY(14px)} to{transform:translateY(0)} }
-  .slide-up-panel { animation: slideUpPanel .42s cubic-bezier(.32,.72,0,1); }
-  @keyframes slideUpPanel { from{transform:translateY(26px)} to{transform:translateY(0)} }
-  .scale-in { animation: scaleIn .25s cubic-bezier(.34,1.3,.64,1); }
-  @keyframes scaleIn { from{transform:scale(.97)} to{transform:scale(1)} }
-  .spin { animation: spin 1s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .cc-roll { display:inline-block; animation: ccRoll .5s cubic-bezier(.32,.72,0,1); }
-  @keyframes ccRoll { from { opacity:0; transform: translateY(0.6em); } to { opacity:1; transform: translateY(0); } }
-  .dash-flow { stroke-dasharray: 6 6; animation: dashFlow 1s linear infinite; }
-  @keyframes dashFlow { to { stroke-dashoffset: -12; } }
-
-  input, textarea, select, button { font-family: inherit; }
-  [data-screen] { height: 100%; }
-</style>
-<!-- Report dialog. Both maps: Map v2's stylesheet stays behind the flag. -->
-<link href="assets/report.css?v=20261026a" rel="stylesheet" />
-<link href="assets/listing-claim.css?v=20261021a" rel="stylesheet" />
-<!-- Tailwind, compiled at build time (QA plan PR F1, item S3; config: ../../tailwind.config.cjs), with the self-hosted
-     fonts and the boot screen below. The build writes assets/tailwind.<hash>.css and points this tag at it. It stays
-     LAST in <head>: the Play CDN it replaces injected its rules here, after the rules above, and the screens were
-     styled against that order (the two sheets the app adds itself at runtime still come after it). -->
+<!-- The page's one stylesheet after MapLibre's, built by scripts/frontend-styles.js as assets/tailwind.<hash>.css:
+     assets/base.css (the tokens, glass, the map container; inline here until QA plan PR F3), assets/report.css (the
+     report dialog), assets/listing-claim.css, then Tailwind compiled at build time (QA plan PR F1, item S3; config:
+     ../../tailwind.config.cjs) with the self-hosted fonts and the boot screen below. That is the order the separate
+     links had, so the cascade is unchanged, in one request instead of four. Tailwind stays LAST: the Play CDN it
+     replaced injected its rules here, and the screens were styled against that order (the two sheets the app adds
+     itself at runtime still come after it). -->
 <link href="assets/tailwind.css" rel="stylesheet" />
 </head>
 <body>
