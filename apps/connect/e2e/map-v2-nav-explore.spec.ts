@@ -423,7 +423,7 @@ test.describe("Where to… on a phone: centred, coloured cards and the panel und
     const tinted = await row(page).locator("[data-mv2='xcard'][data-selected]").evaluate((e) => getComputedStyle(e).backgroundColor);
     expect(tinted).not.toBe(plain);
     const chosenId = (await row(page).locator("[data-mv2='xcard'][data-selected]").getAttribute("data-explore-id"))!;
-    // and the map's pins are outlines (no fill, a black outline on the light map) until chosen: only the chosen card's pin
+    // and the map's pins are neutral (cream, outlined in black on the light map) until chosen: only the chosen card's pin
     // wears its colour (founder, 2026-11-25)
     const pins = await page.evaluate((cid) => {
       const look = (el: Element | null) => (el ? { fill: getComputedStyle(el).fill, stroke: getComputedStyle(el).stroke } : null);
@@ -432,8 +432,8 @@ test.describe("Where to… on a phone: centred, coloured cards and the panel und
         .find((el) => !el.closest(`[data-cc-id="${cid}"]`));
       return { chosen, other: look(other || null) };
     }, chosenId);
-    expect(pins.other).toEqual({ fill: "rgba(0, 0, 0, 0)", stroke: "rgb(36, 38, 36)" });
-    expect(pins.chosen!.fill).not.toBe("rgba(0, 0, 0, 0)");
+    expect(pins.other).toEqual({ fill: "rgb(247, 246, 241)", stroke: "rgb(36, 38, 36)" });
+    expect(pins.chosen!.fill).not.toBe("rgb(247, 246, 241)");
   });
 
   test("the focus row takes a finger like the rest of the panel: up raises, down lowers, sideways scrolls the cards", async ({ page }) => {

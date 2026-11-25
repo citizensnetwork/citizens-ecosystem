@@ -44,7 +44,8 @@
 
   /* pins: white border plus a dark hairline and the shadow, so a pin separates from a light map */
   --pin-border: #ffffff;
-  --pin-line: #242624;                  /* a pin before it is tapped: an outline, no fill (founder, 2026-11-25) */
+  --pin-line: #242624;                  /* a pin before it is tapped: cream, outlined in black (founder, 2026-11-25) */
+  --pin-fill: #f7f6f1;
   --pin-hairline: rgba(10, 9, 8, 0.62);
   --pin-label: #171310;
   --pin-label-halo: rgba(255, 255, 255, 0.95);
@@ -236,6 +237,7 @@
 
   --pin-border: #ffffff;
   --pin-line: #f7f6f1;
+  --pin-fill: #242624;
   --pin-hairline: rgba(255, 255, 255, 0);
   --pin-label: #f7f4ee;
   --pin-label-halo: rgba(10, 9, 8, 0.9);
@@ -359,12 +361,12 @@
 .mv2-pin[data-quiet] {
   opacity: var(--dim-opacity);
 }
-/* Every pin is an outline until it is tapped (founder, 2026-11-25): no fill, its outline and glyph in black on the light
-   map and white on the dark one. Only the chosen pin (and the one a card lights) wears its category colour, the same
+/* Every pin is neutral until it is tapped (founder, 2026-11-25): cream with a black outline and glyph on the light map,
+   charcoal with a white one on the dark map. Only the chosen pin (and the one a card lights) wears its category colour, the same
    colour its card takes. The pin's colour is set inline on .mv2-pin; its parts read it from the body, so the body holds
    the outline look instead. */
 .mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='body'] {
-  --pin-cat: transparent;
+  --pin-cat: var(--pin-fill);
   --pin-glyph: var(--pin-line);
   --pin-border: var(--pin-line);
 }
@@ -376,7 +378,7 @@
 }
 /* a place's and an idea's shape is an SVG with its colour in attributes: CSS outranks a presentation attribute */
 .mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='shape'] {
-  fill: transparent;
+  fill: var(--pin-fill);
 }
 .mv2-pin:not(.is-selected):not(.is-lit) [data-mv2='shape-svg'] > g {
   stroke: var(--pin-line);
