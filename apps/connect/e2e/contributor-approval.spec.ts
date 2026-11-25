@@ -264,6 +264,11 @@ test.describe("signed in: applying and waiting", () => {
 
   test("Care / Recovery (#202): turning the map on brings the address back and says so", async ({ page }) => {
     const db = await openAsApplicant(page);
+    // The geocoder places the typed address at Church Square, Pretoria (registered last, so it wins over the shell's
+    // empty MapTiler answer). A pin only ever comes from the address or the person's own drag, never from a resize.
+    await page.route("**/api.maptiler.com/geocoding/**", (route) =>
+      route.fulfill({ json: { features: [{ center: [28.1881, -25.7461], relevance: 0.9, place_name: "Church Square, Pretoria" }] } }),
+    );
     await bootAt(page);
     await goTo(page, "apply");
     await page.getByPlaceholder("e.g. New Wine Fellowship").fill(ORG_NAME);

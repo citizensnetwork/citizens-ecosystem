@@ -139,6 +139,11 @@ describe("chooseCandidate", () => {
     expect(L.chooseCandidate("Grace Hall", [{ ...PRETORIA_EAST, relevance: 0.9 }]).status).toBe("ok");
     expect(L.chooseCandidate("Grace Hall", [{ ...PRETORIA_EAST, relevance: 0.5 }]).status).toBe("confirm");
   });
+  it("treats a missing score as unknown: a hit near the named city passes, a far one or an unanchored one does not", () => {
+    expect(L.chooseCandidate("Church Square, Pretoria", [{ ...PRETORIA_EAST }]).status).toBe("ok");
+    expect(L.chooseCandidate("Church Square, Pretoria", [{ ...DURBAN_NORTH }]).status).toBe("confirm");
+    expect(L.chooseCandidate("Grace Hall", [{ ...PRETORIA_EAST }]).status).toBe("confirm");
+  });
   it("drops hits outside South Africa and says none when nothing is left", () => {
     expect(L.chooseCandidate("Hall, Pretoria", [{ lat: 51.5, lng: -0.1, relevance: 1 }]).status).toBe("none");
     expect(L.chooseCandidate("Hall, Pretoria", []).status).toBe("none");

@@ -27,6 +27,9 @@ const CASES: [string, Candidate[], Point | null][] = [
   ["18 Oak Avenue, Randburg, Johannesburg", [{ lat: -26.1, lng: 28.0, relevance: 0.9 }], null],
   ["Hall, Pretoria", [{ lat: 51.5, lng: -0.1, relevance: 1 }], null],
   ["Hall, Pretoria", [], null],
+  ["Church Square, Pretoria", [{ lat: -25.7461, lng: 28.1881 }], null],
+  ["Church Square, Pretoria", [{ ...DURBAN_N }], null],
+  ["Grace Hall", [{ ...PTA_EAST }], null],
 ];
 
 describe("placeCheck.ts and location-lib.jsx agree", () => {

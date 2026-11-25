@@ -64,12 +64,18 @@ export function chooseCandidate(query: string, candidates: Candidate[], near?: P
   if (!list.length) return { status: "none" };
   const named = cityNamed(query);
   const anchor: Point | null = named ?? (near && isNum(near.lat) && isNum(near.lng) ? near : null);
-  const rel = (c: Candidate) => (isNum(c.relevance) ? c.relevance : 0);
+  // A missing score is unknown, not zero: near an anchor the distance vouches for the hit; with no anchor it cannot pass.
+  const score = (c: Candidate): number | null => (isNum(c.relevance) ? c.relevance : null);
+  const rel = (c: Candidate) => score(c) ?? 0;
   if (anchor) {
     const min = named ? MIN_RELEVANCE : MIN_RELEVANCE_UNANCHORED;
-    const close = list.filter((c) => haversineKm(c, anchor) <= NEAR_KM && rel(c) >= min);
+    const close = list.filter((c) => {
+      const s = score(c);
+      return haversineKm(c, anchor) <= NEAR_KM && (s === null || s >= min);
+    });
     if (close.length) return { status: "ok", best: [...close].sort((a, b) => rel(b) - rel(a))[0] };
     return { status: "confirm", best: [...list].sort((a, b) => haversineKm(a, anchor) - haversineKm(b, anchor))[0] };
   }
-  return { status: rel(list[0]) >= MIN_RELEVANCE_UNANCHORED ? "ok" : "confirm", best: list[0] };
+  const first = score(list[0]);
+  return { status: first !== null && first >= MIN_RELEVANCE_UNANCHORED ? "ok" : "confirm", best: list[0] };
 }

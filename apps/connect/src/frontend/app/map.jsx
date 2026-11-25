@@ -869,22 +869,32 @@
       }
     }, [value.lat, value.lng]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Debounced forward-geocode while the address text is typed.
+    // Forward-geocode the typed address (debounced). `pendingRef` holds words not yet looked up, so a picker that
+    // closes first (the person pressed Continue within the pause) still looks them up once on the way out.
+    const pendingRef = useRef('');
+    const mountedRef = useRef(true);
+    const resolveTyped = (addr) => {
+      pendingRef.current = '';
+      if (mountedRef.current) setBusy('geocode');
+      return window.CCLocation.resolveLocation(addr, { near: window.viewCentre ? window.viewCentre() : null }).then((r) => {
+        if (mountedRef.current) setBusy(false);
+        if (r.status === 'ok') { lastResolvedRef.current = addr; onChangeRef.current({ lat: r.best.lat, lng: r.best.lng, needsConfirm: false }); }
+        else if (confirmRef.current && r.best) { lastResolvedRef.current = addr; onChangeRef.current({ lat: r.best.lat, lng: r.best.lng, needsConfirm: true }); }
+        // New words found nothing: a doubtful guess for the OLD words is dropped (a pin the owner set or confirmed stays).
+        else if (confirmRef.current && doubtRef.current) onChangeRef.current({ lat: null, lng: null, needsConfirm: false });
+      });
+    };
     useEffect(() => {
       const addr = (value.address || '').trim();
-      if (!addr || addr === lastResolvedRef.current) return;
-      const t = setTimeout(() => {
-        setBusy('geocode');
-        window.CCLocation.resolveLocation(addr, { near: window.viewCentre ? window.viewCentre() : null }).then((r) => {
-          setBusy(false);
-          if (r.status === 'ok') { lastResolvedRef.current = addr; onChangeRef.current({ lat: r.best.lat, lng: r.best.lng, needsConfirm: false }); }
-          else if (confirmRef.current && r.best) { lastResolvedRef.current = addr; onChangeRef.current({ lat: r.best.lat, lng: r.best.lng, needsConfirm: true }); }
-          // New words found nothing: a doubtful guess for the OLD words is dropped (a pin the owner set or confirmed stays).
-          else if (confirmRef.current && doubtRef.current) onChangeRef.current({ lat: null, lng: null, needsConfirm: false });
-        });
-      }, 800);
+      if (!addr || addr === lastResolvedRef.current) { pendingRef.current = ''; return undefined; }
+      pendingRef.current = addr;
+      const t = setTimeout(() => resolveTyped(addr), 800);
       return () => clearTimeout(t);
-    }, [value.address]);
+    }, [value.address]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => () => {
+      mountedRef.current = false;
+      if (pendingRef.current) resolveTyped(pendingRef.current);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const useMyLocation = () => {
       if (!navigator.geolocation) return;

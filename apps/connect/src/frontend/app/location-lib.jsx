@@ -132,10 +132,12 @@
     const named = cityNamed(query);
     const near = opts && hasPin(opts.near) ? opts.near : null;
     const anchor = named || near;
-    const rel = (c) => (isNum(c.relevance) ? c.relevance : 0);
+    // A missing score is unknown, not zero: near an anchor the distance vouches for the hit; with no anchor it cannot pass.
+    const score = (c) => (isNum(c.relevance) ? c.relevance : null);
+    const rel = (c) => (score(c) === null ? 0 : score(c));
     if (anchor) {
       const min = named ? MIN_RELEVANCE : MIN_RELEVANCE_UNANCHORED;
-      const close = list.filter((c) => haversineKm(c, anchor) <= NEAR_KM && rel(c) >= min);
+      const close = list.filter((c) => haversineKm(c, anchor) <= NEAR_KM && (score(c) === null || score(c) >= min));
       if (close.length) {
         const best = close.slice().sort((a, b) => rel(b) - rel(a))[0];
         return { status: 'ok', best, candidates: list };
@@ -145,7 +147,7 @@
       return { status: 'confirm', best, candidates: list, anchor: named ? named.name : null };
     }
     const best = list[0];
-    return { status: rel(best) >= MIN_RELEVANCE_UNANCHORED ? 'ok' : 'confirm', best, candidates: list };
+    return { status: score(best) !== null && score(best) >= MIN_RELEVANCE_UNANCHORED ? 'ok' : 'confirm', best, candidates: list };
   }
 
   // Forward-geocode with a bias toward `near` and five candidates, then choose. Never throws; 'none' on any failure.
