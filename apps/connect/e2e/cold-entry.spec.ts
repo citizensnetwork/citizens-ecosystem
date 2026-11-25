@@ -1,5 +1,5 @@
-import { test, expect, type Page, type Route } from "@playwright/test";
-import { FAKE_PROJECT, mockAppShell } from "./support/fake-project";
+import { test, expect, type Page, type Route } from '@playwright/test';
+import { FAKE_PROJECT, mockAppShell } from './support/fake-project';
 
 // ════════════════════════════════════════════════════════════════════
 //  Cold entry (QA 2026-11-25, CCQA-0001; fix plan PR F0). How long a first-time visitor on a phone waits before
@@ -12,40 +12,62 @@ import { FAKE_PROJECT, mockAppShell } from "./support/fake-project";
 //  docs/audit/cc-f0-cold-entry-2026-11-25.md (re-run it with scripts/measure-cold-entry.mjs).
 //
 //  Budget (founder, 2026-11-25): cold, on this profile, the first paint within 1.5 s and the guest button within 3 s.
-//  ENFORCE_BUDGET stays false until PR F1 removes the render blockers (today's cold load is about 3.7 s live).
+//  ENFORCE.firstPaintMs is on since PR F1 (the boot screen paints with the HTML: about 0.6 s here, was 3.9 s).
+//  ENFORCE.guestMs comes on with PR F2: after F1 the button is at about 3.1 s here, and most of what is left is the
+//  whole lucide icon set (112 KB) that F2 trims to the icons the app uses.
+//
+//  It also guards what F1 took off the critical path: no Tailwind Play CDN, no Google Fonts, and no MapLibre module
+//  before the guest button (maplibre-loader.js fetches it on demand or after the page has loaded).
 // ════════════════════════════════════════════════════════════════════
 
-const SLOW_4G = { offline: false, latency: 150, downloadThroughput: 1.6e6 / 8, uploadThroughput: 750e3 / 8 };
+const SLOW_4G = {
+  offline: false,
+  latency: 150,
+  downloadThroughput: 1.6e6 / 8,
+  uploadThroughput: 750e3 / 8,
+};
 const CPU_SLOWDOWN = 4;
 const BUDGET = { firstPaintMs: 1500, guestMs: 3000 };
-const ENFORCE_BUDGET = false;
-const GUEST = "Browse as Guest";
+const ENFORCE = { firstPaintMs: true, guestMs: false };
+const GUEST = 'Browse as Guest';
 
 /** A real-mode app whose browser has never signed in, with nothing reaching a real backend. */
 async function firstVisit(page: Page) {
-  await mockAppShell(page, { supabaseUrl: FAKE_PROJECT, anonKey: "e2e-anon-key" });
+  await mockAppShell(page, { supabaseUrl: FAKE_PROJECT, anonKey: 'e2e-anon-key' });
   await page.route(`${FAKE_PROJECT}/**`, (route: Route) =>
-    route.fulfill({ json: [], headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*" } }),
+    route.fulfill({
+      json: [],
+      headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' },
+    }),
   );
   await page.routeWebSocket(/e2eproj\.supabase\.test/, () => {});
 }
 
+/** Every URL the page asks for, from now on. */
+function recordRequests(page: Page): string[] {
+  const seen: string[] = [];
+  page.on('request', (r) => seen.push(r.url()));
+  return seen;
+}
+
 async function throttle(page: Page) {
   const cdp = await page.context().newCDPSession(page);
-  await cdp.send("Network.enable");
-  await cdp.send("Network.emulateNetworkConditions", SLOW_4G);
-  await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_SLOWDOWN });
+  await cdp.send('Network.enable');
+  await cdp.send('Network.emulateNetworkConditions', SLOW_4G);
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU_SLOWDOWN });
 }
 
 /** Loads the landing; returns the first paint and the guest mark, in ms since navigation start. */
 async function entryTimes(page: Page): Promise<{ firstPaintMs: number; guestMs: number }> {
-  await page.goto("/", { waitUntil: "commit" });
-  await expect(page.getByRole("button", { name: GUEST })).toBeVisible({ timeout: 60_000 });
+  await page.goto('/', { waitUntil: 'commit' });
+  await expect(page.getByRole('button', { name: GUEST })).toBeVisible({ timeout: 60_000 });
   const times = await page.waitForFunction(
     () => {
-      const guest = performance.getEntriesByName("cc-guest-visible", "mark")[0];
-      const paint = performance.getEntriesByName("first-contentful-paint")[0];
-      return guest && paint ? { firstPaintMs: Math.round(paint.startTime), guestMs: Math.round(guest.startTime) } : null;
+      const guest = performance.getEntriesByName('cc-guest-visible', 'mark')[0];
+      const paint = performance.getEntriesByName('first-contentful-paint')[0];
+      return guest && paint
+        ? { firstPaintMs: Math.round(paint.startTime), guestMs: Math.round(guest.startTime) }
+        : null;
     },
     null,
     { timeout: 10_000 },
@@ -53,16 +75,29 @@ async function entryTimes(page: Page): Promise<{ firstPaintMs: number; guestMs: 
   return (await times.jsonValue()) as { firstPaintMs: number; guestMs: number };
 }
 
-test.describe("Cold entry: the guest button on a throttled 4G phone", () => {
+test.describe('Cold entry: the guest button on a throttled 4G phone', () => {
   // Alone and in order: a parallel worker would steal the CPU this spec is timing.
-  test.describe.configure({ mode: "serial" });
-  test.use({ bypassCSP: true, viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true });
+  test.describe.configure({ mode: 'serial' });
+  test.use({
+    bypassCSP: true,
+    viewport: { width: 412, height: 915 },
+    isMobile: true,
+    hasTouch: true,
+  });
   test.setTimeout(180_000);
 
-  test("records cc-guest-visible, cold and warm", async ({ page, context }, testInfo) => {
+  test('records cc-guest-visible, cold and warm', async ({ page, context }, testInfo) => {
     await firstVisit(page);
     await throttle(page);
+    const requests = recordRequests(page);
     const cold = await entryTimes(page);
+    const beforeGuest = await page.evaluate(() => {
+      const guest = performance.getEntriesByName('cc-guest-visible', 'mark')[0]?.startTime ?? 0;
+      return performance
+        .getEntriesByType('resource')
+        .filter((e) => e.startTime < guest)
+        .map((e) => e.name);
+    });
 
     // Warm: a second visit in the same browser, so the HTTP cache holds every script.
     const again = await context.newPage();
@@ -70,17 +105,38 @@ test.describe("Cold entry: the guest button on a throttled 4G phone", () => {
     await throttle(again);
     const warm = await entryTimes(again);
 
-    const result = { profile: "Slow 4G, CPU 4x, 412x915", cold, warm, budget: BUDGET, enforced: ENFORCE_BUDGET };
-    await testInfo.attach("cc-guest-visible.json", { body: JSON.stringify(result, null, 2), contentType: "application/json" });
+    const result = {
+      profile: 'Slow 4G, CPU 4x, 412x915',
+      cold,
+      warm,
+      budget: BUDGET,
+      enforced: ENFORCE,
+    };
+    await testInfo.attach('cc-guest-visible.json', {
+      body: JSON.stringify(result, null, 2),
+      contentType: 'application/json',
+    });
     const line = `cold: paint ${cold.firstPaintMs} ms, guest ${cold.guestMs} ms; warm: paint ${warm.firstPaintMs} ms, guest ${warm.guestMs} ms`;
-    testInfo.annotations.push({ type: "cc-guest-visible", description: line });
-    console.log(`[cold-entry] ${line} (budget paint ${BUDGET.firstPaintMs} ms, guest ${BUDGET.guestMs} ms, enforced ${ENFORCE_BUDGET})`);
+    testInfo.annotations.push({ type: 'cc-guest-visible', description: line });
+    console.log(
+      `[cold-entry] ${line} (budget paint ${BUDGET.firstPaintMs} ms, guest ${BUDGET.guestMs} ms, enforced ${JSON.stringify(ENFORCE)})`,
+    );
 
     expect(cold.guestMs).toBeGreaterThan(0);
     expect(warm.guestMs).toBeGreaterThan(0);
-    if (ENFORCE_BUDGET) {
-      expect(cold.firstPaintMs, "cold first paint over budget").toBeLessThanOrEqual(BUDGET.firstPaintMs);
-      expect(cold.guestMs, "cold guest button over budget").toBeLessThanOrEqual(BUDGET.guestMs);
-    }
+    if (ENFORCE.firstPaintMs)
+      expect(cold.firstPaintMs, 'cold first paint over budget').toBeLessThanOrEqual(
+        BUDGET.firstPaintMs,
+      );
+    if (ENFORCE.guestMs)
+      expect(cold.guestMs, 'cold guest button over budget').toBeLessThanOrEqual(BUDGET.guestMs);
+
+    // PR F1: nothing asks for the Play CDN or Google Fonts, and MapLibre waits until the guest button is up.
+    const gone = new Set(['cdn.tailwindcss.com', 'fonts.googleapis.com', 'fonts.gstatic.com']);
+    expect(requests.filter((u) => gone.has(new URL(u).hostname))).toEqual([]);
+    expect(
+      beforeGuest.filter((u) => u.includes('maplibre-gl.mjs')),
+      'MapLibre fetched before the guest button',
+    ).toEqual([]);
   });
 });

@@ -32,17 +32,6 @@
 <link rel="manifest" href="manifest.json" />
 <link rel="apple-touch-icon" href="icons/icon-192.png" />
 
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-
-<!-- lucide PINNED. @latest is a moving target and its UMD icon-node shape
-     has changed across releases (0.44x shipped ['svg', attrs, children] where
-     1.x ships a flat child list) — icons.jsx now tolerates both, but the app's
-     icon set should never change under us on someone else's release day. -->
-<script src="https://unpkg.com/lucide@1.34.0/dist/umd/lucide.js"></script>
-<script src="https://cdn.tailwindcss.com"></script>
-
 <!-- MapLibre GL JS — real geographic basemap (MapTiler tiles). v6 dropped the
      UMD build entirely (ESM-only, GHSA-jrc7-96c5-q579 security bump from 4.7.1
      — critical XSS in the attribution-control sanitizer, fixed in 6.4.1), so
@@ -54,40 +43,12 @@
      own import.meta.url (`new URL('./maplibre-gl-worker.mjs', import.meta.url)`),
      and the CSP only allows `worker-src 'self' blob:` — a cross-origin unpkg
      worker is correctly blocked, so both files are served same-origin instead.
-     Re-sync from node_modules/maplibre-gl/dist/ on every version bump. -->
+     Re-sync from node_modules/maplibre-gl/dist/ on every version bump.
+     DEFERRED (QA plan PR F1, founder yes 2026-11-25): maplibre-loader.js imports the 294 KB module only when the map
+     first asks for it (whenMaplibreReady in app/map.jsx) or once the page has loaded, whichever comes first, so it no
+     longer competes with the sign-in landing on a slow phone connection. -->
 <link href="vendor/maplibre-gl/maplibre-gl.css" rel="stylesheet" />
-<script type="module">
-  import * as maplibregl from './vendor/maplibre-gl/maplibre-gl.mjs';
-  window.maplibregl = maplibregl;
-</script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          background: '#F7F4EE', foreground: '#0A0908',
-          card: 'rgba(255,255,255,0.82)', 'card-foreground': '#0A0908',
-          popover: 'rgba(255,255,255,0.97)',
-          primary: '#0A0908', 'primary-foreground': '#FFFFFF',
-          secondary: '#F2BD22', 'secondary-foreground': '#0A0908',
-          muted: '#EDE8DC', 'muted-foreground': '#7A7060',
-          accent: '#FBF1CC', 'accent-foreground': '#0A0908',
-          border: 'rgba(242,189,34,0.22)',
-          destructive: '#c0392b',
-          gold: '#F2BD22', 'gold-light': '#FCDD6C', 'gold-dark': '#836100',
-        },
-        fontFamily: {
-          sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'sans-serif'],
-          serif: ['Playfair Display', 'ui-serif', 'serif'],
-          // Design Spec's "one voice" — geometric Manrope, currently scoped
-          // to the landing/auth screen (crown mark, wordmark, slogan).
-          brand: ['Manrope', 'ui-sans-serif', 'sans-serif'],
-        },
-      },
-    },
-  };
-</script>
-
+<script type="module" src="maplibre-loader.js"></script>
 <style>
   :root {
     /* THE gold (founder, 2026-10-31): the crown logo's own colour, sampled from the logo (#F2BD22). One fill gold; the
@@ -147,14 +108,10 @@
 
   /* The map container must FILL its positioned parent. maplibre-gl.css sets
      `.maplibregl-map { position: relative }`, which has the same specificity
-     as Tailwind's `.absolute` — so which one wins is decided purely by
-     stylesheet order. Today the Tailwind Play CDN injects its rules at runtime
-     (last, so `absolute` wins), but the moment that CDN is swapped for a
-     compiled stylesheet in <head> — the follow-up already on the list — the
-     order flips, the container collapses to height 0 and the map disappears.
-     Verified: it collapses exactly that way against a compiled build. This
-     rule lives after the maplibre <link>, so it settles the question for both.
-     (Measured in the local browser harness, not theorised.) */
+     as Tailwind's `.absolute`, so which one wins is decided purely by
+     stylesheet order. The compiled Tailwind sheet is linked last in <head>
+     (where the Play CDN used to inject its rules), so `absolute` wins there;
+     this rule, after the maplibre <link>, settles it whatever the order. */
   .cc-map { position: absolute; inset: 0; }
 
   /* MapLibre overrides â€” keep our glass overlays above the canvas, mute default chrome */
@@ -192,9 +149,25 @@
 <!-- Report dialog. Both maps: Map v2's stylesheet stays behind the flag. -->
 <link href="assets/report.css?v=20261026a" rel="stylesheet" />
 <link href="assets/listing-claim.css?v=20261021a" rel="stylesheet" />
+<!-- Tailwind, compiled at build time (QA plan PR F1, item S3; config: ../../tailwind.config.cjs), with the self-hosted
+     fonts and the boot screen below. The build writes assets/tailwind.<hash>.css and points this tag at it. It stays
+     LAST in <head>: the Play CDN it replaces injected its rules here, after the rules above, and the screens were
+     styled against that order (the two sheets the app adds itself at runtime still come after it). -->
+<link href="assets/tailwind.css" rel="stylesheet" />
 </head>
 <body>
-<div id="root"></div>
+<!-- The boot screen paints with the HTML and its CSS, before any script (budget: first paint within 1.5 s on a slow
+     phone connection). It is the React LoadingSplash's crown, ring and wash, so the hand-over is still; React's first
+     render replaces it. -->
+<div id="root"><div class="cc-boot" role="status" aria-label="Opening Citizens Connect"><img src="assets/citizens-crown.png?v=20261003a" alt="" width="72" height="39" /><span class="cc-boot-ring" aria-hidden="true"></span><p class="cc-boot-words" aria-hidden="true">Connecting the Kingdom</p></div><noscript><p class="cc-boot-words">Citizens Connect needs JavaScript to run.</p></noscript></div>
+
+<!-- lucide PINNED. @latest is a moving target and its UMD icon-node shape
+     has changed across releases (0.44x shipped ['svg', attrs, children] where
+     1.x ships a flat child list) — icons.jsx now tolerates both, but the app's
+     icon set should never change under us on someone else's release day.
+     In <body>, after the boot screen (QA plan PR F1): only the app bundle reads window.lucide, and a parser-blocking
+     112 KB script in <head> held back the first paint on a slow phone connection. -->
+<script src="https://unpkg.com/lucide@1.34.0/dist/umd/lucide.js"></script>
 
 <!-- React/ReactDOM: DEVELOPMENT builds here, for local no-build dev (full React
      warnings); the build (@citizens/frontend-build) ships each data-prod-* twin

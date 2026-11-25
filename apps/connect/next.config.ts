@@ -8,9 +8,10 @@ const outputFileTracingRoot = __dirname.replace(/\\/g, "/").split("/").slice(0, 
 
 // CDN domains required by the static HTML frontend (loaded via <script> / <link> tags).
 // These are only needed when the frontend is served from the same Next.js project
-// (i.e. after scripts/build-frontend.js copies it into public/).
-const FRONTEND_SCRIPT_CDN = "https://unpkg.com https://cdn.tailwindcss.com https://cdn.jsdelivr.net";
-const FRONTEND_STYLE_CDN  = "https://unpkg.com https://fonts.googleapis.com";
+// (i.e. after scripts/build-frontend.js copies it into public/). Tailwind and the fonts are compiled and served
+// from our own origin since QA plan PR F1 (2026-11-25); React, supabase-js and lucide follow in PR F2.
+const FRONTEND_SCRIPT_CDN = "https://unpkg.com https://cdn.jsdelivr.net";
+const FRONTEND_STYLE_CDN  = "https://unpkg.com";
 const FRONTEND_IMG_CDN    = "https://images.unsplash.com";
 
 // First path segments of the frontend's single-segment screens (see rewrites() below).
@@ -188,7 +189,7 @@ const nextConfig: NextConfig = {
               `script-src 'self' 'unsafe-inline' ${FRONTEND_SCRIPT_CDN}${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
               `style-src 'self' 'unsafe-inline' ${FRONTEND_STYLE_CDN}`,
               `img-src 'self' data: blob: ${FRONTEND_IMG_CDN} https://xyiajtrvhlxaeplsiajj.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://api.maptiler.com https://basemaps.cartocdn.com`,
-              "font-src 'self' https://fonts.gstatic.com",
+              "font-src 'self'",
               "media-src 'self' blob: https://xyiajtrvhlxaeplsiajj.supabase.co",
               "connect-src 'self' https://xyiajtrvhlxaeplsiajj.supabase.co wss://xyiajtrvhlxaeplsiajj.supabase.co https://nominatim.openstreetmap.org https://api.maptiler.com https://tile.openstreetmap.org https://basemaps.cartocdn.com",
               "worker-src 'self' blob:",

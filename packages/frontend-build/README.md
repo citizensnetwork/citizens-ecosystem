@@ -26,6 +26,11 @@ What one `buildFrontend()` call does for an app:
    entries, each bundled and hashed like the bridge and loaded where its own
    `<script src="engine-world.js"></script>` tag stands. The raw entry never ships,
    and the build fails if `index.html` has no such tag.
+7. Optional `stylesheets` (Connect: its compiled Tailwind, `[{ href: "assets/tailwind.css", css }]`):
+   CSS the host generated, written as `assets/tailwind.<hash>.css` and linked where the page's
+   one `<link href="assets/tailwind.css">` stands. The host compiles the CSS (this package stays
+   dependency-free); the build fails before writing anything if the page links the placeholder
+   zero times or more than once.
 
 ## Usage (a host app's `scripts/build-frontend.js`)
 

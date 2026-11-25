@@ -23,6 +23,9 @@
  *   6. optionally (`browserBundles`), bundle + hash more real-ESM entry files
  *      of the host app (Connect's engine world), each loaded where its own
  *      <script> tag stands in index.html
+ *   7. optionally (`stylesheets`), write stylesheets the host generated (Connect's
+ *      compiled Tailwind) as content-hashed files, each linked where its own
+ *      placeholder <link> stands in index.html
  *
  * Before any of that, the CDN <script> tags of the host's `sriPackages` are
  * checked against the lockfile-installed npm packages (exact version + SRI
@@ -59,6 +62,12 @@ const BROWSER_BUNDLE_TAG_RE =
   /^([ \t]*)<script src="([a-z][a-z0-9-]*\.js)(?:\?v=[^"]*)?"><\/script>$/gm;
 /** A content-hashed output of one entry: `engine-world.<hash>.js` → `engine-world.js`. */
 const HASHED_BROWSER_BUNDLE_RE = /^([a-z][a-z0-9-]*)\.[0-9a-f]{10}\.js$/;
+/** A generated stylesheet's placeholder href: a relative path of lower-case segments ending in `.css`. */
+const STYLESHEET_HREF_RE = /^(?:[a-z0-9][a-z0-9-]*\/)*[a-z][a-z0-9-]*\.css$/;
+/** A content-hashed stylesheet output: `tailwind.<hash>.css` → `tailwind`. */
+const HASHED_STYLESHEET_RE = /^([a-z][a-z0-9-]*)\.[0-9a-f]{10}\.css$/;
+/** Opening <link> tags, any case (attributes only). */
+const LINK_TAG_RE = /<link\b([^>]*)>/gi;
 
 /** Opening <script> tags, any case (attributes only — bodies are never inspected). */
 const SCRIPT_OPEN_TAG_RE = /<script\b([^>]*)>/gi;
@@ -341,6 +350,37 @@ function cleanHashedOutputs(dest, browserBundles = []) {
   }
 }
 
+/**
+ * Write each generated stylesheet as `<dir>/<name>.<hash>.css` beside its placeholder path, removing the
+ * hashed copies of earlier builds first. Returns { placeholder href → hashed href }.
+ */
+function writeStylesheets(dest, stylesheets) {
+  const files = {};
+  for (const { href, css } of stylesheets) {
+    const dir = path.posix.dirname(href);
+    const name = path.posix.basename(href, '.css');
+    const outDir = path.join(dest, ...dir.split('/'));
+    fs.mkdirSync(outDir, { recursive: true });
+    for (const old of fs.readdirSync(outDir)) {
+      const match = HASHED_STYLESHEET_RE.exec(old);
+      if (match && match[1] === name) fs.unlinkSync(path.join(outDir, old));
+    }
+    const filename = `${name}.${hashOf(css)}.css`;
+    fs.writeFileSync(path.join(outDir, filename), css);
+    files[href] = dir === '.' ? filename : `${dir}/${filename}`;
+  }
+  return files;
+}
+
+/** How many <link> tags of the page point at `href` (exactly, attribute compared, never pattern-built). */
+function countLinksTo(html, href) {
+  let count = 0;
+  for (const [, attrs] of html.matchAll(LINK_TAG_RE)) {
+    if (attrValue(parseAttrs(attrs), 'href') === href) count += 1;
+  }
+  return count;
+}
+
 /** Recursive copy; `skip` (a Set of names) applies to the top level only. */
 function copyDir(src, dest, skip) {
   fs.mkdirSync(dest, { recursive: true });
@@ -465,12 +505,35 @@ function buildAuthClient({ esbuild, srcDir, dest }) {
  * URL resolves under the prefix whatever deep path served the page. A page
  * without a `<base>` tag is left alone: its relative URLs already resolve
  * against the directory it was served from.
+ *
+ * `stylesheetFiles` ({ "assets/tailwind.css": "assets/tailwind.<hash>.css" }) points each
+ * placeholder <link> at its hashed file; each placeholder must be linked exactly once.
  */
 function rewriteIndexHtml(
   html,
-  { bundleFile, authClientFile, capacitorBridgeFile, browserBundleFiles = {}, basePath = '' },
+  {
+    bundleFile,
+    authClientFile,
+    capacitorBridgeFile,
+    browserBundleFiles = {},
+    stylesheetFiles = {},
+    basePath = '',
+  },
 ) {
   assertBasePath(basePath);
+  for (const [href, hashed] of Object.entries(stylesheetFiles)) {
+    const count = countLinksTo(html, href);
+    if (count !== 1) {
+      throw new Error(
+        `[frontend-build] index.html must link the generated stylesheet ${href} with exactly one <link href="${href}"> (found ${count})`,
+      );
+    }
+    html = html.replace(LINK_TAG_RE, (tag, attrs) =>
+      attrValue(parseAttrs(attrs), 'href') === href
+        ? tag.replace(`href="${href}"`, () => `href="${hashed}"`)
+        : tag,
+    );
+  }
   // Each browser bundle loads where its own tag stands, so the page decides the order.
   const found = new Map(Object.keys(browserBundleFiles).map((name) => [name, 0]));
   html = html.replace(BROWSER_BUNDLE_TAG_RE, (tag, indent, name) => {
@@ -623,6 +686,24 @@ function assertOptions(options) {
       '[frontend-build] options.browserBundles must list distinct top-level entry files such as "engine-world.js" (lower-case letters, digits and hyphens; not auth-client.js, capacitor-bridge.js or config.js)',
     );
   }
+  const { stylesheets } = options;
+  if (
+    stylesheets !== undefined &&
+    (!Array.isArray(stylesheets) ||
+      new Set(stylesheets.map((s) => s && s.href)).size !== stylesheets.length ||
+      stylesheets.some(
+        (s) =>
+          !s ||
+          typeof s.href !== 'string' ||
+          !STYLESHEET_HREF_RE.test(s.href) ||
+          typeof s.css !== 'string' ||
+          s.css.length === 0,
+      ))
+  ) {
+    throw new TypeError(
+      '[frontend-build] options.stylesheets must list { href, css } with distinct relative hrefs such as "assets/tailwind.css" (lower-case segments) and non-empty css',
+    );
+  }
   for (const v of configVars) {
     if (v.validate !== undefined && !Object.hasOwn(VALIDATORS, v.validate)) {
       throw new TypeError(
@@ -659,6 +740,7 @@ function buildFrontend(options) {
     sriPackages = [],
     basePath = '',
     browserBundles = [],
+    stylesheets = [],
     env = process.env,
     log = console.log,
     warn = console.warn,
@@ -684,6 +766,14 @@ function buildFrontend(options) {
   const html = fs.readFileSync(path.join(srcDir, 'index.html'), 'utf8');
   const sriVerified = verifyCdnIntegrity(html, { rootDir, packages: sriPackages });
   assertNoDevelopmentScripts(swapProductionTwins(html));
+  for (const { href } of stylesheets) {
+    const count = countLinksTo(html, href);
+    if (count !== 1) {
+      throw new Error(
+        `[frontend-build] index.html must link the generated stylesheet ${href} with exactly one <link href="${href}"> (found ${count})`,
+      );
+    }
+  }
   // config.js. Web: API_BASE_URL is empty when the frontend is served from the
   // same domain as the API (the standard Vercel deployment topology). Mobile:
   // absolute production API base, env-first with local-config fallback for the
@@ -700,6 +790,7 @@ function buildFrontend(options) {
   for (const name of browserBundles) {
     browserBundleFiles[name] = buildBrowserBundle({ esbuild, srcDir, dest, name });
   }
+  const stylesheetFiles = writeStylesheets(dest, stylesheets);
 
   fs.writeFileSync(
     path.join(dest, 'index.html'),
@@ -708,6 +799,7 @@ function buildFrontend(options) {
       authClientFile,
       capacitorBridgeFile,
       browserBundleFiles,
+      stylesheetFiles,
       basePath: webBasePath,
     }),
   );
@@ -723,6 +815,9 @@ function buildFrontend(options) {
   log(`[build-frontend] Bundled Capacitor plugins → ${capacitorBridgeFile}`);
   for (const [name, file] of Object.entries(browserBundleFiles)) {
     log(`[build-frontend] Bundled ${name} → ${file}`);
+  }
+  for (const [href, file] of Object.entries(stylesheetFiles)) {
+    log(`[build-frontend] Wrote ${href} → ${file}`);
   }
 
   if (mobile && mobileRequiredKeys.some((k) => !config[k])) {
@@ -748,6 +843,7 @@ function buildFrontend(options) {
     authClientFile,
     capacitorBridgeFile,
     browserBundleFiles,
+    stylesheetFiles,
     config,
     sriVerified,
   };

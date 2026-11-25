@@ -41,6 +41,8 @@ const { buildFrontend } = require('@citizens/frontend-build');
 const { basePathFromEnv } = require('@citizens/ecosystem');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const frontendConfig = require('./frontend-config');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { compileFrontendStyles, copyFontFiles } = require('./frontend-styles');
 
 // `next dev`/`next build` load .env.local themselves, but this script runs
 // as a PLAIN node process (a separate step before `next build` in the
@@ -95,31 +97,45 @@ function assertMaplibreVendorInSync(rootDir) {
 }
 assertMaplibreVendorInSync(path.join(__dirname, '..'));
 
-buildFrontend({
-  esbuild,
-  rootDir: path.join(__dirname, '..'),
-  mobile: process.argv.includes('--mobile'),
+async function main() {
+  const rootDir = path.join(__dirname, '..');
+  // Tailwind (compiled here at build time, not by a CDN in every visitor's browser), the self-hosted fonts and the
+  // boot screen: one stylesheet, linked where index.html's <link href="assets/tailwind.css"> stands (QA plan PR F1).
+  const styles = await compileFrontendStyles({ rootDir, esbuild });
+  const result = buildFrontend({
+    esbuild,
+    rootDir,
+    mobile: process.argv.includes('--mobile'),
 
-  // '' until the Vercel project sets NEXT_PUBLIC_BASE_PATH=/citizens/connect
-  // (see packages/ecosystem/README.md before setting it). Read AFTER
-  // loadDotEnvLocal above, so a local .env.local value counts too.
-  basePath: basePathFromEnv('connect'),
+    // '' until the Vercel project sets NEXT_PUBLIC_BASE_PATH=/citizens/connect
+    // (see packages/ecosystem/README.md before setting it). Read AFTER
+    // loadDotEnvLocal above, so a local .env.local value counts too.
+    basePath: basePathFromEnv('connect'),
 
-  // Every screen module, in the exact dependency order the old
-  // <script type="text/babel"> tags loaded them (later files reference
-  // `window.X` set by earlier ones).
-  appFileOrder: [
-    'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'saved-lib.jsx', 'cohost-lib.jsx', 'moments-lib.jsx', 'convince-lib.jsx', 'serving-areas-lib.jsx', 'location-lib.jsx', 'onboarding-presets-lib.jsx', 'data.jsx', 'lets-lib.jsx', 'store.jsx', 'ui.jsx', 'report.jsx', 'listing-claim.jsx', 'auth.jsx', 'cohosts.jsx', 'moments.jsx', 'convince.jsx', 'map-v2-strings.jsx', 'serving-areas.jsx', 'map-v2-time.jsx', 'map-v2-qr.jsx', 'map-v2-pins.jsx', 'map.jsx',
-    'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-card.jsx', 'map-v2-row.jsx', 'map-v2-nearby.jsx', 'map-v2-online.jsx', 'map-v2-sheet.jsx', 'map-v2-explore.jsx', 'connect-chrome.jsx', 'connect-previews.jsx', 'connect-explore.jsx', 'connect-me.jsx', 'map-v2-nav.jsx', 'map-v2-discover.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
-    'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx', 'lets.jsx', 'intake-upgrade.jsx',
-    'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
-  ],
+    // Every screen module, in the exact dependency order the old
+    // <script type="text/babel"> tags loaded them (later files reference
+    // `window.X` set by earlier ones).
+    appFileOrder: [
+      'icons.jsx', 'routes.jsx', 'map-v2-lib.jsx', 'saved-lib.jsx', 'cohost-lib.jsx', 'moments-lib.jsx', 'convince-lib.jsx', 'serving-areas-lib.jsx', 'location-lib.jsx', 'onboarding-presets-lib.jsx', 'data.jsx', 'lets-lib.jsx', 'store.jsx', 'ui.jsx', 'report.jsx', 'listing-claim.jsx', 'auth.jsx', 'cohosts.jsx', 'moments.jsx', 'convince.jsx', 'map-v2-strings.jsx', 'serving-areas.jsx', 'map-v2-time.jsx', 'map-v2-qr.jsx', 'map-v2-pins.jsx', 'map.jsx',
+      'entity-card.jsx', 'map-v2-gallery.jsx', 'map-v2-news.jsx', 'map-v2-card.jsx', 'map-v2-row.jsx', 'map-v2-nearby.jsx', 'map-v2-online.jsx', 'map-v2-sheet.jsx', 'map-v2-explore.jsx', 'connect-chrome.jsx', 'connect-previews.jsx', 'connect-explore.jsx', 'connect-me.jsx', 'map-v2-nav.jsx', 'map-v2-discover.jsx', 'home.jsx', 'kingdom-discovery.jsx', 'apply.jsx', 'pending-application.jsx', 'admin.jsx', 'dashboard.jsx', 'automation.jsx', 'insights.jsx',
+      'create.jsx', 'messages.jsx', 'profiles.jsx', 'pages.jsx', 'lets.jsx', 'intake-upgrade.jsx',
+      'tweaks-panel.jsx', 'tweaks.jsx', 'shell.jsx', 'app.jsx',
+    ],
 
-  // Real-ESM entries bundled beside the screens: the world (words, categories, switches)
-  // from @engine/config (engine step E7). index.html loads it before auth-client.js.
-  browserBundles: ['engine-world.js'],
+    // Real-ESM entries bundled beside the screens: the world (words, categories, switches)
+    // from @engine/config (engine step E7). index.html loads it before auth-client.js.
+    browserBundles: ['engine-world.js'],
 
-  // The config.js env-var mapping and the CDN pins live in ./frontend-config.js
-  // (their own file so a test can run the real configuration into a temp directory).
-  ...frontendConfig,
+    // The config.js env-var mapping and the CDN pins live in ./frontend-config.js
+    // (their own file so a test can run the real configuration into a temp directory).
+    ...frontendConfig,
+    stylesheets: [{ href: 'assets/tailwind.css', css: styles.css }],
+  });
+  copyFontFiles(result.dest, styles.fontFiles);
+  console.log(`[build-frontend] Copied ${styles.fontFiles.length} font files → ${path.basename(result.dest)}/vendor/fonts/`);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
 });
