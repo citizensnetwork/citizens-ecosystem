@@ -23,9 +23,10 @@
  *   6. optionally (`browserBundles`), bundle + hash more real-ESM entry files
  *      of the host app (Connect's engine world), each loaded where its own
  *      <script> tag stands in index.html
- *   7. optionally (`stylesheets`), write stylesheets the host generated (Connect's
- *      compiled Tailwind) as content-hashed files, each linked where its own
- *      placeholder <link> stands in index.html
+ *   7. optionally (`stylesheets`, `scripts`), write files the host generated or vendored
+ *      (Connect's compiled Tailwind; its self-hosted React, supabase-js and trimmed lucide)
+ *      as content-hashed files, each loaded where its own placeholder <link> or
+ *      <script src> stands in index.html
  *
  * Before any of that, the CDN <script> tags of the host's `sriPackages` are
  * checked against the lockfile-installed npm packages (exact version + SRI
@@ -62,15 +63,21 @@ const BROWSER_BUNDLE_TAG_RE =
   /^([ \t]*)<script src="([a-z][a-z0-9-]*\.js)(?:\?v=[^"]*)?"><\/script>$/gm;
 /** A content-hashed output of one entry: `engine-world.<hash>.js` → `engine-world.js`. */
 const HASHED_BROWSER_BUNDLE_RE = /^([a-z][a-z0-9-]*)\.[0-9a-f]{10}\.js$/;
-/** A generated stylesheet's placeholder href: a relative path of lower-case segments ending in `.css`. */
-const STYLESHEET_HREF_RE = /^(?:[a-z0-9][a-z0-9-]*\/)*[a-z][a-z0-9-]*\.css$/;
-/** A content-hashed stylesheet output: `tailwind.<hash>.css` → `tailwind`. */
-const HASHED_STYLESHEET_RE = /^([a-z][a-z0-9-]*)\.[0-9a-f]{10}\.css$/;
-/** Opening <link> tags, any case (attributes only). */
-const LINK_TAG_RE = /<link\b([^>]*)>/gi;
 
 /** Opening <script> tags, any case (attributes only — bodies are never inspected). */
 const SCRIPT_OPEN_TAG_RE = /<script\b([^>]*)>/gi;
+/** A generated file's placeholder path: relative, lower-case segments, ending in `.css` or `.js`. */
+const GENERATED_PATH_RE = {
+  css: /^(?:[a-z0-9][a-z0-9-]*\/)*[a-z][a-z0-9-]*\.css$/,
+  js: /^(?:[a-z0-9][a-z0-9-]*\/)*[a-z][a-z0-9-]*\.js$/,
+};
+/** Opening <link> tags, any case (attributes only). */
+const LINK_TAG_RE = /<link\b([^>]*)>/gi;
+/** How each kind of generated file is loaded: the option, the tag and the attribute that names the file. */
+const GENERATED_KINDS = {
+  css: { option: 'stylesheets', key: 'href', body: 'css', tagRe: LINK_TAG_RE, tag: 'link' },
+  js: { option: 'scripts', key: 'src', body: 'code', tagRe: SCRIPT_OPEN_TAG_RE, tag: 'script' },
+};
 /** A whole external <script …></script> element that declares a production twin. */
 const PROD_TWIN_TAG_RE = /<script\b([^>]*\bdata-prod-[^>]*)>\s*<\/script\s*>/gi;
 /** HTML attributes as the frontends write them: bare booleans or double-quoted values. */
@@ -351,34 +358,64 @@ function cleanHashedOutputs(dest, browserBundles = []) {
 }
 
 /**
- * Write each generated stylesheet as `<dir>/<name>.<hash>.css` beside its placeholder path, removing the
- * hashed copies of earlier builds first. Returns { placeholder href → hashed href }.
+ * Write each generated file as `<dir>/<name>.<hash>.<ext>` beside its placeholder path, removing the hashed
+ * copies of earlier builds first. `items` are [placeholder path, content]. Returns { placeholder → hashed path }.
  */
-function writeStylesheets(dest, stylesheets) {
+function writeGenerated(dest, items, ext) {
   const files = {};
-  for (const { href, css } of stylesheets) {
-    const dir = path.posix.dirname(href);
-    const name = path.posix.basename(href, '.css');
+  const stale =
+    ext === 'css'
+      ? /^([a-z][a-z0-9-]*)\.[0-9a-f]{10}\.css$/
+      : /^([a-z][a-z0-9-]*)\.[0-9a-f]{10}\.js$/;
+  for (const [ref, content] of items) {
+    const dir = path.posix.dirname(ref);
+    const name = path.posix.basename(ref, `.${ext}`);
     const outDir = path.join(dest, ...dir.split('/'));
     fs.mkdirSync(outDir, { recursive: true });
     for (const old of fs.readdirSync(outDir)) {
-      const match = HASHED_STYLESHEET_RE.exec(old);
+      const match = stale.exec(old);
       if (match && match[1] === name) fs.unlinkSync(path.join(outDir, old));
     }
-    const filename = `${name}.${hashOf(css)}.css`;
-    fs.writeFileSync(path.join(outDir, filename), css);
-    files[href] = dir === '.' ? filename : `${dir}/${filename}`;
+    const filename = `${name}.${hashOf(content)}.${ext}`;
+    fs.writeFileSync(path.join(outDir, filename), content);
+    files[ref] = dir === '.' ? filename : `${dir}/${filename}`;
   }
   return files;
 }
 
-/** How many <link> tags of the page point at `href` (exactly, attribute compared, never pattern-built). */
-function countLinksTo(html, href) {
+/** How many tags of one kind point at `ref` (exactly, attribute compared, never pattern-built). */
+function countTagsTo(html, kind, ref) {
+  const { tagRe, key } = GENERATED_KINDS[kind];
   let count = 0;
-  for (const [, attrs] of html.matchAll(LINK_TAG_RE)) {
-    if (attrValue(parseAttrs(attrs), 'href') === href) count += 1;
+  for (const [, attrs] of html.matchAll(tagRe)) {
+    if (attrValue(parseAttrs(attrs), key) === ref) count += 1;
   }
   return count;
+}
+
+/** Fail unless the page loads each placeholder exactly once. */
+function assertPlaceholders(html, kind, refs) {
+  const { key, tag } = GENERATED_KINDS[kind];
+  for (const ref of refs) {
+    const count = countTagsTo(html, kind, ref);
+    if (count !== 1) {
+      throw new Error(
+        `[frontend-build] index.html must load the generated file ${ref} with exactly one <${tag} ${key}="${ref}"> (found ${count})`,
+      );
+    }
+  }
+}
+
+/** Point each placeholder tag at its hashed file (pure). */
+function swapPlaceholders(html, kind, files) {
+  const { tagRe, key } = GENERATED_KINDS[kind];
+  assertPlaceholders(html, kind, Object.keys(files));
+  return html.replace(tagRe, (tag, attrs) => {
+    const ref = attrValue(parseAttrs(attrs), key);
+    return ref !== undefined && Object.hasOwn(files, ref)
+      ? tag.replace(`${key}="${ref}"`, () => `${key}="${files[ref]}"`)
+      : tag;
+  });
 }
 
 /** Recursive copy; `skip` (a Set of names) applies to the top level only. */
@@ -506,8 +543,9 @@ function buildAuthClient({ esbuild, srcDir, dest }) {
  * without a `<base>` tag is left alone: its relative URLs already resolve
  * against the directory it was served from.
  *
- * `stylesheetFiles` ({ "assets/tailwind.css": "assets/tailwind.<hash>.css" }) points each
- * placeholder <link> at its hashed file; each placeholder must be linked exactly once.
+ * `stylesheetFiles` ({ "assets/tailwind.css": "assets/tailwind.<hash>.css" }) and `scriptFiles`
+ * ({ "vendor/react.js": "vendor/react.<hash>.js" }) point each placeholder <link> or <script src>
+ * at its hashed file; each placeholder must be loaded exactly once.
  */
 function rewriteIndexHtml(
   html,
@@ -517,23 +555,13 @@ function rewriteIndexHtml(
     capacitorBridgeFile,
     browserBundleFiles = {},
     stylesheetFiles = {},
+    scriptFiles = {},
     basePath = '',
   },
 ) {
   assertBasePath(basePath);
-  for (const [href, hashed] of Object.entries(stylesheetFiles)) {
-    const count = countLinksTo(html, href);
-    if (count !== 1) {
-      throw new Error(
-        `[frontend-build] index.html must link the generated stylesheet ${href} with exactly one <link href="${href}"> (found ${count})`,
-      );
-    }
-    html = html.replace(LINK_TAG_RE, (tag, attrs) =>
-      attrValue(parseAttrs(attrs), 'href') === href
-        ? tag.replace(`href="${href}"`, () => `href="${hashed}"`)
-        : tag,
-    );
-  }
+  html = swapPlaceholders(html, 'css', stylesheetFiles);
+  html = swapPlaceholders(html, 'js', scriptFiles);
   // Each browser bundle loads where its own tag stands, so the page decides the order.
   const found = new Map(Object.keys(browserBundleFiles).map((name) => [name, 0]));
   html = html.replace(BROWSER_BUNDLE_TAG_RE, (tag, indent, name) => {
@@ -686,23 +714,25 @@ function assertOptions(options) {
       '[frontend-build] options.browserBundles must list distinct top-level entry files such as "engine-world.js" (lower-case letters, digits and hyphens; not auth-client.js, capacitor-bridge.js or config.js)',
     );
   }
-  const { stylesheets } = options;
-  if (
-    stylesheets !== undefined &&
-    (!Array.isArray(stylesheets) ||
-      new Set(stylesheets.map((s) => s && s.href)).size !== stylesheets.length ||
-      stylesheets.some(
-        (s) =>
-          !s ||
-          typeof s.href !== 'string' ||
-          !STYLESHEET_HREF_RE.test(s.href) ||
-          typeof s.css !== 'string' ||
-          s.css.length === 0,
-      ))
-  ) {
-    throw new TypeError(
-      '[frontend-build] options.stylesheets must list { href, css } with distinct relative hrefs such as "assets/tailwind.css" (lower-case segments) and non-empty css',
-    );
+  for (const [ext, { option, key, body }] of Object.entries(GENERATED_KINDS)) {
+    const list = options[option];
+    if (
+      list !== undefined &&
+      (!Array.isArray(list) ||
+        new Set(list.map((s) => s && s[key])).size !== list.length ||
+        list.some(
+          (s) =>
+            !s ||
+            typeof s[key] !== 'string' ||
+            !GENERATED_PATH_RE[ext].test(s[key]) ||
+            typeof s[body] !== 'string' ||
+            s[body].length === 0,
+        ))
+    ) {
+      throw new TypeError(
+        `[frontend-build] options.${option} must list { ${key}, ${body} } with distinct relative paths such as "${ext === 'css' ? 'assets/tailwind.css' : 'vendor/react.js'}" (lower-case segments) and non-empty ${body}`,
+      );
+    }
   }
   for (const v of configVars) {
     if (v.validate !== undefined && !Object.hasOwn(VALIDATORS, v.validate)) {
@@ -741,6 +771,7 @@ function buildFrontend(options) {
     basePath = '',
     browserBundles = [],
     stylesheets = [],
+    scripts = [],
     env = process.env,
     log = console.log,
     warn = console.warn,
@@ -766,14 +797,16 @@ function buildFrontend(options) {
   const html = fs.readFileSync(path.join(srcDir, 'index.html'), 'utf8');
   const sriVerified = verifyCdnIntegrity(html, { rootDir, packages: sriPackages });
   assertNoDevelopmentScripts(swapProductionTwins(html));
-  for (const { href } of stylesheets) {
-    const count = countLinksTo(html, href);
-    if (count !== 1) {
-      throw new Error(
-        `[frontend-build] index.html must link the generated stylesheet ${href} with exactly one <link href="${href}"> (found ${count})`,
-      );
-    }
-  }
+  assertPlaceholders(
+    html,
+    'css',
+    stylesheets.map((s) => s.href),
+  );
+  assertPlaceholders(
+    html,
+    'js',
+    scripts.map((s) => s.src),
+  );
   // config.js. Web: API_BASE_URL is empty when the frontend is served from the
   // same domain as the API (the standard Vercel deployment topology). Mobile:
   // absolute production API base, env-first with local-config fallback for the
@@ -790,7 +823,16 @@ function buildFrontend(options) {
   for (const name of browserBundles) {
     browserBundleFiles[name] = buildBrowserBundle({ esbuild, srcDir, dest, name });
   }
-  const stylesheetFiles = writeStylesheets(dest, stylesheets);
+  const stylesheetFiles = writeGenerated(
+    dest,
+    stylesheets.map((s) => [s.href, s.css]),
+    'css',
+  );
+  const scriptFiles = writeGenerated(
+    dest,
+    scripts.map((s) => [s.src, s.code]),
+    'js',
+  );
 
   fs.writeFileSync(
     path.join(dest, 'index.html'),
@@ -800,6 +842,7 @@ function buildFrontend(options) {
       capacitorBridgeFile,
       browserBundleFiles,
       stylesheetFiles,
+      scriptFiles,
       basePath: webBasePath,
     }),
   );
@@ -816,8 +859,8 @@ function buildFrontend(options) {
   for (const [name, file] of Object.entries(browserBundleFiles)) {
     log(`[build-frontend] Bundled ${name} → ${file}`);
   }
-  for (const [href, file] of Object.entries(stylesheetFiles)) {
-    log(`[build-frontend] Wrote ${href} → ${file}`);
+  for (const [ref, file] of Object.entries({ ...stylesheetFiles, ...scriptFiles })) {
+    log(`[build-frontend] Wrote ${ref} → ${file}`);
   }
 
   if (mobile && mobileRequiredKeys.some((k) => !config[k])) {
@@ -844,6 +887,7 @@ function buildFrontend(options) {
     capacitorBridgeFile,
     browserBundleFiles,
     stylesheetFiles,
+    scriptFiles,
     config,
     sriVerified,
   };

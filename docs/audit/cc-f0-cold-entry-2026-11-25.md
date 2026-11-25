@@ -65,3 +65,16 @@ Re-measure after each PR with `node apps/connect/scripts/measure-cold-entry.mjs`
 | F1 (compiled Tailwind, self-hosted fonts, boot screen, lucide after it, MapLibre deferred) | **0.62 s**        | **3.13 to 3.19 s** |
 
 First paint is inside its 1.5 s budget, and CI enforces it from F1. The guest button is still just over 3 s; most of what remains is the whole lucide icon set (112 KB) and three CDN origins, which F2 removes. CI enforces the guest budget from F2. Re-measure live after each deploy with `node apps/connect/scripts/measure-cold-entry.mjs`.
+
+## After F2 (local e2e, 2026-11-25)
+
+The same profile and spec, one worker:
+
+| Build                                                                                                                                                                              | Cold: first paint  | Cold: guest button |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | ------------------ |
+| F1                                                                                                                                                                                 | 0.62 s             | 3.13 to 3.19 s     |
+| F2 (React, ReactDOM, supabase-js and lucide from our own origin; lucide trimmed from about 2,000 icons to 134, 112 KB to 7 KB on the wire; content-hashed files cached for a year) | **0.59 to 0.61 s** | **2.64 to 2.66 s** |
+
+Both budgets are now enforced in CI. The page names no other origin for its scripts, styles or fonts.
+
+**What is left is CPU, not network.** A warm load, with every file in the cache, is about as slow as a cold one (2.7 s). On a phone CPU four times slower than a laptop, the time goes into parsing and running the app bundle (about 700 KB raw) before React draws the landing. The next real gain would come from splitting that bundle so the landing does not wait for every screen. That's not part of this plan; noted for later.

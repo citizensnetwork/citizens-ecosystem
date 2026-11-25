@@ -181,6 +181,7 @@
   function lucideChildren(name) {
     const lib = window.lucide && window.lucide.icons;
     let node = lib && lib[name];
+    if (lib && !Array.isArray(node) && window.ccMissingIcon) window.ccMissingIcon(name); // see icons.jsx
     if (!node || !Array.isArray(node)) return null;
     if (typeof node[0] === 'string') node = Array.isArray(node[2]) ? node[2] : [];
     return node.filter((c) => Array.isArray(c) && typeof c[0] === 'string');

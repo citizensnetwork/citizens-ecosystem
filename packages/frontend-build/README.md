@@ -31,6 +31,9 @@ What one `buildFrontend()` call does for an app:
    one `<link href="assets/tailwind.css">` stands. The host compiles the CSS (this package stays
    dependency-free); the build fails before writing anything if the page links the placeholder
    zero times or more than once.
+8. Optional `scripts` (Connect: React, react-dom, supabase-js and its trimmed lucide,
+   `[{ src: "vendor/react.js", code }]`): the same for scripts, served from our own origin
+   as `vendor/react.<hash>.js` where the page's one `<script src="vendor/react.js">` stands.
 
 ## Usage (a host app's `scripts/build-frontend.js`)
 

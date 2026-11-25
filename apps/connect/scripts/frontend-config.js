@@ -60,12 +60,8 @@ module.exports = {
   mobileRequiredKeys: ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'MAPTILER_KEY'],
   mobileMissingLabel: 'Supabase/MapTiler',
 
-  // index.html loads supabase-js from jsDelivr, where OSV-Scanner can't see
-  // it. The build fails unless the tag pins the exact lockfile version with an
-  // SRI hash matching the installed package's bytes — the same job
-  // assertMaplibreVendorInSync does for the vendored map runtime.
-  // React/ReactDOM can't be listed: npm React is 19 (no UMD build) while the
-  // page loads the 18.3.1 UMD from unpkg — their hashes are hand-verified
-  // (see index.html). Same split Vision already uses.
-  sriPackages: ['@supabase/supabase-js'],
+  // No CDN scripts to pin (QA plan PR F2, 2026-11-25): React, ReactDOM, supabase-js and lucide are served from our
+  // own origin, copied from the lockfile-installed packages by ./frontend-vendor.js, so OSV-Scanner sees exactly what
+  // the browser runs. The SRI check (sriPackages) stays available in @citizens/frontend-build for a CDN tag that comes
+  // back; the build already fails on any development build that would ship.
 };

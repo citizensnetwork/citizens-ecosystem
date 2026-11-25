@@ -589,6 +589,28 @@ test.describe("The server serves the app under the prefix and nowhere else", () 
     expect((await request.get(`${BASE}/vendor/maplibre-gl/maplibre-gl.css`)).status()).toBe(200);
   });
 
+  test("content-hashed files are cached for a year; the page, config.js and unhashed files always revalidate (PR F2)", async ({ request }) => {
+    const html = await (await request.get(`${BASE}/`)).text();
+    const local = [...html.matchAll(/(?:src|href)="([^"]+)"/g)]
+      .map((m) => m[1])
+      .filter((u) => !/^(?:[a-z]+:|\/\/|#)/.test(u) && !u.startsWith("manifest") && !u.startsWith("icons/"));
+    const hashed = local.filter((u) => /\.[0-9a-f]{10}\.(?:js|css)$/.test(u));
+    // the bundle, auth-client, the bridge, the world, compiled Tailwind and the four vendored libraries
+    expect(hashed.length).toBeGreaterThanOrEqual(9);
+    const css = await (await request.get(`${BASE}/${hashed.find((u) => u.endsWith(".css"))}`)).text();
+    const font = /url\(\.\.\/(vendor\/fonts\/[a-z0-9-]+\.[0-9a-f]{10}\.woff2)\)/.exec(css)?.[1];
+    expect(font, "a self-hosted font in the compiled stylesheet").toBeTruthy();
+    for (const u of [...hashed, font!]) {
+      const res = await request.get(`${BASE}/${u}`);
+      expect(res.status(), u).toBe(200);
+      expect(res.headers()["cache-control"], u).toBe("public, max-age=31536000, immutable");
+    }
+    for (const u of ["", "config.js", "maplibre-loader.js", "vendor/maplibre-gl/maplibre-gl.css", ...local.filter((u) => !hashed.includes(u))]) {
+      const res = await request.get(`${BASE}/${u}`);
+      expect(res.headers()["cache-control"] ?? "", u || "the page").not.toContain("immutable");
+    }
+  });
+
   test("the home-screen app's manifest, icons and start address all resolve under the prefix", async ({ request, baseURL }) => {
     const html = await (await request.get(`${BASE}/`)).text();
     const base = new URL(/<base href="([^"]+)"/.exec(html)![1], baseURL);
