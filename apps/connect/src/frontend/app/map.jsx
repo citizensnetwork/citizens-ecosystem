@@ -387,6 +387,49 @@
       P.layoutOnIdle({ markers: markerObjs.current, project: (ll) => mp.project(ll), selectedId: selectedRef.current, showLabels: z >= ZOOM_LABELS });
     }, []);
 
+    // Keyboard and screen-reader reach (QA 2026-11-25, CCQA-0004). Only pins a sighted person can see are Tab stops
+    // (MapV2Pins.chooseTabStops), worked out from the live layout: a pin counts as shown when it is displayed, its centre
+    // is inside the map and the window, and the topmost element there is the pin itself (so a pin under the Explore
+    // panel, a sheet or the nav is not). Run when the map settles, after pins change, and just before every Tab press,
+    // so a panel that opened since is taken into account. Markers are never rebuilt for this.
+    const [inView, setInView] = React.useState(null);
+    const syncTabStops = React.useCallback(() => {
+      const mp = mapRef.current;
+      const el = containerRef.current;
+      const P = window.MapV2Pins;
+      if (!mp || !el || !P || !P.chooseTabStops || typeof document.elementFromPoint !== 'function') return 0;
+      const box = el.getBoundingClientRect();
+      const pad = framePadding(el);
+      const top = box.top + (typeof pad === 'object' ? pad.top : 0);
+      const bottom = box.bottom - (typeof pad === 'object' ? pad.bottom : 0);
+      const mid = { x: box.left + box.width / 2, y: (top + bottom) / 2 };
+      const vw = window.innerWidth || box.right;
+      const vh = window.innerHeight || box.bottom;
+      const active = document.activeElement;
+      const entries = [];
+      markerObjs.current.forEach((mk, id) => {
+        const w = mk.getElement();
+        if (!w) return;
+        let shown = false;
+        let dist = Infinity;
+        if (w.style.display !== 'none') {
+          const r = w.getBoundingClientRect();
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          const inside = r.width > 0 && cx >= Math.max(box.left, 0) && cx <= Math.min(box.right, vw) && cy >= Math.max(box.top, 0) && cy <= Math.min(box.bottom, vh);
+          if (inside) {
+            const hit = document.elementFromPoint(cx, cy);
+            shown = !!hit && w.contains(hit);
+            dist = Math.hypot(cx - mid.x, cy - mid.y);
+          }
+        }
+        entries.push({ id, shown, dist, selected: selectedRef.current === id, focused: !!active && w.contains(active) });
+      });
+      const stops = P.chooseTabStops(entries);
+      markerObjs.current.forEach((mk, id) => P.applyTabStop(mk.getElement(), stops.has(id)));
+      return entries.filter((e) => e.shown).length;
+    }, []);
+
     // init the map once — deferred until window.maplibregl is actually ready
     // (see whenMaplibreReady above); everything from here down is unchanged
     // from the old synchronous-load version, just wrapped in `init()` so it
@@ -601,6 +644,33 @@
       layoutV2();
     }, [markers, filterCategory, selectedId, litId, applyZoomGates, layoutV2, mapReady]);
 
+    // Keep the Tab stops and the spoken count in step with what is on the screen (see syncTabStops above).
+    useEffect(() => {
+      const mp = mapRef.current;
+      if (!mp) return undefined;
+      let frame = 0;
+      let speak = 0;
+      const settle = () => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+          const n = syncTabStops();
+          clearTimeout(speak);
+          // a short pause, so panning past many places is one sentence, not a stream
+          speak = setTimeout(() => setInView((prev) => (prev === n ? prev : n)), 1200);
+        });
+      };
+      const onKey = (e) => { if (e.key === 'Tab') syncTabStops(); };
+      settle();
+      mp.on('moveend', settle);
+      document.addEventListener('keydown', onKey, true);
+      return () => {
+        cancelAnimationFrame(frame);
+        clearTimeout(speak);
+        mp.off('moveend', settle);
+        document.removeEventListener('keydown', onKey, true);
+      };
+    }, [mapReady, markers, filterCategory, selectedId, syncTabStops]);
+
     // Map v2: the sheet tells the map how much of it the sheet covers; the map eases the selected pin into the
     // middle of what is left visible (tracker E5: about 27 % from the top with the sheet at 46 %). An imperative
     // call rather than props, so a sheet opening never re-renders the whole map screen a second time; one frame
@@ -766,10 +836,15 @@
       return () => { apiRef.current = null; };
     }, [apiRef]);
 
-    return React.createElement('div', {
-      ref: containerRef, className: 'absolute inset-0 cc-map',
-      style: { background: 'var(--map-bg)' },
-    });
+    const reach = window.MapV2Strings && window.MapV2Strings.pin;
+    return React.createElement(React.Fragment, null,
+      React.createElement('div', {
+        ref: containerRef, className: 'absolute inset-0 cc-map',
+        style: { background: 'var(--map-bg)' },
+      }),
+      // what a screen reader hears when the map settles: how many listings are in view (polite, never interrupts)
+      React.createElement('p', { role: 'status', 'aria-live': 'polite', className: 'sr-only', 'data-cc': 'map-in-view' },
+        inView === null || !reach ? '' : reach.inView(inView)));
   }
 
   // ── LocationPicker — bidirectional address ↔ pin widget ─────────────

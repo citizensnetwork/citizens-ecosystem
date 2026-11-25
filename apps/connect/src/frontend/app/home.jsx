@@ -531,6 +531,21 @@
     };
     const ideaMarkers = ideas.filter((i) => i.status === 'voting').filter(matches).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY, createdAt: i.createdAt }));
     return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-crown': clean ? undefined : '', 'data-explore-min': (!clean && !panelOpen) ? '' : undefined },
+      // QA 2026-11-25 (CCQA-0004): the first Tab stop skips the map. It lands on the list in the Explore panel when there is
+      // one, else on the nav, else opens Explore, the list of everything; the map is never the only way in.
+      React.createElement('a', {
+        href: '#', 'data-cc': 'skip-map',
+        className: 'sr-only focus:not-sr-only focus:absolute focus:z-[80] focus:top-3 focus:left-3 focus:px-3 focus:py-2 focus:rounded-xl focus:bg-card focus:text-foreground focus:text-sm focus:font-semibold focus:shadow-lg',
+        onClick: (e) => {
+          e.preventDefault();
+          const root = rootRef.current;
+          const focusable = 'button:not([disabled]), a[href], input, [tabindex="0"]';
+          const inPanel = root && root.querySelector("[data-mv2='explore']");
+          const target = (inPanel && inPanel.querySelector(focusable)) || document.querySelector("[data-mv2='nav-toggle'] " + focusable.split(', ').join(", [data-mv2='nav-toggle'] "));
+          if (target) target.focus();
+          else if (app && app.go) app.go('explore');
+        },
+      }, (window.MapV2Strings && window.MapV2Strings.pin && window.MapV2Strings.pin.skipMap) || ''),
       // A tap on empty map (not a pan, not a map control) goes back to level 0 from any level.
       React.createElement('div', {
         className: 'absolute inset-0',
