@@ -890,6 +890,36 @@
       deleting && h(DeleteCitizenModal, { row: deleting, onClose: () => setDeleting(null), onDone: () => handleDeleted(deleting) }));
   }
 
+  // Pins to check (QA 2026-11-25, CCQA-0009): every listing whose pin is far from the city its own address names, outside the
+  // country, or missing while it has an address. Worked out here from the lists the app already holds (location-lib.jsx), so it
+  // needs no server route and no migration. A fix is made by the owner (or an admin) editing the listing, never by a script.
+  function PinsToCheck() {
+    const { events, places, contributors, go } = window.useApp();
+    const L = window.CCLocation;
+    const rows = []
+      .concat((events || []).map((it) => ({ it, kind: 'Event', page: 'event', name: it.title })))
+      .concat((places || []).map((it) => ({ it, kind: 'Place', page: 'place', name: it.name })))
+      .concat((contributors || []).map((it) => ({ it, kind: W.term('partner'), page: null, name: it.name })))
+      .filter((r) => r.it && L.needsCheck(r.it))
+      .map((r) => ({ ...r, trust: L.pinTrust(r.it) }));
+    const order = { far: 0, outside: 1, none: 2 };
+    rows.sort((a, b) => (order[a.trust.level] - order[b.trust.level]) || ((b.trust.km || 0) - (a.trust.km || 0)));
+    return h('section', { 'data-cc': 'pins-to-check', 'aria-labelledby': 'pins-to-check-title', className: 'mt-4 p-4 rounded-2xl bg-card border border-border' },
+      h('div', { className: 'flex items-center gap-2 mb-1' },
+        h(Icon, { name: 'MapPinOff', size: 16, className: 'text-gold-dark' }),
+        h('h3', { id: 'pins-to-check-title', className: 'text-foreground text-base' }, 'Pins to check'),
+        h('span', { className: 'ml-auto text-xs font-bold text-muted-foreground' }, rows.length)),
+      h('p', { className: 'text-xs text-muted-foreground mb-3' }, 'Listings whose pin is far from the city their address names, or not on the map at all. Ask the owner for the exact address, then correct the pin in the listing\u2019s edit form.'),
+      rows.length === 0
+        ? h('p', { className: 'text-sm text-muted-foreground' }, 'Every pin agrees with its address.')
+        : h('ul', { className: 'space-y-2' }, rows.map((r) => h('li', { key: r.page + ':' + r.it.id, className: 'flex items-start gap-3 p-3 rounded-xl bg-white/60 border border-border' },
+          h('div', { className: 'min-w-0 flex-1' },
+            h('p', { className: 'text-sm font-semibold text-foreground truncate' }, r.name || 'Untitled'),
+            h('p', { className: 'text-[11px] text-muted-foreground' }, r.kind + ' \u00b7 ' + (r.it.address || r.it.location || '')),
+            h('p', { className: 'text-[11px] font-semibold text-gold-dark mt-0.5' }, L.describeTrust(r.trust))),
+          r.page && h(Button, { variant: 'outline', size: 'sm', onClick: () => go(r.page, { id: r.it.id }) }, 'Open')))));
+  }
+
   function AdminPage() {
     const { isAdmin, applications, reviewApplication, go, realUser, nav, toast } = window.useApp();
     // The tab is part of the address (/admin/contributors); replaced rather than pushed (see DashboardPage).
@@ -987,6 +1017,7 @@
             : filtered.map((a) => h(AppCard, { key: a.id, app: a, onReview: handleReview }))),
 
         tab === 'overview' && h(window.AdminOverview, { setTab }),
+        tab === 'overview' && h(PinsToCheck),
 
         tab === 'contributors' && h(AdminListings, { createOpen: createOpen, onCreateOpenChange: setCreateOpen }),
 

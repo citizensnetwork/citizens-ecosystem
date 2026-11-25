@@ -256,7 +256,7 @@ describe("POST /api/intake/google-form — creating the listing", () => {
 
   it("falls back to the script's geocode, then MapTiler, then a warning", async () => {
     const fetchSpy = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ features: [{ center: [28.0, -26.1] }] }), { status: 200 }),
+      new Response(JSON.stringify({ features: [{ center: [28.0, -26.1], relevance: 0.9 }] }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchSpy);
     const addressOnly = { ...row, maps_link: "https://maps.google.com/?q=18+Oak+Avenue" };
@@ -269,9 +269,23 @@ describe("POST /api/intake/google-form — creating the listing", () => {
     expect(rpcArgs()).toMatchObject({ _physical_latitude: -26.1, _physical_longitude: 28.0 });
     expect(String(fetchSpy.mock.calls[0][0])).toContain("api.maptiler.com/geocoding/");
 
+    const asked = new URL(String(fetchSpy.mock.calls[0][0]));
+    expect(asked.searchParams.get("limit")).toBe("5");
+    expect(asked.searchParams.get("proximity")).toBe("28.0473,-26.2041"); // the address names Johannesburg
+
     fetchSpy.mockResolvedValueOnce(new Response("{}", { status: 403 }));
     const res = await POST(signedReq(addressOnly));
     expect(res.status).toBe(200);
+    expect(rpcArgs()).toMatchObject({ _physical_latitude: null, _physical_longitude: null });
+    expect((await res.json()).warnings[0]).toMatch(/No map pin/);
+  });
+
+  it("never takes a geocoder hit far from the city the address names (QA 2026-11-25): no pin and a warning", async () => {
+    // A confident hit near Durban for a Johannesburg address: the first hit used to become the pin.
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ features: [{ center: [31.0679, -29.7128], relevance: 1 }] }), { status: 200 }),
+    ));
+    const res = await POST(signedReq({ ...row, maps_link: "https://maps.google.com/?q=18+Oak+Avenue" }));
     expect(rpcArgs()).toMatchObject({ _physical_latitude: null, _physical_longitude: null });
     expect((await res.json()).warnings[0]).toMatch(/No map pin/);
   });

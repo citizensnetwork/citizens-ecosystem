@@ -781,19 +781,28 @@
   //  A `lastResolvedRef` guard against the type→geocode→reverse-geocode→
   //  refill loop: we only re-geocode typed text that doesn't already match
   //  the address we ourselves just resolved.
-  //  value: { address, lat, lng } — lat/lng may be null (no pin placed yet).
+  //  value: { address, lat, lng, needsConfirm? } — lat/lng may be null (no pin placed yet).
   //  onChange(patch) receives only the field(s) that changed.
-  function LocationPicker({ value, onChange, height }) {
+  //  confirmMode (event and place forms, QA 2026-11-25): a typed address flies to the best guess even when the geocoder is
+  //  not sure, and marks it needsConfirm: true; the form will not publish until the owner drags the map to the venue or
+  //  presses "This is the right spot". Without confirmMode only a confident hit moves the pin (location-lib.jsx).
+  //  An existing pin is never replaced by re-placing the SAME words (on an edit, or when a wizard step remounts this).
+  function LocationPicker({ value, onChange, height, confirmMode }) {
     const h = React.createElement;
     const { useRef, useEffect, useState } = React;
+    const hasPin = typeof value.lat === 'number' && typeof value.lng === 'number';
     const containerRef = useRef(null);
     const mapRef = useRef(null);
     const onChangeRef = useRef(onChange);
     onChangeRef.current = onChange;
+    const confirmRef = useRef(!!confirmMode);
+    confirmRef.current = !!confirmMode;
+    const doubtRef = useRef(!!value.needsConfirm);
+    doubtRef.current = !!value.needsConfirm;
     const suppressMoveRef = useRef(false);
-    const lastResolvedRef = useRef('');
+    const draggedRef = useRef(false);
+    const lastResolvedRef = useRef(hasPin ? (value.address || '').trim() : '');
     const [busy, setBusy] = useState(false); // false | 'geocode' | 'reverse' | 'locate'
-    const hasPin = typeof value.lat === 'number' && typeof value.lng === 'number';
 
     useEffect(() => {
       if (mapRef.current || !containerRef.current) return;
@@ -814,10 +823,14 @@
         });
         map.addControl(mapTilerLogoControl(), 'bottom-left');
         map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+        // A drag is the owner putting the pin where the venue is: that settles any "is this the right spot?".
+        map.on('dragstart', () => { draggedRef.current = true; });
         map.on('moveend', () => {
           if (suppressMoveRef.current) { suppressMoveRef.current = false; return; }
           const c = map.getCenter();
-          onChangeRef.current({ lat: c.lat, lng: c.lng });
+          const settled = draggedRef.current && confirmRef.current;
+          draggedRef.current = false;
+          onChangeRef.current(settled ? { lat: c.lat, lng: c.lng, needsConfirm: false } : { lat: c.lat, lng: c.lng });
           setBusy('reverse');
           window.reverseGeocode(c.lat, c.lng).then((addr) => {
             setBusy(false);
@@ -859,9 +872,12 @@
       if (!addr || addr === lastResolvedRef.current) return;
       const t = setTimeout(() => {
         setBusy('geocode');
-        window.geocodeAddress(addr).then((geo) => {
+        window.CCLocation.resolveLocation(addr, { near: window.viewCentre ? window.viewCentre() : null }).then((r) => {
           setBusy(false);
-          if (geo) { lastResolvedRef.current = addr; onChangeRef.current({ lat: geo.lat, lng: geo.lng }); }
+          if (r.status === 'ok') { lastResolvedRef.current = addr; onChangeRef.current({ lat: r.best.lat, lng: r.best.lng, needsConfirm: false }); }
+          else if (confirmRef.current && r.best) { lastResolvedRef.current = addr; onChangeRef.current({ lat: r.best.lat, lng: r.best.lng, needsConfirm: true }); }
+          // New words found nothing: a doubtful guess for the OLD words is dropped (a pin the owner set or confirmed stays).
+          else if (confirmRef.current && doubtRef.current) onChangeRef.current({ lat: null, lng: null, needsConfirm: false });
         });
       }, 800);
       return () => clearTimeout(t);
@@ -877,7 +893,15 @@
       );
     };
 
-    return h('div', { className: 'rounded-2xl overflow-hidden border border-border relative', style: { height: height || 190 } },
+    const doubt = !!(confirmMode && value.needsConfirm && hasPin);
+    const trust = doubt ? window.CCLocation.pinTrust({ lat: value.lat, lng: value.lng, address: value.address }) : null;
+    const confirmBox = doubt && h('div', { role: 'status', 'data-cc': 'pin-confirm', className: 'mt-2 p-3 rounded-xl border border-gold/50 bg-accent/60 text-xs leading-relaxed text-foreground' },
+      h('p', { className: 'font-semibold' }, 'Is this the right spot?'),
+      h('p', null, (trust && trust.level !== 'ok' ? window.CCLocation.describeTrust(trust) + ' ' : 'We are not sure the map found the right place. ')
+        + 'Drag the map until the pin sits on the venue, or confirm it.'),
+      h('button', { type: 'button', 'data-cc': 'pin-confirm-yes', onClick: () => onChangeRef.current({ needsConfirm: false }),
+        className: 'mt-2 px-3 py-1.5 rounded-lg border border-gold text-gold-dark font-semibold hover:bg-white/70' }, 'This is the right spot'));
+    return h(React.Fragment, null, h('div', { className: 'rounded-2xl overflow-hidden border border-border relative', style: { height: height || 190 } },
       h('div', { ref: containerRef, className: 'absolute inset-0', style: { background: 'var(--map-bg)' } }),
       !styleUrl() && h('div', { className: 'absolute inset-0 flex items-center justify-center text-center text-[11px] text-muted-foreground bg-accent/30 px-4' }, 'Map unavailable — MapTiler key not configured.'),
       // fixed center pin (the map moves under it, not the other way round)
@@ -895,7 +919,8 @@
       (busy === 'geocode' || busy === 'reverse') && h('div', { className: 'absolute left-2 top-2 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground flex items-center gap-1.5' },
         h('span', { className: 'w-2.5 h-2.5 rounded-full border-2 border-gold border-t-transparent spin' }),
         busy === 'geocode' ? 'Finding address…' : 'Reading location…'),
-      !hasPin && !busy && h('div', { className: 'absolute left-2 bottom-11 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground' }, 'Drag the map to drop your pin'));
+      !hasPin && !busy && h('div', { className: 'absolute left-2 bottom-11 px-2 py-1 rounded-lg bg-white/90 shadow-sm text-[10px] font-semibold text-muted-foreground' }, 'Drag the map to drop your pin')),
+      confirmBox);
   }
 
   // Exported so tests (and any future surface) assert against the SAME
