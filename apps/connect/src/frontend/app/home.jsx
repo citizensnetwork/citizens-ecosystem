@@ -478,6 +478,19 @@
       window.addEventListener('cc-rail-map', min);
       return () => window.removeEventListener('cc-rail-map', min);
     }, []);
+    // Province scale (founder, 2026-11-25): when the person zooms in from the country view to where events are drawn,
+    // the panel lifts one step and shows Where to…. Only the person's own zoom counts (not the app flying somewhere).
+    // Zooming further in leaves it up; a tap on empty map folds it as ever.
+    const bandRef = useRef(zoomBand);
+    const onZoomBand = (band, byPerson) => {
+      const was = bandRef.current;
+      bandRef.current = band;
+      setZoomBand(band);
+      // 'places' is province scale (map.jsx zoomBandFor): a pinch or a wheel from the country view passes through it
+      if (!byPerson || was !== 'none' || band !== 'places') return;
+      if (peekRef.current || searchOpen || focus || group || exploreMode !== 'rest') return;
+      setStripSignal((n) => n + 1);
+    };
     // The phone's top-left crown (founder, 2026-11-25): home and reset, every filter, search and carousel cleared.
     const resetHomeRef = useRef(resetHome);
     resetHomeRef.current = resetHome;
@@ -532,7 +545,7 @@
             setSheet(null); setSelected(id); setSelType(t); setLitId(null); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 }));
           },
           onDismissBubble: dismissBubble,
-          onZoomBandChange: setZoomBand,
+          onZoomBandChange: onZoomBand,
         })),
 
       // top: search bar stays its own width; category chips float below and scroll under/past the Find button

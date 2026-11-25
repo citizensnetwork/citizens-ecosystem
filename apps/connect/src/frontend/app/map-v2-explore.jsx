@@ -475,6 +475,18 @@
       const t = setTimeout(measure, 80);
       return () => clearTimeout(t);
     }, [props.children && props.children.length]);
+    // The chosen card comes to the middle of its row, whether a pin or a card chose it (founder, 2026-11-25).
+    useEffect(() => {
+      const el = scroller.current;
+      const id = props.selectedId;
+      if (!el || !id || typeof el.scrollTo !== 'function') return;
+      const card = el.querySelector('[data-explore-id="' + cssId(id) + '"]');
+      if (!card) return;
+      const row = el.getBoundingClientRect();
+      const box = card.getBoundingClientRect();
+      const left = Math.max(0, el.scrollLeft + (box.left - row.left) - (el.clientWidth - box.width) / 2);
+      el.scrollTo({ left: left, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+    }, [props.selectedId]);
     const nudge = (dir) => {
       const el = scroller.current;
       if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
@@ -758,6 +770,8 @@
     const onPanelDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (mode === 'rest') return;
+      // A finger on the open panel is the touch pull's (below): the browser's own scrolling would cancel this one.
+      if (mode === 'open' && e.pointerType === 'touch' && !(e.target.closest && e.target.closest("[data-mv2='explore-grab']"))) return;
       if (e.target.closest && e.target.closest("[data-mv2='explore-grab']")) return;
       // Where-to tiles own horizontal pan-x; only start a panel pull once the move is clearly vertical.
       if (mode === 'open') {
@@ -808,6 +822,74 @@
       else lower();
     };
     const onPanelUp = (e) => { finishPanelPull(e); };
+    // The open panel's content scrolls natively, and a native scroll cancels pointer drags. So a finger that goes down
+    // with the content at its top and moves down drags the panel itself (founder, 2026-11-25): it follows the finger,
+    // a flick lowers it at once, and a long pull takes it all the way down. Any other move is left to the scroll.
+    const openRef = useRef(open);
+    openRef.current = open;
+    const lowerRef = useRef(null);
+    lowerRef.current = (far) => { if (far && !desk) { setStage('rest'); return; } lower(); };
+    useEffect(() => {
+      const sc = scrollRef.current;
+      if (!sc) return undefined;
+      let t = null;
+      const start = (e) => {
+        t = null;
+        if (!openRef.current || e.touches.length !== 1) return;
+        if (sc.scrollTop > 0) return;
+        const p0 = e.touches[0];
+        t = { x: p0.clientX, y: p0.clientY, pulling: false, decided: false, dy: 0, trail: [[e.timeStamp || Date.now(), 0]] };
+      };
+      const move = (e) => {
+        if (!t) return;
+        const p0 = e.touches[0];
+        const dx = p0.clientX - t.x;
+        const dy = p0.clientY - t.y;
+        if (!t.decided) {
+          if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+          t.decided = true;
+          if (dy <= 0 || Math.abs(dx) > Math.abs(dy) || sc.scrollTop > 0) { t = null; return; }
+          t.pulling = true;
+          panelPull.current = null;
+        }
+        if (!t.pulling) return;
+        if (e.cancelable) e.preventDefault();
+        t.dy = Math.max(0, dy);
+        const now = e.timeStamp || Date.now();
+        t.trail.push([now, t.dy]);
+        if (t.trail.length > 6) t.trail.shift();
+        const el = root.current;
+        if (!el) return;
+        el.style.transition = 'none';
+        el.style.transform = panelX() + 'translateY(' + t.dy + 'px)';
+      };
+      const end = (e) => {
+        const g = t;
+        t = null;
+        if (!g || !g.pulling) return;
+        clearPanelDrag();
+        // only the last 100 ms count: a finger that stopped before lifting is not a flick
+        const last = (e && e.timeStamp) || Date.now();
+        const recent = g.trail.filter((p) => last - p[0] <= 100);
+        const a = recent[0];
+        const b = recent[recent.length - 1];
+        // px per ms, down is positive; a flick can land its moves in the same millisecond, which is as fast as it gets
+        const speed = a && b && b !== a ? (b[1] - a[1]) / Math.max(1, b[0] - a[0]) : 0;
+        const H = (root.current && root.current.offsetHeight) || 600;
+        if (g.dy > H * 0.55) lowerRef.current(true);
+        else if (speed > 0.45 || g.dy > 80) lowerRef.current(false);
+      };
+      sc.addEventListener('touchstart', start, { passive: true });
+      sc.addEventListener('touchmove', move, { passive: false });
+      sc.addEventListener('touchend', end);
+      sc.addEventListener('touchcancel', end);
+      return () => {
+        sc.removeEventListener('touchstart', start);
+        sc.removeEventListener('touchmove', move);
+        sc.removeEventListener('touchend', end);
+        sc.removeEventListener('touchcancel', end);
+      };
+    }, []);
     const onGrabUp = (e) => { finishPanelPull(e); };
     const onPanelCancel = () => { panelPull.current = null; clearPanelDrag(); };
     // The crown: with any filter on, it clears them all and goes home (the map screen snaps to the person's place);
@@ -854,16 +936,46 @@
       if (crownDragged.current) { crownDragged.current = false; return; }
       onCrown();
     };
-    // The phone's nudge under the nav (founder, 2026-11-25): a tap or a pull up shows the Where to… strip.
-    const nudgePull = useRef(null);
-    const onNudgeDown = (e) => { nudgePull.current = { y: e.clientY, id: e.pointerId }; };
-    const onNudgeUp = (e) => {
-      const p = nudgePull.current;
-      nudgePull.current = null;
-      if (p && p.id === e.pointerId && p.y - e.clientY > 24) { crownDragged.current = true; setStage('strip'); }
+    // The phone's nav and the nudge under it (founder, 2026-11-25): a stroke up steps the panel up (rest, Where to…,
+    // every row), a stroke down steps it back; a tap is still a tap. The end of the stroke is read from the document, so
+    // a finger that leaves the nav still counts, and the click a stroke would make is swallowed.
+    const navSwiped = useRef(false);
+    const stepPanel = (dir) => {
+      setMe('');
+      setDoor(false);
+      if (dir < 0) {
+        if (props.level && props.onLevelReset) { props.onLevelReset(); return; }
+        lower();
+        return;
+      }
+      if (props.peek) return;
+      if (mode === 'rest') setStage('strip');
+      else raise();
+    };
+    const onStrokeDown = (e) => {
+      if (!phone || open || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      navSwiped.current = false;
+      const s = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      const up = (ev) => {
+        if (ev.pointerId !== s.id) return;
+        document.removeEventListener('pointerup', up, true);
+        document.removeEventListener('pointercancel', up, true);
+        if (ev.type !== 'pointerup') return;
+        const dy = ev.clientY - s.y;
+        if (Math.abs(dy) < 24 || Math.abs(dy) < Math.abs(ev.clientX - s.x)) return;
+        navSwiped.current = true;
+        stepPanel(dy < 0 ? 1 : -1);
+      };
+      document.addEventListener('pointerup', up, true);
+      document.addEventListener('pointercancel', up, true);
+    };
+    const onStrokeClick = (e) => {
+      if (!navSwiped.current) return;
+      navSwiped.current = false;
+      e.preventDefault();
+      e.stopPropagation();
     };
     const onNudgeClick = () => {
-      if (crownDragged.current) { crownDragged.current = false; return; }
       setMe('');
       setStage('strip');
     };
@@ -878,7 +990,7 @@
       if (props.onOpen) props.onOpen(id, type, measuredFrom);
     };
     const cardDist = (str.peek && str.peek.dist) || distWords;
-    const cards = (id, list) => h(XRow, { id: id, list: list }, list.map((r) => h(XCard, {
+    const cards = (id, list) => h(XRow, { id: id, list: list, selectedId: props.selectedId }, list.map((r) => h(XCard, {
       key: id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
       groupWords: str.groups, distWords: cardDist,
       selected: props.selectedId === r.m.id, badge: str.selectedBadge,
@@ -1044,12 +1156,12 @@
       // nudge. Opened, it moves down to the foot as the sticky nav. One element, so it glides (transform only).
       phone && mode === 'rest' && !props.peek ? h('button', {
         type: 'button', 'data-mv2': 'explore-nudge', 'aria-label': P.nudge,
-        onPointerDown: onNudgeDown, onPointerUp: onNudgeUp, onClick: onNudgeClick,
-        onPointerCancel: () => { nudgePull.current = null; },
+        onPointerDown: onStrokeDown, onClickCapture: onStrokeClick, onClick: onNudgeClick,
       }, Icon ? h(Icon, { name: 'ChevronUp', size: 18 }) : null) : null,
       open || phone ? h('nav', {
         'data-mv2': 'explore-dock', 'aria-label': P.dock,
         'data-ride': phone && !open ? '' : undefined, 'data-rest': phone && mode === 'rest' ? '' : undefined,
+        onPointerDown: onStrokeDown, onClickCapture: onStrokeClick,
       },
         door && h('div', { 'data-mv2': 'dock-door', className: 'cn-glass', role: 'menu', 'aria-label': P.door.label },
           h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('lets', {}); } }, P.door.lets),

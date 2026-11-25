@@ -3880,6 +3880,15 @@ a[data-mv2='card2'],
   box-shadow: var(--elev-1);
   cursor: pointer;
 }
+/* A focus row brings the chosen card to the middle (founder, 2026-11-25), so every card, the first and last too,
+   can sit there: half a row of room at each end, and cards snap by their middles. */
+[data-mv2='xfocus'] [data-mv2='xrow'] {
+  padding-inline: calc(50% - var(--xp-card-w) / 2);
+  scroll-padding-inline: calc(50% - var(--xp-card-w) / 2);
+}
+[data-mv2='xfocus'] [data-mv2='xcard'] {
+  scroll-snap-align: center;
+}
 [data-mv2='xcard'][data-selected] {
   outline: var(--focus-w) solid var(--text-1);
   outline-offset: calc(var(--space-1) * -1);
@@ -4113,6 +4122,10 @@ a[data-mv2='card2'],
   [data-mv2='explore-dock'][data-ride][data-rest] {
     transform: translate(-50%, calc(var(--nudge-room) * -1));
   }
+  /* strokes on the riding nav and the nudge step the panel: the browser must not take them for a pan */
+  [data-mv2='explore-dock'][data-ride] {
+    touch-action: none;
+  }
   /* the nudge: a bare gold arrow under the nav that bobs twice, then rests */
   [data-mv2='explore-nudge'] {
     position: absolute;
@@ -4121,7 +4134,8 @@ a[data-mv2='card2'],
     z-index: var(--z-xp-crown);
     display: grid;
     place-items: center;
-    width: var(--hit);
+    /* as wide as the nav above it: the whole space under the nav takes a tap or a stroke */
+    width: min(calc(var(--hit) * 6), calc(100% - var(--space-7)));
     height: var(--space-5);
     padding: 0;
     border: 0;

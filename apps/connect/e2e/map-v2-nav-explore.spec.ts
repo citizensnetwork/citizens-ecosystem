@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { mockMapNetwork, openMap, makeSeed, FIXED_NOW } from "./support/map-v2";
+import { touchSession, swipe, flickTouch } from "./support/touch";
 
 // Pack 08 and the founder's adjustments of 2026-11-17: the crown, the Explore panel's four looks (rest, strip, focus,
 // open), the filter chip, the Search button where the account button was, the nav beside the search bar on a wide
@@ -228,6 +229,119 @@ test.describe("the map home on a phone", () => {
     await dock(page).locator("[data-nav='do']").click();
     await page.getByRole("menuitem", { name: "Kingdom Projects" }).click();
     await expect(page.locator(".cn-phone-dock [data-nav='do']")).toHaveAttribute("aria-current", "page");
+  });
+});
+
+test.describe("strokes, pulls and the province lift on a phone (founder, 2026-11-25)", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const mode = (page: Page) => sheet(page).getAttribute("data-mode");
+  const centreOf = async (page: Page, sel: string) => {
+    const b = (await page.locator(sel).first().boundingBox())!;
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  };
+
+  test("a stroke up on the nav or under it steps the panel up; a stroke down steps it back; a tap is still a tap", async ({ page }) => {
+    await open(page);
+    const cdp = await touchSession(page);
+    await swipe(cdp, await centreOf(page, "[data-mv2='explore-nudge']"), -90);
+    await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
+    await page.waitForTimeout(400);
+    await swipe(cdp, await centreOf(page, "[data-mv2='explore-dock'] [data-nav='map']"), -90);
+    await expect(sheet(page)).toHaveAttribute("data-open", "");
+    // the stroke did not press Map (which would have lowered it again)
+    await page.waitForTimeout(300);
+    await expect(sheet(page)).toHaveAttribute("data-open", "");
+    await page.getByRole("button", { name: "Lower panel" }).click();
+    await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
+    await page.waitForTimeout(400);
+    await swipe(cdp, await centreOf(page, "[data-mv2='explore-dock'] [data-nav='explore']"), 90);
+    await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
+    await expect(page).not.toHaveURL(/\/explore$/);
+  });
+
+  test("the open panel follows a finger pulled down from the top of its rows; a flick lowers it; a scrolled panel scrolls", async ({ page }) => {
+    await open(page);
+    await nudge(page).click();
+    await page.getByRole("button", { name: "Show all rows" }).click();
+    await expect(sheet(page)).toHaveAttribute("data-open", "");
+    await page.waitForTimeout(500);
+    const cdp = await touchSession(page);
+    const scroll = page.locator("[data-mv2='explore-scroll']");
+    const box = (await scroll.boundingBox())!;
+    const at = { x: box.x + box.width / 2, y: box.y + 140 };
+    // scrolled down: the same stroke scrolls the rows back, and the panel stays open
+    await scroll.evaluate((e) => { e.scrollTop = 300; });
+    await swipe(cdp, at, 120);
+    await expect(sheet(page)).toHaveAttribute("data-open", "");
+    await scroll.evaluate((e) => { e.scrollTop = 0; });
+    // at the top: the panel moves with the finger while it is held
+    const top0 = (await sheet(page).boundingBox())!.y;
+    await swipe(cdp, at, 70, { hold: true });
+    const held = (await sheet(page).boundingBox())!.y;
+    expect(held - top0).toBeGreaterThan(50);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] } as never);
+    // a short slow pull springs back
+    await expect(sheet(page)).toHaveAttribute("data-open", "");
+    // a flick lowers it
+    await page.waitForTimeout(400);
+    await flickTouch(cdp, at, 60);
+    await expect(sheet(page)).not.toHaveAttribute("data-open", "");
+  });
+
+  test("coming in from the country view to province scale lifts Where to…; it stays as the map zooms in; empty map folds it", async ({ page }) => {
+    await open(page);
+    expect(await mode(page)).toBe("rest");
+    const jump = (z: number) => page.evaluate((zoom) => {
+      const m = (window as unknown as { __ccMap: { getCenter(): { lng: number; lat: number }; jumpTo(o: object, d: object): void } }).__ccMap;
+      const c = m.getCenter();
+      m.jumpTo({ center: [c.lng, c.lat], zoom }, { originalEvent: {} });
+    }, z);
+    await jump(5);
+    await expect(page.locator("[data-zoom-hint='none']")).toBeVisible();
+    expect(await mode(page)).toBe("rest");
+    await jump(8.5);
+    await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
+    await jump(12.5);
+    await page.waitForTimeout(300);
+    await expect(sheet(page)).toHaveAttribute("data-mode", "strip");
+    // a tap on bare map (no pin under it) folds it
+    const spot = await page.evaluate(() => {
+      for (let y = 140; y < 520; y += 20) for (let x = 40; x < 350; x += 30) {
+        const el = document.elementFromPoint(x, y);
+        if (el && el.classList.contains("maplibregl-canvas")) return { x, y };
+      }
+      return null;
+    });
+    expect(spot).not.toBeNull();
+    await page.mouse.click(spot!.x, spot!.y);
+    await expect(sheet(page)).toHaveAttribute("data-mode", "rest");
+  });
+
+  test("in a focus row, the chosen card comes to the middle: by a card tap and by a pin tap", async ({ page }) => {
+    await open(page);
+    await nudge(page).click();
+    await page.getByRole("button", { name: "Show all rows" }).click();
+    await page.getByRole("button", { name: "Near & now" }).click();
+    await expect(sheet(page)).toHaveAttribute("data-mode", "focus");
+    const row = page.locator("[data-mv2='explore'] [data-mv2='xrow']").first();
+    const cards = row.locator("[data-mv2='xcard']");
+    expect(await cards.count()).toBeGreaterThan(4);
+    const centred = (id: string) => row.evaluate((el, cid) => {
+      // the card's middle against the row's middle
+      const card = (el.querySelector(`[data-explore-id="${cid}"]`) as HTMLElement).getBoundingClientRect();
+      const row = el.getBoundingClientRect();
+      return Math.abs(card.left + card.width / 2 - (row.left + row.width / 2));
+    }, id);
+    const third = cards.nth(3);
+    const id3 = (await third.getAttribute("data-explore-id"))!;
+    await third.click();
+    await expect(third).toHaveAttribute("data-selected", "");
+    await expect.poll(() => centred(id3), { timeout: 3_000 }).toBeLessThan(4);
+    const id1 = (await cards.nth(1).getAttribute("data-explore-id"))!;
+    // press the pin itself (it may sit under the panel on a small screen)
+    await page.locator(`.maplibregl-marker[data-cc-id="${id1}"]`).evaluate((el) => (el as HTMLElement).click());
+    await expect(cards.nth(1)).toHaveAttribute("data-selected", "");
+    await expect.poll(() => centred(id1), { timeout: 3_000 }).toBeLessThan(4);
   });
 });
 

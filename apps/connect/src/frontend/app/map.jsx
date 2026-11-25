@@ -347,7 +347,9 @@
     // frame, so it does nothing but flip a `display` (and one attribute for the
     // labels) — no marker is created, destroyed or re-anchored by zooming, and
     // the parent is only re-rendered when the BAND changes, not per frame.
-    const applyZoomGates = React.useCallback(() => {
+    // `e` is MapLibre's zoom event when there is one: its originalEvent says the person zoomed (a pinch, a wheel, a
+    // double tap), not the app (a fly to a place, a reset). The map screen is told which (founder, 2026-11-25).
+    const applyZoomGates = React.useCallback((e) => {
       const mp = mapRef.current;
       if (!mp) return;
       const z = mp.getZoom();
@@ -363,7 +365,7 @@
       const band = zoomBandFor(z);
       if (band !== bandRef.current) {
         bandRef.current = band;
-        if (onZoomBandChangeRef.current) onZoomBandChangeRef.current(band);
+        if (onZoomBandChangeRef.current) onZoomBandChangeRef.current(band, !!(e && e.originalEvent));
       }
     }, []);
 

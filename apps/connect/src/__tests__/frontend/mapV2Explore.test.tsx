@@ -876,11 +876,21 @@ describe("the map home's levels (founder, 2026-11-18): the pin carousel and the 
       fireEvent.pointerMove(panel, { clientX: 122, clientY: 480, pointerId: 1, pointerType: "touch" });
       fireEvent.pointerUp(panel, { clientX: 122, clientY: 440, pointerId: 1, pointerType: "touch" });
       expect(mode()).toBe("open");
+      // The open panel's rows scroll natively, which cancels pointer drags on a phone, so a finger pull there is read
+      // from touch events (founder, 2026-11-25): down from the top of the rows drags the panel and lowers it.
       const scroller = document.querySelector("[data-mv2='explore-scroll']") as HTMLElement;
-      Object.defineProperty(scroller, "scrollTop", { configurable: true, get: () => 0 });
-      fireEvent.pointerDown(scroller, { clientX: 120, clientY: 200, pointerId: 2, pointerType: "touch" });
-      fireEvent.pointerMove(panel, { clientX: 120, clientY: 260, pointerId: 2, pointerType: "touch" });
-      fireEvent.pointerUp(panel, { clientX: 120, clientY: 320, pointerId: 2, pointerType: "touch" });
+      let top = 40;
+      Object.defineProperty(scroller, "scrollTop", { configurable: true, get: () => top });
+      const pull = () => {
+        fireEvent.touchStart(scroller, { touches: [{ clientX: 120, clientY: 200 }] });
+        for (const y of [230, 260, 320]) fireEvent.touchMove(scroller, { touches: [{ clientX: 120, clientY: y }] });
+        fireEvent.touchEnd(scroller, { touches: [] });
+      };
+      // rows scrolled down: the pull is the rows' own scroll, and the panel stays open
+      pull();
+      expect(mode()).toBe("open");
+      top = 0;
+      pull();
       expect(mode()).toBe("strip");
     });
 
