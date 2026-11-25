@@ -51,6 +51,8 @@
     events.forEach((e) => rows.push({
       id: e.id, type: 'event', title: e.title, category: e.category, detail: e.description || '',
       location: e.location || '', when: [e.date, e.time].filter(Boolean).join(' · '),
+      // the real instants (ISO), for "today / this weekend" (QA 2026-11-25, CCQA-0005); `when` stays the display text
+      startsAt: e.startsAt || '', endsAt: e.endsAt || '',
       image: e.coverPhoto || '', online: !e.lat && !e.location, host: e.organizerName || '',
       hostId: e.organizerId, lat: e.lat, lng: e.lng,       website: e.website || '', phone: e.phone || '', email: e.email || '',
       connected: !!(app.connected && app.connected.has && app.connected.has(e.id)),

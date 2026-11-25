@@ -21,6 +21,8 @@
     const [all, setAll] = useState('');
     const [picked, setPicked] = useState('');
     const [wide, setWide] = useState(false);
+    // Dated discovery (QA 2026-11-25, CCQA-0005): '' (any date), 'today', 'weekend' or 'week' (the next 7 days)
+    const [whenKey, setWhenKey] = useState('');
     const area = chrome.useArea();
     const cities = (chrome && chrome.CITIES) || [];
     const rows = useMemo(() => (window.ConnectPreviews ? window.ConnectPreviews.listingsFrom(app, 'all', '') : []), [app.events, app.places, app.contributors]);
@@ -36,11 +38,21 @@
     const pinned = rows.filter((i) => scopeOf(i) !== 'nopin' && (wide || !city || scopeOf(i) === 'in'));
     const unpinned = rows.filter((i) => scopeOf(i) === 'nopin');
     const catOk = (i) => category === 'All' || (i.groupLabel || '') === category || i.group === category;
-    const matched = pinned.filter((i) => catOk(i) && matchesQuery(i, query));
-    const onlineMatched = unpinned.filter((i) => catOk(i) && matchesQuery(i, query));
-    const searching = !!query.trim() || category !== 'All';
+    const T = window.MapV2Time;
+    const now = Date.now();
+    const ranges = T && T.weekendRange ? { today: T.todayRange(now), weekend: T.weekendRange(now), week: T.nextDaysRange(now, 7) } : {};
+    // a date chip keeps only events that overlap its window; with no chip every listing stays
+    const whenOk = (i) => !whenKey || (i.type === 'event' && !!ranges[whenKey] && T.overlaps(i.startsAt, i.endsAt, ranges[whenKey]));
+    const matched = pinned.filter((i) => catOk(i) && whenOk(i) && matchesQuery(i, query));
+    const onlineMatched = unpinned.filter((i) => catOk(i) && whenOk(i) && matchesQuery(i, query));
+    // "This weekend in {city}": the events in scope that overlap the weekend, soonest first
+    const weekend = ranges.weekend ? pinned.concat(unpinned)
+      .filter((i) => i.type === 'event' && T.overlaps(i.startsAt, i.endsAt, ranges.weekend))
+      .sort((a, b) => String(a.startsAt).localeCompare(String(b.startsAt))) : [];
+    const searching = !!query.trim() || category !== 'All' || !!whenKey;
     const nothing = searching && !matched.length && !onlineMatched.length;
-    const clearSearch = () => { setQuery(''); setCategory('All'); setAll(''); };
+    const clearSearch = () => { setQuery(''); setCategory('All'); setAll(''); setWhenKey(''); };
+    const WHEN = [['', 'Any date'], ['today', 'Today'], ['weekend', 'This weekend'], ['week', 'Next 7 days']];
     const cover = rows.find((i) => i.image);
     const pick = (item) => {
       if (onPick) onPick(item);
@@ -59,7 +71,7 @@
       h('div', { className: 'photo-title' },
         h('small', null, h('i', { style: { background: i.color } }), i.groupLabel),
         h('h3', null, i.title),
-        h('span', null, (i.location || area || 'Nearby') + ' ↗')));
+        h('span', null, (i.type === 'event' && T && T.dateLine && i.startsAt ? T.dateLine(i.startsAt) + ' \u00b7 ' : '') + (i.location || area || 'Nearby') + ' ↗')));
     return h('div', { className: 'connect-scroll', 'data-screen': 'explore', 'data-mv2': 'discover' },
       h('div', { className: 'cn-page explore-page' },
         h('div', { className: 'explore-hero' },
@@ -94,6 +106,18 @@
           h('div', { className: 'cn-row' },
             h('h2', null, all || 'Happening around you'),
             h('button', { type: 'button', className: 'cn-text', onClick: () => setAll(all ? '' : 'All around you') }, all ? 'Show fewer' : 'See all →')),
+          h('div', { className: 'explore-when', role: 'group', 'aria-label': 'When', 'data-cc': 'explore-when' },
+            WHEN.map(([k, word]) => h('button', {
+              key: k || 'any', type: 'button', 'aria-pressed': whenKey === k ? 'true' : 'false',
+              className: whenKey === k ? 'active' : '', onClick: () => setWhenKey(k),
+            }, word))),
+          !searching ? h('section', { className: 'explore-weekend', 'data-cc': 'explore-weekend' },
+            h('div', { className: 'cn-row' }, h('h2', null, 'This weekend' + (city && !wide ? ' in ' + city.name : ''))),
+            weekend.length
+              ? h('div', { className: 'photo-carousel' }, weekend.map(tile))
+              : h('div', { className: 'explore-empty cn-glass' },
+                h('p', null, 'Nothing on this weekend yet. Gather people for something good.'),
+                h('div', { className: 'cn-actions' }, h('button', { type: 'button', onClick: () => app.go('lets') }, 'Start a Let\u2019s gathering')))) : null,
           city ? h('p', { className: 'explore-scope', 'data-cc': 'explore-scope' },
             wide ? 'Showing all of South Africa. ' : 'Showing ' + city.name + ': ' + matched.length + (matched.length === 1 ? ' listing' : ' listings') + ' within ' + radius + ' km. ',
             h('button', { type: 'button', className: 'cn-text', onClick: () => setWide(!wide) }, wide ? 'Back to ' + city.name : 'Widen to all South Africa')) : null,

@@ -219,5 +219,34 @@
     return hhmm(w.getUTCHours() * 60 + w.getUTCMinutes());
   }
 
-  window.MapV2Time = { TZ, LOCALE, openState, eventStartsIn, postedAgo, parseHours, dateParts, clockTime };
+  // Dated discovery (QA 2026-11-25, CCQA-0005): "what is on today / this weekend / in the next 7 days?". Each window is
+  // [start, end) in epoch ms, Johannesburg time. The weekend runs from Friday 17:00 to Monday 00:00; from Friday evening
+  // to Sunday it is the weekend under way, Monday to Thursday the one coming. An event counts when it overlaps the window
+  // (so a two-day camp that began on Thursday is still on this weekend).
+  function startOfDay(ms) { return dayKey(ms) * DAY - OFFSET_MS; }
+  function todayRange(now) { const s = startOfDay(now); return { start: s, end: s + DAY }; }
+  function nextDaysRange(now, days) { return { start: now, end: startOfDay(now) + (Number.isFinite(days) ? days : 7) * DAY }; }
+  function weekendRange(now) {
+    const dow = local(now).getUTCDay(); // 0 Sunday … 6 Saturday
+    const back = dow === 0 ? 2 : dow === 6 ? 1 : dow === 5 ? 0 : -(5 - dow);
+    const friday = startOfDay(now) - back * DAY;
+    return { start: friday + 17 * HOUR, end: friday + 3 * DAY };
+  }
+  function overlaps(start, end, range) {
+    const s = toMs(start);
+    if (s === null || !range) return false;
+    const e = toMs(end);
+    return s < range.end && (e !== null && e > s ? e : s) >= range.start;
+  }
+  // "Sat 28 Nov · 18:00" for an event card.
+  function dateLine(time) {
+    const p = toMs(time);
+    if (p === null) return '';
+    const w = local(p);
+    const days = S().dayShort || ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const months = S().monthShort || [];
+    return (days[w.getUTCDay()] || '') + ' ' + w.getUTCDate() + ' ' + (months[w.getUTCMonth()] || '') + ' \u00b7 ' + hhmm(w.getUTCHours() * 60 + w.getUTCMinutes());
+  }
+
+  window.MapV2Time = { TZ, LOCALE, openState, eventStartsIn, postedAgo, parseHours, dateParts, clockTime, todayRange, nextDaysRange, weekendRange, overlaps, dateLine };
 })();
