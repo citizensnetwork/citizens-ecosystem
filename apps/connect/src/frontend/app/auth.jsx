@@ -237,6 +237,15 @@
     // Email sign-in needs a configured Supabase; demo mode can't sign anyone in.
     const canEmail = !!window.CC_AUTH;
 
+    // The moment a first-time visitor can act (QA 2026-11-25, CCQA-0001): the cold-entry e2e reads this mark
+    // under a throttled phone profile, and so can anyone measuring the live site. Once per page load.
+    useEffect(() => {
+      try {
+        const p = window.performance;
+        if (p && p.mark && !p.getEntriesByName('cc-guest-visible').length) p.mark('cc-guest-visible');
+      } catch { /* a browser without the User Timing API just records nothing */ }
+    }, []);
+
     const onGoogle = () => {
       if (loading) return;
       setLoading(true);
