@@ -43,7 +43,7 @@ test.describe("P1-12 the map look follows the phone", () => {
     const { styles } = await openRecording(page);
     expect(await theme(page)).toBe("dark");
     await expect.poll(() => styles).toEqual(["dataviz-dark"]);
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--surface-1").trim())).toBe("#1a1714");
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--surface-1").trim())).toBe("#2c2e2c"); // charcoal (connect-shell.css, 2026-11-23)
   });
 
   test("switching the phone's setting while the map is open switches the map at once, both ways", async ({ page }) => {
@@ -97,9 +97,9 @@ test.describe("P1-12 the map look follows the phone", () => {
     await openListing(page, ev.id);
     // 2nd tap opens the raised pinpeek (inline sheet is transparent; the peek uses --xp-sheet)
     const peek = page.locator("[data-mv2='pinpeek']");
-    // dark --xp-sheet / --surface-1 (browsers may resolve the glass sheet to either)
+    // dark --xp-sheet / --surface-1 (browsers may resolve the glass sheet to either); charcoal since 2026-11-23
     const bg = await peek.evaluate((el) => getComputedStyle(el).backgroundColor);
-    expect(bg === "rgba(27, 28, 24, 0.95)" || bg === "rgb(26, 23, 20)").toBe(true);
+    expect(bg === "rgba(36, 38, 36, 0.94)" || bg === "rgb(44, 46, 44)").toBe(true);
     const sheet = page.locator("[data-mv2='sheet']");
     await expect(sheet.locator("[data-mv2='name']")).toHaveCSS("color", "rgb(247, 244, 238)");
     await expect(pin.locator("[data-mv2='logo-wrap']")).toHaveCSS("background-color", "rgb(255, 255, 255)");

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { mockMapNetwork, openMap, mapSettled, makeSeed, FIXED_NOW } from "./support/map-v2";
+import { mockMapNetwork, openMap, mapSettled, makeSeed, FIXED_NOW, centreOnE2eTown } from "./support/map-v2";
 
 // The map home's levels (founder, 2026-11-18): 0 the crown alone; 1 the search bar open with ONE row of small category
 // chips; 2 a pin tapped, its card and its neighbours in the pin carousel; 3 the chosen card tapped again, the carousel
@@ -123,10 +123,14 @@ async function shot(page: Page, name: string) {
 }
 /** Wait for the carousel to stop sliding (it moves by a transform transition). */
 async function still(page: Page) {
+  // Settled = the same top for four reads in a row (~180 ms). Two equal reads can come before a slide has even begun
+  // (a slow CI machine), and a drag started then lands on a handle that is about to move.
   let last = -1;
-  for (let i = 0; i < 40; i++) {
+  let same = 0;
+  for (let i = 0; i < 60; i++) {
     const top = await peek(page).evaluate((e) => Math.round(e.getBoundingClientRect().top));
-    if (top === last) return top;
+    same = top === last ? same + 1 : 0;
+    if (same >= 3) return top;
     last = top;
     await page.waitForTimeout(60);
   }
@@ -337,18 +341,22 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await climb();
       await page.locator("[data-mv2='pinpeek-bar']").getByRole("button", { name: "Back", exact: true }).click();
       await expect(peek(page)).not.toHaveAttribute("data-raised", "");
-      // lowered, the crown rides the carousel's top edge (a phone) or heads the nav beside the search bar (desktop)
-      const crown = size.name === "phone" ? page.locator("[data-mv2='explore-crown']") : page.locator("[data-mv2='desktop-crown']");
+      // lowered: on a phone the nav rides just above the carousel's top edge and the crown floats top-left (founder,
+      // 2026-11-25); on a desktop the crown heads the nav beside the search bar
+      const crown = size.name === "phone" ? page.locator(".cn-phone-crown-btn") : page.locator(".cn-rail-brand");
       if (size.name === "phone") {
         // both slide by transform: measure once neither moves
         await expect.poll(async () => {
           const top = await still(page);
-          const c = (await crown.boundingBox())!;
-          return Math.abs(c.y + c.height / 2 - top);
+          const d = (await page.locator("[data-mv2='explore-dock']").boundingBox())!;
+          return Math.abs(d.y + d.height + 8 - top);
         }, { timeout: 5_000 }).toBeLessThan(6);
       }
       await crown.click();
       await reset();
+      // the phone's crown is home and reset (founder, 2026-11-25): it also takes the camera back to the person's place,
+      // which in this fixture is the country overview, so come back to the fixture town for the pins
+      if (size.name === "phone") await centreOnE2eTown(page);
 
       // a tap on bare map, from the carousel (re-measure pins: the climb may have moved the camera)
       const openPins = await visiblePins(page);
@@ -361,21 +369,20 @@ for (const size of [{ name: "phone", width: 390, height: 844 }, { name: "desktop
       await reset();
       // from the Where to… strip too (a phone: a wide screen rests on its strip)
       if (size.name === "phone") {
-        await page.locator("[data-mv2='explore-crown']").click();
+        await page.locator("[data-mv2='explore-nudge']").click();
         await expect(page.locator("[data-mv2='explore-host']")).toHaveAttribute("data-mode", "strip");
         const spot1 = (await bareMap(page))!;
         await page.mouse.click(spot1.x, spot1.y);
         await expect(page.locator("[data-mv2='explore-host']")).toHaveAttribute("data-mode", "rest");
       }
       // a pan is not a tap: it leaves the carousel where it is
-      // Re-check pins after the long climb (camera may have drifted; soft-centre / dive centre).
+      // Re-check pins after the long climb (camera may have drifted; soft-centre / dive centre), once the map is still:
+      // a pin measured mid-glide is no longer under that point when it is tapped.
+      await idle(page);
       const panPins = await visiblePins(page);
       if (panPins.length === 0) {
-        await page.evaluate(() => {
-          const m = (window as unknown as { __ccMap: MapLike }).__ccMap;
-          const c = m.getCenter();
-          m.jumpTo({ center: [c.lng, c.lat], zoom: Math.max(m.getZoom(), 13.6) }, { originalEvent: {} });
-        });
+        // the camera may have drifted off the fixtures: come back to the fixture town, where the pins are
+        await centreOnE2eTown(page);
         await idle(page);
       }
       const panPins2 = panPins.length > 0 ? panPins : await visiblePins(page);

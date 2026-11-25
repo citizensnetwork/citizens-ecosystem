@@ -420,7 +420,7 @@ test.describe("P1-07 header, actions, tabs", () => {
 test.describe("P1-06 side panel (wide screens)", () => {
   test.use({ viewport: { width: 1000, height: 800 } });
 
-  test("at 768 px and above it is a 380 px panel beside the sidebar, with no snap points or handle", async ({ page }) => {
+  test("at 768 px and above it is a 380 px panel beside the rail, with no snap points or handle", async ({ page }) => {
     const seed = seed0();
     await mockMapNetwork(page, seed);
     await mockContributorDetail(page, seed);
@@ -430,7 +430,7 @@ test.describe("P1-06 side panel (wide screens)", () => {
     await expect(sheet(page)).toHaveAttribute("data-wide", "1");
     const b = (await sheet(page).boundingBox())!;
     expect(Math.round(b.width)).toBe(380);
-    expect(b.x).toBeGreaterThanOrEqual(256); // right of the sidebar
+    expect(b.x).toBeGreaterThanOrEqual(64); // right of the rail (64 px on the map)
     await expect(page.locator("[data-mv2='handle']")).toHaveCount(0);
     // the selected pin is pushed clear of the panel, into the visible part of the map
     await expect

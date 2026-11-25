@@ -1,5 +1,5 @@
 import { test, expect, type Page, type Route } from "@playwright/test";
-import { openListing, openExploreAll } from "./support/map-v2";
+import { openListing } from "./support/map-v2";
 import {
   FAKE_PROJECT,
   FAKE_PROJECT_CORS,
@@ -317,8 +317,9 @@ test.describe("Browser Back and Forward", () => {
     await page.goto("/manifest.json");
     await page.goto(`/c/${SLUG}`);
     await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 15_000 });
-    await page.getByRole("button", { name: "Kingdom Exploration" }).first().click();
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
+    // the rail's Explore (the old sidebar and its Kingdom Exploration link are gone)
+    await page.locator("[data-rail-item='explore']").click();
+    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
 
     await page.goBack();
     await expect.poll(() => screen(page)).toBe("profile");

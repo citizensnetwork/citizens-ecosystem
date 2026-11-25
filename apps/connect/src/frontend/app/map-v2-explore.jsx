@@ -331,6 +331,8 @@
   const SECTIONS = ['around', 'weekend', 'online', 'fresh', 'more'];
   const FINE_MQ = '(min-width: 1024px) and (pointer: fine)';
   const DESK_MQ = '(min-width: 64rem)';    // the desktop nav beside the search bar takes over from the crown
+  // A phone (founder, 2026-11-25): the app shell has no rail there, and the full nav stands where the crown stood.
+  const PHONE_MQ = '(max-width: 767px)';
   const HOUR = 60 * 60 * 1000;
   const DAY = 24 * HOUR;
   const NEW_WINDOW = 30 * DAY;
@@ -436,6 +438,8 @@
       'data-cat': group || undefined,
       'data-selected': props.selected ? '' : undefined,
       'aria-current': props.selected ? 'true' : undefined,
+      // the card's pin colour (map.jsx fills the pin with the same category hex; ideas are gold), for the chosen look
+      style: cat && cat.hex ? { '--card-pin': cat.hex } : undefined,
       onClick: () => props.onOpen && props.onOpen(m.id, m.type),
     },
       h('span', { 'data-mv2': 'xcard-img' },
@@ -473,19 +477,21 @@
       const t = setTimeout(measure, 80);
       return () => clearTimeout(t);
     }, [props.children && props.children.length]);
+    // The chosen card comes to the middle of its row, whether a pin or a card chose it (founder, 2026-11-25).
+    useEffect(() => {
+      const el = scroller.current;
+      const id = props.selectedId;
+      if (!el || !id || typeof el.scrollTo !== 'function') return;
+      const card = el.querySelector('[data-explore-id="' + cssId(id) + '"]');
+      if (!card) return;
+      const row = el.getBoundingClientRect();
+      const box = card.getBoundingClientRect();
+      const left = Math.max(0, el.scrollLeft + (box.left - row.left) - (el.clientWidth - box.width) / 2);
+      el.scrollTo({ left: left, behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
+    }, [props.selectedId, (props.list || []).map((r) => r.m.id).join('|')]);
     const nudge = (dir) => {
       const el = scroller.current;
       if (el) el.scrollBy({ left: dir * Math.max(160, el.clientWidth * 0.8), behavior: matches(REDUCED_MQ) ? 'auto' : 'smooth' });
-    };
-    // Edge tap rotates the carousel (same language as pinpeek arrows); does not select a card / snap a pin.
-    const onEdgeTap = (e) => {
-      const el = scroller.current;
-      if (!el || !(edges.l || edges.r)) return;
-      const box = el.getBoundingClientRect();
-      const x = e.clientX - box.left;
-      const band = Math.max(48, box.width * 0.18);
-      if (edges.l && x < band) { e.preventDefault(); e.stopPropagation(); nudge(-1); }
-      else if (edges.r && x > box.width - band) { e.preventDefault(); e.stopPropagation(); nudge(1); }
     };
     const Icon = window.Icon;
     const P = S().panel || {};
@@ -495,7 +501,6 @@
       showArrows && edges.l ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'prev', 'aria-label': P.scrollLeft, onClick: () => nudge(-1) }, Icon ? h(Icon, { name: 'ChevronLeft', size: 16 }) : null) : null,
       h('div', {
         'data-mv2': 'xrow', 'data-row': props.id, ref: scroller, onScroll: measure,
-        onClickCapture: onEdgeTap,
       }, props.children),
       showArrows && edges.r ? h('button', { type: 'button', 'data-mv2': 'xarrow', 'data-dir': 'next', 'aria-label': P.scrollRight, onClick: () => nudge(1) }, Icon ? h(Icon, { name: 'ChevronRight', size: 16 }) : null) : null);
   }
@@ -518,6 +523,7 @@
     const api = props.apiRef;
     const desk = useMedia(DESK_MQ);
     const fine = useMedia(FINE_MQ);
+    const phone = useMedia(PHONE_MQ);
     const [stage, setStage] = useState(() => (matches(DESK_MQ) ? 'strip' : 'rest'));
     const [rail, setRail] = useState(true);
     const [me, setMe] = useState('');          // '' | 'rail' | 'dock': where the account menu is open
@@ -527,7 +533,6 @@
     const root = useRef(null);
     const tabsRef = useRef(null);
     const scrollRef = useRef(null);
-    const drag = useRef(null);
     const str = S();
     const P = str.panel || {};
     const Icon = window.Icon;
@@ -603,8 +608,15 @@
     useEffect(() => {
       const min = () => { setFocus(null); setMe(''); setStage(desk ? 'strip' : 'rest'); };
       window.addEventListener('cc-rail-map', min);
-      return () => window.removeEventListener('cc-rail-map', min);
+      // The phone's top-left crown: home, with every panel folded (the map screen clears the filters itself).
+      window.addEventListener('cc-crown-home', min);
+      return () => {
+        window.removeEventListener('cc-rail-map', min);
+        window.removeEventListener('cc-crown-home', min);
+      };
     }, [desk]);
+    // The Do menu folds whenever the panel changes its look.
+    useEffect(() => { setDoor(false); }, [mode]);
 
     // the chosen tab in view, in the middle of its row
     const tabKey = tile || sec;
@@ -749,6 +761,8 @@
     const onPanelDown = (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       if (mode === 'rest') return;
+      // A finger on the panel is the touch pull's (below): the browser's own scrolling would cancel this one.
+      if (e.pointerType === 'touch') return;
       if (e.target.closest && e.target.closest("[data-mv2='explore-grab']")) return;
       // Where-to tiles own horizontal pan-x; only start a panel pull once the move is clearly vertical.
       if (mode === 'open') {
@@ -799,6 +813,85 @@
       else lower();
     };
     const onPanelUp = (e) => { finishPanelPull(e); };
+    // A finger on the panel (founder, 2026-11-25). Its rows scroll natively, and a native scroll cancels pointer drags, so a
+    // finger is read from touch events, with the first clear move deciding: sideways belongs to the card rows; up or down
+    // drags the panel with the finger. On the strip and a focus row both ways work (up raises, down lowers); on the open
+    // panel only down, and only with its rows at their top. A flick moves it at once (speed from the last 100 ms), and
+    // on the open panel a long pull takes it all the way down. The grab keeps its own pointer pull.
+    const pull = useRef({});
+    pull.current = { panelX: panelX, xpVis: xpVis, clear: clearPanelDrag, raise: raise, lower: lower, desk: desk, setStage: setStage };
+    const modeRef = useRef(mode);
+    modeRef.current = mode;
+    useEffect(() => {
+      const el = root.current;
+      const sc = scrollRef.current;
+      if (!el) return undefined;
+      let t = null;
+      const start = (e) => {
+        t = null;
+        const m = modeRef.current;
+        if (m === 'rest' || e.touches.length !== 1) return;
+        if (e.target.closest && e.target.closest("[data-mv2='explore-grab']")) return;
+        if (m === 'open' && sc && sc.scrollTop > 0) return;
+        const p0 = e.touches[0];
+        const H = el.offsetHeight;
+        const vis = m === 'open' ? H : pull.current.xpVis(m === 'focus' ? 'focus' : 'strip');
+        t = { m: m, x: p0.clientX, y: p0.clientY, H: H, base: Math.max(0, H - vis), decided: false, pulling: false, dy: 0, trail: [[e.timeStamp || Date.now(), 0]] };
+      };
+      const move = (e) => {
+        if (!t) return;
+        const p0 = e.touches[0];
+        const dx = p0.clientX - t.x;
+        const dy = p0.clientY - t.y;
+        if (!t.decided) {
+          if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+          t.decided = true;
+          if (Math.abs(dx) > Math.abs(dy)) { t = null; return; }
+          if (t.m === 'open' && (dy <= 0 || (sc && sc.scrollTop > 0))) { t = null; return; }
+          t.pulling = true;
+          panelPull.current = null;
+        }
+        if (!t.pulling) return;
+        if (e.cancelable) e.preventDefault();
+        t.dy = t.m === 'open' ? Math.max(0, dy) : dy;
+        t.trail.push([e.timeStamp || Date.now(), t.dy]);
+        if (t.trail.length > 6) t.trail.shift();
+        const y = Math.max(0, Math.min(t.H, t.base + t.dy));
+        el.style.transition = 'none';
+        el.style.transform = pull.current.panelX() + 'translateY(' + y + 'px)';
+      };
+      const end = (e) => {
+        const g = t;
+        t = null;
+        if (!g || !g.pulling) return;
+        const api = pull.current;
+        api.clear();
+        // only the last 100 ms count: a finger that stopped before lifting is not a flick
+        const last = (e && e.timeStamp) || Date.now();
+        const recent = g.trail.filter((p) => last - p[0] <= 100);
+        const a = recent[0];
+        const b = recent[recent.length - 1];
+        // px per ms, down is positive; a flick can land its moves in the same millisecond, which is as fast as it gets
+        const speed = a && b && b !== a ? (b[1] - a[1]) / Math.max(1, b[0] - a[0]) : 0;
+        if (g.m === 'open') {
+          if (g.H > 0 && g.dy > g.H * 0.55 && !api.desk) api.setStage('rest');
+          else if (speed > 0.45 || g.dy > 80) api.lower();
+          return;
+        }
+        if (speed < -0.45 || g.dy < -60) api.raise();
+        else if (speed > 0.45 || g.dy > 60) api.lower();
+      };
+      el.addEventListener('touchstart', start, { passive: true });
+      el.addEventListener('touchmove', move, { passive: false });
+      el.addEventListener('touchend', end);
+      el.addEventListener('touchcancel', end);
+      return () => {
+        el.removeEventListener('touchstart', start);
+        el.removeEventListener('touchmove', move);
+        el.removeEventListener('touchend', end);
+        el.removeEventListener('touchcancel', end);
+      };
+    }, []);
     const onGrabUp = (e) => { finishPanelPull(e); };
     const onPanelCancel = () => { panelPull.current = null; clearPanelDrag(); };
     // The crown: with any filter on, it clears them all and goes home (the map screen snaps to the person's place);
@@ -845,6 +938,49 @@
       if (crownDragged.current) { crownDragged.current = false; return; }
       onCrown();
     };
+    // The phone's nav and the nudge under it (founder, 2026-11-25): a stroke up steps the panel up (rest, Where to…,
+    // every row), a stroke down steps it back; a tap is still a tap. The end of the stroke is read from the document, so
+    // a finger that leaves the nav still counts, and the click a stroke would make is swallowed.
+    const navSwiped = useRef(false);
+    const stepPanel = (dir) => {
+      setMe('');
+      setDoor(false);
+      if (dir < 0) {
+        if (props.level && props.onLevelReset) { props.onLevelReset(); return; }
+        lower();
+        return;
+      }
+      if (props.peek) return;
+      if (mode === 'rest') setStage('strip');
+      else raise();
+    };
+    const onStrokeDown = (e) => {
+      if (!phone || open || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      navSwiped.current = false;
+      const s = { x: e.clientX, y: e.clientY, id: e.pointerId };
+      const up = (ev) => {
+        if (ev.pointerId !== s.id) return;
+        document.removeEventListener('pointerup', up, true);
+        document.removeEventListener('pointercancel', up, true);
+        if (ev.type !== 'pointerup') return;
+        const dy = ev.clientY - s.y;
+        if (Math.abs(dy) < 24 || Math.abs(dy) < Math.abs(ev.clientX - s.x)) return;
+        navSwiped.current = true;
+        stepPanel(dy < 0 ? 1 : -1);
+      };
+      document.addEventListener('pointerup', up, true);
+      document.addEventListener('pointercancel', up, true);
+    };
+    const onStrokeClick = (e) => {
+      if (!navSwiped.current) return;
+      navSwiped.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const onNudgeClick = () => {
+      setMe('');
+      setStage('strip');
+    };
 
     // A card in the full panel takes its row over first; the map screen then chooses it (a second tap opens it).
     const openCard = (row) => (id, type) => {
@@ -856,7 +992,7 @@
       if (props.onOpen) props.onOpen(id, type, measuredFrom);
     };
     const cardDist = (str.peek && str.peek.dist) || distWords;
-    const cards = (id, list) => h(XRow, { id: id, list: list }, list.map((r) => h(XCard, {
+    const cards = (id, list) => h(XRow, { id: id, list: list, selectedId: props.selectedId }, list.map((r) => h(XCard, {
       key: id + ':' + r.m.id, m: r.m, meters: r.meters, rec: byKey.get(r.m.type + ':' + r.m.id),
       groupWords: str.groups, distWords: cardDist,
       selected: props.selectedId === r.m.id, badge: str.selectedBadge,
@@ -998,30 +1134,37 @@
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
           'aria-label': open ? (P.lower) : (P.raise),
-          // Strip / focus: up chevron — swipe or tap to see the rest (founder, 2026-11-23). Open: flat only.
-          'data-hint': (mode === 'strip' || mode === 'rest' || mode === 'focus') ? 'up' : undefined,
           onPointerDown: onGrabDown, onPointerMove: onPanelMove, onPointerUp: onGrabUp,
           onPointerCancel: onPanelCancel, onClick: onGrabClick,
           onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (open) lower(); else raise(); } },
         },
+          // a bare bar: the gold nudge under the nav says there is more (founder, 2026-11-25: the chevron is gone)
           h('span', { 'data-mv2': 'explore-handle', 'aria-hidden': 'true' },
-            h('span', { 'data-mv2': 'handle-bar' }),
-            (mode === 'strip' || mode === 'rest') && Icon
-              ? h(Icon, { name: 'ChevronUp', size: 12 }) : null),
+            h('span', { 'data-mv2': 'handle-bar' })),
           h('span', { 'data-mv2': 'drawer-mark', 'aria-hidden': 'true' }, P.brandMark || '')),
         h('div', { 'data-mv2': 'explore-scroll', ref: scrollRef },
           mode === 'focus' ? focusView() : mode === 'open' ? openView() : tilesBig())),
       // The crown and the sticky nav swap outright (founder, 2026-11-17: the morph was slow on a phone).
-      !open ? h('button', {
+      !open && !phone ? h('button', {
         type: 'button', 'data-mv2': 'explore-crown', 'aria-label': crownLabel,
         'data-filtered': filtered ? '' : undefined,
         onPointerDown: onCrownDown, onPointerUp: onCrownUp, onClick: onCrownClick,
         onPointerCancel: () => { crownPull.current = null; },
       }, window.CrownMark ? h(window.CrownMark, { size: 32 }) : (Icon ? h(Icon, { name: 'Crown', size: 28 }) : null)) : null,
-      open ? h('nav', { 'data-mv2': 'explore-dock', 'aria-label': P.dock },
-        door && h('div', { 'data-mv2': 'dock-door', className: 'cn-glass', role: 'menu', 'aria-label': 'Do' },
-          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('lets', {}); } }, 'Let\u2019s\u2026'),
-          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('community', {}); } }, 'Kingdom Projects')),
+      // A phone keeps the nav up in every look: riding where the crown rode (`data-ride`), and at rest lifted over the
+      // nudge. Opened, it moves down to the foot as the sticky nav. One element, so it glides (transform only).
+      phone && mode === 'rest' && !props.peek ? h('button', {
+        type: 'button', 'data-mv2': 'explore-nudge', 'aria-label': P.nudge,
+        onPointerDown: onStrokeDown, onClickCapture: onStrokeClick, onClick: onNudgeClick,
+      }, Icon ? h(Icon, { name: 'ChevronUp', size: 18 }) : null) : null,
+      open || phone ? h('nav', {
+        'data-mv2': 'explore-dock', 'aria-label': P.dock,
+        'data-ride': phone && !open ? '' : undefined, 'data-rest': phone && mode === 'rest' ? '' : undefined,
+        onPointerDown: onStrokeDown, onClickCapture: onStrokeClick,
+      },
+        door && h('div', { 'data-mv2': 'dock-door', className: 'cn-glass', role: 'menu', 'aria-label': P.door.label },
+          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('lets', {}); } }, P.door.lets),
+          h('button', { type: 'button', role: 'menuitem', onClick: () => { setDoor(false); if (props.onGo) props.onGo('community', {}); } }, P.door.community)),
         DOCK.map((item) => {
           const lead = navIcon(item);
           if (item.me) return meItem('dock', item, { 'data-mv2': 'explore-nav' }, lead);
@@ -1034,7 +1177,11 @@
               setMe('');
               if (item.door) { setDoor((v) => !v); return; }
               setDoor(false);
-              if (item.close) { setStage(desk ? 'strip' : 'rest'); return; }
+              if (item.close) {
+                if (props.level && props.onLevelReset) props.onLevelReset();
+                setStage(desk ? 'strip' : 'rest');
+                return;
+              }
               if (item.page && props.onGo) props.onGo(item.page, {});
             },
           }, lead, h('small', null, (P.nav && P.nav[item.id]) || item.id));
@@ -1209,6 +1356,8 @@
         e.target.closest("[data-mv2='handle-bar']")
       ));
       const inBody = !!(e.target.closest && e.target.closest("[data-mv2='pinpeek-body']"));
+      // A finger off the bar is the touch pull's (below): the body's native scrolling would cancel this one.
+      if (e.pointerType === 'touch' && !onBar) return;
       const el = root.current;
       if (!el) return;
       const H = el.offsetHeight;
@@ -1293,6 +1442,84 @@
     };
     const onPullUp = (e) => { finishPeekPull(e); };
     const onPullCancel = () => { pull.current = null; clearPeekDrag(); };
+    // A finger on the cards or the raised details (founder, 2026-11-25), read from touch events like the Explore panel:
+    // the first clear move decides. Sideways stays with the card row. Lowered, up raises and down closes; raised, a pull
+    // down from the top of the details follows the finger, and a flick or a long pull steps back to the cards. The bar
+    // keeps its pointer pull, and the buttons keep their taps.
+    const touchApi = useRef({});
+    touchApi.current = { raised: raised, peekPx: peekPx, peekX: peekX, clear: clearPeekDrag, onBack: props.onBack, onRaise: props.onRaise };
+    useEffect(() => {
+      const el = root.current;
+      if (!el) return undefined;
+      const SKIP = "[data-mv2='pinpeek-bar'], [data-mv2='handle'], [data-mv2='pinpeek-back'], [data-mv2='pinpeek-close'], [data-mv2='xarrow'], [data-mv2='handle-chip']";
+      let t = null;
+      const start = (e) => {
+        t = null;
+        if (e.touches.length !== 1 || (e.target.closest && e.target.closest(SKIP))) return;
+        const api = touchApi.current;
+        const sc = body.current;
+        if (api.raised && sc && sc.scrollTop > 0) return;
+        const p0 = e.touches[0];
+        const H = el.offsetHeight;
+        t = {
+          raised: api.raised, x: p0.clientX, y: p0.clientY, H: H, mid: Math.max(0, H - api.peekPx()),
+          base: api.raised ? 0 : Math.max(0, H - api.peekPx()), decided: false, pulling: false, dy: 0,
+          trail: [[e.timeStamp || Date.now(), 0]],
+        };
+      };
+      const move = (e) => {
+        if (!t) return;
+        const p0 = e.touches[0];
+        const dx = p0.clientX - t.x;
+        const dy = p0.clientY - t.y;
+        if (!t.decided) {
+          if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+          t.decided = true;
+          const sc = body.current;
+          if (Math.abs(dx) > Math.abs(dy) || (t.raised && (dy <= 0 || (sc && sc.scrollTop > 0)))) { t = null; return; }
+          t.pulling = true;
+          pull.current = null;
+        }
+        if (!t.pulling) return;
+        if (e.cancelable) e.preventDefault();
+        t.dy = t.raised ? Math.max(0, dy) : dy;
+        t.trail.push([e.timeStamp || Date.now(), t.dy]);
+        if (t.trail.length > 6) t.trail.shift();
+        el.style.transition = 'none';
+        el.style.transform = touchApi.current.peekX() + 'translateY(' + Math.max(0, Math.min(t.H, t.base + t.dy)) + 'px)';
+      };
+      const end = (e) => {
+        const g = t;
+        t = null;
+        if (!g || !g.pulling) return;
+        const api = touchApi.current;
+        api.clear();
+        swallow.current = true;
+        setTimeout(() => { swallow.current = false; }, 0);
+        // only the last 100 ms count: a finger that stopped before lifting is not a flick
+        const last = (e && e.timeStamp) || Date.now();
+        const recent = g.trail.filter((p) => last - p[0] <= 100);
+        const a = recent[0];
+        const b = recent[recent.length - 1];
+        const speed = a && b && b !== a ? (b[1] - a[1]) / Math.max(1, b[0] - a[0]) : 0;   // px per ms, down positive
+        if (g.raised) {
+          if (speed > 0.45 || g.dy > 80 || (g.mid > 0 && g.dy > g.mid / 2)) { if (api.onBack) api.onBack(); }
+          return;
+        }
+        if (speed < -0.45 || g.dy < -60) { if (api.onRaise) api.onRaise(); }
+        else if (speed > 0.45 || g.dy > 60) { if (api.onBack) api.onBack(); }
+      };
+      el.addEventListener('touchstart', start, { passive: true });
+      el.addEventListener('touchmove', move, { passive: false });
+      el.addEventListener('touchend', end);
+      el.addEventListener('touchcancel', end);
+      return () => {
+        el.removeEventListener('touchstart', start);
+        el.removeEventListener('touchmove', move);
+        el.removeEventListener('touchend', end);
+        el.removeEventListener('touchcancel', end);
+      };
+    }, []);
 
     const tap = (id) => {
       if (swallow.current) return;
@@ -1330,8 +1557,7 @@
         h('button', {
           type: 'button', 'data-mv2': 'handle',
           'aria-label': P.lower || P.back || '',
-          // Lowest (cards) shows flat bar + slight up chevron; raised is flat only (founder, 2026-11-22).
-          'data-hint': raised ? undefined : 'up',
+          // A bare bar in every look (founder, 2026-11-25: the chevron is gone; the gold nudge carries the hint).
           // Handle = minimize / step down (same as Back). Tap is handled in onPullUp; click is the keyboard fallback.
           onClick: (e) => {
             if (swallow.current) { swallow.current = false; return; }
@@ -1339,8 +1565,7 @@
             if (props.onBack) props.onBack();
           },
         },
-          h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' }),
-          !raised && Icon ? h(Icon, { name: 'ChevronUp', size: 12 }) : null),
+          h('span', { 'data-mv2': 'handle-bar', 'aria-hidden': 'true' })),
         h('span', { 'data-mv2': 'drawer-mark', 'aria-hidden': 'true' },
           (window.MapV2Strings && window.MapV2Strings.explore && window.MapV2Strings.explore.panel
             && window.MapV2Strings.explore.panel.brandMark) || ''),

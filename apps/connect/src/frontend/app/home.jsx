@@ -68,6 +68,9 @@
   }
 
   const CARD_ZOOM = 14;     // a card never lands on a map zoomed out further than this: the pin has to be seen
+  // Where to… (founder, 2026-11-25) keeps its distance, so every option stays in view: a first tap on a card or a pin only
+  // chooses it, a second zooms all the way in to that pin (its name and photo show from 15), a third opens it.
+  const WHERE_TO_ZOOM = 16.5;
   // A Where to… tile or a row in focus shows its town, not its province (founder, 2026-11-17): every pin is drawn from 9.5.
   const TOWN_ZOOM = 11;
   // Pins kept for a Where-to / section focus: metro-scale around the camera town (founder, 2026-11-23).
@@ -435,12 +438,24 @@
     chosen.current = { id: selected, type: selType };
     // A card's first tap chooses it and lifts the pin; the second tap opens the shared raised pinpeek drawer
     // (same chrome as a map-icon 2nd tap — founder, 2026-11-22). View Full still reaches the profile page.
+    const whereTo = !!(focus && focus.kind === 'tile');
+    const zoomedTo = useRef('');   // the Where to… card or pin a second tap zoomed in to
+    const zoomInTo = (id) => {
+      zoomedTo.current = id;
+      if (mapApi.current && mapApi.current.focusLifted) mapApi.current.focusLifted(WHERE_TO_ZOOM, id);
+    };
     const tapCard = (id, t) => {
       if (t === 'idea') { setSheet(null); setSelected(id); setSelType(t); return; }
-      if (selected === id) { openPeek(id, t, false, { raised: true }); return; }
+      if (selected === id) {
+        if (whereTo && zoomedTo.current !== id) { zoomInTo(id); return; }
+        openPeek(id, t, false, { raised: true });
+        return;
+      }
       chosen.current = { id, type: t };
+      zoomedTo.current = '';
       setSelected(id); setSelType(t); setLitId(id);
-      if (mapApi.current && mapApi.current.focusLifted) mapApi.current.focusLifted(CARD_ZOOM);
+      if (whereTo) return;
+      if (mapApi.current && mapApi.current.focusLifted) mapApi.current.focusLifted(CARD_ZOOM, id);
     };
     // The filter chip: what is on, in its colour, and a clear button. A tile takes the colour of its group.
     const chip = (() => {
@@ -477,6 +492,27 @@
       const min = () => { setPeek(null); setSheet(null); setSearchOpen(false); setFocus(null); setSelected(null); setLitId(null); };
       window.addEventListener('cc-rail-map', min);
       return () => window.removeEventListener('cc-rail-map', min);
+    }, []);
+    // Province scale (founder, 2026-11-25): when the person zooms in from the country view to where events are drawn,
+    // the panel lifts one step and shows Where to…. Only the person's own zoom counts (not the app flying somewhere).
+    // Zooming further in leaves it up; a tap on empty map folds it as ever.
+    const bandRef = useRef(zoomBand);
+    const onZoomBand = (band, byPerson) => {
+      const was = bandRef.current;
+      bandRef.current = band;
+      setZoomBand(band);
+      // 'places' is province scale (map.jsx zoomBandFor): a pinch or a wheel from the country view passes through it
+      if (!byPerson || was !== 'none' || band !== 'places') return;
+      if (peekRef.current || searchOpen || focus || group || exploreMode !== 'rest') return;
+      setStripSignal((n) => n + 1);
+    };
+    // The phone's top-left crown (founder, 2026-11-25): home and reset, every filter, search and carousel cleared.
+    const resetHomeRef = useRef(resetHome);
+    resetHomeRef.current = resetHome;
+    useEffect(() => {
+      const home = () => resetHomeRef.current();
+      window.addEventListener('cc-crown-home', home);
+      return () => window.removeEventListener('cc-crown-home', home);
     }, []);
     useEffect(() => {
       if (!searchOpen) { setFilterEdges({ l: false, r: false }); return undefined; }
@@ -520,11 +556,18 @@
             // founder, 2026-11-18: a pin opens the pin carousel (level 2), unless the panel already holds a row of cards (a
             // focus, or every row), where the pin chooses its card in that row as before
             if (exploreMode !== 'focus' && exploreMode !== 'open') { openPeek(id, t, byKey); return; }
+            // Where to…: the chosen pin's second tap zooms in to it, its third opens it, like its card (founder, 2026-11-25)
+            if (whereTo && selected === id) {
+              if (zoomedTo.current !== id) zoomInTo(id);
+              else openPeek(id, t, byKey, { raised: true });
+              return;
+            }
+            zoomedTo.current = '';
             // A pin chooses itself. The keyboard follows into the sheet; a finger tap leaves the sheet where it is.
             setSheet(null); setSelected(id); setSelType(t); setLitId(null); setReveal((r) => ({ id, focus: byKey, n: (r ? r.n : 0) + 1 }));
           },
           onDismissBubble: dismissBubble,
-          onZoomBandChange: setZoomBand,
+          onZoomBandChange: onZoomBand,
         })),
 
       // top: search bar stays its own width; category chips float below and scroll under/past the Find button

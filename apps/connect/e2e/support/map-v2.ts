@@ -184,7 +184,9 @@ export async function openExploreAll(page: Page, how: "click" | "tap" = "click")
     await expect(page.locator("[data-mv2='filter-chip']")).toHaveCount(0, { timeout: 5_000 });
   }
   if ((await explore.getAttribute("data-mode")) === "rest") {
-    await press(page.locator("[data-mv2='explore-crown']"));
+    // a phone's rest has the nudge under the nav (founder, 2026-11-25); a tablet's has the crown
+    const nudge = page.locator("[data-mv2='explore-nudge']");
+    await press((await nudge.count()) ? nudge : page.locator("[data-mv2='explore-crown']"));
     await expect(explore).not.toHaveAttribute("data-mode", "rest", { timeout: 5_000 });
   }
   await press(page.locator("[data-mv2='explore-grab']"));
@@ -238,20 +240,14 @@ export async function openListing(page: Page, id: string, how: "click" | "tap" =
  * the nav beside the search bar; on a phone it is in the sticky nav of the open Explore panel. This opens that menu.
  */
 export async function openMe(page: Page) {
-  // Me is the full profile page. On a wide screen it is in the rail. On a phone the rail
-  // leaves the map, and Me is a gold icon in the preview panel's bar.
+  // Me is the full profile page. On a wide screen it is in the rail. A phone has no rail (founder, 2026-11-25):
+  // Me is in the floating nav, which is always up.
   if (await page.locator(".me-page").isVisible()) return;
   const railMe = page.locator("[data-rail-item='me']");
   if (await railMe.isVisible()) {
     await railMe.click();
   } else {
-    const dockMe = page.locator("[data-mv2='explore-nav'][data-nav='me']");
-    if (!(await dockMe.isVisible())) {
-      await page.locator("[data-mv2='explore-crown']").click();
-      const all = page.getByRole("button", { name: "Show all rows" });
-      if (await all.count()) await all.click();
-    }
-    await dockMe.click();
+    await page.locator("[data-mv2='explore-nav'][data-nav='me']").click();
   }
   await expect(page.locator(".me-page")).toBeVisible();
 }

@@ -475,6 +475,6 @@ test.describe("tabbed block keyboard and dark look", () => {
     expect(color.theme).toBe("dark");
     expect(color.hair).toBe("rgba(247, 244, 238, 0.14)");
     expect(color.hair).toBe(color.bar);
-    expect(color.fill).toBe("rgb(26, 23, 20)");
+    expect(color.fill).toBe("rgb(44, 46, 44)"); // --surface-1, charcoal since 2026-11-23
   });
 });
