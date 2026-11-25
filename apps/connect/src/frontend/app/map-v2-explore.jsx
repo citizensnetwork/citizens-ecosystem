@@ -1130,6 +1130,8 @@
         'aria-label': str.title,
         onPointerDown: onPanelDown, onPointerMove: onPanelMove, onPointerUp: onPanelUp,
         onPointerCancel: onPanelCancel,
+        // now, and again one frame later: the browser's own focus scroll can land after this handler and undo it
+        onFocus: (e) => { const t = e.target; revealInRow(t, root.current); requestAnimationFrame(() => { if (document.activeElement === t) revealInRow(t, root.current); }); },
       },
         h('div', {
           'data-mv2': 'explore-grab', role: 'button', tabIndex: 0, 'aria-expanded': open ? 'true' : 'false',
@@ -1709,6 +1711,37 @@
 
   /** True on a phone-width screen, where the folding nav sits at the foot (the home screen clears room for it). */
   const useNarrow = () => useMedia(NARROW_MQ);
+
+  // QA 2026-11-25 (CCQA-0004): a Tab stop in a sideways row must be seen. Chrome scrolls a focused element into view only
+  // when it is fully hidden, so a tile half past the row's edge took focus with its centre still clipped. Scroll the
+  // nearest sideways row (inside the panel) just enough to show the focused element whole, clear of the row's arrow
+  // buttons. Sideways only: the panel's own vertical scroller must not move (an overflow-hidden box can still be scrolled).
+  function revealInRow(el, stop) {
+    if (!el || !el.getBoundingClientRect) return;
+    // keyboard focus only: a finger or mouse focuses the button just before its click lands, and moving the row then
+    // would pull the card out from under the tap (the founder's Where to… taps rely on the card staying put)
+    let byKey = false;
+    try { byKey = el.matches(':focus-visible'); } catch { byKey = false; }
+    if (!byKey) return;
+    let row = el.parentElement;
+    while (row && row !== stop) {
+      const ox = window.getComputedStyle(row).overflowX;
+      if ((ox === 'auto' || ox === 'scroll') && row.scrollWidth > row.clientWidth + 1) break;
+      row = row.parentElement;
+    }
+    if (!row || row === stop) return;
+    const r = el.getBoundingClientRect();
+    const b = row.getBoundingClientRect();
+    // the arrows show only once the row holds focus (so they can measure 0 here): always leave an arrow's room, 52 px
+    // (a 44 px button 4 px in from the edge, plus a little air), or more if a wider arrow is already showing
+    let edge = row.parentElement && row.parentElement.querySelector(':scope > [data-mv2="xarrow"]') ? 52 : 0;
+    (row.parentElement ? row.parentElement.querySelectorAll(':scope > [data-mv2="xarrow"]') : []).forEach((a) => {
+      const w = a.getBoundingClientRect().width + 8;
+      if (w > edge) edge = w;
+    });
+    if (r.left < b.left + edge) row.scrollLeft -= (b.left + edge) - r.left;
+    else if (r.right > b.right - edge) row.scrollLeft += r.right - (b.right - edge);
+  }
 
   window.MapV2Explore = {
     ROW_CAP, SETTLE_MS, GROUPS, GROUP_OF, PILLS, INTENTS, TILES, groupOf, pillMatches, intentOf, intentMatches, matchesFilter, tileOf, tileMatches, tileFor, rank, useNarrow, indexSources, cardFor, Pills, Categories, Intents, Explore, SECTIONS,

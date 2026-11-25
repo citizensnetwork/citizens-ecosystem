@@ -14,6 +14,9 @@
       type: { event: 'Event', place: 'Place', contributor: 'Contributor', idea: 'Impact idea' },
       kind: { ministry: 'Ministry', organization: 'Organisation', business: 'Business', individual: 'Individual' },
       dismissUpdate: 'Dismiss update',
+      // QA 2026-11-25 (CCQA-0004): what a screen reader hears as the map settles, and the first Tab stop on the map home
+      inView: (n) => (n === 0 ? 'No listings in this part of the map.' : n === 1 ? '1 listing in view.' : n + ' listings in view.'),
+      skipMap: 'Skip the map, go to the list',
     },
 
     sheet: {

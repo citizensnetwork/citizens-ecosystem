@@ -295,6 +295,32 @@
     });
   }
 
+  // Keyboard and screen-reader reach (QA 2026-11-25, CCQA-0004): only pins a sighted person can see are Tab stops. A pin
+  // off the screen, gated out at this zoom, or under a panel (the Explore panel, a sheet, the nav) used to be a Tab stop
+  // too (22 presses reached 6 off-screen and 3 covered pins). Pure choice, so it can be tested: each entry says whether
+  // its pin is shown (displayed, inside the map and the window, and the topmost element at its centre), how far it is
+  // from the middle of the open map, and whether it must stay reachable (the focused pin, the chosen pin). At most
+  // MAX_TAB_STOPS shown pins, nearest the middle first; the focused pin always stays so focus is never stranded.
+  const MAX_TAB_STOPS = 12;
+  function chooseTabStops(entries, max) {
+    const cap = Number.isFinite(max) ? max : MAX_TAB_STOPS;
+    const out = new Set();
+    (entries || []).forEach((e) => { if (e && e.focused) out.add(e.id); });
+    (entries || []).forEach((e) => { if (e && e.shown && e.selected && out.size < cap) out.add(e.id); });
+    (entries || []).filter((e) => e && e.shown && !out.has(e.id))
+      .sort((a, b) => (a.dist || 0) - (b.dist || 0))
+      .forEach((e) => { if (out.size < cap) out.add(e.id); });
+    return out;
+  }
+  // A pin that is not a Tab stop is also hidden from screen readers (it is not on the screen either).
+  function applyTabStop(wrap, on) {
+    if (!wrap) return;
+    const want = on ? '0' : '-1';
+    if (wrap.getAttribute('tabindex') !== want) wrap.setAttribute('tabindex', want);
+    if (on) { if (wrap.hasAttribute('aria-hidden')) wrap.removeAttribute('aria-hidden'); }
+    else if (wrap.getAttribute('aria-hidden') !== 'true') wrap.setAttribute('aria-hidden', 'true');
+  }
+
   // Start loading a pin's logo (once). Safe to call repeatedly.
   function ensureLogo(wrap) {
     const img = wrap.querySelector('[data-mv2="logo"]');
@@ -378,5 +404,6 @@
   window.MapV2Pins = {
     photoShown, glyphColor, ariaLabelFor, comparePriority, overlapGroups, hiddenLabels,
     build, makeOperable, ensureLogo, applyDim, applyMatch, applySelected, applyLit, layoutOnIdle, OVERLAP_PX,
+    MAX_TAB_STOPS, chooseTabStops, applyTabStop,
   };
 })();
