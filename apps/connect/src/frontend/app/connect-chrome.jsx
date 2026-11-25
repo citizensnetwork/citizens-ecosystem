@@ -48,14 +48,8 @@ const SLUGS={"worship-prayer": "praying-hands", "church-services": "church", "co
   GROUPS.forEach((g) => { HEX[g.id] = g.hex; });
   const DO_PAGES = ['community', 'lets', 'apply'];
   // Public city centres already used by the app's city labels. The select shows where the map is; it does not switch a second location model.
-  const CITIES = [
-    { name: 'Pretoria', lat: -25.7479, lng: 28.2293 },
-    { name: 'Johannesburg', lat: -26.2041, lng: 28.0473 },
-    { name: 'Cape Town', lat: -33.9249, lng: 18.4241 },
-    { name: 'Durban', lat: -29.8587, lng: 31.0218 },
-    { name: 'Gqeberha', lat: -33.9608, lng: 25.6022 },
-    { name: 'Bloemfontein', lat: -29.0852, lng: 26.1596 },
-  ];
+  // One list for the app (location-lib.jsx also measures pins against it).
+  const CITIES = window.CCLocation.CITIES.map((c) => ({ name: c.name, lat: c.lat, lng: c.lng }));
 
   const shell = { search: false, filter: false, central: false, panels: false, subs: new Set() };
   function patchShell(p) {

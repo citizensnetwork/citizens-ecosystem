@@ -351,7 +351,12 @@
       h('select', { 'aria-label': 'Report reason', value: reason, onChange: (e) => setReason(e.target.value) }, ['Listing details', 'Content concern', 'Something else'].map((o) => h('option', { key: o }, o))),
       h('button', { type: 'button', className: 'cn-primary', onClick: sendReport }, 'Send report'),
       reportState ? h('p', null, reportState) : null);
-    else if (action === 'Directions') body = h(React.Fragment, null, h('p', null, item.location || 'The listing has no address yet.'), (item.lat != null && item.lng != null) ? h('a', { className: 'cn-primary', href: 'https://www.openstreetmap.org/?mlat=' + item.lat + '&mlon=' + item.lng + '#map=16/' + item.lat + '/' + item.lng }, 'Get directions →') : null);
+    else if (action === 'Directions') {
+      // One fail-safe rule for every Directions button (location-lib.jsx): a doubtful pin is never the destination.
+      const dir = window.CCLocation.directionsFor(item);
+      body = h(React.Fragment, null, h('p', null, item.location || item.address || 'The listing has no address yet.'),
+        dir.url ? h('a', { className: 'cn-primary', href: dir.url, target: '_blank', rel: 'noopener noreferrer' }, 'Get directions →') : null);
+    }
     else if (action === 'Website' && item.website) body = h('a', { className: 'cn-primary', href: item.website }, item.website);
     else if (action === 'Call' && item.phone) body = h('a', { className: 'cn-primary', href: 'tel:' + item.phone }, item.phone);
     else if (action === 'Email' && item.email) body = h('a', { className: 'cn-primary', href: 'mailto:' + item.email }, item.email);

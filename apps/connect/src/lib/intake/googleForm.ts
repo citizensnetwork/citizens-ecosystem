@@ -12,6 +12,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { CONTRIBUTOR_TYPES, type ContributorType } from "@/lib/categories";
 import type { ContributorKind } from "@/types/db";
+import { chooseCandidate, cityNamed } from "@/lib/location/placeCheck";
 
 // ── Labels ──────────────────────────────────────────────────────────────
 
@@ -133,9 +134,10 @@ export function parseMapsCoordinates(link: unknown): LatLng | null {
 }
 
 /**
- * Forward-geocode an address with MapTiler (same endpoint and South-Africa
- * bias as the frontend's store.jsx geocodeAddress). Best-effort: any failure
- * is null and the caller records a warning instead of failing the intake.
+ * Forward-geocode an address with MapTiler (same endpoint, South-Africa bias and acceptance rule as the frontend's
+ * location-lib.jsx). Five candidates, biased toward the city the text names; a hit is kept only when it is close to
+ * that city (src/lib/location/placeCheck.ts, QA 2026-11-25: a first hit once put a Pretoria venue near Durban).
+ * Best-effort: a failure or a doubtful hit is null and the caller records a warning instead of failing the intake.
  * `referer` is sent because the key may be origin-restricted in MapTiler.
  */
 export async function geocodeWithMapTiler(
@@ -145,17 +147,25 @@ export async function geocodeWithMapTiler(
   const q = address.trim().slice(0, 300);
   if (!q || !opts.key) return null;
   try {
+    const named = cityNamed(q);
     const url =
       `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json` +
-      `?key=${encodeURIComponent(opts.key)}&limit=1&country=za`;
+      `?key=${encodeURIComponent(opts.key)}&limit=5&country=za` +
+      (named ? `&proximity=${named.lng},${named.lat}` : "");
     const res = await fetch(url, {
       headers: { Referer: opts.referer },
       signal: AbortSignal.timeout(5_000),
     });
     if (!res.ok) return null;
-    const json = (await res.json()) as { features?: { center?: unknown }[] };
-    const center = json.features?.[0]?.center;
-    return Array.isArray(center) ? toLatLng(center[1], center[0]) : null;
+    const json = (await res.json()) as { features?: { center?: unknown; relevance?: unknown }[] };
+    const candidates = (json.features ?? []).flatMap((f) => {
+      const c = f?.center;
+      if (!Array.isArray(c)) return [];
+      const point = toLatLng(c[1], c[0]);
+      return point ? [{ ...point, relevance: typeof f.relevance === "number" ? f.relevance : 0 }] : [];
+    });
+    const choice = chooseCandidate(q, candidates);
+    return choice.status === "ok" && choice.best ? toLatLng(choice.best.lat, choice.best.lng) : null;
   } catch {
     return null;
   }

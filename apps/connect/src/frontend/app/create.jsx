@@ -57,8 +57,17 @@
     // combined `location` string (see createEvent), so the original
     // venue-name/address split isn't recoverable. Showing the true combined
     // value beats guessing a fake split.
+    // The pin travels with the form (QA 2026-11-25, CCQA-0009): an edit starts from the saved pin, and a saved pin that is
+    // far from the city its own words name starts as "needs confirming", so the owner sees the problem before saving.
+    const pinOf = (it) => {
+      const lat = it && typeof it.lat === 'number' ? it.lat : null;
+      const lng = it && typeof it.lng === 'number' ? it.lng : null;
+      const lv = lat == null ? 'none' : window.CCLocation.pinTrust(it).level;
+      return { lat, lng, needsConfirm: lv === 'far' || lv === 'outside' };
+    };
     const [f, setF] = useState(() => {
       if (isEditing && isEvent) return {
+        ...pinOf(editing),
         title: editing.title || '', category: editing.category || '', description: editing.description || '',
         date: editing.date || '', time: editing.time24 || '', endTime: editing.endTime24 || '',
         location: editing.location || '', address: '',
@@ -68,14 +77,22 @@
         upcomingDates: [], launchBroadcast: '',
       };
       if (isEditing) return {
+        ...pinOf(editing),
         name: editing.name || '', category: editing.category || '', description: editing.description || '',
         address: editing.address || '', openHours: editing.openHours || '',
         coverPhoto: editing.coverPhoto || '', gallery: editing.gallery || [],
         socials: editing.socials || {}, volunteeringEnabled: !!editing.volunteeringEnabled,
       };
       return isEvent
-        ? { title: '', category: presetStarter ? presetStarter.category : '', description: '', date: '', time: '', endTime: '', location: '', address: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false, letsStarter: presetStarter ? presetStarter.id : '', upcomingDates: [], launchBroadcast: '' }
-        : { name: '', category: '', description: '', address: '', openHours: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false };
+        ? { title: '', category: presetStarter ? presetStarter.category : '', description: '', date: '', time: '', endTime: '', location: '', address: '', lat: null, lng: null, needsConfirm: false, coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false, letsStarter: presetStarter ? presetStarter.id : '', upcomingDates: [], launchBroadcast: '' }
+        : { name: '', category: '', description: '', address: '', lat: null, lng: null, needsConfirm: false, openHours: '', coverPhoto: '', gallery: [], socials: {}, volunteeringEnabled: false };
+    });
+    // The picker reports the pin and whether it is settled. Its reverse-geocoded address is not used: the owner's own
+    // words stay the listing's address, and the pin is what the map shows.
+    const setLoc = (patch) => setF((cur) => {
+      const next = { ...cur };
+      ['lat', 'lng', 'needsConfirm'].forEach((k) => { if (k in patch) next[k] = patch[k]; });
+      return next;
     });
     const up = (k, v) => setF((s) => ({ ...s, [k]: v }));
     const pickStarter = (id) => {
@@ -131,9 +148,11 @@
         h(Field, { label: 'End' }, h('input', { type: 'time', value: f.endTime, onChange: (e) => up('endTime', e.target.value), className: window.UI.inputCls }))),
       h(Field, { label: isEvent ? 'Venue name' : 'Address', required: true }, h(Input, { value: isEvent ? f.location : f.address, onChange: (e) => up(isEvent ? 'location' : 'address', e.target.value), placeholder: isEvent ? 'Where is it held?' : 'Street, suburb, city' })),
       isEvent && h(Field, { label: 'Address', hint: 'Include suburb & city — this places your pin on the map.' }, h(Input, { value: f.address, onChange: (e) => up('address', e.target.value), placeholder: 'Street, suburb, city' })),
-      h('div', { className: 'flex items-start gap-2 p-3 rounded-xl bg-accent/60 text-gold-dark' },
-        h(Icon, { name: 'MapPin', size: 15, className: 'shrink-0 mt-0.5' }),
-        h('p', { className: 'text-xs leading-relaxed' }, 'Your map pin is placed automatically from the address above.')),
+      h(Field, { label: 'Map pin', hint: 'The pin follows the address. If it is not on the venue, drag the map until it is.' },
+        h(window.LocationPicker, {
+          value: { address: isEvent ? (f.address || f.location) : f.address, lat: f.lat, lng: f.lng, needsConfirm: f.needsConfirm },
+          onChange: setLoc, confirmMode: true, height: 170,
+        })),
       // DEFER TO V2: recurring / upcoming dates.
       isEvent && h(Field, { label: 'Recurring / upcoming dates', hint: 'Optional — add future dates this repeats.' },
         h('div', { className: 'flex gap-2 mb-2' },
@@ -172,7 +191,7 @@
       ? [{ title: 'The basics', node: Basics }, { title: 'When & where', node: When }, { title: 'Media & links', node: Media }, { title: 'Options & launch', node: Options }]
       : [{ title: 'The basics', node: Basics }, { title: 'Location', node: When }, { title: 'Media & links', node: Media }, { title: 'Options', node: Options }];
 
-    const canSubmit = isEvent ? (f.title && f.category) : (f.name && f.category);
+    const canSubmit = (isEvent ? (f.title && f.category) : (f.name && f.category)) && !f.needsConfirm;
     const title = isEditing ? (isEvent ? 'Edit Event' : 'Edit Place') : (isEvent ? 'Create Event' : 'Add Place');
     const variant = creationStyle === 'side' ? 'side' : creationStyle === 'modal' ? 'modal' : 'sheet';
 
@@ -192,7 +211,7 @@
             h('div', { className: 'space-y-4' }, cur.node)),
           h('div', { className: 'shrink-0 border-t border-border px-5 py-3 flex gap-3' },
             step > 0 && h(Button, { variant: 'outline', className: 'flex-1', onClick: () => setStep(step - 1) }, 'Back'),
-            h(Button, { variant: 'gold', className: 'flex-[2]', disabled: (last && !canSubmit) || publishing, icon: last ? (isEditing ? 'Check' : 'Rocket') : null, iconRight: last ? null : 'ArrowRight', onClick: () => (last ? submit() : setStep(step + 1)) }, last ? (publishing ? (isEditing ? 'Saving…' : 'Publishing…') : (isEditing ? 'Save changes' : 'Publish')) : 'Continue'))));
+            h(Button, { variant: 'gold', className: 'flex-[2]', disabled: (last && !canSubmit) || (cur.node === When && f.needsConfirm) || publishing, icon: last ? (isEditing ? 'Check' : 'Rocket') : null, iconRight: last ? null : 'ArrowRight', onClick: () => (last ? submit() : setStep(step + 1)) }, last ? (publishing ? (isEditing ? 'Saving…' : 'Publishing…') : (isEditing ? 'Save changes' : 'Publish')) : 'Continue'))));
     }
 
     // MODAL / SIDE layout (single scroll, sectioned)

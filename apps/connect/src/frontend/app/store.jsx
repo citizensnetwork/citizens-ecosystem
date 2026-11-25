@@ -134,22 +134,32 @@
     return publicUrl;
   }
 
-  // Forward-geocode a free-text address via MapTiler (key already in env for
-  // the basemap). South-Africa-biased. Returns {lat,lng} or null — callers
-  // decide whether coordinates are required (places) or optional (events).
+  // Forward-geocode a free-text address (MapTiler, the basemap's key) and keep
+  // the answer ONLY when it is close to the city the text names, or to the
+  // place being looked at (location-lib.jsx, QA 2026-11-25 CCQA-0009: a first
+  // hit once put a Pretoria venue near Durban). Returns {lat,lng} or null; a
+  // doubtful hit is null, so callers place no pin rather than a wrong one, and
+  // the forms' pin picker is where the owner confirms or moves it.
+  function viewCentre() {
+    const map = window.__ccMap;
+    if (!map || !map.getCenter) return null;
+    const c = map.getCenter();
+    return { lat: c.lat, lng: c.lng };
+  }
   async function geocodeAddress(q) {
-    try {
-      const key = window.__CC_ENV && window.__CC_ENV.MAPTILER_KEY;
-      if (!key || !q || !q.trim()) return null;
-      const res = await fetch('https://api.maptiler.com/geocoding/' + encodeURIComponent(q.trim()) + '.json?key=' + key + '&limit=1&country=za');
-      if (!res.ok) return null;
-      const json = await res.json();
-      const f = json && json.features && json.features[0];
-      if (!f || !Array.isArray(f.center)) return null;
-      return { lng: f.center[0], lat: f.center[1] };
-    } catch (e) { return null; }
+    const r = await window.CCLocation.resolveLocation(q, { near: viewCentre() });
+    return r.status === 'ok' ? { lat: r.best.lat, lng: r.best.lng } : null;
   }
   window.geocodeAddress = geocodeAddress;
+  window.viewCentre = viewCentre;
+  // The pin the form's picker holds, when the owner placed or confirmed it.
+  // A pin the picker still marks "needs confirming" is never used.
+  const pickedPin = (form) => (form && typeof form.lat === 'number' && typeof form.lng === 'number' && isFinite(form.lat) && isFinite(form.lng)
+    ? { lat: form.lat, lng: form.lng } : null);
+  const samePin = (a, b) => (!a && !b) || (!!a && !!b && Math.abs(a.lat - b.lat) < 1e-6 && Math.abs(a.lng - b.lng) < 1e-6);
+  // A form that carries the picker's fields (create.jsx) has already placed its pin with the owner watching: the store
+  // saves exactly that pin and never re-geocodes behind the owner's back. Other callers send text only.
+  const fromPicker = (form) => !!form && Object.prototype.hasOwnProperty.call(form, 'lat');
 
   // Reverse-geocode a dropped pin back into a human-readable address (same
   // MapTiler key/endpoint as geocodeAddress, just {lng,lat} instead of a
@@ -1264,7 +1274,9 @@
           const start = form.date ? new Date(form.date + 'T' + (form.time || '09:00')) : null;
           if (!start || isNaN(start.getTime())) { toast('Please pick a date and start time.', 'red'); finish(false); return; }
           const end = form.endTime ? new Date(form.date + 'T' + form.endTime) : null;
-          const geo = await geocodeAddress(form.address || form.location);
+          if (form.needsConfirm) { toast('Check the pin on the map first: is it the right spot?', 'gold'); finish(false); return; }
+          // The picker's pin first (the owner saw it), like places and contributors; else a confident geocode; else no pin.
+          const geo = pickedPin(form) || await geocodeAddress(form.address || form.location);
           const socials = form.socials || {};
           const row = {
             title: form.title,
@@ -1284,7 +1296,7 @@
           const { data, error } = await window.CC_SUPABASE.from('events').insert(row).select('*').single();
           if (error) throw error;
           setEvents((prev) => [adaptEvent(data), ...prev]);
-          toast(geo ? 'Event published — now live on the map!' : 'Event published! We couldn’t place that address on the map — refine it later.', 'green');
+          toast(geo ? 'Event published — now live on the map!' : 'Event published! We couldn’t place that address on the map with confidence — edit it and set the pin.', 'green');
           if (form.launchBroadcast && role === 'contributor') sendBroadcast('event', data.id, form.launchBroadcast);
           finish(true, data);
         } catch (e) {
@@ -1326,8 +1338,14 @@
           const end = form.endTime ? new Date(form.date + 'T' + form.endTime) : null;
           const existing = eventRows.find((e) => e.id === id);
           const newLocation = [form.location, form.address].filter(Boolean).join(', ');
+          if (form.needsConfirm) { toast('Check the pin on the map first: is it the right spot?', 'gold'); finish(false); return; }
           const locationChanged = !existing || newLocation !== existing.location;
-          const geo = locationChanged ? await geocodeAddress(form.address || form.location) : null;
+          const oldPin = existing && typeof existing.lat === 'number' ? { lat: existing.lat, lng: existing.lng } : null;
+          // The picker's pin when the form has one (null clears it); otherwise new words are re-placed confidently or not at all.
+          const picker = fromPicker(form);
+          const picked = pickedPin(form);
+          const pinChanged = picker && !samePin(picked, oldPin);
+          const geo = picker ? picked : (locationChanged ? await geocodeAddress(form.address || form.location) : null);
           const socials = form.socials || {};
           const row = {
             title: form.title,
@@ -1340,7 +1358,7 @@
             volunteer_openings: !!form.volunteeringEnabled,
             ...window.DATA.socialsToRow(socials, 'event'),
           };
-          if (locationChanged) { row.latitude = geo ? geo.lat : null; row.longitude = geo ? geo.lng : null; }
+          if (picker ? pinChanged : locationChanged) { row.latitude = geo ? geo.lat : null; row.longitude = geo ? geo.lng : null; }
           const { data, error } = await window.CC_SUPABASE.from('events').update(row).eq('id', id).select('*').single();
           if (error) throw error;
           setEvents((prev) => prev.map((e) => (e.id === id ? { ...adaptEvent(data), status: e.status } : e)));
@@ -1399,8 +1417,9 @@
       }
       (async () => {
         try {
-          const geo = await geocodeAddress(form.address);
-          if (!geo) { toast('We couldn’t find that address — add a suburb and city, then try again.', 'red'); finish(false); return; }
+          if (form.needsConfirm) { toast('Check the pin on the map first: is it the right spot?', 'gold'); finish(false); return; }
+          const geo = pickedPin(form) || await geocodeAddress(form.address);
+          if (!geo) { toast('We couldn’t place that address with confidence — add a suburb and city, or set the pin on the map.', 'red'); finish(false); return; }
           const categoryId = await getCategoryId(form.category);
           const row = {
             name: form.name,
@@ -1448,9 +1467,15 @@
       (async () => {
         try {
           const existing = placeRows.find((p) => p.id === id);
+          if (form.needsConfirm) { toast('Check the pin on the map first: is it the right spot?', 'gold'); finish(false); return; }
           const addressChanged = !existing || form.address !== existing.address;
-          const geo = addressChanged ? await geocodeAddress(form.address) : null;
-          if (addressChanged && !geo) { toast('We couldn’t find that address — add a suburb and city, then try again.', 'red'); finish(false); return; }
+          const oldPin = existing && typeof existing.lat === 'number' ? { lat: existing.lat, lng: existing.lng } : null;
+          const picker = fromPicker(form);
+          const picked = pickedPin(form);
+          const pinChanged = picker && !samePin(picked, oldPin);
+          const geo = picker ? picked : (addressChanged ? await geocodeAddress(form.address) : null);
+          // places.latitude/longitude are NOT NULL: a place always keeps a pin the owner can see.
+          if ((picker || addressChanged) && !geo) { toast('We couldn’t place that address with confidence — add a suburb and city, or set the pin on the map.', 'red'); finish(false); return; }
           const categoryId = await getCategoryId(form.category);
           const row = {
             name: form.name,
@@ -1463,7 +1488,7 @@
             volunteer_openings: !!form.volunteeringEnabled,
             ...window.DATA.socialsToRow(form.socials || {}, 'place'),
           };
-          if (addressChanged) { row.latitude = geo.lat; row.longitude = geo.lng; }
+          if (geo && (picker ? pinChanged : addressChanged)) { row.latitude = geo.lat; row.longitude = geo.lng; }
           const { data, error } = await window.CC_SUPABASE.from('places').update(row).eq('id', id).select('*').single();
           if (error) throw error;
           setPlaces((prev) => prev.map((p) => (p.id === id ? { ...adaptPlace(data), category: form.category || p.category, status: p.status } : p)));

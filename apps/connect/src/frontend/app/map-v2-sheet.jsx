@@ -94,8 +94,8 @@
     }, []);
     return wide;
   }
-  const directionsUrl = (it) => (typeof it.lat === 'number' && typeof it.lng === 'number')
-    ? 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(it.lat + ',' + it.lng) : '';
+  // Fail-safe Directions (location-lib.jsx, QA 2026-11-25): a doubtful pin hands the provider the address text instead.
+  const directionsUrl = (it) => window.CCLocation.directionsFor(it).url;
   // A public contact address only becomes a mailto: link when it is one plain address (no spaces, no header tricks).
   const mailUrl = (addr) => (/^[^\s@<>"',;?&=]+@[^\s@<>"',;?&=]+\.[^\s@<>"',;?&=]+$/.test(String(addr || '')) ? 'mailto:' + encodeURI(addr) : '');
   const telUrl = (phone) => {
