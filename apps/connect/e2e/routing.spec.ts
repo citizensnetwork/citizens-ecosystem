@@ -808,6 +808,54 @@ test.describe("Sign-in redirects are fixed and safe", () => {
   }
 });
 
+test.describe("App links in the native shell (QA plan PR G)", () => {
+  test("the link that started the app opens its screen, a link while it runs opens too, Back returns, a foreign link is ignored", async ({ page }) => {
+    await openDemo(page);
+    // stand in for the native bridge: every appUrlOpen listener is kept (auth-client.js registers one too), and the
+    // app was started by a link to Kingdom Exploration
+    await page.route("**/capacitor-bridge*.js", (route: Route) =>
+      route.fulfill({
+        contentType: "application/javascript",
+        body:
+          "window.__capOpen=[];" +
+          "window.CapCore={isNativePlatform:function(){return true;}};" +
+          "window.CapApp={addListener:function(e,cb){if(e==='appUrlOpen')window.__capOpen.push(cb);return Promise.resolve({remove:function(){}});}," +
+          "getLaunchUrl:function(){return Promise.resolve({url:'https://219.co.za/citizens/connect/discover'});}};",
+      }),
+    );
+    const open = (url: string) =>
+      page.evaluate((u) => (window as unknown as { __capOpen: ((d: { url: string }) => void)[] }).__capOpen.forEach((cb) => cb({ url: u })), url);
+
+    await page.goto("/");
+    await expect.poll(() => screen(page)).toBe("kingdom-discovery");
+    expect(path(page)).toBe("/discover");
+
+    await open(`https://219.co.za/citizens/connect/e/${EVENT_ID}`);
+    await expect.poll(() => screen(page)).toBe("event");
+    expect(path(page)).toBe(`/e/${EVENT_ID}`);
+
+    // not ours: another host, another app under the same domain, the sign-in callback. The screen stays where it is.
+    for (const url of [
+      "https://evil.example/citizens/connect/discover",
+      "https://219.co.za/citizens/wear/discover",
+      "citizensconnect://auth-callback?code=abc",
+    ]) {
+      await open(url);
+    }
+    await page.waitForTimeout(300);
+    expect(await screen(page)).toBe("event");
+
+    // the link opened the screen the way a tap does: Back returns to where the person was
+    await page.goBack();
+    await expect.poll(() => screen(page)).toBe("kingdom-discovery");
+
+    // a link to the build's own public address opens too: with no mobile config that is the address the app shares
+    // today (routes.jsx PUBLIC_ORIGIN's fallback), so a link it shared brings the person back in
+    await open(`https://www.citizenscentral.co.za/e/${EVENT_ID}`);
+    await expect.poll(() => screen(page)).toBe("event");
+  });
+});
+
 test.describe("The Capacitor hardware Back button", () => {
   test("closes an open card, then steps back through the screens, then exits from the first", async ({ page }) => {
     await openDemo(page);

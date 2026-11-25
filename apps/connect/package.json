@@ -27,7 +27,7 @@
     "mobile:build": "npx cap sync"
   },
   "dependencies": {
-    "@capacitor/android": "~8.4.3",
+    "@capacitor/android": "~8.5.3",
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.5",
     "@capacitor/cli": "~8.5.3",

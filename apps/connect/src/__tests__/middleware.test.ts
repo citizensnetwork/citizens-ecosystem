@@ -155,4 +155,17 @@ describe("middleware", () => {
     expect(mod.config.matcher).toBeDefined();
     expect(mod.config.matcher.length).toBeGreaterThan(0);
   });
+
+  it("skips /.well-known/ (App Links' assetlinks.json is served as it is), and still runs on pages and the API", async () => {
+    const mod = await import("@/middleware");
+    // the matcher is a path pattern whose one group is a plain regular expression
+    const re = new RegExp(`^${mod.config.matcher[0]}$`);
+    expect(re.test("/.well-known/assetlinks.json")).toBe(false);
+    expect(re.test("/.well-known/apple-app-site-association")).toBe(false);
+    expect(re.test("/_next/static/chunk.js")).toBe(false);
+    expect(re.test("/icons/icon-192.png")).toBe(false);
+    for (const path of ["/", "/api/v1/events", "/e/0f8fad5b-d9cb-469f-a165-70867728950e", "/.well-knownish", "/dashboard"]) {
+      expect(re.test(path), path).toBe(true);
+    }
+  });
 });
