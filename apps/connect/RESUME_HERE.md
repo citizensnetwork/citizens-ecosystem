@@ -1,6 +1,6 @@
 # RESUME_HERE — Citizens Ecosystem (Connect · Vision · Wear)
 
-> **Journal folded through: 2026-11-01T19:46:14Z.** Read the journal entries newer than this.
+> **Journal folded through: 2026-11-25T13:57:35Z.** Read the journal entries newer than this.
 >
 > **Read this first. It is the single source of truth for "where are we?" between sessions.**
 > Read [`VISION.md`](VISION.md) before it, and follow the root [`CLAUDE.md`](../../CLAUDE.md).
@@ -10,6 +10,7 @@
 >   [`docs/archive/RESUME_HISTORY_2026H2.md`](docs/archive/RESUME_HISTORY_2026H2.md). **Section numbers are
 >   unchanged**, so a doc that cites "RESUME_HERE §3AS" resolves there.
 > - Phase 0 → mid-June 2026 (§2x batches): [`docs/archive/RESUME_HISTORY_2026H1.md`](docs/archive/RESUME_HISTORY_2026H1.md).
+> - Journal entries, word for word: [`docs/journal/`](docs/journal/) (one file a month).
 > - 2026-10-17 → 2026-11-01 sessions, the old long §2 and the old header, verbatim: [`docs/archive/RESUME_HISTORY_2026-11.md`](docs/archive/RESUME_HISTORY_2026-11.md). The older §2 prose is in [`docs/archive/RESUME_HISTORY_2026-10.md`](docs/archive/RESUME_HISTORY_2026-10.md).
 
 ### How to update this file (the daily fold only)
@@ -38,7 +39,7 @@ If `gh` is unavailable, say so in your first message and carry on with this file
 | Frontend | Standalone HTML/React app in `src/frontend/`, precompiled by `@citizens/frontend-build` (esbuild) | Same model, desktop-first, no Capacitor | Same model |
 | Backend | Next.js 15 **API-only** (`/api/*`, public `/api/v1`) | Next.js 16 API-only (45 handlers) | Next.js 15 API-only (`/api/*`, Bearer-or-cookie `handler()`) |
 | DB schema | `public` (the commons) | `vision.*` | `wear.*` |
-| Production | https://www.citizenscentral.co.za | https://citizens-ecosystem-vision.vercel.app | https://citizens-ecosystem-wear.vercel.app |
+| Production | https://219.co.za/citizens/connect | https://219.co.za/citizens/vision | https://219.co.za/citizens/wear |
 | Mobile | Capacitor 8 shell (`android/`, `ios/`), never tested on a device | none (by design) | JS bridge ready, no native shell yet |
 
 - **One Supabase project for all three apps:** `xyiajtrvhlxaeplsiajj` (Free org: no branching, no HIBP). One
@@ -54,26 +55,29 @@ If `gh` is unavailable, say so in your first message and carry on with this file
 
 ---
 
-## 2. Current state snapshot (2026-11-01; the daily fold refreshes it from live reads)
+## 2. Current state snapshot (2026-11-25; the daily fold refreshes it from live reads)
 
-The long per-PR prose that used to sit here is verbatim in [`docs/archive/RESUME_HISTORY_2026-11.md`](docs/archive/RESUME_HISTORY_2026-11.md) ("Old section 2").
+Older snapshots are verbatim in [`docs/archive/RESUME_HISTORY_2026-11.md`](docs/archive/RESUME_HISTORY_2026-11.md) ("Old section 2"). The fold of 2026-11-25 ran in a cloud session that the database tool refuses: the migration and advisor lines below come from the journal, not a live read.
 
-- **`main` head: `a0f63ce6`, PR #322** (docs only: the session-journal proposal). Last code merges under it: #320 `cf8dd6f2` (contributor review emails link to real screens and the live site), #319 `e05bef54` (S17: the force re-login and bio-setup gates retired), #318 `db6ad3a6` (hub: Citizens Learn line, Citizens Impact reserved), #309 `c9d60a74` (the front door and the old-address rules, off by default; C39). Every earlier merge since 2026-10-19: the archive. Live: `git log origin/main`.
-- **Latest live migration = 199** (`20261101171030 / 199_edit_listing_suggestion`, PR #277), applied after **200** (`20261101163103 / 200_lock_anon_secdef_execute`, PR #291). Read from the database 2026-11-01. Also live: 198 (`20261026055042`, PR #272), 197, 196, 195 (serving areas, PR #262), 194 and 193 (applied 2026-10-19). Do not apply any of 193 to 200 again. **The next new migration is 201.** Take the number from a fresh `list_migrations` at apply time. The Builder never applies a migration.
-- **Security advisor: 0 ERROR / 139 WARN / 3 INFO** (re-queried 2026-11-01, after 199 was live; not re-queried by the slimming PR). Every WARN is known and accepted: SECURITY DEFINER EXECUTE grants (by design, each documented in its migration), HIBP (needs Supabase Pro), `pg_net` in `public`. The 3 INFO: `search_term_stats` (service_role-only by design) and the two orphan `kv_store_*` tables (H6). No new ERROR.
-- **Performance advisor debt (not yet addressed; counts from 2026-09-27):** 214 `auth_rls_initplan`, 319 `multiple_permissive_policies`, 65 unindexed foreign keys (19 in `wear`), 6 duplicate indexes (all in `public`). Item **S6**.
-- **15 cron jobs, all active** (map prominence, messaging purge, contributor analytics x3, search-term purge, contributor digest, Vision MV refresh x3, Vision daily snapshots, Vision advisory eval, live-location cleanup every 15 min, impersonation expiry every 5 min, `moments-cleanup` 02:17 daily).
-- **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash, `INTAKE_WEBHOOK_SECRET`, the Vercel-Supabase integration vars, `RESEND_API_KEY` (Production and Preview; the four approval live checks passed 2026-10-19) and `ADMIN_NOTIFY_EMAIL`. Auth email goes through Resend SMTP (`no-reply@citizenscentral.co.za`).
+- **`main` head: `7bd49e56`, PR #391** (2026-11-25, the phone layout). Merged since 2026-11-01, by area: the cutover (#327, #342) and the front door (#339 to #341); the engine (#352 to #354, #359, #360, #364, #376, #384; topic [`engine.md`][en]); the map home rebuild (#365, #378 to #380, #383, #388), the pack screens (#389) and the phone layout (#391); home-screen icons (#355), the service worker retired (#358), the intake join page (#385); dependencies (#331, #344, #356, #357, #377 picomatch fork); the pre-apply tag ceremony dropped (#328); C41 Open to collaborate (#324, migration 201). Live: `git log origin/main`.
+- **Production is `219.co.za/citizens/<app>`** since the cutover of 2026-11-03 (closed 2026-11-05, A19). `www.citizenscentral.co.za` forwards (308) and must be renewed before 2027-06-08 (A23).
+- **Migrations (journal 2026-11-12 and 2026-11-13, not re-read): live through 202**; 201 and 202 were applied on 2026-11-01, 202 first, so the highest recorded version is 201's. 203 to 205 are drafted on PR #351 (Central, C59), not applied. Take the next number from a fresh `list_migrations` at apply time. A new `supabase/migrations` file needs a line in `supabase-engine/citizens-line-ledger.json` or the `@engine/db` drift test fails.
+- **Security advisor: 0 ERROR / 139 WARN / 3 INFO as of 2026-11-01** (not re-queried since). Every WARN is known and accepted: SECURITY DEFINER EXECUTE grants (by design), HIBP (needs Supabase Pro), `pg_net` in `public`. The 3 INFO: `search_term_stats` (service_role-only by design) and the two orphan `kv_store_*` tables (H6).
+- **Performance advisor debt (counts from 2026-09-27):** 214 `auth_rls_initplan`, 319 `multiple_permissive_policies`, 65 unindexed foreign keys (19 in `wear`), 6 duplicate indexes. Item **S6**.
+- **15 cron jobs, all active** (as of 2026-11-01; list in the archive's old section 2).
+- **Engine:** its own Supabase organisation with one free build project (eu-central-1, test data only) and its own migration line `supabase-engine/` (0001 to 0011 applied there). Nothing from Citizens' data goes in.
+- **Env:** Connect's Vercel env has Supabase, MapTiler, Upstash, `INTAKE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `ADMIN_NOTIFY_EMAIL`; `NEXT_PUBLIC_BASE_PATH` and `NEXT_PUBLIC_SITE_URL` since Step 3 of the cutover; Vision and Wear read `CONNECT_API_BASE_URL` (Wear runs its mock client: no `CONNECT_MODE`). Auth email goes through Resend SMTP.
 - **Local-dev gap:** Wear's and Vision's `.env.local` have no Supabase vars, so local builds get a blank `config.js` and Vision's `next start` returns 500. Workaround: inject the two public `NEXT_PUBLIC_SUPABASE_*` values from Connect's `.env.local` into the local process env (never commit or print them).
-- **Next up:** the instruction edits from the proposal's section 5 (`CLAUDE.md`, `apps/connect/CLAUDE.md`, `apps/connect/AGENTS.md`) are PR [#325](https://github.com/citizensnetwork/citizens-ecosystem/pull/325), waiting for the founder's merge; then the first fold PR. Until it merges, both `CLAUDE.md` files still tell sessions to update this file; see the first rule in §3.
+- **Next up:** C58, the QA fix plan of 2026-11-25: PR A (event location truth) first; one published event's pin is 522 km off (A27). Engine: E7 part 3 after Codex PRs #381 and #382; the E6 console needs the engine's name (A22).
 
 ---
 
 ## 3. Standing rules and gotchas (distilled from the history; do not lose these)
 
 **Journal and docs (founder decision, 2026-11-01)**
-- **Sessions do NOT edit this file.** Post ONE entry to the journal (issue #323) when you decide something, find a trap, need the founder, or finish; the daily fold is the only writer. Code PRs never touch this file. At most one docs PR a day. Push once, when the work is ready (squash locally; no "Update branch" merge commits on docs PRs). Until the instruction edits land (§2, Next up), `CLAUDE.md` still says "update RESUME_HERE at the end": a session whose opening prompt says otherwise follows its prompt.
-- **The Builder never applies a migration.** A migration PR waits for the founder's yes (pre-apply tag pushed, rollback-only probe, advisors at 0 ERROR and no new finding). Head and next number: §2.
+- **Sessions do NOT edit this file.** Post ONE entry to the journal (issue #323) when you decide something, find a trap, need the founder, or finish; the daily fold is the only writer. Code PRs never touch this file. At most one docs PR a day. Push once, when the work is ready (squash locally; no "Update branch" merge commits on docs PRs). (The instruction edits landed in #325.)
+- **The Builder never applies a migration.** A migration is applied after the founder says yes in chat (no pre-apply tag since #328); then run its probe and the security advisor (0 ERROR, no new finding). Probes check rights with `has_function_privilege` under a switched role, never by calling a refused function as the owner: that restarts the database (journal 2026-11-14). Head and next number: §2.
+- **Merging (founder, 2026-11-03):** a session may merge its PR once CI is green without the founder naming it; not migrations, data deletion, DNS, plan upgrades or PRs on hold. There are **no required checks**, so `--auto` merges at once: wait for green yourself.
 
 **Process**
 - Work in the **monorepo only**. The standalone `citizens-connect`, `citizens-vision` and `citizens-wear`
@@ -104,8 +108,8 @@ The long per-PR prose that used to sit here is verbatim in [`docs/archive/RESUME
   leave uncommitted files full of zero bytes, so commit early. After a crash, scan with `tr -cd '\000' < file | wc -c`.
 
 **Database / migrations**
-- `supabase/` at the repo root is the one migration lineage. Apply with MCP `apply_migration`, set a pre-apply
-  git tag **and push it**, then require advisors to show 0 ERROR and 0 unexpected new findings. Commit the
+- `supabase/` at the repo root is the one migration lineage (the engine has its own, `supabase-engine/`). Apply with MCP `apply_migration`,
+  then require advisors to show 0 ERROR and 0 unexpected new findings. Commit the
   `.sql` file in the same PR (mig 167 was once applied without one).
 - `CREATE OR REPLACE VIEW` silently drops `security_invoker`, and `CREATE OR REPLACE FUNCTION` drops
   `search_path=''`. Re-state both every time (migs 165/166/168).
@@ -139,12 +143,12 @@ The long per-PR prose that used to sit here is verbatim in [`docs/archive/RESUME
 - `next.config`'s `outputFileTracingRoot` must be the monorepo root, or every API route crashes on Vercel
   (§3AK). Any env var a build script reads must be in `turbo.json` `globalEnv` (§3AH, §3AI).
 - Preview deployments sit behind Vercel SSO. External callers (e.g. the Google Apps Script intake) can only
-  reach `www.citizenscentral.co.za`.
+  reach production, `219.co.za/citizens/connect` (Step 5 of the cutover set the intake address).
 - One Supabase project means one Site URL (Connect's). Another app's auth redirects work only if its origin is
   in the Redirect URLs allow-list (the Wear deploy-hash wildcard is there). PKCE links complete only in the
   browser that requested them, so **the 6-digit email code is the primary email sign-in path**.
 
-**More rules, moved out (still cited as "RESUME_HERE §3").** All are in [`docs/topics/gotchas.md`][gt]; search it for the name before you touch that area: worktrees and dev servers; design-ready; team hours; old docs batching; old Builder-migration rule; timestamp migration versions; routing (routes.jsx); Back and history; store.jsx and button text; CDN tags and SRI; MapLibre; brand icons; new frontend folders; map rules (map.jsx); Map v2 modules; past events; social values; React types; e2e fake project; sign-in; pending applicants (D-12); email; e2e hooks; pins and the Explore row; slow-CI flakes; a known flake; listing automation consent.
+**More rules, moved out (still cited as "RESUME_HERE §3").** All are in [`docs/topics/gotchas.md`][gt]; search it for the name before you touch that area (its last section holds the journal-era traps: merging, engine parity, cloud sessions, panel gestures, pins, overlays, Vercel redeploys, flaky specs): worktrees and dev servers; design-ready; team hours; old docs batching; old Builder-migration rule; timestamp migration versions; routing (routes.jsx); Back and history; store.jsx and button text; CDN tags and SRI; MapLibre; brand icons; new frontend folders; map rules (map.jsx); Map v2 modules; past events; social values; React types; e2e fake project; sign-in; pending applicants (D-12); email; e2e hooks; pins and the Explore row; slow-CI flakes; a known flake; listing automation consent.
 
 ---
 
@@ -173,7 +177,7 @@ The two orderings of the open Connect work (quickest win first, then mission pri
 | [A3][fa] | Wear walk-through: sign-in-as, live email test | P2 |
 | [A4][fa] | Write Ts&Cs, Code of Conduct, fee schedule | P2 |
 | [A6][fa] | Custom domains, branded storage origin (apps: A19) | P3 |
-| [A7][fa] | Supabase Preview check red on main (harmless) | P3 |
+| [A7][fa] | CLOSED 2026-11-25: ignore the red Supabase Preview check | — |
 | [A8][fa] | Store accounts, compliance, release; Android app link | Parked |
 | [A9][fa] | Supabase Pro upgrade decision | Parked |
 | [A10][fa] | Email-code sign-in: optional OTP expiry, re-tests | P3 |
@@ -183,9 +187,16 @@ The two orderings of the open Connect work (quickest win first, then mission pri
 | [A16][fa] | Decide on a stub sign-in account | P2 |
 | [A17][fa] | Listing sources: no feed (RSS) kind; news from feeds | P2 |
 | [A18][fa] | Founder holds #210, #209, #202, #206, #195 (see C57) | P2 |
-| [A19][mv] | 219.co.za one-domain move: founder actions | P2 |
+| [A19][mv] | DONE 2026-11-05: 219.co.za cutover (Steps 1 to 6) | — |
 | [A20][fa] | Repository visibility: founder prefers private | P2 |
 | [A21][fa] | Vercel: look for a 'skip unaffected projects' setting | P2 |
+| [A22][fa] | Engine launch gate: legal entity, name (O8), domain, paid plans | P2 |
+| [A23][fa] | Renew citizenscentral.co.za before 2027-06-08 | P2 |
+| [A24][fa] | After 2027-02-12: yes to deleting sw.js | P3 |
+| [A25][fa] | Phone checks of the November redesign (#365 to #391, #355) | P2 |
+| [A26][fa] | QA fix plan: section 4 decisions, MapTiler referrer, Android SHA-256 | P1 |
+| [A27][fa] | Before 2026-11-28: one event pin 522 km from its venue | P1 |
+| [A28][fa] | Optional: link an organisation for Vision; Wear CONNECT_MODE | P3 |
 
 ### C. Connect: the v1 discovery loop (current product focus)
 
@@ -212,7 +223,7 @@ The two orderings of the open Connect work (quickest win first, then mission pri
 | [C32][cp] | News and Nearby scroll sideways (#275, merged) | P2 | S |
 | [C37][cp] | #210 parts 1 to 3: superseded by C38, closed | P2 | M |
 | [C38][cp] | #210 Map navigation refresh shipped as v4 (#301) | P2 | M |
-| [C39][mv] | One domain, /citizens/<app>: PRs A to D | P2 | L |
+| [C39][mv] | DONE 2026-11-05: one domain, /citizens/<app>, PRs A to D | — | — |
 | [C40][cp] | 'Where to...' in the Explore category list | P2 *(proposed)* | S–M |
 | [C41][cp] | 'Open to collaborate' flag on a Contributor | P3 *(proposed)* | S |
 | [C42][cp] | Per-listing share preview (check first) | P2 *(proposed)* | S–M |
@@ -231,6 +242,21 @@ The two orderings of the open Connect work (quickest win first, then mission pri
 | [C55][cp] | DONE #259: online and non-location Contributors on the map | P3 | S (check only) |
 | [C56][cp] | Members Only events: Become a Member (#260) | P3 | L |
 | [C57][cp] | Founder design decisions 2026-10-21 | P3 | S |
+| [C58][cp] | QA 2026-11-25 fix plan: PRs A to I (A = event pins first) | P1 | L |
+| [C59][cp] | Central feed (#351 draft; migrations 203 to 205 not applied) | P2 | L |
+| [C60][cp] | Ecosystem alignment proposals (KP-2, CON, VIS, WEAR) | P3 *(proposed)* | — |
+
+### E. Engine (white-label map engine; topic [`engine.md`][en])
+
+| ID | Item | Pri | Size |
+|---|---|---|---|
+| [E1][en] | DONE #352/#353: plan, ADR-001, founder answers | — | — |
+| [E2][en] | DONE #353: boundary inventory | — | — |
+| [E3][en] | DONE #354: configuration contract (@engine/config) | — | — |
+| [E5][en] | DONE #359: engine baseline, applied to the build project | — | — |
+| [E6][en] | Security half DONE #360; console needs the name (A22) | P2 | M |
+| [E7][en] | Parts 1-2 DONE (#364, #376, #384); part 3 after #381/#382 | P2 | M |
+| [E8][en] | Not started; needs A22 | P3 | L |
 
 ### T. Agent team (from 2026-10-18: Auditor, Builder and the lead; the Steward is paused as of 2026-10-25; the Dispatcher, Scribe and Strategist keep their clocks; the Designer is paused; the Reader is merged in test mode)
 
@@ -304,6 +330,8 @@ The two orderings of the open Connect work (quickest win first, then mission pri
 | [H11][sh] | A MapTiler key is in a tracked document |
 | [H12][sh] | Wear and Vision functions probably still in iad1 |
 | [H13][sh] | DONE #226: Vercel skips docs-only and untouched apps |
+| [H14][sh] | Monthly: upstream picomatch fix (patched forks, #377) |
+| [H15][sh] | Dead Connect code and dependencies (move the parity test first) |
 
 [fa]: docs/topics/founder-actions.md
 [cp]: docs/topics/connect-pipeline.md
@@ -312,6 +340,7 @@ The two orderings of the open Connect work (quickest win first, then mission pri
 [sh]: docs/topics/security-housekeeping.md
 [vw]: docs/topics/vision-wear-money.md
 [gt]: docs/topics/gotchas.md
+[en]: docs/topics/engine.md
 
 ---
 
@@ -344,7 +373,7 @@ One line per project; where each one stopped is in [`docs/topics/connect-pipelin
 ## 6. Recent sessions (moved: the session journal replaces this section)
 
 History up to 2026-11-01 (about 50 entries, newest first) is verbatim in [`docs/archive/RESUME_HISTORY_2026-11.md`](docs/archive/RESUME_HISTORY_2026-11.md) ("Old section 6").
-Sessions now post to the session journal, pinned issue [#323](https://github.com/citizensnetwork/citizens-ecosystem/issues/323); the daily fold copies the entries into `docs/journal/YYYY-MM.md`.
+Sessions now post to the session journal, pinned issue [#323](https://github.com/citizensnetwork/citizens-ecosystem/issues/323); the daily fold copies the entries into [`docs/journal/YYYY-MM.md`](docs/journal/) (2026-11: 64 entries, through 2026-11-25T13:57:35Z).
 
 ---
 
