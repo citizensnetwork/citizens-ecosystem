@@ -94,6 +94,19 @@ test.describe("event location truth", () => {
     // The owner corrects the words; the geocoder finds nothing for them, so the doubtful old pin is not kept.
     await page.getByPlaceholder("Where is it held?").fill("Community hall, Olympus, Pretoria");
     await expect(box).toHaveCount(0, { timeout: 5000 });
-    await expect(page.getByText("Drag the map to drop your pin")).toBeVisible();
+    const hint = page.getByText("Drag the map to drop your pin");
+    await expect(hint).toBeVisible();
+
+    // Only a move the person makes places a pin, and a pin placed by hand needs no question.
+    const area = await hint.locator("..").boundingBox();
+    if (!area) throw new Error("the picker has no box");
+    const x = area.x + area.width / 2;
+    const y = area.y + area.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x + 40, y + 20, { steps: 8 });
+    await page.mouse.up();
+    await expect(hint).toHaveCount(0);
+    await expect(box).toHaveCount(0);
   });
 });

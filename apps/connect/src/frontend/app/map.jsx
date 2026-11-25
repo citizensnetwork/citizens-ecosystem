@@ -825,8 +825,11 @@
         map.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
         // A drag is the owner putting the pin where the venue is: that settles any "is this the right spot?".
         map.on('dragstart', () => { draggedRef.current = true; });
-        map.on('moveend', () => {
+        map.on('moveend', (e) => {
           if (suppressMoveRef.current) { suppressMoveRef.current = false; return; }
+          // Only a move the person made places the pin (MapLibre attaches the input event to those). A resize also ends in
+          // 'moveend': it used to drop a pin nobody chose at the centre, and to bring back a doubtful pin the form had cleared.
+          if (!e || !e.originalEvent) return;
           const c = map.getCenter();
           const settled = draggedRef.current && confirmRef.current;
           draggedRef.current = false;
