@@ -11,7 +11,7 @@
 //       geocoder then decides. No pin and no text means no Directions.
 //  The geocoder is MapTiler's (the key is the one the basemap already uses). Requests carry the typed text only.
 //
-//  Public surface: window.CCLocation = { CITIES, SA_BOUNDS, FAR_KM, NEAR_KM, MIN_RELEVANCE, haversineKm, inSouthAfrica,
+//  Public surface: window.CCLocation = { CITIES, SA_BOUNDS, FAR_KM, NEAR_KM, MIN_RELEVANCE, CITY_RADIUS_KM, cityScope, haversineKm, inSouthAfrica,
 //  cityNamed, pinTrust, needsCheck, describeTrust, directionsFor, chooseCandidate, resolveLocation }.
 // ════════════════════════════════════════════════════════════════════
 (function () {
@@ -34,6 +34,9 @@
   const NEAR_KM = 60;
   // ...and only when the geocoder itself is reasonably sure it matched the text.
   const MIN_RELEVANCE = 0.6;
+  // City scope on Explore (QA 2026-11-25, CCQA-0002; founder: 35 km, so Pretoria takes in Centurion and Midrand while
+  // Johannesburg, about 55 km away, stays out).
+  const CITY_RADIUS_KM = 35;
   const MIN_RELEVANCE_UNANCHORED = 0.8;
 
   const isNum = (v) => typeof v === 'number' && isFinite(v);
@@ -121,6 +124,16 @@
     return { url: '', by: 'none' };
   }
 
+  // Where a listing stands against a chosen city: 'in' (its pin is within the radius), 'out' (a pin beyond it), or
+  // 'nopin' (online, travelling, or not placed yet). Explore never hides 'nopin' listings: it shows them in their own
+  // group, so the small and the online are not lost by choosing a city.
+  function cityScope(item, city, radiusKm) {
+    if (!hasPin(item)) return 'nopin';
+    if (!hasPin(city)) return 'in';
+    const r = Number.isFinite(radiusKm) ? radiusKm : CITY_RADIUS_KM;
+    return haversineKm(item, city) <= r ? 'in' : 'out';
+  }
+
   // Pure choice over geocoder candidates (tested on its own). candidates: [{ lat, lng, label, relevance }] in the geocoder's
   // order. The anchor is the city the text names, else `near` (the place being looked at). Returns
   //   { status: 'ok', best }       a candidate close to the anchor that the geocoder is sure of: place it without asking
@@ -175,7 +188,7 @@
   }
 
   window.CCLocation = {
-    CITIES, SA_BOUNDS, FAR_KM, NEAR_KM, MIN_RELEVANCE,
+    CITIES, SA_BOUNDS, FAR_KM, NEAR_KM, MIN_RELEVANCE, CITY_RADIUS_KM, cityScope,
     haversineKm, inSouthAfrica, cityNamed, pinTrust, needsCheck, describeTrust, directionsFor, chooseCandidate, resolveLocation,
   };
 })();
