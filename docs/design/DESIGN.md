@@ -85,7 +85,7 @@ Every screen outside the map still reads these. They are the same gold as Map v2
 | Spacing (4-pt) | `--space-1` to `--space-8`: 4, 8, 12, 16, 20, 24, 32, 48 px                                                                                                                                                |
 | Radii          | `--radius-sm` 8, `--radius-md` 12, `--radius-lg` 20, `--radius-full` 999 px                                                                                                                                |
 | Type           | three sizes `--fs-1` 12/16, `--fs-2` 14/20, `--fs-3` 18/24 (size/line height); two weights 400 and 600                                                                                                     |
-| Fonts          | display `--font-display`: Playfair Display; body `--font-body`: Plus Jakarta Sans                                                                                                                          |
+| Fonts          | display `--font-display`: Manrope in Connect (Playfair Display until 2026-11-26; still Playfair in Vision); body `--font-body`: Plus Jakarta Sans                                                          |
 | Elevation      | two levels: `--elev-1`, `--elev-2` (plus the pin's own shadow)                                                                                                                                             |
 | Hit area       | `--hit` 44 px; focus ring `--focus-w` 2 px with `--focus-offset` 2 px                                                                                                                                      |
 | Motion         | `--dur-fast` 120, `--dur-base` 200, `--dur-slow` 320 ms; `--ease-enter`, `--ease-exit`; transform and opacity only; every duration is 0 under `prefers-reduced-motion`                                     |
@@ -154,12 +154,12 @@ for a in connect vision wear; do echo $a; grep -o -E 'family=[A-Za-z+]+' apps/$a
 git grep -n -i 'cormorant' -- packages apps ':!*.md' ':!*.lock' ':!*vendor*'
 ```
 
-| Surface         | Display face                                        | Body face             | Also loaded                                         |
-| --------------- | --------------------------------------------------- | --------------------- | --------------------------------------------------- |
-| Connect, Map v2 | Playfair Display                                    | Plus Jakarta Sans     | Manrope (landing and sign-in only: the brand voice) |
-| Vision          | Playfair Display                                    | Plus Jakarta Sans     |                                                     |
-| Wear (shipped)  | Manrope                                             | Manrope               |                                                     |
-| `packages/ui`   | Cormorant Garamond (falls back to Playfair Display) | the system sans stack | not loaded by any app                               |
+| Surface         | Display face                                        | Body face             | Also loaded                                |
+| --------------- | --------------------------------------------------- | --------------------- | ------------------------------------------ |
+| Connect, Map v2 | Manrope (Playfair Display retired 2026-11-26)       | Plus Jakarta Sans     | nothing else: self-hosted since 2026-11-25 |
+| Vision          | Playfair Display                                    | Plus Jakarta Sans     |                                            |
+| Wear (shipped)  | Manrope                                             | Manrope               |                                            |
+| `packages/ui`   | Cormorant Garamond (falls back to Playfair Display) | the system sans stack | not loaded by any app                      |
 
 The handoff's earlier note of "Inter in three `index.html` files" was wrong: the third face in all three pages is Manrope.
 

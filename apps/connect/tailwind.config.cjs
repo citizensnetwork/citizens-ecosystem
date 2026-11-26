@@ -32,8 +32,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ["Plus Jakarta Sans", "ui-sans-serif", "sans-serif"],
-        serif: ["Playfair Display", "ui-serif", "serif"],
-        // Design Spec's "one voice": geometric Manrope, scoped to the landing/auth screen (crown mark, wordmark, slogan).
+        // Manrope: the landing/auth screen (crown mark, wordmark, slogan) and, since 2026-11-26, the headings base.css styles.
         brand: ["Manrope", "ui-sans-serif", "sans-serif"],
       },
     },
