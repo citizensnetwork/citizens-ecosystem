@@ -647,7 +647,8 @@
 
       // ONE bottom area: the Explore panel, or the full listing of the card that was tapped twice, never both. The panel
       // stays mounted (hidden) under the listing, so it keeps its place and the card that opened it gets focus back.
-      !clean && React.createElement(X.Explore, {
+      // covered by Explore or Me (under): the panel and its nav are not drawn at all, so there is one nav on screen
+      !clean && !under && React.createElement(X.Explore, {
         hidden: !!sheet,
         markers: rowMarkers, ideas: ideaMarkers, sources, apiRef: mapApi, selectedId: selected, reveal,
         focus, filtered: !!group || !!q,
@@ -663,7 +664,7 @@
       }),
       // Levels 2 and 3: the pin carousel, and the chosen card's details below it once raised (the listing sheet, inline).
       // Under a full sheet (a Nearby row or an owner line picked in the details) it stays mounted, hidden, as it was.
-      peek && !clean && React.createElement(X.PinCarousel, {
+      peek && !clean && !under && React.createElement(X.PinCarousel, {
         items: peekItems, index: Math.max(0, peekItems.findIndex((m) => m.id === peek.ids[peek.index])), raised: peek.raised,
         hidden: !!sheet, focusCard: peek.focusCard,
         origin: peek.view ? (peek.view.user || peek.view.centre) : null,
