@@ -297,16 +297,36 @@
       React.createElement('div', { className: 'connect-frame' }, node));
   }
 
-  // The map and Explore share ONE stage (founder's design, 2026-11-26): Explore is pulled in over the live map, so the map
-  // stays mounted underneath (same element type in the same place for both pages, so React keeps it) and is only blurred.
-  // On the map, a pill on the right edge pulls Explore back in (a left swipe, a tap or Enter).
-  function MapStage({ explore }) {
+  // The map, Explore and Me share ONE stage (founder's design, 2026-11-26): Explore is pulled in over the live map from the
+  // right and Me from the left, so the map stays mounted underneath (same element type in the same place for all three, so
+  // React keeps it). Under either screen the map is shown as one small stretched snapshot (ConnectExplore.MapSnapshot), the
+  // cheap blur. On the map, a pill on each edge pulls its screen in (a swipe or flick, a tap or Enter); the left one is for
+  // a phone, where there is no rail. A swipe back toward the map's side puts the screen away.
+  function MeOver({ wide }) {
     const app = window.useApp();
     const X = window.ConnectExplore;
-    return React.createElement('div', { 'data-mv2': 'map-stage', 'data-explore': explore ? '' : undefined },
-      React.createElement('div', { 'data-mv2': 'map-under', 'aria-hidden': explore ? 'true' : undefined, inert: explore ? '' : undefined },
-        React.createElement(window.HomePage, { under: explore })),
-      explore ? React.createElement(X.Page) : React.createElement(X.EdgeHandle, { onOpen: () => app.go('explore') }));
+    const ref = useRef(null);
+    const press = useRef(null);
+    const swipes = X.swipeHandlers(press, (dir) => {
+      if (dir !== 'left') return;
+      X.slideAway(ref.current, 'left', () => app.go('home', {}));
+    }, X.SWIPE_IGNORE);
+    return React.createElement('div', Object.assign({ ref, 'data-mv2': 'me-over' }, swipes),
+      React.createElement('div', { 'data-mv2': 'me-veil', 'aria-hidden': 'true' }),
+      placed(wide, React.createElement(window.ConnectMe.Page)));
+  }
+  function MapStage({ over, wide }) {
+    const app = window.useApp();
+    const X = window.ConnectExplore;
+    return React.createElement('div', { 'data-mv2': 'map-stage', 'data-over': over || undefined },
+      React.createElement('div', { 'data-mv2': 'map-under', 'aria-hidden': over ? 'true' : undefined, inert: over ? '' : undefined },
+        React.createElement(window.HomePage, { under: !!over }),
+        over ? React.createElement(X.MapSnapshot) : null),
+      over === 'explore' ? React.createElement(X.Page)
+        : over === 'me' ? React.createElement(MeOver, { wide })
+          : React.createElement(React.Fragment, null,
+            wide ? null : React.createElement(X.EdgeHandle, { side: 'left', onOpen: () => app.go('profile', {}) }),
+            React.createElement(X.EdgeHandle, { side: 'right', onOpen: () => app.go('explore') })));
   }
 
   function CurrentPage() {
@@ -314,8 +334,8 @@
     const wide = window.ConnectChrome && window.ConnectChrome.useWide ? window.ConnectChrome.useWide() : false;
     const p = nav.page;
     switch (p) {
-      case 'home': return React.createElement(MapStage, { explore: false });
-      case 'explore': return React.createElement(MapStage, { explore: true });
+      case 'home': return React.createElement(MapStage, { wide });
+      case 'explore': return React.createElement(MapStage, { over: 'explore', wide });
       case 'lets': return React.createElement(window.LetsPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
@@ -330,8 +350,8 @@
       case 'place': return React.createElement(window.PlaceProfilePage, { id: nav.params.id });
       case 'profile': return nav.params.id
         ? React.createElement(window.ContributorProfilePage, { id: nav.params.id })
-        : placed(wide, React.createElement(window.ConnectMe.Page));
-      default: return React.createElement(MapStage, { explore: false });
+        : React.createElement(MapStage, { over: 'me', wide });
+      default: return React.createElement(MapStage, { wide });
     }
   }
 
@@ -351,7 +371,7 @@
   }
 
   // One rail. The crown stays at the top; the words beside it hide when the rail
-  // is closed. Me, Explore, Map keep that order, and Do sits under them.
+  // is closed. Me, Map, Explore keep that order (founder, 2026-11-26), and Do sits under them.
   const RAIL_DO = [
     { page: 'lets', label: 'Let\u2019s\u2026' },
     { page: 'community', label: 'Kingdom Projects' },
@@ -394,7 +414,7 @@
         window.CrownMark ? React.createElement(window.CrownMark, { size: 36 }) : null,
         React.createElement('span', { className: 'cn-rail-word' }, React.createElement('b', null, 'Citizens'), React.createElement('small', null, 'Connect'))),
       React.createElement('div', { className: 'cn-rail-stack' },
-        item('me', 'Me'), item('explore', 'Explore'), item('map', 'Map'),
+        item('me', 'Me'), item('map', 'Map'), item('explore', 'Explore'),
         React.createElement('div', { className: 'cn-rail-do-wrap' },
           React.createElement('button', {
             type: 'button', className: 'cn-rail-do' + (door || page === 'lets' || page === 'community' ? ' on' : ''),
@@ -410,12 +430,13 @@
   // ── The phone's chrome (founder, 2026-11-25): no side rail on a phone. ──
   // The crown floats in the top-left corner on every screen and takes the person home: the map, every panel
   // closed and every filter cleared ('cc-crown-home', which home.jsx and the Explore panel answer). Off the map the
-  // Citizens · Connect words sit beside it, and the same floating nav the map uses (Me, Explore, Map, Do) sits at
+  // Citizens · Connect words sit beside it, and the same floating nav the map uses (Me, Map, Explore, Do) sits at
   // the foot. On the map the Explore panel draws that nav itself, where the crown used to be.
+  // Order (founder, 2026-11-26): Me, Map, Explore, Do, the way the screens sit around the map (Me left, Explore right).
   const PHONE_DOCK = [
     { id: 'me', label: 'Me', kind: 'Me' },
-    { id: 'explore', label: 'Explore', kind: 'Explore' },
     { id: 'map', label: 'Map', kind: 'Map' },
+    { id: 'explore', label: 'Explore', kind: 'Explore' },
     { id: 'do', label: 'Do', kind: 'Do' },
   ];
   // The screens drawn by placed() (CurrentPage): their own scroller runs under the floating nav.
@@ -479,6 +500,8 @@
     return React.createElement('div', {
       className: 'connect-app', 'data-rail': onMap ? 'closed' : 'open', 'data-phone': wide ? undefined : '',
       'data-page': nav && nav.page ? nav.page : 'home',
+      // Explore and Me float over the map (MapStage): no crown band, the screen runs edge to edge
+      'data-over': nav && (nav.page === 'explore' || (nav.page === 'profile' && !(nav.params && nav.params.id))) ? '' : undefined,
       'data-placed': PLACED.indexOf(nav && nav.page) !== -1 && !(nav.params && nav.params.id) ? '' : undefined,
       'data-flow': FLOWS.indexOf(nav && nav.page) !== -1 ? '' : undefined,
     },

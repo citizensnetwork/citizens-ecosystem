@@ -312,10 +312,12 @@
   // The map home's nav. Do and Central are hidden until they are built out (founder, 2026-11-17); with them gone the
   // sticky nav keeps Map in the middle (Explore, Map, Me). Me opens the account menu (the top-right person button is a
   // Search button now), so everything that button held is one tap from the nav.
+  // Order (founder, 2026-11-26): Me, Map, Explore, Do. Me opens from the map's left edge and Explore from its right,
+  // so the nav reads the way the screens sit around the map.
   const DOCK = [
     { id: 'me', icon: 'User', page: 'profile' },
-    { id: 'explore', icon: 'Compass', page: 'explore' },
     { id: 'map', icon: 'Map', close: true, emphasis: true },
+    { id: 'explore', icon: 'Compass', page: 'explore' },
     { id: 'do', icon: 'LayoutGrid', door: true },
   ];
   const RAIL = [

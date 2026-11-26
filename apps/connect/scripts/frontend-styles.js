@@ -8,7 +8,7 @@
  * @fontsource-variable packages (SIL Open Font License), Latin and Latin Extended only, as variable woff2 files.
  * Each file is copied beside the build as vendor/fonts/<name>.<hash>.woff2. A browser downloads a face only when the
  * page uses it, so listing a face costs nothing until then. The family names stay the ones the CSS already uses
- * ('Plus Jakarta Sans', 'Playfair Display', 'Manrope').
+ * ('Plus Jakarta Sans' for body text, 'Manrope' for headings; Playfair Display was dropped by the founder on 2026-11-26).
  */
 'use strict';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -21,7 +21,6 @@ const { hashOf } = require('@citizens/frontend-build');
 /** The faces Google served before (index.html, until 2026-11-25): family, package, the css files of its styles. */
 const FONT_FACES = [
   { family: 'Plus Jakarta Sans', pkg: '@fontsource-variable/plus-jakarta-sans', styles: ['wght.css'] },
-  { family: 'Playfair Display', pkg: '@fontsource-variable/playfair-display', styles: ['wght.css', 'wght-italic.css'] },
   { family: 'Manrope', pkg: '@fontsource-variable/manrope', styles: ['wght.css'] },
 ];
 const SUBSETS = new Set(['latin', 'latin-ext']);

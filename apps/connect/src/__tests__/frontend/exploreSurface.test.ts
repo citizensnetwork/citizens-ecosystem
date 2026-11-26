@@ -20,7 +20,9 @@ type Api = {
   pillMatches: (pill: string, i: Item) => boolean;
   ideasFrom: (app: unknown) => Item[];
   matchesQuery: (i: Item, q: string) => boolean;
+  swipeOf: (a: Pt3 | null, b: Pt3 | null, distance?: number) => string;
 };
+type Pt3 = { x: number; y: number; t: number };
 let X: Api;
 const T = { dateLine: (iso: string) => "D(" + iso.slice(0, 10) + ")" };
 const L = {
@@ -125,5 +127,22 @@ describe("fair turns and sorting", () => {
   it("search matches the category's name as well as its id", () => {
     expect(X.matchesQuery(place(), "cafés hatfield")).toBe(true);
     expect(X.matchesQuery(place(), "worship")).toBe(false);
+  });
+});
+
+describe("swipes between the map, Explore and Me (founder, 2026-11-26)", () => {
+  const at = (x: number, y: number, t: number) => ({ x, y, t });
+  it("a long enough sideways drag is a swipe, either way", () => {
+    expect(X.swipeOf(at(300, 400, 0), at(240, 405, 600), 52)).toBe("left");
+    expect(X.swipeOf(at(10, 400, 0), at(80, 400, 600), 52)).toBe("right");
+  });
+  it("a short drag counts only when it is fast (a flick)", () => {
+    expect(X.swipeOf(at(300, 400, 0), at(270, 400, 50), 52)).toBe("left"); // 30 px in 50 ms
+    expect(X.swipeOf(at(300, 400, 0), at(270, 400, 400), 52)).toBe(""); // 30 px, slowly
+    expect(X.swipeOf(at(300, 400, 0), at(285, 400, 10), 52)).toBe(""); // too short even when fast
+  });
+  it("a mostly vertical move (a scroll) is never a swipe", () => {
+    expect(X.swipeOf(at(300, 400, 0), at(220, 300, 100), 52)).toBe("");
+    expect(X.swipeOf(null, at(0, 0, 0), 52)).toBe("");
   });
 });

@@ -17,7 +17,6 @@ const mapId = (page: Page) =>
     return w.__ccMap.__e2eId;
   });
 const explore = (page: Page) => page.locator("[data-screen='explore']");
-const edge = (page: Page) => page.locator("[data-mv2='xs-edge']");
 
 test.describe("on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
@@ -26,9 +25,9 @@ test.describe("on a phone", () => {
     await mockMapNetwork(page, smallSeed(FIXED_NOW));
     await openMap(page, "/", 1);
     const before = await mapId(page);
-    await expect(edge(page)).toBeVisible();
+    await expect(page.locator("[data-mv2='xs-edge'][data-side='right']")).toBeVisible();
 
-    const box = (await edge(page).boundingBox())!;
+    const box = (await page.locator("[data-mv2='xs-edge'][data-side='right']").boundingBox())!;
     const cdp = await touchSession(page);
     const y = box.y + box.height / 2;
     await swipe(cdp, { x: box.x + box.width - 6, y }, 0, { dx: -140, ms: 260, steps: 10 });
@@ -47,10 +46,45 @@ test.describe("on a phone", () => {
     expect(await mapId(page)).toBe(before);
   });
 
+  test("a swipe right on Explore puts it away; a flick from the left edge pulls Me in over the map, and a swipe left puts Me away", async ({ page }) => {
+    await mockMapNetwork(page, smallSeed(FIXED_NOW));
+    await openMap(page, "/", 1);
+    const before = await mapId(page);
+    const cdp = await touchSession(page);
+
+    // Explore in from the right edge, then a swipe to the right on Explore itself takes it away
+    await page.locator("[data-mv2='xs-edge'][data-side='right']").click();
+    await expect(explore(page)).toBeVisible();
+    // the map behind it is one stretched snapshot, and the live canvas is hidden
+    await expect(page.locator("[data-mv2='map-snap']")).toHaveCount(1, { timeout: 10_000 });
+    await expect(page.locator(".maplibregl-canvas")).toBeHidden();
+    await swipe(cdp, { x: 120, y: 520 }, 0, { dx: 160, ms: 260, steps: 10 });
+    await expect(explore(page)).toHaveCount(0);
+    await expect(page).not.toHaveURL(/\/explore$/);
+    await expect(page.locator(".maplibregl-canvas")).toBeVisible();
+
+    // Me in from the left edge with a swipe to the right (a short fast flick counts too: exploreSurface.test.ts, swipeOf;
+    // the test driver's touch timing is too uneven to prove speed here)
+    const left = page.locator("[data-mv2='xs-edge'][data-side='left']");
+    await expect(left).toBeVisible();
+    const box = (await left.boundingBox())!;
+    const y = box.y + box.height / 2;
+    await swipe(cdp, { x: box.x + 6, y }, 0, { dx: 90, ms: 200, steps: 8 });
+    await expect(page.locator("[data-mv2='me-over'] .me-page")).toBeVisible();
+    await expect(page).toHaveURL(/\/me$/);
+    expect(await mapId(page)).toBe(before);
+
+    // and a swipe to the left takes Me away again (once Me has finished sliding in: until then the touch lands beside it)
+    await page.waitForTimeout(500);
+    await swipe(cdp, { x: 300, y: 600 }, 0, { dx: -160, ms: 260, steps: 10 });
+    await expect(page.locator("[data-mv2='me-over']")).toHaveCount(0);
+    await expect(page.locator('[data-screen="discover"]')).toBeVisible();
+  });
+
   test("a card opens its preview: one gold action, Close returns focus to the card, and Full profile opens the listing", async ({ page }) => {
     await mockMapNetwork(page, smallSeed(FIXED_NOW));
     await openMap(page, "/", 1);
-    await edge(page).click();
+    await page.locator("[data-mv2='xs-edge'][data-side='right']").click();
     await expect(explore(page)).toBeVisible();
 
     const card = explore(page).locator("[data-mv2='xs-card']").first();

@@ -7,7 +7,7 @@
  *    and two extra origins, and F3's strict CSP has no room for them);
  *  - the compiled stylesheet's placeholder sits LAST in <head>, where the Play CDN injected its rules: the screens
  *    were styled against that order (a utility after report.css wins a tie, and preflight after the inline <style>);
- *  - the compiled sheet has the theme (gold, the three font families), the self-hosted faces and the boot screen,
+ *  - the compiled sheet has the theme (gold, the two font families), the self-hosted faces and the boot screen,
  *    and Tailwind is the Play CDN's exact version;
  *  - the boot screen in #root mirrors the React LoadingSplash (same crown size), so the hand-over does not jump;
  *  - MapLibre loads through maplibre-loader.js, not with the page.
@@ -96,12 +96,13 @@ describe("the compiled stylesheet", () => {
 
   it("serves the three families from our own origin, Latin and Latin Extended", () => {
     const faces = css.match(/@font-face\{[^}]*\}/g) ?? [];
-    expect(faces).toHaveLength(8); // Jakarta, Manrope: 2 subsets; Playfair: 2 subsets x normal and italic
-    for (const family of ["Plus Jakarta Sans", "Playfair Display", "Manrope"]) {
+    expect(faces).toHaveLength(4); // Jakarta and Manrope: 2 subsets each (Playfair dropped, founder 2026-11-26)
+    expect(css).not.toContain("Playfair");
+    for (const family of ["Plus Jakarta Sans", "Manrope"]) {
       expect(faces.some((f) => f.includes(`font-family:${family};`))).toBe(true);
     }
     for (const face of faces) expect(face).toMatch(/url\(\.\.\/vendor\/fonts\/[a-z0-9-]+\.[0-9a-f]{10}\.woff2\)/);
-    expect(fontFiles).toHaveLength(8);
+    expect(fontFiles).toHaveLength(4);
     for (const f of fontFiles) {
       expect(existsSync(f.from)).toBe(true);
       expect(css).toContain(f.to);

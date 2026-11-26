@@ -19,8 +19,8 @@ body {
   font-family: 'Plus Jakarta Sans', sans-serif; -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
-.font-display { font-family: 'Playfair Display', serif; }
-h1,h2,h3,h4 { font-family: 'Playfair Display', serif; font-weight: 600; line-height: 1.25; margin: 0; }
+.font-display { font-family: 'Manrope', 'Plus Jakarta Sans', ui-sans-serif, sans-serif; } /* headings: Manrope (founder, 2026-11-26) */
+h1,h2,h3,h4 { font-family: 'Manrope', 'Plus Jakarta Sans', ui-sans-serif, sans-serif; font-weight: 700; line-height: 1.25; margin: 0; }
 
 /* glassmorphism */
 .glass {

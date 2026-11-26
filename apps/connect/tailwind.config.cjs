@@ -32,8 +32,9 @@ module.exports = {
       },
       fontFamily: {
         sans: ["Plus Jakarta Sans", "ui-sans-serif", "sans-serif"],
-        serif: ["Playfair Display", "ui-serif", "serif"],
-        // Design Spec's "one voice": geometric Manrope, scoped to the landing/auth screen (crown mark, wordmark, slogan).
+        // Headings are Manrope and body text Plus Jakarta Sans (founder, 2026-11-26: Playfair dropped). `serif` stays a
+        // name so old classes keep working; it is the heading face now.
+        serif: ["Manrope", "Plus Jakarta Sans", "ui-sans-serif", "sans-serif"],
         brand: ["Manrope", "ui-sans-serif", "sans-serif"],
       },
     },

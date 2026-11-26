@@ -130,7 +130,7 @@
   --avatar-half: 56px;
   --gallery-gap: 2px;
   --gallery-ratio: 1 / 1;
-  --font-display: 'Playfair Display', serif;
+  --font-display: 'Manrope', 'Plus Jakarta Sans', ui-sans-serif, sans-serif; /* headings (founder, 2026-11-26: Playfair dropped) */
   --font-body: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
   --viewer-bg: rgba(10, 9, 8, 0.94);
   --viewer-fg: #f7f4ee;
@@ -223,6 +223,10 @@
   --radius-inner: 16px;                     /* a photo or plate inside a card (the card's corner minus its 8 px inset) */
   --float-bg: rgba(255, 255, 255, 0.88);    /* a floating panel: about 12 % see-through */
   --float-solid: rgba(255, 255, 255, 0.94); /* a card on a floating panel, and the search field */
+  /* A live blur re-renders on every frame something moves behind it (a pan, a scroll), which a phone feels (founder,
+     2026-11-26). It is kept for the one thing that opens over a still page (the preview and Refine). Explore and Me
+     sit on a stretched snapshot of the map instead (connect-explore.jsx MapSnapshot), and cards and panels over the
+     live map are see-through without a blur. */
   --float-blur: 14px;
   --float-line: rgba(39, 42, 37, 0.11);     /* kept for outdoor light, where a shadow alone washes out */
   --float-glint: rgba(255, 255, 255, 0.75); /* the top highlight line of a floating thing */
@@ -231,11 +235,9 @@
   --veil-rgb: 255 253 247;                  /* Explore's veil over the map, as an rgb triple */
   --veil-left: 0.03;                        /* the veil tapers from the left edge ... */
   --veil-right: 0.8;                        /* ... to the right edge, the side Explore is pulled in from */
-  --explore-map-blur: 8px;                  /* the map under Explore: blurred lightly, so the streets still read */
-  --explore-map-scale: 1.04;                /* hides the blur's soft edge */
   --fs-4: 22px;                             /* Explore's section titles */
   --lh-4: 28px;
-  --fs-display: 52px;                       /* the one page title, "Explore." (Playfair, the accent face) */
+  --fs-display: 52px;                       /* the one page title, "Explore." (the heading face) */
   --lh-display: 56px;
   --xs-max: 1080px;                         /* Explore's reading width on a wide screen */
   --xs-row-img: 56px;                       /* a row's picture */
@@ -5290,7 +5292,7 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
    The live map stays mounted under Explore (shell.jsx MapStage): blurred a little, with a veil that tapers from almost
    nothing at the left edge to most of the way at the right, the side Explore is pulled in from. Cards and panels use the
    shared look: --radius-card outside, --radius-inner inside, a light wash of the category colour, gold only for the
-   chosen thing and the main action. Words use the body face; the page title and a preview's listing name use Playfair. */
+   chosen thing and the main action. Words use the body face; the page title and a preview's listing name use the heading face. */
 [data-mv2='map-stage'] {
   position: relative;
   flex: 1;
@@ -5304,20 +5306,48 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   display: flex;
   min-width: 0;
 }
-[data-mv2='map-stage'][data-explore] > [data-mv2='map-under'] {
+[data-mv2='map-stage'][data-over] > [data-mv2='map-under'] {
   pointer-events: none;
 }
-/* under Explore the map is a backdrop: its panel, its controls and its pins step aside, and it blurs a little */
-[data-mv2='map-stage'][data-explore] [data-mv2='home'] > :not(.absolute) {
+/* under Explore or Me the map is a backdrop: its panel, its controls and its pins step aside */
+[data-mv2='map-stage'][data-over] [data-mv2='home'] > :not(.absolute) {
   visibility: hidden;
 }
-[data-mv2='map-stage'][data-explore] .maplibregl-canvas {
-  filter: blur(var(--explore-map-blur)) saturate(1.2);
-  transform: scale(var(--explore-map-scale));
-}
-[data-mv2='map-stage'][data-explore] .maplibregl-marker,
-[data-mv2='map-stage'][data-explore] .maplibregl-control-container {
+[data-mv2='map-stage'][data-over] .maplibregl-marker,
+[data-mv2='map-stage'][data-over] .maplibregl-control-container {
   visibility: hidden;
+}
+/* the cheap blur: one small snapshot of the map, stretched; the live canvas behind it is hidden and stops drawing */
+[data-mv2='map-snap'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+[data-mv2='map-under']:has([data-mv2='map-snap']) .maplibregl-canvas {
+  visibility: hidden;
+}
+/* Me, pulled in from the map's left edge: the same see-through screen, its veil tapering the other way */
+[data-mv2='me-over'] {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-controls);
+  animation: xs-in-left var(--dur-slow) var(--ease-enter);
+}
+@keyframes xs-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+[data-mv2='me-veil'] {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to right,
+    rgb(var(--veil-rgb) / var(--veil-right)) 0%,
+    rgb(var(--veil-rgb) / calc((var(--veil-right) + var(--veil-left)) / 2)) 55%,
+    rgb(var(--veil-rgb) / var(--veil-left)) 100%);
 }
 
 /* the group tones: one muted, contrast-tested colour per group (4j's tokens) */
@@ -5352,9 +5382,12 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
     rgb(var(--veil-rgb) / calc((var(--veil-right) + var(--veil-left)) / 2)) 55%,
     rgb(var(--veil-rgb) / var(--veil-left)) 100%);
 }
+/* The page scrolls up and down; a sideways drag stays ours, for the swipe back to the map. A sideways row (the pills) is
+   its own scroller, which ends the touch-action chain, so it still scrolls sideways. */
 [data-mv2='xs-scroll'] {
   position: absolute;
   inset: 0;
+  touch-action: pan-y;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-bottom: var(--xs-dock-clear);
@@ -5383,7 +5416,7 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   font-size: var(--fs-display);
   line-height: var(--lh-display);
   font-weight: var(--fw-semibold);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.06em;
 }
 [data-mv2='xs-intro'] h1 span {
   color: var(--accent);
@@ -5404,7 +5437,6 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   padding: var(--space-1);
   border-radius: var(--radius-full);
   background: var(--float-bg);
-  backdrop-filter: blur(var(--float-blur));
   box-shadow: inset 0 1px var(--float-glint), var(--float-shadow);
   overflow-x: auto;
   scrollbar-width: none;
@@ -5444,8 +5476,7 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
 }
 [data-mv2='xs-controls'][data-stuck] {
   padding-top: calc(var(--space-8) + var(--space-5) + env(safe-area-inset-top, 0px));
-  background: var(--float-bg);
-  backdrop-filter: blur(var(--float-blur));
+  background: var(--float-solid);
   box-shadow: var(--float-shadow);
 }
 [data-mv2='xs-search-line'] {
@@ -5541,6 +5572,7 @@ main[data-mv2='xs-wrap'] {
 [data-mv2='xs-results-head'] h2,
 [data-mv2='xs-dir-nav'] h2 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--fs-4);
   line-height: var(--lh-4);
   font-weight: var(--fw-semibold);
@@ -5579,7 +5611,6 @@ main[data-mv2='xs-wrap'] {
   background:
     linear-gradient(105deg, color-mix(in srgb, var(--tone) var(--wash), transparent) 0%, transparent 45%),
     var(--float-bg);
-  backdrop-filter: blur(var(--float-blur));
   box-shadow: inset 0 1px var(--float-glint), var(--float-shadow);
 }
 [data-mv2='xs-card'],
@@ -5696,7 +5727,7 @@ main[data-mv2='xs-wrap'] {
   font-family: var(--font-display);
   font-size: var(--fs-4);
   line-height: var(--lh-4);
-  letter-spacing: 0;
+  letter-spacing: -0.03em;
 }
 [data-mv2='xs-card'][data-mode='feature'] [data-mv2='xs-chev'] {
   position: absolute;
@@ -5962,7 +5993,7 @@ main[data-mv2='xs-wrap'] {
 }
 [data-mv2='xs-preview'] [data-mv2='xs-dialog-body'] h2 {
   font-family: var(--font-display);
-  letter-spacing: 0;
+  letter-spacing: -0.03em;
 }
 [data-mv2='xs-detail'] {
   margin: 0;
@@ -6048,11 +6079,16 @@ main[data-mv2='xs-wrap'] {
   border: 1px solid var(--float-line);
   border-radius: var(--radius-full);
   background: var(--float-bg);
-  backdrop-filter: blur(var(--float-blur));
   box-shadow: var(--float-shadow);
   color: var(--accent-ink);
 }
-/* the edge hides while the map's own panels are up */
+[data-mv2='xs-edge'][data-side='left'] {
+  right: auto;
+  left: 0;
+  justify-items: start;
+  padding: 0 0 0 var(--space-2);
+}
+/* the edges hide while the map's own panels are up */
 [data-mv2='map-stage']:has([data-mv2='pinpeek']:not([hidden])) > [data-mv2='xs-edge'],
 [data-mv2='map-stage']:has([data-mv2='explore'][data-open]) > [data-mv2='xs-edge'] {
   display: none;
@@ -6065,12 +6101,12 @@ main[data-mv2='xs-wrap'] {
    bar keeps the handle, Back where there is a level above, and one Close. ── */
 [data-mv2='explore'],
 [data-mv2='pinpeek'] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   border: 1px solid var(--float-line);
   border-bottom: 0;
   border-radius: var(--radius-card) var(--radius-card) 0 0;
   background: var(--float-bg);
-  -webkit-backdrop-filter: blur(var(--float-blur));
-  backdrop-filter: blur(var(--float-blur));
   box-shadow: inset 0 1px var(--float-glint), var(--float-shadow);
 }
 [data-mv2='explore'] [data-mv2='drawer-mark'],

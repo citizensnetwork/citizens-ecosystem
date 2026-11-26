@@ -5,7 +5,7 @@
 //  stays mounted underneath (shell.jsx MapStage); here it is blurred a little and covered by a veil that tapers from
 //  almost nothing at the left edge to most of the way at the right, the side Explore is pulled in from.
 //
-//  The page: "Explore." (Playfair, the accent face, with the gold full stop), three views (This week, Things to do,
+//  The page: "Explore." (Manrope, the heading face, with the gold full stop), three views (This week, Things to do,
 //  Categories), a search field and Refine that stick to the top once scrolled, and the category pills. Any search,
 //  pill, Things-to-do choice, "See all" or refinement turns the page into one list of results with a sort.
 //
@@ -76,6 +76,7 @@
     filters: 'Filters',
     preview: 'Preview', close: 'Close', fullProfile: 'Full profile',
     edge: 'Open Explore', edgeHint: 'Swipe left or tap to open Explore',
+    edgeMe: 'Open Me', edgeMeHint: 'Swipe right or tap to open Me',
     kind: { event: 'Event', place: 'Place', contributor: 'Contributor', idea: 'Kingdom Project' },
     // an uncategorised Contributor still says what kind of organisation it is (entity-card.jsx KINDS)
     orgKind: { ministry: 'Ministry', organization: 'Organisation', business: 'Business', individual: 'Individual' },
@@ -587,7 +588,14 @@
       ? h(Section, { title: W.online, cc: 'explore-online' }, rows(sortItems(unpinned, 'recommended', ctx).slice(0, 6), open, T)) : null;
     const refinements = cats.length + (whenKey ? 1 : 0) + (wide ? 1 : 0);
 
-    return h('div', { 'data-screen': 'explore', 'data-mv2': 'xs', 'data-wide': wideScreen ? '' : undefined },
+    // A swipe (or flick) to the right puts Explore away and shows the map again (founder, 2026-11-26).
+    const rootRef = useRef(null);
+    const press = useRef(null);
+    const swipes = swipeHandlers(press, (dir) => {
+      if (dir !== 'right' || preview || refining) return;
+      slideAway(rootRef.current, 'right', () => app.go('home', {}));
+    }, SWIPE_IGNORE);
+    return h('div', Object.assign({ ref: rootRef, 'data-screen': 'explore', 'data-mv2': 'xs', 'data-wide': wideScreen ? '' : undefined }, swipes),
       h('div', { 'data-mv2': 'xs-veil', 'aria-hidden': 'true' }),
       h('div', { 'data-mv2': 'xs-scroll', ref: scroller },
         h('div', { 'data-mv2': 'xs-wrap' },
@@ -649,38 +657,143 @@
       }) : null);
   }
 
-  // ── the Map's right-edge handle: pulls Explore in ─────────────────────
-  function EdgeHandle({ onOpen }) {
-    const start = useRef(null);
-    const dragged = useRef(false);
-    const swipe = () => {
-      const v = window.getComputedStyle ? parseFloat(window.getComputedStyle(document.documentElement).getPropertyValue('--xs-swipe')) : NaN;
-      return Number.isFinite(v) && v > 0 ? v : 52;
+  // ── swipes between the map and the screens beside it (founder, 2026-11-26) ─────────────────────
+  //  Explore sits to the map's right, Me to its left. A swipe or a quick flick moves between them: a long enough drag
+  //  (--xs-swipe, 52 px), or a shorter one that is fast (a flick). It must be mostly sideways, so a scroll never counts.
+  const FLICK_PX = 24;          // the least a flick travels
+  const FLICK_SPEED = 0.3;      // px per ms: faster than this, a short drag is a flick (the usual swipe-library value)
+  function swipePx() {
+    const v = window.getComputedStyle ? parseFloat(window.getComputedStyle(document.documentElement).getPropertyValue('--xs-swipe')) : NaN;
+    return Number.isFinite(v) && v > 0 ? v : 52;
+  }
+  /** Which way a press-and-release travelled: 'left', 'right' or '' (too short, too slow or not sideways enough). */
+  function swipeOf(start, end, distance) {
+    if (!start || !end) return '';
+    const dx = end.x - start.x;
+    const dy = Math.abs(end.y - start.y);
+    const ms = Math.max(1, (end.t || 0) - (start.t || 0));
+    const ax = Math.abs(dx);
+    if (ax <= dy * 1.3) return '';
+    const far = ax >= (distance || 52);
+    const flick = ax >= FLICK_PX && ax / ms >= FLICK_SPEED;
+    if (!far && !flick) return '';
+    return dx < 0 ? 'left' : 'right';
+  }
+  /**
+   * Pointer handlers that call onSwipe(direction) for a swipe that starts outside `ignore` (a sideways row, a field).
+   * `store` is a ref that keeps the press across re-renders.
+   */
+  function swipeHandlers(store, onSwipe, ignore) {
+    return {
+      onPointerDown: (e) => {
+        store.current = null;
+        if (!e.isPrimary || e.button !== 0) return;
+        if (ignore && e.target && e.target.closest && e.target.closest(ignore)) return;
+        store.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp };
+      },
+      onPointerUp: (e) => {
+        const s = store.current;
+        store.current = null;
+        if (!s || s.id !== e.pointerId) return;
+        const dir = swipeOf(s, { x: e.clientX, y: e.clientY, t: e.timeStamp }, swipePx());
+        if (dir) onSwipe(dir);
+      },
+      onPointerCancel: () => { store.current = null; },
     };
+  }
+  /** Slide a screen off toward `dir`, then run `done` (at once under reduced motion). */
+  function slideAway(el, dir, done) {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!el || !el.animate || reduce) { done(); return; }
+    const anim = el.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(' + (dir === 'left' ? '-100%' : '100%') + ')' }],
+      { duration: 220, easing: 'cubic-bezier(.4,0,1,1)', fill: 'forwards' });
+    anim.onfinish = done;
+    anim.oncancel = done;
+  }
+  // Sideways rows, fields and dialogs keep their own sideways drags.
+  const SWIPE_IGNORE = "[data-mv2='xs-pills'], [data-mv2='xs-views'], input, textarea, select, dialog, [data-hscroll], .photo-carousel, [data-mv2='hrow']";
+
+  // ── an edge of the map: a pill that pulls the screen on that side in ─────────────────────
+  //  side 'right' pulls Explore in with a swipe left; side 'left' pulls Me in with a swipe right. A tap, Enter or Space
+  //  opens it too; a drag the other way does nothing.
+  function EdgeHandle({ onOpen, side }) {
+    const left = side === 'left';
+    const dragged = useRef(false);
+    const start = useRef(null);
     return h('button', {
-      type: 'button', 'data-mv2': 'xs-edge', 'aria-label': W.edge, title: W.edgeHint,
+      type: 'button', 'data-mv2': 'xs-edge', 'data-side': left ? 'left' : 'right',
+      'aria-label': left ? W.edgeMe : W.edge, title: left ? W.edgeMeHint : W.edgeHint,
       onPointerDown: (e) => {
         if (!e.isPrimary || e.button !== 0) return;
         dragged.current = false;
-        start.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+        start.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp };
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* not capturable */ }
       },
       onPointerUp: (e) => {
         const s = start.current;
         start.current = null;
         if (!s || s.id !== e.pointerId) return;
-        const dx = s.x - e.clientX;
-        const dy = Math.abs(e.clientY - s.y);
-        dragged.current = Math.abs(dx) > 10 || dy > 10;
-        if (dx >= swipe() && dx > dy * 1.3) onOpen();
+        dragged.current = Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10;
+        if (swipeOf(s, { x: e.clientX, y: e.clientY, t: e.timeStamp }, swipePx()) === (left ? 'right' : 'left')) onOpen();
       },
       onPointerCancel: () => { start.current = null; },
-      // a tap, Enter or Space opens it too; a drag that was not a left swipe does nothing
       onClick: (e) => { if (e.detail === 0 || !dragged.current) onOpen(); dragged.current = false; },
-    }, h('span', null, I('ChevronLeft', 16)));
+    }, h('span', null, I(left ? 'ChevronRight' : 'ChevronLeft', 16)));
+  }
+
+  // ── the map behind Explore and Me: one small snapshot, stretched (the cheap blur) ─────────────────────
+  //  A live CSS blur re-renders on every frame something moves behind it, which a phone feels. Instead the map is drawn
+  //  ONCE into a canvas a tenth of its size and shown stretched to the screen: the browser's smooth scaling blurs it for
+  //  free, and the live map (hidden behind it) stops drawing. The copy is taken inside MapLibre's own render, while its
+  //  picture is still in the buffer. With no map yet it waits for the map to settle; if a copy fails nothing is shown.
+  const SNAP_SCALE = 0.1;
+  function snapshotOf(canvas, scale) {
+    try {
+      const w = Math.max(1, Math.round(canvas.width * scale));
+      const hh = Math.max(1, Math.round(canvas.height * scale));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = hh;
+      const ctx = c.getContext('2d');
+      if (!ctx) return '';
+      // a map with no background layer leaves transparent pixels, which a JPEG would turn black: paint the map's own
+      // base colour under it first
+      const base = window.getComputedStyle ? window.getComputedStyle(document.documentElement).getPropertyValue('--map-base').trim() : '';
+      ctx.fillStyle = base || '#f9f9f6';
+      ctx.fillRect(0, 0, w, hh);
+      ctx.drawImage(canvas, 0, 0, w, hh);
+      return c.toDataURL('image/jpeg', 0.7);
+    } catch (e) {
+      return '';
+    }
+  }
+  function MapSnapshot() {
+    const [src, setSrc] = useState('');
+    useEffect(() => {
+      let live = true;
+      let map = null;
+      let waitAt = null;
+      const take = () => {
+        const m = window.__ccMap;
+        if (!m || !m.getCanvas) return;
+        m.once('render', () => {
+          const url = snapshotOf(m.getCanvas(), SNAP_SCALE);
+          if (live && url) setSrc(url);
+        });
+        m.triggerRepaint();
+      };
+      const begin = () => {
+        map = window.__ccMap;
+        if (!map) { waitAt = window.setTimeout(begin, 300); return; }
+        if (map.loaded && map.loaded()) take();
+        else map.once('idle', take);
+      };
+      begin();
+      return () => { live = false; if (waitAt) window.clearTimeout(waitAt); };
+    }, []);
+    return src ? h('img', { 'data-mv2': 'map-snap', src, alt: '', 'aria-hidden': 'true', decoding: 'async' }) : null;
   }
 
   window.ConnectExplore = {
-    Page, EdgeHandle, matchesQuery, areaOf, kindLabel, metaLine, factsOf, actionsOf, fairTurn, upcoming, sortItems, pillMatches, ideasFrom,
+    Page, EdgeHandle, MapSnapshot, swipeOf, swipeHandlers, slideAway, SWIPE_IGNORE, matchesQuery, areaOf, kindLabel, metaLine, factsOf, actionsOf, fairTurn, upcoming, sortItems, pillMatches, ideasFrom,
   };
 })();

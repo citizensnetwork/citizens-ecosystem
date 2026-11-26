@@ -164,7 +164,7 @@ export const citizensConfiguration: Configuration = {
       mapBackground: '#292929',
     },
     fonts: {
-      display: "'Playfair Display', serif",
+      display: "'Manrope', 'Plus Jakarta Sans', ui-sans-serif, sans-serif", // headings (founder, 2026-11-26: Playfair dropped)
       body: "'Plus Jakarta Sans', ui-sans-serif, sans-serif",
     },
   },

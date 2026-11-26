@@ -1424,11 +1424,13 @@
   .connect-app .cn-phone-dock{position:fixed;z-index:var(--phone-crown-z)}
   /* Off the map the page's own scroller runs under the floating nav; other screens keep a clear band for it. */
   .connect-app[data-phone][data-placed] .connect-scroll{padding-bottom:var(--phone-dock-clear)}
-  .connect-app[data-phone]:not([data-placed]):not([data-flow]):not([data-page='home']):not([data-page='explore']) .connect-app-main{padding-bottom:var(--phone-dock-clear)}
+  .connect-app[data-phone]:not([data-placed]):not([data-flow]):not([data-page='home']):not([data-over]) .connect-app-main{padding-bottom:var(--phone-dock-clear)}
   /* Off the map the crown has a band of its own (founder, 2026-11-25): the screen, and everything that scrolls in it,
-     starts below the crown, with the same space under the crown as above it. Nothing slides beneath it. Explore is the
-     exception (founder's design, 2026-11-26): it floats over the map edge to edge and keeps clear of the crown itself. */
-  .connect-app[data-phone]:not([data-page='home']):not([data-page='explore']) .connect-app-main{padding-top:var(--phone-crown-clear)}
+     starts below the crown, with the same space under the crown as above it. Nothing slides beneath it. Explore and Me
+     are the exception (founder's design, 2026-11-26): they float over the map edge to edge and keep clear of the crown
+     themselves. */
+  .connect-app[data-phone]:not([data-page='home']):not([data-over]) .connect-app-main{padding-top:var(--phone-crown-clear)}
+  [data-mv2='me-over'] .connect-scroll{padding-top:var(--phone-crown-clear)}
   /* The open map search starts after the crown, its middle level with the crown's. */
   [data-mv2='home'] [data-mv2='home-bar']{padding-left:calc(var(--space-3) + var(--hit) + var(--space-2))}
 }
@@ -1509,3 +1511,10 @@
 [data-theme='dark'] .explore-when button{border-color:rgba(247,246,241,.3)}
 [data-theme='dark'] .explore-when button.active{background:#f7f6f1;color:#242624}
 .explore-weekend{margin:0 0 8px}
+
+/* Me over the map (founder, 2026-11-26): its page is see-through so the map's snapshot and the veil show behind it, and its
+   glass cards drop the live blur (a blur re-renders on every scroll frame; the cards are opaque enough on their own). */
+[data-mv2='me-over'] .connect-shell,[data-mv2='me-over'] .connect-frame{background:transparent}
+[data-mv2='me-over'] .connect-frame .cn-glass{-webkit-backdrop-filter:none;backdrop-filter:none}
+/* Me scrolls up and down; a sideways drag is the swipe back to the map (sideways rows are their own scrollers) */
+[data-mv2='me-over'] .connect-scroll{touch-action:pan-y}

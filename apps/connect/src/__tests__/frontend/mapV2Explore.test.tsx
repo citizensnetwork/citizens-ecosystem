@@ -327,13 +327,13 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id")).toBe("three");
   });
 
-  it("the sticky nav is Me, Explore, Map and Do (no Central): Me and Explore are pages, Do opens its menu, Map rests", () => {
+  it("the sticky nav is Me, Map, Explore and Do (founder, 2026-11-26; no Central): Me and Explore are pages, Do opens its menu, Map rests", () => {
     const onGo = vi.fn();
     render(React.createElement(Harness, { onGo }));
     fireEvent.click(screen.getByRole("button", { name: P().open }));
     fireEvent.click(screen.getByRole("button", { name: P().raise }));
     const dock = screen.getByRole("navigation", { name: P().dock });
-    expect([...dock.querySelectorAll("[data-nav]")].map((b) => b.getAttribute("data-nav"))).toEqual(["me", "explore", "map", "do"]);
+    expect([...dock.querySelectorAll("[data-nav]")].map((b) => b.getAttribute("data-nav"))).toEqual(["me", "map", "explore", "do"]);
     expect(document.querySelector("[data-nav='central']")).toBeNull();
     // the crown has given way to the nav outright
     expect(document.querySelector("[data-mv2='explore-crown']")).toBeNull();
