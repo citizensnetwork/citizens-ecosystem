@@ -445,3 +445,36 @@ Cached for 5 minutes at the edge.
 - `id`, `full_name`, `avatar_url` are guaranteed to be present on every
   `/api/v1/profiles/{id}` payload; that endpoint will never widen beyond
   display-safe fields without a `/api/v2` bump.
+
+---
+
+## Central feed (added 2026-11-11)
+
+Design, rules and guardrails: [`docs/central/CENTRAL_FEED_GUIDE.md`](../../../docs/central/CENTRAL_FEED_GUIDE.md).
+
+### `GET /api/v1/central/feed`
+
+Today's edition of the Central feed: one finite, ordered stream of cards, the same for everyone
+in the same coarse place on the same day.
+
+| Query    | Meaning                                                                                            |
+| -------- | -------------------------------------------------------------------------------------------------- |
+| `near`   | optional `lat,lng`, rounded to 1 decimal by the client (about 11 km). Rounded again on the server, never stored or logged. Malformed means "no place". |
+| `cursor` | optional, the previous page's `nextCursor`.                                                        |
+| `limit`  | 1 to 24, default 12.                                                                               |
+
+Response: `{ data: { edition: { day, cell, size }, lead: { encouragement }, items: FeedItem[], nextCursor, caughtUp, nextEditionAt }, meta: { status: "ok" | "partial", source: "connect-live" } }`.
+`FeedItem` is defined in `packages/central/src/contract.ts`. The page that holds the last card
+has `caughtUp: true` and `nextCursor: null`; there is nothing after it until `nextEditionAt`.
+
+Errors: `400 invalid_cursor`, `409 edition_changed` (start again without a cursor), `429`,
+`503 feed_unavailable`. Cache: `public, s-maxage=300, stale-while-revalidate=600`.
+
+Stability: additive only. `meta.source` will become `table` when the `central` tables are in
+use; consumers must not depend on its value.
+
+### `GET /api/v1/central/apps`
+
+The Central app registry: `{ data: CentralApp[], meta: { status, source } }`, one entry per
+ecosystem app (slug, name, label, accent, icon, explanation, visitUrl, status, sortOrder, kinds).
+Cache: one hour.

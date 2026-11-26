@@ -97,8 +97,10 @@ function hubRedirects() {
 }
 
 /**
- * Strict policy for the front door's own pages. They are static HTML with one external stylesheet and no script at
- * all, so nothing inline is allowed. Development adds what `next dev` needs (React Refresh, injected styles).
+ * Strict policy for the front door's own pages. They are static HTML with one external stylesheet; only the landing
+ * page runs script (the Central feed), from external files only, so nothing inline is allowed. The hub builds with
+ * webpack for this reason: Turbopack writes an inline loader script. Development adds what `next dev` needs (React
+ * Refresh, injected styles).
  */
 function contentSecurityPolicy(isDev = false) {
   return [

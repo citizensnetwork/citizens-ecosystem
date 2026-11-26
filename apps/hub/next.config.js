@@ -15,6 +15,8 @@ const nextConfig = {
   agentRules: false,
   reactStrictMode: true,
   poweredByHeader: false,
+  // @citizens/central ships TypeScript source (no build step). Turbopack compiles it without this; webpack does not.
+  transpilePackages: ['@citizens/central'],
   // Pin the workspace root so Next does not pick up a stray lockfile elsewhere on the machine.
   outputFileTracingRoot: path.join(__dirname, '../../'),
   async redirects() {

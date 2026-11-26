@@ -1,5 +1,6 @@
 import type { NextPage } from 'next';
 import { PATH_ROOT } from '@citizens/ecosystem';
+import { CentralSection } from '../../components/central/CentralSection';
 import { EcosystemDiagram } from '../../components/EcosystemDiagram';
 import { AppIcon, ArrowIcon } from '../../components/Icons';
 import { Layout } from '../../components/Layout';
@@ -21,8 +22,8 @@ import {
 } from '../../lib/content';
 import type { AppCard } from '../../lib/content';
 
-// Pure static HTML: the page has no interaction, so it ships no JavaScript at all.
-export const config = { unstable_runtimeJS: false };
+// The one hub page that ships JavaScript: the Central feed loads today's cards from Connect's /api/v1 and lays them out
+// in staggered columns. Everything else on the page is still static HTML.
 
 /**
  * One tile. The whole tile is the link (a plain rectangle, so the keyboard focus ring is never clipped); the slanted
@@ -97,6 +98,8 @@ const Landing: NextPage = () => {
           <img className="hero-crown" src="/citizens-crown.png" alt="" width={240} height={130} />
         </div>
       </section>
+
+      <CentralSection />
 
       <div className="wrap intro">
         <p className="intro-lead">{INTRO.lead}</p>
