@@ -429,7 +429,7 @@ The HTML design's colour system — use these when building any new UI component
 | `accent` | `#F2E8CC` | Accent fills |
 | `border` | `rgba(201,168,76,0.22)` | Borders |
 | Font (sans) | Plus Jakarta Sans | Body text |
-| Font (display) | Playfair Display | Headings |
+| Font (display) | Manrope | Headings and the sign-in screen (Playfair Display retired 2026-11-26) |
 
 ---
 

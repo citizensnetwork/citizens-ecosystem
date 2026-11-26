@@ -19,8 +19,9 @@ body {
   font-family: 'Plus Jakarta Sans', sans-serif; -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
-.font-display { font-family: 'Playfair Display', serif; }
-h1,h2,h3,h4 { font-family: 'Playfair Display', serif; font-weight: 600; line-height: 1.25; margin: 0; }
+/* Headings and display text: Manrope, the sign-in screen's face (founder, 2026-11-26: Playfair Display retired). */
+.font-display { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; }
+h1,h2,h3,h4 { font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif; font-weight: 600; line-height: 1.25; margin: 0; }
 
 /* glassmorphism */
 .glass {

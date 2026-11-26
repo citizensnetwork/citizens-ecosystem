@@ -1,14 +1,14 @@
 /**
  * Connect's compiled frontend stylesheet (QA fix plan PR F1, item S3): Tailwind 3.4.17 from ../tailwind.config.cjs,
- * the three self-hosted font families, and the pre-React boot screen, minified into ONE stylesheet that
+ * the two self-hosted font families, and the pre-React boot screen, minified into ONE stylesheet that
  * @citizens/frontend-build writes as assets/tailwind.<hash>.css. It replaces the Tailwind Play CDN (which compiled the
  * same utilities in every visitor's browser) and the Google Fonts stylesheet (a blocking request to two more origins).
  *
- * Fonts: the families index.html loaded from Google (founder, 2026-11-25: self-host all three), from the
- * @fontsource-variable packages (SIL Open Font License), Latin and Latin Extended only, as variable woff2 files.
- * Each file is copied beside the build as vendor/fonts/<name>.<hash>.woff2. A browser downloads a face only when the
- * page uses it, so listing a face costs nothing until then. The family names stay the ones the CSS already uses
- * ('Plus Jakarta Sans', 'Playfair Display', 'Manrope').
+ * Fonts: Plus Jakarta Sans (body) and Manrope (the sign-in screen and headings), from the @fontsource-variable
+ * packages (SIL Open Font License), Latin and Latin Extended only, as variable woff2 files (founder, 2026-11-25:
+ * self-host them; 2026-11-26: Playfair Display retired, its headings moved to Manrope). Each file is copied beside
+ * the build as vendor/fonts/<name>.<hash>.woff2. A browser downloads a face only when the page uses it, so listing a
+ * face costs nothing until then. The family names stay the ones the CSS already uses.
  */
 'use strict';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -18,10 +18,10 @@ const fs = require('fs');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { hashOf } = require('@citizens/frontend-build');
 
-/** The faces Google served before (index.html, until 2026-11-25): family, package, the css files of its styles. */
+/** The page's font families: family, package, the css files of its styles. Upright only:
+ * the one italic line, the sign-in epigraph (Manrope, which has no italic), is slanted by the browser. */
 const FONT_FACES = [
   { family: 'Plus Jakarta Sans', pkg: '@fontsource-variable/plus-jakarta-sans', styles: ['wght.css'] },
-  { family: 'Playfair Display', pkg: '@fontsource-variable/playfair-display', styles: ['wght.css', 'wght-italic.css'] },
   { family: 'Manrope', pkg: '@fontsource-variable/manrope', styles: ['wght.css'] },
 ];
 const SUBSETS = new Set(['latin', 'latin-ext']);
