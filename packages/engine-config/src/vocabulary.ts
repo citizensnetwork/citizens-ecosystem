@@ -801,6 +801,7 @@ export const RESERVED_ADDRESS_WORDS: ReadonlySet<string> = new Set([
   'conversations',
   'convince',
   'cron',
+  'csp-report',
   'events',
   'follow',
   'indemnity',

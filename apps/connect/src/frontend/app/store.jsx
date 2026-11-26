@@ -3045,6 +3045,35 @@
       return () => { cancelled = true; if (handle && handle.remove) handle.remove(); };
     }, [handleBack]);
 
+    // ── App links (QA plan PR G) ─────────────────────────────────────────
+    //  An https link to a Connect screen (https://219.co.za/citizens/connect/e/<id>, a shared listing, a sign-in
+    //  return) opens the native app once Android has verified the App Link (the release key's assetlinks.json on the
+    //  219.co.za front door, A8). Capacitor hands it over as 'appUrlOpen' while the app runs, and as
+    //  App.getLaunchUrl() when the link started the app. routes.jsx routeFromAppLink turns it into a screen (null for
+    //  anything that is not ours, the sign-in callback included), and the screen opens the way a tap opens it, go(), so
+    //  a screen that needs a signed-in person still asks for sign-in, and Back returns to where the person was. The
+    //  launch link is read once per app start, whatever re-renders follow.
+    const goRef = useRef(go);
+    goRef.current = go;
+    const launchLinkRead = useRef(false);
+    useEffect(() => {
+      const isNative = !!(window.CapCore && window.CapCore.isNativePlatform && window.CapCore.isNativePlatform());
+      if (!isNative || !window.CapApp || !window.CapApp.addListener) return undefined;
+      const open = (url) => {
+        const r = ROUTES.routeFromAppLink(url);
+        if (r) goRef.current(r.nav.page, r.nav.params);
+      };
+      let handle = null, cancelled = false;
+      Promise.resolve(window.CapApp.addListener('appUrlOpen', (data) => open(data && data.url))).then((hnd) => {
+        if (cancelled) { if (hnd && hnd.remove) hnd.remove(); } else handle = hnd;
+      }).catch(() => {});
+      if (!launchLinkRead.current && window.CapApp.getLaunchUrl) {
+        launchLinkRead.current = true;
+        Promise.resolve(window.CapApp.getLaunchUrl()).then((res) => { if (!cancelled) open(res && res.url); }).catch(() => {});
+      }
+      return () => { cancelled = true; if (handle && handle.remove) handle.remove(); };
+    }, []);
+
     // ── Page load: stamp the arrival entry, and tidy the address ───────────────
     //  The entry the person arrived on IS the first screen: it is only REPLACED (state
     //  stamped, address made canonical), never added to. Nothing is pushed on page load

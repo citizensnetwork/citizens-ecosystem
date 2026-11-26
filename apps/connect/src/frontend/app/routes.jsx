@@ -297,6 +297,36 @@
     return typeof o.webOrigin === 'string' && o.webOrigin !== '' ? o.webOrigin + appUrl(path) : null;
   }
 
+  // The address Android opens the app for: the App Link in android/app/src/main/AndroidManifest.xml (its autoVerify
+  // intent filter; src/__tests__/frontend/appLinks.test.ts checks they agree). A build's own public address (the
+  // mobile-only PUBLIC_ORIGIN + PUBLIC_BASE_PATH) is accepted too, so a link it shared opens it.
+  const APP_LINK_ROOTS = [
+    { origin: 'https://219.co.za', base: '/citizens/connect' },
+    { origin: PUBLIC_ORIGIN, base: PUBLIC_BASE_PATH },
+  ];
+
+  /**
+   * An https link that opened the native app (an Android App Link; Capacitor hands it over as `appUrlOpen` while the
+   * app runs, and as App.getLaunchUrl() when the link started it) → the screen it names, as navFromPath gives it
+   * ({ ok, nav, canonical, legacy }), or null when the link is not ours: another scheme, host or port, a user name, a
+   * path outside the app's prefix, a path that names no screen, or not a string. The sign-in callback
+   * (citizensconnect://auth-callback) belongs to auth-client.js and never matches. Pure; never throws.
+   */
+  function routeFromAppLink(url) {
+    if (typeof url !== 'string' || url.length === 0 || url.length > 2048) return null;
+    let u;
+    try { u = new URL(url); } catch { return null; }
+    if (u.protocol !== 'https:' || u.username || u.password) return null;
+    for (const root of APP_LINK_ROOTS) {
+      if (u.origin !== root.origin) continue;
+      const path = stripBase(u.pathname, root.base);
+      if (path === null) continue;
+      const r = navFromPath(path, u.search);
+      if (r.ok) return r;
+    }
+    return null;
+  }
+
   const BASE_TITLE = window.WORLD.t('meta.title');
   const TITLES = {
     explore: window.WORLD.t('screen.discover.title'), lets: window.WORLD.t('screen.gatherings.title'), community: window.WORLD.t('screen.ideas.title'), messages: 'Messages',
@@ -320,7 +350,7 @@
   window.CC_ROUTES = {
     pathFor, navFromPath, safeReturnPath, accessFor, isEntityRoute, titleFor,
     stripBase, withBase, appUrl, BASE_PATH,
-    publicUrl, PUBLIC_ORIGIN, PUBLIC_BASE_PATH,
+    publicUrl, PUBLIC_ORIGIN, PUBLIC_BASE_PATH, routeFromAppLink,
     DASHBOARD_TABS, ADMIN_TABS, PREFIXES, PAGES, isUuid, isSlug,
   };
 })();

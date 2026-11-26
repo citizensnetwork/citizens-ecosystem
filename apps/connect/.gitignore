@@ -51,6 +51,8 @@ yarn-error.log*
 /public/config.example.js
 # maplibre-loader.js: copied from src/frontend (QA plan PR F1; the MapLibre module loads on demand).
 /public/maplibre-loader.js
+# viewport.js: copied from src/frontend (QA plan PR F3; the pinch-zoom script, no longer inline).
+/public/viewport.js
 /public/app/
 /public/vendor/
 /public/assets/

@@ -10,8 +10,9 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const APP = join(HERE, '..', '..');
 export const CSS_PATH = join(APP, 'src', 'frontend', 'assets', 'map-v2.css');
 export const DATA_PATH = join(APP, 'src', 'frontend', 'app', 'data.jsx');
-// Connect's older look keeps its gold ramp (--gold, --gold-light, --gold-deep, --gold-dark) in this page's :root.
-export const INDEX_PATH = join(APP, 'src', 'frontend', 'index.html');
+// Connect's older look keeps its gold ramp (--gold, --gold-light, --gold-deep, --gold-dark) in its base stylesheet's
+// :root (index.html's inline <style> until QA plan PR F3, when the CSP dropped inline styles).
+export const INDEX_PATH = join(APP, 'src', 'frontend', 'assets', 'base.css');
 
 /** `indexHtml` (optional) adds the older look's :root tokens underneath Map v2's, so a pair can name `--gold-light` and the like. */
 export function parseTokens(css, indexHtml = '') {
@@ -22,7 +23,7 @@ export function parseTokens(css, indexHtml = '') {
     for (const d of m[1].matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) out[d[1]] = d[2].trim();
     return out;
   };
-  const base = indexHtml ? grab(indexHtml.replace(/\/\*[\s\S]*?\*\//g, ''), /:root\s*\{([\s\S]*?)\n  \}/) : {};
+  const base = indexHtml ? grab(indexHtml.replace(/\/\*[\s\S]*?\*\//g, ''), /:root\s*\{([\s\S]*?)\n\s*\}/) : {};
   const light = { ...base, ...grab(css, /:root\s*\{([\s\S]*?)\n\}/) };
   const dark = grab(css, /\[data-theme='dark'\]\s*\{([\s\S]*?)\n\}/);
   return { light, dark: { ...light, ...dark } };

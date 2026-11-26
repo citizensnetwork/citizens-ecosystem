@@ -1,6 +1,6 @@
 /**
  * One gold (founder decision, 2026-10-31): the crown logo's own colour, #F2BD22, is Connect's only fill gold, and every
- * place that writes a gold value (the Tailwind config, `:root` in index.html, Map v2's tokens, the map pins, the PWA
+ * place that writes a gold value (the Tailwind config, `:root` in assets/base.css, Map v2's tokens, the map pins, the PWA
  * manifest) agrees on it. Gold text and small icons use the dark ink #836100; a gradient is light, the crown, then amber
  * (never a brown end stop); a label on a gold fill is near-black, never white. The contrast pairs themselves are in
  * `scripts/map-v2/contrast.mjs` (asserted by mapV2Tokens.test.ts); this file keeps the sources from drifting apart again.
@@ -12,7 +12,8 @@ import { analyseRepo, isFillGold } from "../../../scripts/design/drift.mjs";
 
 const APP = process.cwd();
 const read = (rel: string) => readFileSync(join(APP, rel), "utf8");
-const index = read("src/frontend/index.html");
+// `:root` left index.html's inline <style> for assets/base.css when the CSP dropped inline styles (QA plan PR F3).
+const base = read("src/frontend/assets/base.css");
 // The Tailwind theme left index.html for its own file when the Play CDN went (QA plan PR F1, 2026-11-25).
 const tailwind = read("tailwind.config.cjs");
 const mapCss = read("src/frontend/assets/map-v2.css");
@@ -42,20 +43,20 @@ describe("one gold: the crown's colour", () => {
     for (const c of [LIGHT, AMBER, INK, "#fbf1cc"]) expect(isFillGold(c), c).toBe(false);
   });
 
-  it("Connect's source set has exactly one fill gold (the drift index counts every extra one)", () => {
+  it("Connect's source set has exactly one fill gold (the drift base counts every extra one)", () => {
     expect(analyseRepo().apps.connect.golds).toEqual([CROWN]);
   });
 
   it("every token source agrees on the crown gold and on the ink", () => {
-    // the Tailwind config, and :root in index.html
+    // the Tailwind config, and :root in assets/base.css
     expect(decl(tailwind, "gold")).toBe(CROWN);
     expect(decl(tailwind, "secondary")).toBe(CROWN);
     expect(decl(tailwind, "gold-light")).toBe(LIGHT);
     expect(decl(tailwind, "gold-dark")).toBe(INK);
-    expect(decl(index, "--gold")).toBe(CROWN);
-    expect(decl(index, "--gold-light")).toBe(LIGHT);
-    expect(decl(index, "--gold-deep")).toBe(AMBER);
-    expect(decl(index, "--gold-dark")).toBe(INK);
+    expect(decl(base, "--gold")).toBe(CROWN);
+    expect(decl(base, "--gold-light")).toBe(LIGHT);
+    expect(decl(base, "--gold-deep")).toBe(AMBER);
+    expect(decl(base, "--gold-dark")).toBe(INK);
     // Map v2: light and dark
     const dark = /\[data-theme='dark'\]\s*\{([\s\S]*?)\n\}/.exec(mapCss)![1];
     expect(decl(mapCss, "--accent")).toBe(CROWN);
@@ -79,25 +80,25 @@ describe("one gold: the crown's colour", () => {
 describe("gold fills and gold text", () => {
   /** The declarations of the first rule whose selector list contains `selector` (plain string search: no regex built from input). */
   const rule = (selector: string) => {
-    const at = index.indexOf(selector);
-    const open = at < 0 ? -1 : index.indexOf("{", at);
-    return open < 0 ? "" : index.slice(open + 1, index.indexOf("}", open));
+    const at = base.indexOf(selector);
+    const open = at < 0 ? -1 : base.indexOf("{", at);
+    return open < 0 ? "" : base.slice(open + 1, base.indexOf("}", open));
   };
 
   it("the gradient is light, the crown, then amber: no brown end stop", () => {
     expect(rule(".gold-gradient")).toMatch(/linear-gradient\(135deg,\s*var\(--gold-light\) 0%,\s*var\(--gold\) 55%,\s*var\(--gold-deep\) 100%\)/);
-    for (const g of index.match(/linear-gradient\([^)]*\)/g) ?? []) expect(g, g).not.toMatch(/--gold-dark|--gold-crown-dark/);
+    for (const g of base.match(/linear-gradient\([^)]*\)/g) ?? []) expect(g, g).not.toMatch(/--gold-dark|--gold-crown-dark/);
   });
 
   it("a label on a gold fill is near-black: every `text-white` on one is overridden at the source", () => {
-    expect(index).toMatch(/\.gold-gradient\.text-white[^{]*\{\s*color:\s*var\(--accent-contrast,\s*#0A0908\)/);
-    expect(index).toMatch(/\.bg-gold\.text-white/);
-    expect(index).toMatch(/\.gold-gradient \[class\*="text-white"\]/);
+    expect(base).toMatch(/\.gold-gradient\.text-white[^{]*\{\s*color:\s*var\(--accent-contrast,\s*#0A0908\)/);
+    expect(base).toMatch(/\.bg-gold\.text-white/);
+    expect(base).toMatch(/\.gold-gradient \[class\*="text-white"\]/);
   });
 
   it("gold text is the ink, never a clipped vivid gradient, and `text-gold` reads as the ink", () => {
     expect(rule(".gold-text")).toMatch(/color:\s*var\(--gold-dark\)/);
-    expect(index).not.toMatch(/-webkit-text-fill-color:\s*transparent/);
-    expect(index).toMatch(/:root \.text-gold\s*\{\s*color:\s*var\(--gold-dark\)/);
+    expect(base).not.toMatch(/-webkit-text-fill-color:\s*transparent/);
+    expect(base).toMatch(/:root \.text-gold\s*\{\s*color:\s*var\(--gold-dark\)/);
   });
 });
