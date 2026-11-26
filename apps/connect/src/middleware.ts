@@ -89,8 +89,11 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // `.well-known/` is skipped too (QA plan PR G): files such as an App Links `assetlinks.json` must be served as they
+  // are, with no session lookup. The 219.co.za root's own copy is the front door's (apps/hub); this keeps Connect's
+  // paths the same if one is ever placed here.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|\\.well-known/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
 

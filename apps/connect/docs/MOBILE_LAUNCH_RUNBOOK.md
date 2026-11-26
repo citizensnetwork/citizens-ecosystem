@@ -88,10 +88,18 @@ share or QR link the app builds ever used it, so the entry could never verify. I
    exist until the app has a signed build (A8).
 2. After installing a signed build: `adb shell pm get-app-links com.citizensconnect.app` should list
    `219.co.za` as `verified`.
-3. **Code gap, found while checking:** nothing in the app yet navigates on an `https` app link. The only
-   `appUrlOpen` listener (`auth-client.js`) handles `citizensconnect://auth-callback`. A verified link opens
-   the app on its home screen. Routing it needs: strip `PUBLIC_BASE_PATH` from the incoming path, then
-   `CC_ROUTES.navFromPath`. Not built.
+3. **Routing the link: built (QA plan PR G, 2026-11-25).** `CC_ROUTES.routeFromAppLink(url)` (`routes.jsx`) takes
+   the https link, accepts only `https://219.co.za/citizens/connect/...` (the manifest's App Link; a test checks
+   they agree) or the build's own `PUBLIC_ORIGIN` + `PUBLIC_BASE_PATH`, strips the prefix and asks
+   `CC_ROUTES.navFromPath` for the screen. `store.jsx` calls it for `appUrlOpen` while the app runs and for
+   `App.getLaunchUrl()` once per start, and opens the screen with `go()` (sign-in gates still apply). The
+   `citizensconnect://auth-callback` link stays `auth-client.js`'s.
+   Found at the same time: the committed Android project did not include the `@capacitor/app` and
+   `@capacitor/browser` plugins (the last `cap sync` predated them), so `appUrlOpen` could never have fired on
+   Android. `npx cap sync android` added them; `src/__tests__/scripts/capacitorVersions.test.ts` keeps every
+   plugin wired in, and core, cli, android and ios on one minor (8.5).
+   For a store build, set `MOBILE_PUBLIC_ORIGIN=https://219.co.za` and `MOBILE_PUBLIC_BASE_PATH=/citizens/connect`
+   (see "Native web address"), so the links the app shares are the ones that open it.
 
 **Related, not changed here:** the Supabase edge functions `review-contributor-application` (deployed) and
 `submit-contributor-application` (not deployed) build their email links from the `PUBLIC_SITE_URL` secret and
