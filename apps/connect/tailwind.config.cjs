@@ -32,9 +32,7 @@ module.exports = {
       },
       fontFamily: {
         sans: ["Plus Jakarta Sans", "ui-sans-serif", "sans-serif"],
-        // Headings are Manrope and body text Plus Jakarta Sans (founder, 2026-11-26: Playfair dropped). `serif` stays a
-        // name so old classes keep working; it is the heading face now.
-        serif: ["Manrope", "Plus Jakarta Sans", "ui-sans-serif", "sans-serif"],
+        // Manrope: the landing/auth screen (crown mark, wordmark, slogan) and, since 2026-11-26, the headings base.css styles.
         brand: ["Manrope", "ui-sans-serif", "sans-serif"],
       },
     },

@@ -9,6 +9,7 @@
  *    were styled against that order (a utility after report.css wins a tie, and preflight after the inline <style>);
  *  - the compiled sheet has the theme (gold, the two font families), the self-hosted faces and the boot screen,
  *    and Tailwind is the Play CDN's exact version;
+ *  - Playfair Display stays retired (founder, 2026-11-26): headings are Manrope, nothing names or ships Playfair;
  *  - the boot screen in #root mirrors the React LoadingSplash (same crown size), so the hand-over does not jump;
  *  - MapLibre loads through maplibre-loader.js, not with the page.
  */
@@ -94,10 +95,9 @@ describe("the compiled stylesheet", () => {
     expect(css).toMatch(/--tw-border-spacing-x/); // preflight's reset, as the Play CDN injected it
   });
 
-  it("serves the three families from our own origin, Latin and Latin Extended", () => {
+  it("serves the two families from our own origin, Latin and Latin Extended", () => {
     const faces = css.match(/@font-face\{[^}]*\}/g) ?? [];
-    expect(faces).toHaveLength(4); // Jakarta and Manrope: 2 subsets each (Playfair dropped, founder 2026-11-26)
-    expect(css).not.toContain("Playfair");
+    expect(faces).toHaveLength(4); // Jakarta and Manrope, each Latin and Latin Extended, upright
     for (const family of ["Plus Jakarta Sans", "Manrope"]) {
       expect(faces.some((f) => f.includes(`font-family:${family};`))).toBe(true);
     }
@@ -118,6 +118,16 @@ describe("the compiled stylesheet", () => {
     for (const [name, pos] of Object.entries({ base, report, claim, preflight })) expect(pos, name).toBeGreaterThan(-1);
     expect([base, report, claim, preflight]).toEqual([...[base, report, claim, preflight]].sort((a, b) => a - b));
     expect(index).not.toMatch(/href="assets\/(?:base|report|listing-claim)\.css/);
+  });
+
+  it("sets headings and display text in Manrope, and ships no Playfair Display (founder, 2026-11-26)", () => {
+    expect(css).toMatch(/h1,h2,h3,h4\{font-family:Manrope,/);
+    expect(css).toMatch(/\.font-display\{font-family:Manrope,/);
+    expect(css).not.toMatch(/playfair/i);
+    expect(readFileSync(join(APP, "src/frontend/assets/map-v2.css"), "utf8")).toMatch(/--font-display: 'Manrope',/);
+    expect(Object.keys(JSON.parse(readFileSync(join(APP, "package.json"), "utf8")).dependencies)).not.toContain(
+      "@fontsource-variable/playfair-display",
+    );
   });
 
   it("styles the boot screen", () => {

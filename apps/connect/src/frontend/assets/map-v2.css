@@ -130,7 +130,7 @@
   --avatar-half: 56px;
   --gallery-gap: 2px;
   --gallery-ratio: 1 / 1;
-  --font-display: 'Manrope', 'Plus Jakarta Sans', ui-sans-serif, sans-serif; /* headings (founder, 2026-11-26: Playfair dropped) */
+  --font-display: 'Manrope', ui-sans-serif, system-ui, sans-serif;
   --font-body: 'Plus Jakarta Sans', ui-sans-serif, sans-serif;
   --viewer-bg: rgba(10, 9, 8, 0.94);
   --viewer-fg: #f7f4ee;
