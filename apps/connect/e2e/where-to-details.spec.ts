@@ -68,19 +68,16 @@ test.describe("Where to… quick details (phone)", () => {
 test.describe("phone hierarchy", () => {
   test.use({ viewport: { width: 390, height: 844 } });
 
-  test("the Explore hero is a slim band on a phone, and the first results are above the fold", async ({ page }) => {
+  test("Explore's intro stays compact on a phone, and the first card is above the fold", async ({ page }) => {
     await mockMapNetwork(page);
     await openMap(page, "/", 1);
     await page.evaluate(() => (window as unknown as { __cc: { go: (p: string) => void } }).__cc.go("explore"));
-    const hero = page.locator("[data-screen='explore'] .explore-hero");
-    await expect(hero).toBeVisible();
-    const h = (await hero.boundingBox())!.height;
-    expect(h).toBeLessThanOrEqual(140);
-    const firstTile = page.locator("[data-screen='explore'] .photo-tile").first();
-    if (await firstTile.count()) {
-      const t = (await firstTile.boundingBox())!;
-      expect(t.y).toBeLessThan(844);
-    }
+    const intro = page.locator("[data-screen='explore'] [data-mv2='xs-intro']");
+    await expect(intro).toBeVisible();
+    expect((await intro.boundingBox())!.height).toBeLessThanOrEqual(300);
+    const firstCard = page.locator("[data-screen='explore'] [data-mv2='xs-card']").first();
+    await expect(firstCard).toBeVisible();
+    expect((await firstCard.boundingBox())!.y).toBeLessThan(844);
   });
 
   for (const width of [360, 390]) {

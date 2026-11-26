@@ -425,7 +425,6 @@ describe("the folding nav", () => {
   it("maps each screen to its item, and each item to its screen", () => {
     expect(N.currentOf({ page: "home", params: {} })).toBe("home");
     expect(N.currentOf({ page: "home", params: { view: "map" } })).toBe("map");
-    expect(N.currentOf({ page: "kingdom-discovery", params: {} })).toBe("explore");
     expect(N.currentOf({ page: "explore", params: {} })).toBe("explore"); // #210 part 3: the Discover page
     expect(N.currentOf({ page: "messages", params: {} })).toBe("profile");
     expect(N.currentOf({ page: "lets", params: {} })).toBe("profile");
@@ -558,7 +557,7 @@ describe("the stylesheet and the wiring", () => {
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123e");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261126a");
     const sheetCss = read("src/frontend/assets/map-v2.css");
     expect(sheetCss).toMatch(/\[data-mv2='explore'\] \{[\s\S]*?touch-action: none;/);
     // Where-to category tiles swipe sideways in focus and in the open preview (founder, 2026-11-23)

@@ -18,7 +18,7 @@
 //  That list has a second view, "Where to…" (C40): the same rows, each a saved set of existing categories.
 //  The home screen shows the panel OR the full listing, never both. The row ranks again only when the map settles (moveend),
 //  never per frame, and holds its own state, so a pan never re-renders the map screen. "See all" opens the
-//  Discover page (map-v2-discover.jsx), which draws the SAME card (cardFor) and measures from lastView().
+//  Explore page (connect-explore.jsx, pulled in over this map since 2026-11-26).
 //
 //  Pure helpers (groupOf, pillMatches, intentMatches, matchesFilter, rank, PILLS, INTENTS) are unit-tested in mapV2Explore.test.tsx.
 //  Styles: assets/map-v2.css sections 4j and 4k (tokens only). Text: MapV2Strings.explore.
@@ -187,7 +187,7 @@
   }
 
   /**
-   * ONE large Explore card, shared by the Explore row and the Discover page (map-v2-discover.jsx): the cover (or a
+   * ONE large Explore card, used by the Explore row (the Discover page that shared it was retired on 2026-11-26): the cover (or a
    * neutral tile with the category icon), the category chip in its group colour, the title and the distance in km.
    * opts: m (marker), meters, rec (full record), idPrefix (unique per row: one listing can sit in several rows),
    * words (distance words), selected + badge (the map's gold outline and its word), onOpen(id, type).

@@ -14,7 +14,7 @@ import { FAKE_PROJECT, mockAppShell, signInToFakeProject } from "./support/fake-
 //  decision that waits for the server.
 //
 //  The demo-mode counterpart (no session, one person is both applicant and
-//  admin, the pin appears after approval) is e2e/kingdom-discovery.spec.ts.
+//  admin, the pin appears after approval) is e2e/kingdom-discovery.spec.ts (Kingdom Discovery is now Explore).
 // ════════════════════════════════════════════════════════════════════
 
 test.use({ bypassCSP: true });
@@ -128,13 +128,16 @@ test.describe("signed in: applying and waiting", () => {
     await expect(banner).toContainText("it goes on the map once approved");
     await expect(page.getByRole("heading", { name: "You're approved!" })).toHaveCount(0);
 
-    // Not on the map, not in Kingdom Discovery.
+    // Not on the map, not in Explore.
     await goTo(page, "home");
     await mapReady(page);
     await expect(page.locator(".maplibregl-marker")).toHaveCount(0);
-    await goTo(page, "kingdom-discovery");
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
-    await expect(page.locator('[data-screen="kingdom-discovery"]').getByText(ORG_NAME)).toHaveCount(0);
+    await goTo(page, "explore");
+    const explore = page.locator('[data-screen="explore"]');
+    await expect(explore).toBeVisible();
+    await explore.locator("[data-mv2='xs-search'] input").fill(ORG_NAME);
+    await expect(explore.locator("[data-mv2='xs-results']")).toBeVisible();
+    await expect(explore.locator("[data-mv2='xs-card']").filter({ hasText: ORG_NAME })).toHaveCount(0);
   });
 
   test("they can finish their profile while pending: edits go to their own application, not the public profile", async ({ page }) => {

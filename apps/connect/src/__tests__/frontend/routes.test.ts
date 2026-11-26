@@ -41,7 +41,6 @@ const nav = (page: string, params: Record<string, unknown> = {}): Nav => ({ page
 describe("pathFor ↔ navFromPath: every row of the route table", () => {
   const rows: [Nav, string][] = [
     [nav("home"), "/"],
-    [nav("kingdom-discovery"), "/discover"],
     [nav("explore"), "/explore"],
     [nav("lets"), "/lets"],
     [nav("community"), "/community"],
@@ -114,8 +113,12 @@ describe("navFromPath: tidy-ups that keep one canonical URL per screen", () => {
     expect(R.navFromPath("/map")).toMatchObject({ ok: true, legacy: true, canonical: "/", nav: nav("home") });
   });
 
+  it("/discover (the retired Kingdom Exploration list) lands on Explore and is replaced in the address bar", () => {
+    expect(R.navFromPath("/discover")).toMatchObject({ ok: true, legacy: true, canonical: "/explore", nav: nav("explore") });
+  });
+
   it("ignores a trailing slash and the case of an id", () => {
-    expect(R.navFromPath("/discover/")).toMatchObject({ ok: true, legacy: true, canonical: "/discover" });
+    expect(R.navFromPath("/explore/")).toMatchObject({ ok: true, legacy: true, canonical: "/explore" });
     expect(R.navFromPath(`/e/${ID.toUpperCase()}`)).toMatchObject({ ok: true, canonical: `/e/${ID}`, nav: nav("event", { id: ID }) });
   });
 
@@ -213,7 +216,7 @@ describe("malformed or unknown paths fall back to the map (ok=false, so the app 
 
 describe("accessFor: the URL never grants access, it only says what the screen needs", () => {
   it("public screens", () => {
-    for (const n of [nav("home"), nav("kingdom-discovery"), nav("explore"), nav("lets"), nav("community"), nav("event", { id: ID }), nav("place", { id: ID }), nav("profile", { id: ID }), nav("profile", { slug: "x" })]) {
+    for (const n of [nav("home"), nav("explore"), nav("lets"), nav("community"), nav("event", { id: ID }), nav("place", { id: ID }), nav("profile", { id: ID }), nav("profile", { slug: "x" })]) {
       expect(R.accessFor(n), n.page).toBe("public");
     }
   });
@@ -248,12 +251,13 @@ describe("safeReturnPath: where to land after signing in, same-origin only", () 
     expect(R.safeReturnPath("/")).toBe("/");
     expect(R.safeReturnPath("/map")).toBe("/");
     expect(R.safeReturnPath("/index.html?c=impact-radio")).toBe("/c/impact-radio");
-    expect(R.safeReturnPath("  /discover  ")).toBe("/discover");
+    expect(R.safeReturnPath("  /explore  ")).toBe("/explore");
+    expect(R.safeReturnPath("/discover")).toBe("/explore");
   });
 
   it("drops the query string and hash, so nothing smuggled in them survives", () => {
     expect(R.safeReturnPath("/dashboard?next=https://evil.example")).toBe("/dashboard");
-    expect(R.safeReturnPath("/discover#access_token=abc")).toBe("/discover");
+    expect(R.safeReturnPath("/explore#access_token=abc")).toBe("/explore");
   });
 
   it("refuses anything that could leave the origin or run script", () => {
@@ -292,7 +296,6 @@ describe("safeReturnPath: where to land after signing in, same-origin only", () 
 describe("titleFor", () => {
   it("names the screen in the tab and history", () => {
     expect(R.titleFor(nav("home"))).toBe("Citizens Connect");
-    expect(R.titleFor(nav("kingdom-discovery"))).toBe("Kingdom Exploration · Citizens Connect");
     expect(R.titleFor(nav("explore"))).toBe("Explore · Citizens Connect");
     expect(R.titleFor(nav("lets"))).toBe("Let's… · Citizens Connect");
     expect(R.titleFor(nav("community"))).toBe("Kingdom Projects · Citizens Connect");
@@ -454,7 +457,7 @@ describe("stripBase / withBase: the prefix crossing", () => {
       }
     });
     it("pathFor then withBase then stripBase then navFromPath returns the screen we started on", () => {
-      const screens: Nav[] = [nav("home"), nav("kingdom-discovery"), nav("dashboard", { tab: "events" }), nav("event", { id: ID }), nav("profile", { slug: "harvest-hall" }), nav("messages", { convId: ID })];
+      const screens: Nav[] = [nav("home"), nav("explore"), nav("dashboard", { tab: "events" }), nav("event", { id: ID }), nav("profile", { slug: "harvest-hall" }), nav("messages", { convId: ID })];
       for (const n of screens) {
         const url = R.withBase(R.pathFor(n) as string, BASE) as string;
         expect(R.navFromPath(R.stripBase(url, BASE), "").nav, url).toEqual(n);

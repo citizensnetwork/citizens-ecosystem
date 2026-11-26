@@ -20,19 +20,23 @@ const components = (() => {
 const valuesOf = (prop: string) => [...components.matchAll(new RegExp(`(?<![\\w-])${prop}:\\s*([^;]+);`, "g"))].map((m) => m[1].trim());
 
 describe("Map v2 visual consistency (tracker section 12.3)", () => {
-  it("three type sizes and two weights only: every font-size and font-weight is a token", () => {
-    for (const v of valuesOf("font-size")) expect(v).toMatch(/^(var\(--fs-[123]\)|inherit)$/);
+  // The shared look (founder, 2026-11-26) adds Explore's section titles (--fs-4) and its one page title (--fs-display).
+  it("three body type sizes, two title sizes and two weights only: every font-size and font-weight is a token", () => {
+    for (const v of valuesOf("font-size")) expect(v).toMatch(/^(var\(--fs-([1234]|display)\)|inherit)$/);
     for (const v of valuesOf("font-weight")) expect(v).toMatch(/^var\(--fw-(regular|semibold)\)$/);
     expect(css).toMatch(/--fw-regular:\s*400;/);
     expect(css).toMatch(/--fw-semibold:\s*600;/);
   });
 
-  it("radii come from {8, 12, 20, 999}: every border-radius is a radius token", () => {
+  // The shared look (founder, 2026-11-26) adds the card corner (24) and the inner corner (16).
+  it("radii come from {8, 12, 16, 20, 24, 999}: every border-radius is a radius token", () => {
     const radii = [...css.matchAll(/--radius-(sm|md|lg|full):\s*(\d+)px;/g)].map((m) => Number(m[2])).sort((a, b) => a - b);
     expect(radii).toEqual([8, 12, 20, 999]);
     for (const v of valuesOf("border-radius")) {
-      for (const part of v.split(/\s+/)) expect(part).toMatch(/^(var\(--(radius-(sm|md|lg|full)|sheet-radius|reader-radius)\)|0)$/);
+      for (const part of v.split(/\s+/)) expect(part).toMatch(/^(var\(--(radius-(sm|md|lg|full|card|inner)|sheet-radius|reader-radius)\)|0)$/);
     }
+    expect(css).toMatch(/--radius-card:\s*24px;/);
+    expect(css).toMatch(/--radius-inner:\s*16px;/);
   });
 
   it("spacing comes from the 4-pt scale: 4, 8, 12, 16, 20, 24, 32, 48", () => {

@@ -55,7 +55,7 @@ test.describe("every icon a screen draws is in the trimmed lucide set", () => {
     expect(await missing(page), "icons missing on the map").toEqual([]);
 
     for (const [path, screen] of [
-      ["/discover", "kingdom-discovery"],
+      ["/explore", "explore"],
       ["/lets", "lets"],
       ["/community", "community"],
       ["/me", "profile"],

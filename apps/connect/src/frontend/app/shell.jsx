@@ -8,11 +8,8 @@
   const useBackGuard = window.useBackGuard || function () {};
 
   const BASE_TABS = [
-    { page: 'home', label: 'Discover', icon: 'Map' },
-    // Kingdom Exploration is a real destination, not a button hidden in the
-    // map's top-right corner — it now lives in the nav on both breakpoints, so
-    // moving between the map and the list never moves the controls around you.
-    { page: 'kingdom-discovery', label: 'Kingdom Exploration', icon: 'LayoutGrid' },
+    { page: 'home', label: 'Map', icon: 'Map' },
+    { page: 'explore', label: 'Explore', icon: 'Compass' },
     { page: 'lets', label: 'Let\'s…', icon: 'Users' },
     { page: 'messages', label: 'Messages', icon: 'MessageCircle' },
     { page: 'notifications', label: 'Notifications', icon: 'Bell' },
@@ -300,15 +297,25 @@
       React.createElement('div', { className: 'connect-frame' }, node));
   }
 
+  // The map and Explore share ONE stage (founder's design, 2026-11-26): Explore is pulled in over the live map, so the map
+  // stays mounted underneath (same element type in the same place for both pages, so React keeps it) and is only blurred.
+  // On the map, a pill on the right edge pulls Explore back in (a left swipe, a tap or Enter).
+  function MapStage({ explore }) {
+    const app = window.useApp();
+    const X = window.ConnectExplore;
+    return React.createElement('div', { 'data-mv2': 'map-stage', 'data-explore': explore ? '' : undefined },
+      React.createElement('div', { 'data-mv2': 'map-under', 'aria-hidden': explore ? 'true' : undefined, inert: explore ? '' : undefined },
+        React.createElement(window.HomePage, { under: explore })),
+      explore ? React.createElement(X.Page) : React.createElement(X.EdgeHandle, { onOpen: () => app.go('explore') }));
+  }
+
   function CurrentPage() {
     const { nav, isPendingApplicant, listingRole } = window.useApp();
     const wide = window.ConnectChrome && window.ConnectChrome.useWide ? window.ConnectChrome.useWide() : false;
     const p = nav.page;
     switch (p) {
-      case 'home': return React.createElement(window.HomePage);
-      case 'kingdom-discovery': return React.createElement(window.KingdomDiscoveryPage);
-      // Explore is the image-first page. Kingdom Exploration stays at /discover.
-      case 'explore': return placed(wide, React.createElement(window.ConnectExplore.Page));
+      case 'home': return React.createElement(MapStage, { explore: false });
+      case 'explore': return React.createElement(MapStage, { explore: true });
       case 'lets': return React.createElement(window.LetsPage);
       case 'community': return React.createElement(window.CommunityPage);
       case 'messages': return React.createElement(window.MessagesPage);
@@ -324,7 +331,7 @@
       case 'profile': return nav.params.id
         ? React.createElement(window.ContributorProfilePage, { id: nav.params.id })
         : placed(wide, React.createElement(window.ConnectMe.Page));
-      default: return React.createElement(window.HomePage);
+      default: return React.createElement(MapStage, { explore: false });
     }
   }
 
@@ -412,7 +419,7 @@
     { id: 'do', label: 'Do', kind: 'Do' },
   ];
   // The screens drawn by placed() (CurrentPage): their own scroller runs under the floating nav.
-  const PLACED = ['explore', 'settings', 'profile'];
+  const PLACED = ['settings', 'profile'];
   // Step-by-step forms keep their own Continue bar at the foot, so the floating nav stands aside there (the crown stays).
   const FLOWS = ['apply', 'onboarding', 'intake-upgrade'];
   function crownHome(app, onMap) {

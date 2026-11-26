@@ -79,7 +79,9 @@
   const HOME_ZOOM = 12.5;
 
   // ── Home / Discover ──
-  function HomePage() {
+  // under: Explore is pulled in over this map (shell.jsx MapStage). The map stays mounted underneath as a backdrop, so its
+  // own levels close first: a Back press then belongs to Explore, never to a carousel nobody can see.
+  function HomePage({ under } = {}) {
     const app = window.useApp();
     const { events, places, contributors, ideas, newsPosts, dismissBubble, trackImpression } = app;
     const [selected, setSelected] = useState(null);
@@ -403,6 +405,7 @@
       setStripSignal((n) => n + 1);
     };
     useBackGuard(searchOpen, closeSearch);
+    useEffect(() => { if (under) resetLevels(); }, [under]); // eslint-disable-line react-hooks/exhaustive-deps
     // One history entry per level: raised Back/Escape steps down; cards-only Back closes (handle tap still uses peekBack).
     useBackGuard(!!peek, closePeek);
     useBackGuard(!!(peek && peek.raised), lowerPeek);
@@ -530,7 +533,7 @@
       requestAnimationFrame(() => { if (searchRef.current) searchRef.current.focus(); });
     };
     const ideaMarkers = ideas.filter((i) => i.status === 'voting').filter(matches).map((i) => ({ id: i.id, type: 'idea', title: i.title, category: i.category, lat: i.lat, lng: i.lng, mapX: i.mapX, mapY: i.mapY, createdAt: i.createdAt }));
-    return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-crown': clean ? undefined : '', 'data-explore-min': (!clean && !panelOpen) ? '' : undefined },
+    return React.createElement('div', { ref: rootRef, className: 'flex-1 relative overflow-hidden', style: { height: '100%' }, 'data-screen': under ? undefined : 'discover', 'data-mv2': 'home', 'data-clean': clean ? '' : undefined, 'data-narrow': narrow ? '' : undefined, 'data-crown': clean ? undefined : '', 'data-explore-min': (!clean && !panelOpen) ? '' : undefined },
       // QA 2026-11-25 (CCQA-0004): the first Tab stop skips the map. It lands on the list in the Explore panel when there is
       // one, else on the nav, else opens Explore, the list of everything; the map is never the only way in.
       React.createElement('a', {

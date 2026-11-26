@@ -20,7 +20,7 @@ import { SURFACES, captureAll, parseArgs } from './capture.mjs';
 const FRONT = 'apps/connect/src/frontend/';
 /** Connect surface id -> the tracked files that draw it (paths under src/frontend). `map` is matched by prefix. */
 export const SURFACE_FILES = {
-  discovery: ['app/kingdom-discovery.jsx', 'app/entity-card.jsx', 'app/pages.jsx'],
+  discovery: ['app/connect-explore.jsx', 'app/entity-card.jsx', 'app/pages.jsx'],
   profile: ['app/profiles.jsx', 'app/entity-card.jsx'],
   'landing-auth': ['app/auth.jsx'],
   apply: ['app/apply.jsx', 'app/pending-application.jsx'],

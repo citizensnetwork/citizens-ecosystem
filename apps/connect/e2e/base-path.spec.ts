@@ -212,7 +212,7 @@ test.describe("Every kind of screen opens directly and survives a reload, under 
   const routes: [string, string, string][] = [
     ["", "discover", "the front door, the map"],
     ["/", "discover", "the front door with a slash"],
-    ["/discover", "kingdom-discovery", "Kingdom Exploration"],
+    ["/explore", "explore", "Explore"],
     ["/lets", "lets", "Let's…"],
     ["/community", "community", "Kingdom Projects"],
     [`/e/${EVENT_ID}`, "event", "an event"],
@@ -304,7 +304,7 @@ test.describe("In-app navigation, Back and Forward never leave the prefix", () =
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1, { timeout: 15_000 });
 
     const steps: [() => Promise<unknown>, string, string][] = [
-      [() => go(page, "kingdom-discovery"), `${BASE}/discover`, "kingdom-discovery"],
+      [() => go(page, "explore"), `${BASE}/explore`, "explore"],
       [() => go(page, "event", { id: EVENT_ID }), `${BASE}/e/${EVENT_ID}`, "event"],
       [() => go(page, "profile", { id: ORG_ID }), `${BASE}/c/${SLUG}`, "profile"],
       [() => go(page, "settings"), `${BASE}/settings`, "settings"],
@@ -315,12 +315,12 @@ test.describe("In-app navigation, Back and Forward never leave the prefix", () =
       expect(path(page)).toBe(url);
     }
 
-    for (const [url, name] of [[`${BASE}/c/${SLUG}`, "profile"], [`${BASE}/e/${EVENT_ID}`, "event"], [`${BASE}/discover`, "kingdom-discovery"], [BASE, "discover"]] as const) {
+    for (const [url, name] of [[`${BASE}/c/${SLUG}`, "profile"], [`${BASE}/e/${EVENT_ID}`, "event"], [`${BASE}/explore`, "explore"], [BASE, "discover"]] as const) {
       await page.goBack();
       await expect.poll(() => screen(page)).toBe(name);
       expect(path(page)).toBe(url);
     }
-    for (const [url, name] of [[`${BASE}/discover`, "kingdom-discovery"], [`${BASE}/e/${EVENT_ID}`, "event"]] as const) {
+    for (const [url, name] of [[`${BASE}/explore`, "explore"], [`${BASE}/e/${EVENT_ID}`, "event"]] as const) {
       await page.goForward();
       await expect.poll(() => screen(page)).toBe(name);
       expect(path(page)).toBe(url);
@@ -496,8 +496,8 @@ test.describe("Assets and API calls all live under the prefix", () => {
     await openDemo(page);
     await page.goto(`${BASE}/`);
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1, { timeout: 15_000 });
-    await go(page, "kingdom-discovery");
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
+    await go(page, "explore");
+    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
 
     // map-v2.css is injected by script (a root-absolute href once): it must be the prefixed one and must have loaded
     const css = await page.evaluate(() => document.querySelector('link[href*="map-v2.css"]')?.getAttribute("href") ?? "");
