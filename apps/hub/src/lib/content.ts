@@ -30,7 +30,7 @@ export const PAGES = {
 /** Where Connect's own screens live under the shared domain (app-relative paths from Connect's routes.jsx). */
 export const CONNECT = {
   home: `${PATH_ROOT}/connect`,
-  search: `${PATH_ROOT}/connect/discover`,
+  search: `${PATH_ROOT}/connect/explore`, // Explore replaced the Kingdom Exploration list (2026-11-26)
   kingdomProjects: `${PATH_ROOT}/connect/community`,
   lets: `${PATH_ROOT}/connect/lets`,
   apply: `${PATH_ROOT}/connect/apply`,

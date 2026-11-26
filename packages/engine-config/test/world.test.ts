@@ -39,7 +39,7 @@ describe('a world’s words', () => {
     expect(sample.t('manifest.description')).toBe(
       'Find makers, gardens and get-togethers near you.',
     );
-    expect(citizens.t('screen.discover.title')).toBe('Kingdom Exploration');
+    expect(citizens.t('screen.discover.title')).toBe('Explore');
   });
 
   it('fills values, the same way on every call', () => {

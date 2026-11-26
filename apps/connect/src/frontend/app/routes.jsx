@@ -299,7 +299,7 @@
 
   const BASE_TITLE = window.WORLD.t('meta.title');
   const TITLES = {
-    explore: 'Explore', lets: window.WORLD.t('screen.gatherings.title'), community: window.WORLD.t('screen.ideas.title'), messages: 'Messages',
+    explore: window.WORLD.t('screen.discover.title'), lets: window.WORLD.t('screen.gatherings.title'), community: window.WORLD.t('screen.ideas.title'), messages: 'Messages',
     notifications: 'Notifications', settings: 'Settings', apply: window.WORLD.t('screen.apply.title'),
     onboarding: 'Set up your profile', dashboard: 'Dashboard', admin: 'Admin',
     'intake-upgrade': 'Confirm your listing',

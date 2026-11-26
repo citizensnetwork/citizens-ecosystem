@@ -553,7 +553,7 @@ describe('get involved (/citizens/get-involved)', () => {
     );
     // [CONNECT key, Connect's page name in routes.jsx, its app-relative path]
     const screens: [keyof typeof CONNECT, string, string][] = [
-      ['search', 'kingdom-discovery', '/discover'],
+      ['search', 'explore', '/explore'],
       ['kingdomProjects', 'community', '/community'],
       ['lets', 'lets', '/lets'],
       ['apply', 'apply', '/apply'],
