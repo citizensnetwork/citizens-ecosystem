@@ -65,7 +65,7 @@ test.describe("no screen breaks the strict CSP (report-only now, enforced after 
     }
     expect(await violations(page), "on the map").toEqual([]);
     for (const [path, screen] of [
-      ["/discover", "kingdom-discovery"],
+      ["/explore", "explore"],
       ["/lets", "lets"],
       ["/community", "community"],
       ["/me", "profile"],

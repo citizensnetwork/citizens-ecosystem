@@ -27,7 +27,8 @@ describe("routeFromAppLink: a link that opened the app → the screen it names",
     [`${ROOT}/e/${UUID}`, "event", { id: UUID }],
     [`${ROOT}/p/${UUID}`, "place", { id: UUID }],
     [`${ROOT}/c/anchor-church`, "profile", { slug: "anchor-church" }],
-    [`${ROOT}/discover`, "kingdom-discovery", {}],
+    [`${ROOT}/explore`, "explore", {}],
+    [`${ROOT}/discover`, "explore", {}], // the retired Kingdom Exploration address opens Explore
     [`${ROOT}/dashboard/events`, "dashboard", { tab: "events" }],
     [`${ROOT}`, "home", {}],
     [`${ROOT}/`, "home", {}],
@@ -82,7 +83,7 @@ describe("the code and the native shell agree", () => {
     const filter = /<intent-filter android:autoVerify="true">([\s\S]*?)<\/intent-filter>/.exec(manifest)?.[1] ?? "";
     const data = /<data android:scheme="([^"]+)" android:host="([^"]+)" android:pathPrefix="([^"]+)"/.exec(filter);
     expect(data?.slice(1)).toEqual(["https", "219.co.za", "/citizens/connect"]);
-    expect(R.routeFromAppLink(`${data![1]}://${data![2]}${data![3]}/discover`)?.nav.page).toBe("kingdom-discovery");
+    expect(R.routeFromAppLink(`${data![1]}://${data![2]}${data![3]}/explore`)?.nav.page).toBe("explore");
   });
 
   it("store.jsx routes both the running app's links and the launch link through routeFromAppLink", () => {

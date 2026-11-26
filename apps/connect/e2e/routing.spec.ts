@@ -813,7 +813,7 @@ test.describe("App links in the native shell (QA plan PR G)", () => {
   test("the link that started the app opens its screen, a link while it runs opens too, Back returns, a foreign link is ignored", async ({ page }) => {
     await openDemo(page);
     // stand in for the native bridge: every appUrlOpen listener is kept (auth-client.js registers one too), and the
-    // app was started by a link to Kingdom Exploration
+    // app was started by an old link to Kingdom Exploration (retired 2026-11-26: it opens Explore)
     await page.route("**/capacitor-bridge*.js", (route: Route) =>
       route.fulfill({
         contentType: "application/javascript",
@@ -828,8 +828,8 @@ test.describe("App links in the native shell (QA plan PR G)", () => {
       page.evaluate((u) => (window as unknown as { __capOpen: ((d: { url: string }) => void)[] }).__capOpen.forEach((cb) => cb({ url: u })), url);
 
     await page.goto("/");
-    await expect.poll(() => screen(page)).toBe("kingdom-discovery");
-    expect(path(page)).toBe("/discover");
+    await expect.poll(() => screen(page)).toBe("explore");
+    expect(path(page)).toBe("/explore");
 
     await open(`https://219.co.za/citizens/connect/e/${EVENT_ID}`);
     await expect.poll(() => screen(page)).toBe("event");
@@ -848,7 +848,7 @@ test.describe("App links in the native shell (QA plan PR G)", () => {
 
     // the link opened the screen the way a tap does: Back returns to where the person was
     await page.goBack();
-    await expect.poll(() => screen(page)).toBe("kingdom-discovery");
+    await expect.poll(() => screen(page)).toBe("explore");
 
     // a link to the build's own public address opens too: with no mobile config that is the address the app shares
     // today (routes.jsx PUBLIC_ORIGIN's fallback), so a link it shared brings the person back in
