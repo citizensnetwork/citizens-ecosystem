@@ -1430,7 +1430,9 @@
      are the exception (founder's design, 2026-11-26): they float over the map edge to edge and keep clear of the crown
      themselves. */
   .connect-app[data-phone]:not([data-page='home']):not([data-over]) .connect-app-main{padding-top:var(--phone-crown-clear)}
-  [data-mv2='me-over'] .connect-scroll{padding-top:var(--phone-crown-clear)}
+  /* Me over the map keeps the crown's band (founder, 2026-11-25): its page scrolls below the band, never under the
+     crown; the band itself shows the faded map */
+  [data-mv2='me-over'] .connect-scroll{top:var(--phone-crown-clear)}
   /* The open map search starts after the crown, its middle level with the crown's. */
   [data-mv2='home'] [data-mv2='home-bar']{padding-left:calc(var(--space-3) + var(--hit) + var(--space-2))}
 }
