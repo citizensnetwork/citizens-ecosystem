@@ -37,7 +37,7 @@ describe("next.config.ts rewrites ↔ routes.jsx", () => {
   it("covers every path the route table can produce", () => {
     const navs: Nav[] = [
       { page: "home", params: {} },
-      { page: "kingdom-discovery", params: {} },
+      { page: "explore", params: {} },
       { page: "lets", params: {} },
       { page: "community", params: {} },
       { page: "messages", params: {} },

@@ -32,7 +32,6 @@ const WIRED_SCREENS: readonly string[] = [
   'app/entity-card.jsx',
   'app/insights.jsx',
   'app/intake-upgrade.jsx',
-  'app/kingdom-discovery.jsx',
   'app/listing-claim.jsx',
   'app/map-v2-sheet.jsx',
   'app/messages.jsx',

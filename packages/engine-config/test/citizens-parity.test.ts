@@ -408,7 +408,7 @@ describe('vocabulary', () => {
    */
   const WIRED: Partial<Record<MessageKey, { files: readonly string[]; text: string }>> = {
     'meta.title': { files: [routes], text: 'Citizens Connect' },
-    'screen.discover.title': { files: [routes], text: 'Kingdom Exploration' },
+    'screen.discover.title': { files: [routes], text: 'Explore' },
     'screen.gatherings.title': { files: [routes], text: "Let's…" },
     'screen.ideas.title': { files: [routes, pages], text: 'Kingdom Projects' },
     'screen.ideas.subtitle': {
@@ -684,7 +684,7 @@ describe('layout, map and the rest', () => {
     const pages = [...block.matchAll(/\{ page: '([a-z-]+)'/g)].map((match) => match[1] ?? '');
     const component: Record<string, string> = {
       home: 'map',
-      'kingdom-discovery': 'discover',
+      explore: 'discover',
       lets: 'gatherings',
       messages: 'messages',
       notifications: 'notifications',

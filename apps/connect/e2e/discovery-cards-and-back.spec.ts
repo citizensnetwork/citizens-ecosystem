@@ -15,7 +15,7 @@ declare global {
 //  Three regressions this suite exists to catch, all of them things
 //  unit tests structurally cannot see:
 //
-//  1. Kingdom Discovery cards COLLAPSING. Chromium sizes a grid
+//  1. Explore cards COLLAPSING (Kingdom Discovery's, until 2026-11-26). Chromium sizes a grid
 //     container's implicit `auto` rows against its own box when that
 //     container is itself a scroll container with a definite height —
 //     every card was squashed to ~2px and the list rendered as coloured
@@ -168,58 +168,45 @@ const screenName = (page: Page) =>
     return el ? el.getAttribute("data-screen") : null;
   });
 
-test.describe("Kingdom Discovery cards render at full size", () => {
-  test("a card is a real card — not a collapsed hairline — and carries its details and actions", async ({ page }) => {
+test.describe("Explore cards render at full size, and the preview carries the details", () => {
+  test("a card is a real card, not a collapsed hairline, and its preview says what it is with its actions", async ({ page }) => {
     await mockNetwork(page);
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
-    const screen = page.locator('[data-screen="kingdom-discovery"]');
+    // Kingdom Discovery is Explore now (founder, 2026-11-26)
+    await page.evaluate(() => window.__cc.go("explore"));
+    const screen = page.locator('[data-screen="explore"]');
     await expect(screen).toBeVisible();
+    await screen.locator("[data-mv2='xs-search'] input").fill("Hatfield Sunday");
 
-    // Tapping the card opens it, so band + title are one <button>; the card
-    // itself is the [data-entity-card] box, which is what must have height.
-    const tapTarget = screen.getByRole("button", { name: /Hatfield Sunday Celebration/ }).first();
-    await expect(tapTarget).toBeVisible({ timeout: 15_000 });
-    const card = screen.locator('[data-entity-card="event"]').first();
-
-    // THE regression guard: the collapsed state measured ~2px tall.
+    // THE regression guard: a card must have real height (a collapsed grid once measured ~2px).
+    const card = screen.locator("[data-mv2='xs-results'] [data-mv2='xs-card']").filter({ hasText: "Hatfield Sunday Celebration" }).first();
+    await expect(card).toBeVisible({ timeout: 15_000 });
     const box = await card.boundingBox();
     expect(box).not.toBeNull();
-    expect(box!.height).toBeGreaterThan(120);
+    expect(box!.height).toBeGreaterThan(56);
     expect(box!.width).toBeGreaterThan(200);
 
-    // …and the details the founder asked to see are actually on it.
-    await expect(screen.getByText("A weekly gathering open to everyone in the city.")).toBeVisible();
-    await expect(screen.getByText("1186 Burnett Street, Hatfield, Pretoria")).toBeVisible();
-    await expect(screen.getByText(/connected/)).toBeVisible();
-    await expect(screen.getByText(/considering/)).toBeVisible();
-    await expect(screen.getByRole("button", { name: "View Full Profile" }).first()).toBeVisible();
-    await expect(screen.getByRole("button", { name: /Consider|Remove from considering/ }).first()).toBeVisible();
-    await expect(screen.getByRole("button", { name: "Share" }).first()).toBeVisible();
-
-    // Socials on the card itself — one link per handle the row carries, each
-    // pointing at the real platform URL whether the value was stored as a
-    // handle, a scheme-less link or a full URL.
-    const eventCard = card;
-    await expect(eventCard.getByRole("link", { name: "Instagram" })).toHaveAttribute(
-      "href", "https://instagram.com/hatfieldsunday",
-    );
-    await expect(eventCard.getByRole("link", { name: "Facebook" })).toHaveAttribute(
-      "href", "https://facebook.com/hatfieldsunday",
-    );
-    await expect(eventCard.getByRole("link", { name: "YouTube" })).toHaveAttribute(
-      "href", "https://youtube.com/@hatfieldsunday",
-    );
-    // …and a brand mark beside each, not the empty <svg> lucide 1.x leaves
-    // behind for a name it no longer ships.
-    await expect(eventCard.getByRole("link", { name: "Instagram" }).locator("svg path")).toHaveCount(1);
+    // the preview: the details the founder asked to see, one gold action, quiet ones, and the full profile
+    await card.click();
+    const preview = page.locator("[data-mv2='xs-preview']");
+    await expect(preview).toBeVisible();
+    await expect(preview.getByText("A weekly gathering open to everyone in the city.")).toBeVisible();
+    await expect(preview.getByText("1186 Burnett Street, Hatfield, Pretoria")).toBeVisible();
+    await expect(preview.locator("[data-mv2='xs-act'][data-primary]")).toHaveCount(1);
+    await expect(preview.getByRole("button", { name: /Connect/ })).toBeVisible();
+    await expect(preview.getByRole("button", { name: /Consider/ })).toBeVisible();
+    await expect(preview.getByRole("button", { name: /Share/ })).toBeVisible();
+    await expect(preview.getByRole("button", { name: "Full profile" })).toBeVisible();
+    await preview.getByRole("button", { name: "Close" }).click();
+    await expect(preview).toHaveCount(0);
 
     // An uncategorised Contributor still says what kind of organisation it is.
-    await page.getByRole("button", { name: "Contributors", exact: true }).click();
-    await expect(screen.getByText("Anchor Community Church")).toBeVisible();
-    await expect(screen.getByText("Ministry").first()).toBeVisible();
+    await screen.locator("[data-mv2='xs-search'] input").fill("Anchor Community Church");
+    const org = screen.locator("[data-mv2='xs-card']").filter({ hasText: "Anchor Community Church" }).first();
+    await expect(org).toBeVisible();
+    await expect(org.locator("[data-mv2='xs-kind']")).toHaveText("Ministry");
   });
 });
 
@@ -231,13 +218,13 @@ test.describe("Device Back button", () => {
     await page.goto("/");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible({ timeout: 15_000 });
 
-    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible();
+    await page.evaluate(() => window.__cc.go("explore"));
+    await expect(page.locator('[data-screen="explore"]')).toBeVisible();
     await page.evaluate(() => window.__cc.go("settings"));
     await expect(page.locator('[data-screen="settings"]')).toBeVisible();
 
     await page.goBack();
-    await expect.poll(() => screenName(page)).toBe("kingdom-discovery");
+    await expect.poll(() => screenName(page)).toBe("explore");
     await page.goBack();
     await expect.poll(() => screenName(page)).toBe("discover");
 
@@ -330,9 +317,10 @@ test.describe("Finished events", () => {
     await expect(page.locator(".maplibregl-marker")).toHaveCount(2, { timeout: 15_000 });
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1);
 
-    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
-    const list = page.locator('[data-screen="kingdom-discovery"]');
-    await expect(list.locator('[data-entity-card="event"]')).toHaveCount(1, { timeout: 10_000 });
+    await page.evaluate(() => window.__cc.go("explore"));
+    const list = page.locator('[data-screen="explore"]');
+    await list.getByRole("button", { name: "Events", exact: true }).click();
+    await expect(list.locator("[data-mv2='xs-results'] [data-mv2='xs-card']")).toHaveCount(1, { timeout: 10_000 });
     await expect(list.getByText("Hatfield Sunday Celebration").first()).toBeVisible();
     await expect(list.getByText("Last Summer's Beach Camp")).toHaveCount(0);
 
@@ -352,13 +340,13 @@ test.describe("Finished events", () => {
     await expect(page.locator(".maplibregl-marker")).toHaveCount(1, { timeout: 15_000 });
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(0);
 
-    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
-    const list = page.locator('[data-screen="kingdom-discovery"]');
+    await page.evaluate(() => window.__cc.go("explore"));
+    const list = page.locator('[data-screen="explore"]');
     await expect(list).toBeVisible();
-    await page.getByRole("button", { name: "Events", exact: true }).click();
-    await expect(list.getByText("No upcoming events yet")).toBeVisible();
-    await expect(list.getByText("Follow organisations to hear when they post.")).toBeVisible();
-    await expect(list.locator("[data-entity-card]")).toHaveCount(0);
+    await list.getByRole("button", { name: "Events", exact: true }).click();
+    await expect(list.locator("[data-cc='explore-empty']")).toBeVisible();
+    await expect(list.locator("[data-cc='explore-empty']")).toContainText("Nothing matches these filters");
+    await expect(list.locator("[data-mv2='xs-results'] [data-mv2='xs-card']")).toHaveCount(0);
   });
 });
 

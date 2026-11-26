@@ -13,7 +13,7 @@
      anything else loaded, and on the web it changes nothing; in the native shell the file is local and runs at once.
      The native bridge sets window.Capacitor at document start, before it runs; if anything there fails the
      page stays zoomable. -->
-<!-- Every screen has its own URL now (/discover, /e/<id>, /dashboard/events, ...), and the
+<!-- Every screen has its own URL now (/explore, /e/<id>, /dashboard/events, ...), and the
      server serves this same file for all of them. Without a base, the relative script,
      style and vendor paths below would resolve under those paths (/e/app/store.jsx) and
      404. next.config.ts rewrites an explicit list of paths here, never a catch-all. -->
@@ -88,8 +88,8 @@
 <script src="auth-client.js?v=20261003a"></script>
 
 <script type="text/babel" src="app/icons.jsx?v=20261122m"></script>
-<script type="text/babel" src="app/routes.jsx?v=20261026c"></script>
-<script type="text/babel" src="app/map-v2-lib.jsx?v=20261123e"></script>
+<script type="text/babel" src="app/routes.jsx?v=20261126a"></script>
+<script type="text/babel" src="app/map-v2-lib.jsx?v=20261126a"></script>
 <script type="text/babel" src="app/saved-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/cohost-lib.jsx?v=20261017a"></script>
 <script type="text/babel" src="app/moments-lib.jsx?v=20261017a"></script>
@@ -124,12 +124,10 @@
 <script type="text/babel" src="app/map-v2-explore.jsx?v=20261123h"></script>
 <script type="text/babel" src="app/connect-chrome.jsx?v=20261123a"></script>
 <script type="text/babel" src="app/connect-previews.jsx?v=20261123a"></script>
-<script type="text/babel" src="app/connect-explore.jsx?v=20261123a"></script>
+<script type="text/babel" src="app/connect-explore.jsx?v=20261126a"></script>
 <script type="text/babel" src="app/connect-me.jsx?v=20261123a"></script>
 <script type="text/babel" src="app/map-v2-nav.jsx?v=20261026c"></script>
-<script type="text/babel" src="app/map-v2-discover.jsx?v=20261030a"></script>
-<script type="text/babel" src="app/home.jsx?v=20261123d"></script>
-<script type="text/babel" src="app/kingdom-discovery.jsx?v=20261002b"></script>
+<script type="text/babel" src="app/home.jsx?v=20261126a"></script>
 <script type="text/babel" src="app/apply.jsx?v=20261101a"></script>
 <script type="text/babel" src="app/pending-application.jsx?v=20261022a"></script>
 <script type="text/babel" src="app/admin.jsx?v=20261101a"></script>
@@ -144,7 +142,7 @@
 <script type="text/babel" src="app/intake-upgrade.jsx?v=20261025a"></script>
 <script type="text/babel" src="app/tweaks-panel.jsx?v=20260615b"></script>
 <script type="text/babel" src="app/tweaks.jsx?v=20260826c"></script>
-<script type="text/babel" src="app/shell.jsx?v=20261117a"></script>
+<script type="text/babel" src="app/shell.jsx?v=20261126a"></script>
 <script type="text/babel" src="app/app.jsx?v=20260615b"></script>
 </body>
 </html>

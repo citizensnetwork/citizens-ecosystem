@@ -19,31 +19,39 @@ async function openExplore(page: Page) {
   await page.evaluate(() => (window as unknown as { __cc: { go: (p: string) => void } }).__cc.go("explore"));
   await expect(page.locator("[data-screen='explore']")).toBeVisible();
 }
-const mainTitles = (page: Page) => page.locator("[data-screen='explore'] .explore-content > .photo-carousel, [data-screen='explore'] .explore-content > .explore-grid").first().locator(".photo-tile h3");
+const resultTitles = (page: Page) => page.locator("[data-screen='explore'] [data-mv2='xs-results'] [data-mv2='xs-title']");
+/** The date choice lives in Refine (founder's design, 2026-11-26): pick one and show the results. */
+async function refineWhen(page: Page, word: string) {
+  await page.getByRole("button", { name: /^Refine/ }).click();
+  const when = page.locator("[data-cc='explore-when']");
+  await when.getByRole("button", { name: word }).click();
+  await expect(when.getByRole("button", { name: word })).toHaveAttribute("aria-pressed", "true");
+  await page.locator("[data-mv2='xs-refine']").getByRole("button", { name: "Show results" }).click();
+  await expect(page.locator("[data-mv2='xs-refine']")).toHaveCount(0);
+}
 
 test("'This weekend in Pretoria' shows what is on, with a date line on each event", async ({ page }) => {
   await openExplore(page);
   const shelf = page.locator("[data-cc='explore-weekend']");
   await expect(shelf.getByRole("heading", { name: "This weekend in Pretoria" })).toBeVisible();
-  await expect(shelf.locator(".photo-tile h3").first()).toContainText("Fixture Gathering");
-  await expect(shelf.locator(".photo-tile h3").filter({ hasText: LATER })).toHaveCount(0);
-  // "Sat 10 Oct · 12:00 · 30 Example Avenue, Pretoria ↗"
-  await expect(shelf.locator(".photo-tile .photo-title > span").first()).toContainText(/^(Fri|Sat|Sun) \d{1,2} Oct · \d\d:\d\d · /);
+  await expect(shelf.locator("[data-mv2='xs-title']").first()).toContainText("Fixture Gathering");
+  await expect(shelf.locator("[data-mv2='xs-title']").filter({ hasText: LATER })).toHaveCount(0);
+  // "Sat 10 Oct · 12:00 · <area>"
+  await expect(shelf.locator("[data-mv2='xs-meta']").first()).toContainText(/^(Fri|Sat|Sun) \d{1,2} Oct · \d\d:\d\d/);
 });
 
-test("the date chips keep only events in their window, and say so when there are none", async ({ page }) => {
+test("the date choice keeps only events in its window, and says so when there are none", async ({ page }) => {
   await openExplore(page);
-  const when = page.locator("[data-cc='explore-when']");
-  await when.getByRole("button", { name: "This weekend" }).click();
-  await expect(when.getByRole("button", { name: "This weekend" })).toHaveAttribute("aria-pressed", "true");
-  await expect(mainTitles(page).first()).toContainText("Fixture Gathering");
-  await expect(mainTitles(page).filter({ hasText: LATER })).toHaveCount(0);
-  await expect(mainTitles(page).filter({ hasText: "Fixture Place" })).toHaveCount(0); // places are not "on" a date
+  await refineWhen(page, "This weekend");
+  await expect(resultTitles(page).first()).toContainText("Fixture Gathering");
+  await expect(resultTitles(page).filter({ hasText: LATER })).toHaveCount(0);
+  await expect(resultTitles(page).filter({ hasText: "Fixture Place" })).toHaveCount(0); // places are not "on" a date
 
-  await when.getByRole("button", { name: "Any date" }).click();
-  await expect(mainTitles(page).filter({ hasText: LATER })).toHaveCount(1);
+  await page.getByLabel("Search Explore").fill(LATER);
+  await expect(page.locator("[data-cc='explore-empty']")).toBeVisible();
+  await refineWhen(page, "Any date");
+  await expect(resultTitles(page).filter({ hasText: LATER })).toHaveCount(1);
 
-  await when.getByRole("button", { name: "Today" }).click();
-  await page.getByLabel("Explore search").fill(LATER);
+  await refineWhen(page, "Today");
   await expect(page.locator("[data-cc='explore-empty']")).toBeVisible();
 });

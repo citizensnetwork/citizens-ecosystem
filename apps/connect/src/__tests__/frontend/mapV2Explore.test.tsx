@@ -327,13 +327,13 @@ describe("Explore panel (founder, 2026-11-17: rest, strip, focus, open)", () => 
     expect(document.activeElement?.closest("[data-explore-id]")?.getAttribute("data-explore-id")).toBe("three");
   });
 
-  it("the sticky nav is Me, Explore, Map and Do (no Central): Me and Explore are pages, Do opens its menu, Map rests", () => {
+  it("the sticky nav is Me, Map, Explore and Do (founder, 2026-11-26; no Central): Me and Explore are pages, Do opens its menu, Map rests", () => {
     const onGo = vi.fn();
     render(React.createElement(Harness, { onGo }));
     fireEvent.click(screen.getByRole("button", { name: P().open }));
     fireEvent.click(screen.getByRole("button", { name: P().raise }));
     const dock = screen.getByRole("navigation", { name: P().dock });
-    expect([...dock.querySelectorAll("[data-nav]")].map((b) => b.getAttribute("data-nav"))).toEqual(["me", "explore", "map", "do"]);
+    expect([...dock.querySelectorAll("[data-nav]")].map((b) => b.getAttribute("data-nav"))).toEqual(["me", "map", "explore", "do"]);
     expect(document.querySelector("[data-nav='central']")).toBeNull();
     // the crown has given way to the nav outright
     expect(document.querySelector("[data-mv2='explore-crown']")).toBeNull();
@@ -425,7 +425,6 @@ describe("the folding nav", () => {
   it("maps each screen to its item, and each item to its screen", () => {
     expect(N.currentOf({ page: "home", params: {} })).toBe("home");
     expect(N.currentOf({ page: "home", params: { view: "map" } })).toBe("map");
-    expect(N.currentOf({ page: "kingdom-discovery", params: {} })).toBe("explore");
     expect(N.currentOf({ page: "explore", params: {} })).toBe("explore"); // #210 part 3: the Discover page
     expect(N.currentOf({ page: "messages", params: {} })).toBe("profile");
     expect(N.currentOf({ page: "lets", params: {} })).toBe("profile");
@@ -558,7 +557,7 @@ describe("the stylesheet and the wiring", () => {
       expect(build.indexOf("'map-v2-sheet.jsx'")).toBeLessThan(build.indexOf(`'${f}'`));
       expect(build.indexOf(`'${f}'`)).toBeLessThan(build.indexOf("'home.jsx'"));
     }
-    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261123e");
+    expect(read("src/frontend/app/map-v2-lib.jsx")).toContain("/assets/map-v2.css?v=20261126a");
     const sheetCss = read("src/frontend/assets/map-v2.css");
     expect(sheetCss).toMatch(/\[data-mv2='explore'\] \{[\s\S]*?touch-action: none;/);
     // Where-to category tiles swipe sideways in focus and in the open preview (founder, 2026-11-23)

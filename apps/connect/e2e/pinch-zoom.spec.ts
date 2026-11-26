@@ -44,7 +44,7 @@ async function goTo(page: Page, want: "peek" | "half" | "full") {
   expect(await snapOf()).toBe(want);
 }
 
-/** A plain screen (the Kingdom list): a normal scrolling page with no gesture handlers of its own. */
+/** A plain screen (Let's…): a normal scrolling page with no gesture handlers of its own. */
 async function openPlainPage(page: Page, native = false) {
   if (native) {
     // what the native bridge does at document start: it defines window.Capacitor before any page script runs
@@ -53,8 +53,8 @@ async function openPlainPage(page: Page, native = false) {
     });
   }
   await mockMapNetwork(page, seed0());
-  await page.goto("/discover");
-  await page.waitForSelector('[data-screen="kingdom-discovery"]', { timeout: 20_000 });
+  await page.goto("/lets");
+  await page.waitForSelector('[data-screen="lets"]', { timeout: 20_000 });
 }
 
 /** Spread two fingers apart on the page, the way a person zooms in. */

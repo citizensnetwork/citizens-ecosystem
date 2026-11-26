@@ -34,7 +34,7 @@
     const page = nav && nav.page;
     const params = (nav && nav.params) || {};
     if (!page || page === 'home') return params.view === 'map' ? 'map' : 'home';
-    if (page === 'explore' || page === 'kingdom-discovery') return 'explore';
+    if (page === 'explore') return 'explore';
     if (page === 'profile') return params.id ? '' : 'profile';
     return UNDER_PROFILE.indexOf(page) !== -1 ? 'profile' : '';
   }

@@ -214,6 +214,44 @@
   --xp-tile-on: rgba(255, 255, 255, 0.94);  /* the selected tab: a more opaque grey plate, ink text, no gold */
   --xp-tile-ink: #272a25;
   --xp-muted: #6d7067;
+
+  /* ── The shared look (founder, 2026-11-26): the middle ground between Me and the Explore design ──
+     One card corner and one inner corner for every panel, card and preview; floating things are a little see-through
+     with a soft blur so the live map shows behind them; a category's colour runs into a card as a light wash; gold is
+     only the chosen thing and the main action. The type floor is --fs-1 (12 px). */
+  --radius-card: 24px;                      /* a card, a panel, the preview */
+  --radius-inner: 16px;                     /* a photo or plate inside a card (the card's corner minus its 8 px inset) */
+  --float-bg: rgba(255, 255, 255, 0.88);    /* a floating panel: about 12 % see-through */
+  --float-solid: rgba(255, 255, 255, 0.94); /* a card on a floating panel, and the search field */
+  /* A live blur re-renders on every frame something moves behind it (a pan, a scroll), which a phone feels (founder,
+     2026-11-26). It is kept for the one thing that opens over a still page (the preview and Refine). Explore and Me
+     sit on a stretched snapshot of the map instead (connect-explore.jsx MapSnapshot), and cards and panels over the
+     live map are see-through without a blur. */
+  --float-blur: 14px;
+  --float-line: rgba(39, 42, 37, 0.11);     /* kept for outdoor light, where a shadow alone washes out */
+  --float-glint: rgba(255, 255, 255, 0.75); /* the top highlight line of a floating thing */
+  --float-shadow: 0 8px 24px rgba(54, 48, 25, 0.1);
+  --wash: 10%;                              /* how much of a category's colour runs into its card */
+  --veil-rgb: 255 253 247;                  /* Explore's veil over the map, as an rgb triple */
+  --veil-left: 0.03;                        /* the veil tapers from the left edge ... */
+  --veil-right: 0.8;                        /* ... to the right edge, the side Explore is pulled in from */
+  --fs-4: 22px;                             /* Explore's section titles */
+  --lh-4: 28px;
+  --fs-display: 52px;                       /* the one page title, "Explore." (the heading face) */
+  --lh-display: 56px;
+  --xs-max: 1080px;                         /* Explore's reading width on a wide screen */
+  --xs-row-img: 56px;                       /* a row's picture */
+  --xs-feature-img: 180px;                  /* the week's feature picture */
+  --xs-feature-img-wide: 240px;
+  --xs-edge-w: 44px;                        /* the Map's right-edge handle: its touch strip ... */
+  --xs-edge-pill-w: 28px;                   /* ... and the pill you see */
+  --xs-edge-pill-h: 80px;
+  --xs-swipe: 52px;                         /* the swipe that pulls Explore in */
+  --xs-dot: 8px;                            /* the ring before a kind label */
+  --xs-preview-w: 520px;                    /* the preview on a wide screen */
+  --xs-preview-img: 168px;
+  --xs-refine-w: 380px;
+  --xs-dock-clear: 112px;                   /* room under Explore's last row for the floating nav */
 }
 
 /* ── 2. Tokens: dark (the setting, built from the same brand tokens) ── */
@@ -269,6 +307,13 @@
   --xp-tile-on: rgba(90, 93, 98, 0.92);
   --xp-tile-ink: #f7f6f1;
   --xp-muted: #a9a89c;
+  --float-bg: rgba(26, 23, 20, 0.86);
+  --float-solid: rgba(34, 31, 27, 0.94);
+  --float-line: rgba(247, 246, 241, 0.14);
+  --float-glint: rgba(255, 255, 255, 0.06);
+  --float-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --wash: 16%;
+  --veil-rgb: 12 11 10;
 }
 
 /* ── 3. Reduced motion: every duration collapses, so no transition or
@@ -3019,101 +3064,6 @@ a[data-mv2='card2'],
   }
 }
 
-/* ── 4m. The Discover page (app/map-v2-discover.jsx, issue #210 part 3) ──────────────
-   A full screen of the Explore row's own cards (4k) as sideways rows (4i): Near you, Popular, then one row per
-   category group, titled with the group's name and its colour dot. The title and the pills stay at the top
-   (sticky, on the solid app background: a blur this wide would be redrawn on every scroll frame); a selected pill is the same gold fill as on the map. The page scrolls under them and clears
-   the folding nav on a phone. Outside the sheet a row keeps the browser's own touch handling, so a vertical swipe
-   that starts on a card scrolls the page and a sideways one scrolls only that row, which snaps card by card; the
-   pills get the same (their map rule is pan-x only). */
-[data-mv2='discover'] {
-  --hrow-card-w: var(--explore-card-w);
-  --nav-clear: 0px;
-  position: relative;
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-  background: var(--surface-0);
-  color: var(--text-1);
-  font-family: var(--font-body);
-}
-[data-mv2='discover'][data-narrow] {
-  --nav-clear: var(--nav-zone);
-}
-[data-mv2='discover-scroll'] {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior-y: contain;
-  padding-bottom: calc(var(--nav-clear) + var(--space-4));
-}
-[data-mv2='discover-top'] {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-controls);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: max(var(--space-3), env(safe-area-inset-top, 0px)) 0 var(--space-2);
-  background: var(--surface-0);
-  box-shadow: var(--elev-1);
-}
-[data-mv2='discover-bar'] {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: 0 var(--space-3) 0 var(--space-4);
-}
-[data-mv2='discover-title'] {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-3);
-  line-height: var(--lh-3);
-  font-weight: var(--fw-semibold);
-  color: var(--text-1);
-}
-[data-mv2='discover'] [data-mv2='pills'] {
-  touch-action: pan-x pan-y;
-}
-[data-mv2='discover-row'] {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-4) var(--space-4) 0;
-}
-[data-mv2='discover-row-title'] {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--fs-3);
-  line-height: var(--lh-3);
-  font-weight: var(--fw-semibold);
-  color: var(--text-1);
-}
-[data-mv2='discover-hint'],
-[data-mv2='discover-empty'] {
-  margin: 0;
-  font-size: var(--fs-1);
-  line-height: var(--lh-1);
-  color: var(--text-2);
-}
-[data-mv2='discover-empty'] {
-  padding: var(--space-6) var(--space-4);
-  font-size: var(--fs-2);
-  line-height: var(--lh-2);
-}
-[data-mv2='discover'] [data-mv2='hrow-item'] > [data-mv2='explore-card'] {
-  display: flex;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
 /* ── 4n. The expanded listing sheet (app/map-v2-sheet.jsx `expanded`, issue #210) ──────────────
    An Explore card opens the sheet at full: a fixed bar (the grab bar to the eye, X at --hit to a thumb), then a header
    at the top of the content that scrolls with it: the cover in the card's own 16:9 media box (a neutral tile with the
@@ -5335,5 +5285,949 @@ body:has([data-mv2='home-top'][data-search]) [data-mv2='nav-dim'] {
   }
   [data-mv2='home'][data-crown]:has([data-mv2='pinpeek']:not([hidden]):not([data-raised])) {
     --explore-h: calc(var(--pp-peek) + var(--space-2) + var(--xp-dock-h));
+  }
+}
+
+/* ── 4p. Explore, pulled in over the map (app/connect-explore.jsx; founder's design, 2026-11-26) ──────────────
+   The live map stays mounted under Explore (shell.jsx MapStage): blurred a little, with a veil that tapers from almost
+   nothing at the left edge to most of the way at the right, the side Explore is pulled in from. Cards and panels use the
+   shared look: --radius-card outside, --radius-inner inside, a light wash of the category colour, gold only for the
+   chosen thing and the main action. Words use the body face; the page title and a preview's listing name use the heading face. */
+[data-mv2='map-stage'] {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  height: 100%;
+}
+[data-mv2='map-stage'] > [data-mv2='map-under'] {
+  position: relative;
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+[data-mv2='map-stage'][data-over] > [data-mv2='map-under'] {
+  pointer-events: none;
+}
+/* under Explore or Me the map is a backdrop: its panel, its controls and its pins step aside */
+[data-mv2='map-stage'][data-over] [data-mv2='home'] > :not(.absolute) {
+  visibility: hidden;
+}
+[data-mv2='map-stage'][data-over] .maplibregl-marker,
+[data-mv2='map-stage'][data-over] .maplibregl-control-container {
+  visibility: hidden;
+}
+/* the cheap blur: one small snapshot of the map, stretched; the live canvas behind it is hidden and stops drawing */
+[data-mv2='map-snap'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+[data-mv2='map-under']:has([data-mv2='map-snap']) .maplibregl-canvas {
+  visibility: hidden;
+}
+/* Me, pulled in from the map's left edge: the same see-through screen, its veil tapering the other way */
+[data-mv2='me-over'] {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-controls);
+  animation: xs-in-left var(--dur-slow) var(--ease-enter);
+}
+@keyframes xs-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+[data-mv2='me-veil'] {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to right,
+    rgb(var(--veil-rgb) / var(--veil-right)) 0%,
+    rgb(var(--veil-rgb) / calc((var(--veil-right) + var(--veil-left)) / 2)) 55%,
+    rgb(var(--veil-rgb) / var(--veil-left)) 100%);
+}
+
+/* the group tones: one muted, contrast-tested colour per group (4j's tokens) */
+[data-mv2='xs'] [data-group='worship'] { --tone: var(--cat-worship); }
+[data-mv2='xs'] [data-group='serve'],
+[data-mv2='xs'] [data-group='ideas'] { --tone: var(--cat-serve); }
+[data-mv2='xs'] [data-group='culture'] { --tone: var(--cat-culture); }
+[data-mv2='xs'] [data-group='learn'] { --tone: var(--cat-learn); }
+[data-mv2='xs'] [data-group='audiences'] { --tone: var(--cat-audiences); }
+[data-mv2='xs'] [data-group='business'] { --tone: var(--cat-business); }
+[data-mv2='xs'] [data-group='events'] { --tone: var(--accent-ink); }
+
+[data-mv2='xs'] {
+  --tone: var(--accent-ink);
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-controls);
+  color: var(--text-1);
+  font-family: var(--font-body);
+  animation: xs-in var(--dur-slow) var(--ease-enter);
+}
+@keyframes xs-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+[data-mv2='xs-veil'] {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to left,
+    rgb(var(--veil-rgb) / var(--veil-right)) 0%,
+    rgb(var(--veil-rgb) / calc((var(--veil-right) + var(--veil-left)) / 2)) 55%,
+    rgb(var(--veil-rgb) / var(--veil-left)) 100%);
+}
+/* The page scrolls up and down; a sideways drag stays ours, for the swipe back to the map. A sideways row (the pills) is
+   its own scroller, which ends the touch-action chain, so it still scrolls sideways. */
+[data-mv2='xs-scroll'] {
+  position: absolute;
+  inset: 0;
+  touch-action: pan-y;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: var(--xs-dock-clear);
+}
+[data-mv2='xs-wrap'] {
+  width: 100%;
+  max-width: var(--xs-max);
+  margin-inline: auto;
+  padding-inline: var(--space-4);
+}
+[data-mv2='xs-sr'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+[data-mv2='xs-intro'] {
+  padding-top: calc(var(--space-8) + var(--space-6) + env(safe-area-inset-top, 0px));
+  padding-bottom: var(--space-3);
+}
+[data-mv2='xs-intro'] h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-display);
+  line-height: var(--lh-display);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.06em;
+}
+[data-mv2='xs-intro'] h1 span {
+  color: var(--accent);
+}
+[data-mv2='xs-intro'] p {
+  margin: var(--space-2) 0 0;
+  max-width: 56ch;
+  color: var(--text-2);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+}
+[data-mv2='xs-views'] {
+  display: flex;
+  gap: var(--space-1);
+  width: max-content;
+  max-width: 100%;
+  margin-top: var(--space-4);
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--float-bg);
+  box-shadow: inset 0 1px var(--float-glint), var(--float-shadow);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+[data-mv2='xs-view'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--ctrl-btn);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-2);
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-mv2='xs-view'][aria-pressed='true'] {
+  background: var(--surface-1);
+  color: var(--text-1);
+  box-shadow: var(--elev-1);
+}
+[data-mv2='xs-view'][aria-pressed='true'] svg {
+  color: var(--accent-ink);
+}
+[data-mv2='xs-sentinel'] {
+  height: 1px;
+}
+/* the search and the pills: they stick to the top once the intro has scrolled away */
+[data-mv2='xs-controls'] {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  padding: var(--space-2) 0 var(--space-3);
+}
+[data-mv2='xs-controls'][data-stuck] {
+  padding-top: calc(var(--space-8) + var(--space-5) + env(safe-area-inset-top, 0px));
+  background: var(--float-solid);
+  box-shadow: var(--float-shadow);
+}
+[data-mv2='xs-search-line'] {
+  display: flex;
+  gap: var(--space-2);
+}
+[data-mv2='xs-search'] {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--hit);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--float-line);
+  border-radius: var(--radius-full);
+  background: var(--float-solid);
+  color: var(--text-2);
+}
+[data-mv2='xs-search']:focus-within {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+[data-mv2='xs-search'] input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-1);
+  font-size: var(--fs-2);
+}
+[data-mv2='xs-refine-btn'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--hit);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--float-line);
+  border-radius: var(--radius-full);
+  background: var(--float-solid);
+  color: var(--text-1);
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='xs-refine-btn'][data-active] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+[data-mv2='xs-pills'] {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: var(--space-1);
+}
+[data-mv2='xs-pill'] {
+  flex: none;
+  min-height: var(--ctrl-btn);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--float-line);
+  border-radius: var(--radius-full);
+  background: var(--float-solid);
+  color: var(--text-1);
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-mv2='xs-pill'][aria-pressed='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+/* sections */
+main[data-mv2='xs-wrap'] {
+  padding-top: var(--space-3);
+}
+[data-mv2='xs-section'] {
+  margin-bottom: var(--space-7);
+}
+[data-mv2='xs-section-head'] {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+[data-mv2='xs-section-head'] h2,
+[data-mv2='xs-results-head'] h2,
+[data-mv2='xs-dir-nav'] h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-4);
+  line-height: var(--lh-4);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.03em;
+}
+[data-mv2='xs-section-head'] p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-2);
+  font-size: var(--fs-1);
+}
+[data-mv2='xs-link'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--ctrl-btn);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+[data-mv2='xs-link']:hover {
+  text-decoration: underline;
+}
+
+/* a card: the shared look. A row by default; the week's feature is larger */
+[data-mv2='xs-card'],
+[data-mv2='xs-question'],
+[data-mv2='xs-dir-nav'],
+[data-mv2='xs-empty'] {
+  border: 1px solid var(--float-line);
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(105deg, color-mix(in srgb, var(--tone) var(--wash), transparent) 0%, transparent 45%),
+    var(--float-bg);
+  box-shadow: inset 0 1px var(--float-glint), var(--float-shadow);
+}
+[data-mv2='xs-card'],
+[data-mv2='xs-question'],
+[data-mv2='xs-dir-btn'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+  color: var(--text-1);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-enter);
+}
+[data-mv2='xs-card']:active,
+[data-mv2='xs-question']:active {
+  transform: scale(0.98);
+}
+[data-mv2='xs-rows'] {
+  display: grid;
+  gap: var(--space-2);
+}
+[data-mv2='xs-art'] {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--xs-row-img);
+  height: var(--xs-row-img);
+  overflow: hidden;
+  border-radius: var(--radius-inner);
+  background: color-mix(in srgb, var(--tone) 14%, var(--surface-1));
+  color: var(--tone);
+}
+[data-mv2='xs-art'] img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+[data-mv2='xs-glyph'],
+[data-mv2='xs-glyph'] svg {
+  display: grid;
+  place-items: center;
+  width: var(--pin-glyph-size);
+  height: var(--pin-glyph-size);
+}
+[data-mv2='xs-copy'] {
+  display: grid;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+[data-mv2='xs-kind'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: color-mix(in srgb, var(--tone) 72%, var(--text-1));
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='xs-kind']::before {
+  content: '';
+  flex: none;
+  width: var(--xs-dot);
+  height: var(--xs-dot);
+  border: var(--focus-w) solid var(--tone);
+  border-radius: var(--radius-full);
+}
+[data-mv2='xs-title'] {
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+[data-mv2='xs-meta'] {
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  line-height: var(--lh-1);
+}
+[data-mv2='xs-chev'] {
+  flex: none;
+  color: var(--text-2);
+}
+/* the week's feature: picture and words side by side on a wide screen, stacked on a phone */
+[data-mv2='xs-feature-grid'] {
+  display: grid;
+  gap: var(--space-3);
+}
+[data-mv2='xs-side'] {
+  display: grid;
+  gap: var(--space-2);
+}
+[data-mv2='xs-card'][data-mode='feature'] {
+  position: relative;
+  flex-direction: column;
+  align-items: stretch;
+  padding: var(--space-2);
+  background:
+    linear-gradient(115deg, var(--float-bg) 35%, color-mix(in srgb, var(--tone) var(--wash), var(--float-bg))),
+    var(--float-bg);
+}
+[data-mv2='xs-card'][data-mode='feature'] [data-mv2='xs-art'] {
+  width: 100%;
+  height: var(--xs-feature-img);
+}
+[data-mv2='xs-card'][data-mode='feature'] [data-mv2='xs-copy'] {
+  padding: var(--space-2) var(--space-7) var(--space-2) var(--space-2);
+}
+[data-mv2='xs-card'][data-mode='feature'] [data-mv2='xs-title'] {
+  font-family: var(--font-display);
+  font-size: var(--fs-4);
+  line-height: var(--lh-4);
+  letter-spacing: -0.03em;
+}
+[data-mv2='xs-card'][data-mode='feature'] [data-mv2='xs-chev'] {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-4);
+}
+/* Things to do: the "where to" questions */
+[data-mv2='xs-todo'] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+[data-mv2='xs-q-glyph'] {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--ctrl-btn);
+  height: var(--ctrl-btn);
+  border-radius: var(--radius-full);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+[data-mv2='xs-todo'][data-big] [data-mv2='xs-question'] {
+  min-height: calc(var(--hit) * 2);
+}
+[data-mv2='xs-lanes'] {
+  display: grid;
+  gap: 0 var(--space-4);
+}
+/* Categories: the directory beside its rows */
+[data-mv2='xs-directory'] {
+  display: grid;
+  gap: var(--space-5);
+}
+[data-mv2='xs-dir-nav'] {
+  display: grid;
+  gap: var(--space-1);
+  align-self: start;
+  padding: var(--space-3);
+}
+[data-mv2='xs-dir-nav'] h2 {
+  margin: var(--space-1) var(--space-2) var(--space-2);
+}
+[data-mv2='xs-dir-btn'] {
+  --tone: var(--accent-ink);
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: transparent;
+}
+[data-mv2='xs-dir-btn']:hover {
+  background: color-mix(in srgb, var(--tone) 10%, transparent);
+}
+[data-mv2='xs-dir-btn'] [data-mv2='xs-q-glyph'] {
+  background: color-mix(in srgb, var(--tone) 16%, var(--surface-1));
+  color: var(--tone);
+}
+[data-mv2='xs-count'] {
+  color: var(--text-2);
+  font-size: var(--fs-1);
+  font-variant-numeric: tabular-nums;
+}
+/* results */
+[data-mv2='xs-results-head'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+[data-mv2='xs-results-head'] h2:focus {
+  outline: none;
+}
+[data-mv2='xs-results-head'] p {
+  margin: var(--space-1) 0 0;
+  color: var(--text-2);
+  font-size: var(--fs-2);
+}
+[data-mv2='xs-sort'] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+[data-mv2='xs-sort'] svg {
+  position: absolute;
+  right: var(--space-3);
+  pointer-events: none;
+}
+[data-mv2='xs-select'] {
+  appearance: none;
+  min-height: var(--ctrl-btn);
+  padding: 0 var(--space-7) 0 var(--space-3);
+  border: 1px solid var(--float-line);
+  border-radius: var(--radius-full);
+  background: var(--float-solid);
+  color: var(--text-1);
+  font-size: var(--fs-2);
+}
+[data-mv2='xs-active'] {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--text-1);
+  font-size: var(--fs-2);
+}
+[data-mv2='xs-empty'] {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-5);
+}
+[data-mv2='xs-empty'] h3,
+[data-mv2='xs-empty'] p {
+  margin: 0;
+}
+[data-mv2='xs-empty'] h3 {
+  font-size: var(--fs-3);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='xs-empty'] p {
+  color: var(--text-2);
+  font-size: var(--fs-2);
+}
+[data-mv2='xs-scope'] {
+  margin: 0 0 var(--space-4);
+  color: var(--text-2);
+  font-size: var(--fs-1);
+}
+/* buttons in previews, empty states and Refine */
+[data-mv2='xs-acts'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+[data-mv2='xs-act'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--ctrl-btn);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--float-line);
+  border-radius: var(--radius-full);
+  background: var(--float-solid);
+  color: var(--text-1);
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  cursor: pointer;
+}
+[data-mv2='xs-act'][aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+[data-mv2='xs-act'][data-primary] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+[data-mv2='xs-full'] {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--ctrl-btn);
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-ink);
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+[data-mv2='xs-card']:focus-visible,
+[data-mv2='xs-question']:focus-visible,
+[data-mv2='xs-dir-btn']:focus-visible,
+[data-mv2='xs-view']:focus-visible,
+[data-mv2='xs-pill']:focus-visible,
+[data-mv2='xs-act']:focus-visible,
+[data-mv2='xs-full']:focus-visible,
+[data-mv2='xs-link']:focus-visible,
+[data-mv2='xs-close']:focus-visible,
+[data-mv2='xs-refine-btn']:focus-visible,
+[data-mv2='xs-edge']:focus-visible > span {
+  outline: var(--focus-w) solid var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
+/* the preview and Refine: a bottom sheet on a phone, a centred panel on a wide screen */
+[data-mv2='xs-preview'],
+[data-mv2='xs-refine'] {
+  width: 100%;
+  max-width: none;
+  max-height: calc(94dvh - env(safe-area-inset-top, 0px));
+  margin: auto 0 0;
+  padding: 0;
+  border: 1px solid var(--float-line);
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--float-bg);
+  backdrop-filter: blur(var(--float-blur));
+  color: var(--text-1);
+  box-shadow: var(--elev-2);
+  overscroll-behavior: contain;
+}
+[data-mv2='xs-preview']::backdrop,
+[data-mv2='xs-refine']::backdrop {
+  background: var(--nav-dim);
+}
+[data-mv2='xs-preview'][open],
+[data-mv2='xs-refine'][open] {
+  animation: xs-sheet-in var(--dur-slow) var(--ease-enter);
+}
+@keyframes xs-sheet-in {
+  from { transform: translateY(var(--space-8)); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+[data-mv2='xs-preview'] {
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--tone) var(--wash), transparent) 0%, transparent 40%),
+    var(--float-bg);
+}
+[data-mv2='xs-dialog-top'] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-5);
+}
+[data-mv2='xs-dialog-top'] strong {
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='xs-close'] {
+  display: grid;
+  place-items: center;
+  width: var(--hit);
+  height: var(--hit);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-1);
+  cursor: pointer;
+}
+[data-mv2='xs-close']:hover {
+  background: var(--surface-2);
+}
+[data-mv2='xs-dialog-body'] {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-5) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+}
+[data-mv2='xs-dialog-body'] [data-mv2='xs-art'][data-role='preview']:not([data-empty]) {
+  width: 100%;
+  height: var(--xs-preview-img);
+}
+[data-mv2='xs-dialog-body'] h2 {
+  margin: 0;
+  font-size: var(--fs-4);
+  line-height: var(--lh-4);
+  font-weight: var(--fw-semibold);
+  letter-spacing: -0.02em;
+}
+[data-mv2='xs-preview'] [data-mv2='xs-dialog-body'] h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.03em;
+}
+[data-mv2='xs-detail'] {
+  margin: 0;
+  color: var(--text-2);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+[data-mv2='xs-dialog-body'] dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--float-line);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+}
+[data-mv2='xs-dialog-body'] dt {
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='xs-dialog-body'] dd {
+  margin: 0;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+[data-mv2='xs-field'] {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: var(--float-solid);
+}
+[data-mv2='xs-field'] legend {
+  padding: var(--space-2) 0 0;
+  font-size: var(--fs-2);
+  font-weight: var(--fw-semibold);
+}
+[data-mv2='xs-chips'] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+[data-mv2='xs-check'] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--ctrl-btn);
+  font-size: var(--fs-2);
+}
+[data-mv2='xs-check'] input {
+  accent-color: var(--accent-ink);
+}
+
+/* the Map's right-edge pill: swipe left from it (or tap) to pull Explore in */
+[data-mv2='xs-edge'] {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  z-index: var(--z-controls);
+  display: grid;
+  align-items: center;
+  justify-items: end;
+  width: var(--xs-edge-w);
+  height: calc(var(--xs-edge-pill-h) + var(--space-8));
+  padding: 0 var(--space-2) 0 0;
+  border: 0;
+  background: transparent;
+  transform: translateY(-50%);
+  touch-action: pan-y;
+  cursor: ew-resize;
+}
+[data-mv2='xs-edge'] > span {
+  display: grid;
+  place-items: center;
+  width: var(--xs-edge-pill-w);
+  height: var(--xs-edge-pill-h);
+  border: 1px solid var(--float-line);
+  border-radius: var(--radius-full);
+  background: var(--float-bg);
+  box-shadow: var(--float-shadow);
+  color: var(--accent-ink);
+}
+[data-mv2='xs-edge'][data-side='left'] {
+  right: auto;
+  left: 0;
+  justify-items: start;
+  padding: 0 0 0 var(--space-2);
+}
+/* the edges hide while the map's own panels are up */
+[data-mv2='map-stage']:has([data-mv2='pinpeek']:not([hidden])) > [data-mv2='xs-edge'],
+[data-mv2='map-stage']:has([data-mv2='explore'][data-open]) > [data-mv2='xs-edge'] {
+  display: none;
+}
+
+/* ── The map home takes the shared look too (founder, 2026-11-26): the Where to… panel, its tiles and cards, a card's
+   quick details and the pin preview. Floating panels are a little see-through with a soft blur (the live map shows),
+   corners follow --radius-card and --radius-inner, and colour is a light wash: a chosen card is outlined in gold over a
+   lighter tint of its pin's colour (22 %, was 50 %); a chosen tile stays a plain plate (founder, 2026-11-17). The "Citizens Connect" mark in a panel's bar steps aside: the
+   bar keeps the handle, Back where there is a level above, and one Close. ── */
+[data-mv2='explore'],
+[data-mv2='pinpeek'] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--float-line);
+  border-bottom: 0;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--float-bg);
+  box-shadow: inset 0 1px var(--float-glint), var(--float-shadow);
+}
+[data-mv2='explore'] [data-mv2='drawer-mark'],
+[data-mv2='pinpeek'] [data-mv2='drawer-mark'] {
+  display: none;
+}
+[data-mv2='where-lead'] {
+  letter-spacing: -0.03em;
+}
+[data-mv2='explore-tile'] {
+  border-color: var(--float-line);
+  border-radius: var(--radius-inner);
+  background: var(--float-solid);
+  box-shadow: inset 0 1px var(--float-glint);
+}
+[data-mv2='explore-tile'] svg {
+  color: var(--accent-ink);
+}
+[data-mv2='explore-tiles'][data-tabs] [data-mv2='explore-tile'] {
+  border-radius: var(--radius-full);
+}
+[data-mv2='xcard'] {
+  border-color: var(--float-line);
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--card-pin, var(--accent)) var(--wash), transparent) 0%, transparent 55%),
+    var(--float-solid);
+  box-shadow: inset 0 1px var(--float-glint), var(--float-shadow);
+}
+/* the chosen card keeps its pin's colour (founder, 2026-11-25), now as a lighter wash with a gold outline */
+[data-mv2='xcard'][data-selected] {
+  outline: var(--focus-w) solid var(--accent);
+  outline-offset: calc(var(--space-1) * -1);
+  background: color-mix(in srgb, var(--card-pin, var(--accent)) 22%, var(--float-solid));
+}
+[data-mv2='xdetails'] {
+  border-color: var(--float-line);
+  border-radius: var(--radius-card);
+  background:
+    linear-gradient(105deg, color-mix(in srgb, var(--accent) var(--wash), transparent) 0%, transparent 45%),
+    var(--float-solid);
+  box-shadow: inset 0 1px var(--float-glint), var(--float-shadow);
+}
+[data-mv2='xdetails-full'] {
+  border-color: var(--accent);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-contrast);
+}
+
+[data-mv2='pinpeek'] [data-mv2='cover-hero'],
+[data-mv2='pinpeek'] [data-mv2='card-media'] {
+  border-radius: var(--radius-card);
+}
+/* a preview with no photo: a small plate, not an empty picture */
+[data-mv2='xs-art'][data-role='preview'][data-empty] {
+  width: var(--xs-row-img);
+  height: var(--xs-row-img);
+}
+/* a feature with no photo: the picture shrinks to a row's, and the words carry the card */
+[data-mv2='xs-card'][data-mode='feature'][data-noimg] {
+  flex-direction: row;
+  align-items: center;
+}
+[data-mv2='xs-card'][data-mode='feature'][data-noimg] [data-mv2='xs-art'] {
+  width: var(--xs-row-img);
+  height: var(--xs-row-img);
+}
+/* a wide screen (ConnectChrome.useWide, the same switch as the rail) */
+[data-mv2='xs'][data-wide] [data-mv2='xs-view'] {
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-wrap'] {
+  padding-inline: var(--space-7);
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-intro'] {
+  padding-top: var(--space-8);
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-controls'][data-stuck] {
+  padding-top: var(--space-3);
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-feature-grid'] {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-card'][data-mode='feature'] {
+  flex-direction: row;
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-card'][data-mode='feature']:not([data-noimg]) [data-mv2='xs-art'] {
+  width: 55%;
+  height: var(--xs-feature-img-wide);
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-todo'] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-lanes'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-directory'] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-rows'] {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--explore-card-w)), 1fr));
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-dir-rows'] [data-mv2='xs-rows'],
+[data-mv2='xs'][data-wide] [data-mv2='xs-lanes'] [data-mv2='xs-rows'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-preview'],
+[data-mv2='xs'][data-wide] [data-mv2='xs-refine'] {
+  width: min(var(--xs-preview-w), calc(100% - var(--space-7)));
+  margin: auto;
+  border-radius: var(--radius-card);
+}
+[data-mv2='xs'][data-wide] [data-mv2='xs-refine'] {
+  width: min(var(--xs-refine-w), calc(100% - var(--space-7)));
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-mv2='xs'],
+  [data-mv2='xs-preview'][open],
+  [data-mv2='xs-refine'][open] {
+    animation: none;
   }
 }

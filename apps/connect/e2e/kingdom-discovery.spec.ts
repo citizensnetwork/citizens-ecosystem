@@ -134,10 +134,16 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     await applyAsContributor(page);
 
     // ── Pending: nothing of theirs is public ──
-    await goTo(page, "kingdom-discovery");
-    const discoveryScreen = page.locator('[data-screen="kingdom-discovery"]');
-    await expect(discoveryScreen).toBeVisible();
-    await expect(discoveryScreen.getByText(ORG_NAME)).toHaveCount(0);
+    // Kingdom Discovery is Explore now (founder, 2026-11-26): search it for the name
+    const discoveryScreen = page.locator('[data-screen="explore"]');
+    const searchExplore = async () => {
+      await goTo(page, "explore");
+      await expect(discoveryScreen).toBeVisible();
+      await discoveryScreen.locator("[data-mv2='xs-search'] input").fill(ORG_NAME);
+      await expect(discoveryScreen.locator("[data-mv2='xs-results']")).toBeVisible();
+    };
+    await searchExplore();
+    await expect(discoveryScreen.locator("[data-mv2='xs-card']").filter({ hasText: ORG_NAME })).toHaveCount(0);
 
     await goTo(page, "home");
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
@@ -160,9 +166,8 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     await expect(card.getByText(/Approved — contributor access granted/)).toBeVisible();
 
     // ── Kingdom Discovery — the new Contributor is listed ──
-    await goTo(page, "kingdom-discovery");
-    await expect(discoveryScreen).toBeVisible();
-    await expect(discoveryScreen.getByText(ORG_NAME)).toBeVisible({ timeout: 10_000 });
+    await searchExplore();
+    await expect(discoveryScreen.locator("[data-mv2='xs-card']").filter({ hasText: ORG_NAME }).first()).toBeVisible({ timeout: 10_000 });
 
     // ── Map — a new Contributor with no place or event is not pinned.
     //     They show on Kingdom Discovery and on their profile. ──
@@ -170,8 +175,9 @@ test.describe("Kingdom Discovery — self-serve Contributor, admin approval (D-1
     await expect(page.locator('[data-screen="discover"]')).toBeVisible();
     await expect(page.locator(".maplibregl-marker")).toHaveCount(0, { timeout: 15_000 });
 
-    await goTo(page, "kingdom-discovery");
+    await searchExplore();
     await discoveryScreen.getByRole("button", { name: new RegExp(ORG_NAME) }).first().click();
+    await page.locator("[data-mv2='xs-preview']").getByRole("button", { name: "Full profile" }).click();
     await expect(page.locator('[data-screen="profile"]')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(ORG_NAME).first()).toBeVisible();
 

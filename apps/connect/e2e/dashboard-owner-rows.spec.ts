@@ -215,17 +215,20 @@ test.describe("Dashboard keeps every status; the map shows published only", () =
     await expect(pins(page, "place")).toHaveCount(1, { timeout: 15_000 });
   });
 
-  test("a cancelled event stays off Kingdom Discovery, and opens for its owner with a banner", async ({ page }) => {
+  test("a cancelled event stays off Explore, and opens for its owner with a banner", async ({ page }) => {
     const db = { events: [eventRow(LIVE_EVENT, "Kayaking!", "published"), eventRow(CANCELLED_EVENT, "Cancelled test event", "cancelled")], places: [] };
     await openAsOwner(page, db);
     await openDashboard(page);
     await expect(card(page, CANCELLED_EVENT)).toBeVisible({ timeout: 15_000 });
 
-    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
-    const list = page.locator('[data-screen="kingdom-discovery"]');
+    await page.evaluate(() => window.__cc.go("explore"));
+    const list = page.locator('[data-screen="explore"]');
     await expect(list).toBeVisible();
+    await list.locator("[data-mv2='xs-search'] input").fill("test event");
+    await expect(list.locator("[data-mv2='xs-results']")).toBeVisible();
+    await expect(list.locator("[data-mv2='xs-card']").filter({ hasText: "Cancelled test event" })).toHaveCount(0);
+    await list.locator("[data-mv2='xs-search'] input").fill("Kayaking");
     await expect(list.getByText("Kayaking!").first()).toBeVisible();
-    await expect(list.getByText("Cancelled test event")).toHaveCount(0);
 
     // Its own page opens from the Dashboard's View, and says it is cancelled.
     await page.evaluate(([id]) => window.__cc.go("event", { id }), [CANCELLED_EVENT]);
@@ -254,7 +257,10 @@ test.describe("Dashboard keeps every status; the map shows published only", () =
     // The private one is not a pin; the public feed carries Kayaking and the stranger's.
     await page.evaluate(() => window.__cc.go("home"));
     await expect(pins(page, "event")).toHaveCount(2, { timeout: 15_000 });
-    await page.evaluate(() => window.__cc.go("kingdom-discovery"));
-    await expect(page.locator('[data-screen="kingdom-discovery"]').getByText("Leaders only")).toHaveCount(0);
+    await page.evaluate(() => window.__cc.go("explore"));
+    const list = page.locator('[data-screen="explore"]');
+    await list.locator("[data-mv2='xs-search'] input").fill("Leaders");
+    await expect(list.locator("[data-mv2='xs-results']")).toBeVisible();
+    await expect(list.locator("[data-mv2='xs-card']").filter({ hasText: "Leaders only" })).toHaveCount(0);
   });
 });

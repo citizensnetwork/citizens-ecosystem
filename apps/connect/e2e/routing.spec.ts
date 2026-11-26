@@ -122,7 +122,7 @@ async function openDemo(page: Page, role: "citizen" | "contributor" | "admin" = 
 test.describe("Every public screen has its own URL and survives a reload", () => {
   const routes: [string, string, string][] = [
     ["/", "discover", "the map"],
-    ["/discover", "kingdom-discovery", "Kingdom Exploration"],
+    ["/explore", "explore", "Explore"],
     ["/lets", "lets", "Let's…"],
     ["/community", "community", "Kingdom Projects"],
     [`/e/${EVENT_ID}`, "event", "an event"],
@@ -187,8 +187,8 @@ test.describe("Every public screen has its own URL and survives a reload", () =>
     await page.goto(`/e/${EVENT_ID}`);
     await expect(page.locator('[data-screen="event"]')).toBeVisible({ timeout: 15_000 });
     await expect.poll(() => page.title()).toBe("Hatfield Sunday Celebration · Citizens Connect");
-    await go(page, "kingdom-discovery");
-    await expect.poll(() => page.title()).toBe("Kingdom Exploration · Citizens Connect");
+    await go(page, "explore");
+    await expect.poll(() => page.title()).toBe("Explore · Citizens Connect");
     await go(page, "home");
     await expect.poll(() => page.title()).toBe("Citizens Connect");
   });
@@ -251,7 +251,7 @@ test.describe("Browser Back and Forward", () => {
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1, { timeout: 15_000 });
 
     const steps: [() => Promise<unknown>, string, string][] = [
-      [() => go(page, "kingdom-discovery"), "/discover", "kingdom-discovery"],
+      [() => go(page, "explore"), "/explore", "explore"],
       [() => go(page, "event", { id: EVENT_ID }), `/e/${EVENT_ID}`, "event"],
       [() => go(page, "profile", { id: ORG_ID }), `/c/${SLUG}`, "profile"],
       [() => go(page, "settings"), "/settings", "settings"],
@@ -262,12 +262,12 @@ test.describe("Browser Back and Forward", () => {
       expect(path(page)).toBe(url);
     }
 
-    for (const [url, name] of [[`/c/${SLUG}`, "profile"], [`/e/${EVENT_ID}`, "event"], ["/discover", "kingdom-discovery"], ["/", "discover"]] as const) {
+    for (const [url, name] of [[`/c/${SLUG}`, "profile"], [`/e/${EVENT_ID}`, "event"], ["/explore", "explore"], ["/", "discover"]] as const) {
       await page.goBack();
       await expect.poll(() => screen(page)).toBe(name);
       expect(path(page)).toBe(url);
     }
-    for (const [url, name] of [["/discover", "kingdom-discovery"], [`/e/${EVENT_ID}`, "event"]] as const) {
+    for (const [url, name] of [["/explore", "explore"], [`/e/${EVENT_ID}`, "event"]] as const) {
       await page.goForward();
       await expect.poll(() => screen(page)).toBe(name);
       expect(path(page)).toBe(url);
@@ -359,12 +359,12 @@ test.describe("Browser Back and Forward", () => {
 
     // an entry whose saved screen names a slug the route table would never allow
     await page.evaluate(() => {
-      history.pushState({ cc: 1, idx: 1, nav: { page: "profile", params: { slug: "../../api/admin" } } }, "", "/discover");
+      history.pushState({ cc: 1, idx: 1, nav: { page: "profile", params: { slug: "../../api/admin" } } }, "", "/lets");
       history.back();
     });
     await expect.poll(() => path(page)).toBe("/");
     await page.goForward(); // onto the forged entry: the handler restores its nav
-    await expect.poll(() => path(page)).toBe("/discover");
+    await expect.poll(() => path(page)).toBe("/lets");
     await page.waitForTimeout(500);
     expect(requested.filter((u) => u.includes("/api/admin") || u.includes(".."))).toEqual([]);
   });
@@ -372,8 +372,9 @@ test.describe("Browser Back and Forward", () => {
   test("from the first screen, Back really leaves", async ({ page }) => {
     await openDemo(page);
     await page.goto("/manifest.json"); // a real previous entry
-    await page.goto("/discover");
-    await expect(page.locator('[data-screen="kingdom-discovery"]')).toBeVisible({ timeout: 15_000 });
+    await page.goto("/discover"); // the retired list's address: it lands on Explore, in place
+    await expect(page.locator('[data-screen="explore"]')).toBeVisible({ timeout: 15_000 });
+    expect(path(page)).toBe("/explore");
     await page.goBack();
     await expect.poll(() => page.url()).toContain("manifest.json");
   });
@@ -618,7 +619,7 @@ test.describe("Dashboard and Admin tabs live in the URL", () => {
     await expect.poll(() => path(page)).toBe("/dashboard");
 
     // tabs are views of one screen: Back leaves the Dashboard, it does not replay every tab
-    await go(page, "kingdom-discovery");
+    await go(page, "explore");
     await page.goBack();
     await expect.poll(() => screen(page)).toBe("dashboard");
     expect(path(page)).toBe("/dashboard");
@@ -812,7 +813,7 @@ test.describe("App links in the native shell (QA plan PR G)", () => {
   test("the link that started the app opens its screen, a link while it runs opens too, Back returns, a foreign link is ignored", async ({ page }) => {
     await openDemo(page);
     // stand in for the native bridge: every appUrlOpen listener is kept (auth-client.js registers one too), and the
-    // app was started by a link to Kingdom Exploration
+    // app was started by an old link to Kingdom Exploration (retired 2026-11-26: it opens Explore)
     await page.route("**/capacitor-bridge*.js", (route: Route) =>
       route.fulfill({
         contentType: "application/javascript",
@@ -827,8 +828,8 @@ test.describe("App links in the native shell (QA plan PR G)", () => {
       page.evaluate((u) => (window as unknown as { __capOpen: ((d: { url: string }) => void)[] }).__capOpen.forEach((cb) => cb({ url: u })), url);
 
     await page.goto("/");
-    await expect.poll(() => screen(page)).toBe("kingdom-discovery");
-    expect(path(page)).toBe("/discover");
+    await expect.poll(() => screen(page)).toBe("explore");
+    expect(path(page)).toBe("/explore");
 
     await open(`https://219.co.za/citizens/connect/e/${EVENT_ID}`);
     await expect.poll(() => screen(page)).toBe("event");
@@ -847,7 +848,7 @@ test.describe("App links in the native shell (QA plan PR G)", () => {
 
     // the link opened the screen the way a tap does: Back returns to where the person was
     await page.goBack();
-    await expect.poll(() => screen(page)).toBe("kingdom-discovery");
+    await expect.poll(() => screen(page)).toBe("explore");
 
     // a link to the build's own public address opens too: with no mobile config that is the address the app shares
     // today (routes.jsx PUBLIC_ORIGIN's fallback), so a link it shared brings the person back in
@@ -876,7 +877,7 @@ test.describe("The Capacitor hardware Back button", () => {
     await expect(page.locator('[data-cc-pin="event"]')).toHaveCount(1, { timeout: 15_000 });
     await expect.poll(() => page.evaluate(() => typeof (window as unknown as { __capBack?: unknown }).__capBack)).toBe("function");
 
-    await go(page, "kingdom-discovery");
+    await go(page, "explore");
     await go(page, "event", { id: EVENT_ID });
     await expect(page.locator('[data-screen="event"]')).toBeVisible();
 
@@ -895,8 +896,8 @@ test.describe("The Capacitor hardware Back button", () => {
     await back();
     await expect.poll(() => screen(page)).toBe("event");
     await back();
-    await expect.poll(() => screen(page)).toBe("kingdom-discovery");
-    expect(path(page)).toBe("/discover");
+    await expect.poll(() => screen(page)).toBe("explore");
+    expect(path(page)).toBe("/explore");
     await back();
     await expect.poll(() => screen(page)).toBe("discover");
     expect(path(page)).toBe("/");

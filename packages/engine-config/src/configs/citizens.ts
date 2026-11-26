@@ -80,8 +80,8 @@ export const citizensConfiguration: Configuration = {
       partnerApplications: 'contributor-applications',
     },
     messages: {
-      'screen.map.navLabel': 'Discover',
-      'screen.discover.title': 'Kingdom Exploration',
+      'screen.map.navLabel': 'Map',
+      'screen.discover.title': 'Explore', // the one Explore, pulled in over the map (founder, 2026-11-26)
       'screen.ideas.mapType': 'Impact idea',
       'screen.apply.intro':
         'Contributors create events & places, broadcast updates, message citizens, and lead Kingdom initiatives across the map.',

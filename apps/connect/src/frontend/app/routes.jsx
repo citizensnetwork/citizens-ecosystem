@@ -8,8 +8,7 @@
 //  src/__tests__/frontend/routes.test.ts without a browser.
 //
 //    /                      map (home)         /map → /  (alias)
-//    /discover              Kingdom Exploration list
-//    /explore               Map v2's Discover page (#210; the old map shows Kingdom Exploration there)
+//    /explore               Explore, pulled in over the map   /discover → /explore (alias; the old list is gone)
 //    /lets                  Let's… gatherings
 //    /community             Kingdom Projects (linked from Let's…, not in the nav)
 //    /e/<uuid>              event              /p/<uuid>   place
@@ -48,7 +47,6 @@
   // page → path, for the screens that are one fixed path.
   const STATIC_PATHS = {
     home: '/',
-    'kingdom-discovery': '/discover',
     explore: '/explore',
     lets: '/lets',
     community: '/community',
@@ -67,7 +65,7 @@
 
   // Every first path segment this table owns. next.config.ts rewrites exactly these
   // to index.html (never a catch-all, which would shadow /api, /auth and static files).
-  const PREFIXES = [...Object.keys(PAGE_BY_SEGMENT), 'map', 'me', 'e', 'p', 'c', 'upgrade'];
+  const PREFIXES = [...Object.keys(PAGE_BY_SEGMENT), 'map', 'discover', 'me', 'e', 'p', 'c', 'upgrade'];
 
   // Every screen name the app can show (history.state.nav is trusted only for these).
   const PAGES = Object.keys(STATIC_PATHS).concat(['event', 'place', 'profile', 'intake-upgrade']);
@@ -115,6 +113,8 @@
     const head = seg[0];
 
     if (head === 'map' && seg.length === 1) return resolved(HOME(), '/', true);
+    // The Kingdom Exploration list was retired (founder, 2026-11-26): Explore replaces it, so an old link lands there.
+    if (head === 'discover' && seg.length === 1) return resolved({ page: 'explore', params: {} }, '/explore', true);
     if (head === 'me' && seg.length === 1) return resolved({ page: 'profile', params: {} }, '/me', trimmed);
 
     if (head === 'dashboard' || head === 'admin') {
@@ -203,7 +203,7 @@
     const page = nav && nav.page;
     const p = (nav && nav.params) || {};
     switch (page) {
-      case 'home': case 'kingdom-discovery': case 'explore': case 'lets': case 'community': case 'event': case 'place': return 'public';
+      case 'home': case 'explore': case 'lets': case 'community': case 'event': case 'place': return 'public';
       case 'profile': return p.id || p.slug ? 'public' : 'auth';
       case 'dashboard': return 'contributor';
       case 'admin': return 'admin';
@@ -329,7 +329,7 @@
 
   const BASE_TITLE = window.WORLD.t('meta.title');
   const TITLES = {
-    'kingdom-discovery': window.WORLD.t('screen.discover.title'), explore: 'Explore', lets: window.WORLD.t('screen.gatherings.title'), community: window.WORLD.t('screen.ideas.title'), messages: 'Messages',
+    explore: window.WORLD.t('screen.discover.title'), lets: window.WORLD.t('screen.gatherings.title'), community: window.WORLD.t('screen.ideas.title'), messages: 'Messages',
     notifications: 'Notifications', settings: 'Settings', apply: window.WORLD.t('screen.apply.title'),
     onboarding: 'Set up your profile', dashboard: 'Dashboard', admin: 'Admin',
     'intake-upgrade': 'Confirm your listing',

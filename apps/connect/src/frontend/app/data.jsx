@@ -90,7 +90,7 @@
 
   // ── Events: has it finished? ─────────────────────────────────────────
   //  The ONE definition behind "does this still belong on the map / in the
-  //  discovery list" (home.jsx, kingdom-discovery.jsx) and "which group does it
+  //  discovery list" (home.jsx, connect-explore.jsx) and "which group does it
   //  sit in on the organiser's profile and dashboard". An event is over once its
   //  END is behind us. End time is optional on the create form, so an event with
   //  no end stays up for the rest of its calendar day rather than vanishing the
