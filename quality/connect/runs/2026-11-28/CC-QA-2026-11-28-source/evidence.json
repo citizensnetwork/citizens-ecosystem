@@ -1,0 +1,169 @@
+{
+  "schema_version": "1.0.0",
+  "run_id": "CC-QA-2026-11-28-source",
+  "started_at": "2026-11-28T07:56:02+02:00",
+  "target_url": "https://219.co.za/citizens/connect/",
+  "commit_sha": "e54d32df7bc2b4caa05ad10d902244313c467bc4",
+  "deployment": null,
+  "environment": "connector source review",
+  "previous_run_id": "CC-QA-2026-11-25",
+  "tests": [
+    {
+      "scenario_id": "CC-01",
+      "status": "blocked",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Programme scenario acceptance",
+      "actual": "No interactive browser execution evidenced",
+      "evidence_reference": null
+    },
+    {
+      "scenario_id": "CC-02",
+      "status": "blocked",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Programme scenario acceptance",
+      "actual": "No interactive browser execution evidenced",
+      "evidence_reference": null
+    },
+    {
+      "scenario_id": "CC-03",
+      "status": "blocked",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Programme scenario acceptance",
+      "actual": "No interactive browser execution evidenced",
+      "evidence_reference": null
+    },
+    {
+      "scenario_id": "CC-04",
+      "status": "blocked",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Programme scenario acceptance",
+      "actual": "No interactive browser execution evidenced",
+      "evidence_reference": null
+    },
+    {
+      "scenario_id": "CC-05",
+      "status": "blocked",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Programme scenario acceptance",
+      "actual": "No interactive browser execution evidenced",
+      "evidence_reference": null
+    },
+    {
+      "scenario_id": "CC-06",
+      "status": "blocked",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Programme scenario acceptance",
+      "actual": "No interactive browser execution evidenced",
+      "evidence_reference": null
+    },
+    {
+      "scenario_id": "CC-07",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Programme scenario acceptance",
+      "actual": "No verified isolated staging or native device execution",
+      "evidence_reference": null
+    },
+    {
+      "scenario_id": "CC-08",
+      "status": "not_run",
+      "observed_at": null,
+      "browser_or_device": null,
+      "fixture_reference": null,
+      "steps": [],
+      "expected": "Programme scenario acceptance",
+      "actual": "No verified isolated staging or native device execution",
+      "evidence_reference": null
+    }
+  ],
+  "findings": [],
+  "implementation_cards": [
+    {
+      "id": "INNOV-01",
+      "problem": "Explore regression and gesture arbitration",
+      "user_value": "Reliable spacious discovery",
+      "priority": "P1",
+      "effort": "M",
+      "evidence": "PR #403; snapshot backdrop and edge swipe",
+      "acceptance": "Verify 320/390/768/1440 widths, single dock, focus restoration, no map movement during Explore, 20 swipe trials each direction with no accidental navigation during vertical scroll; compare p95 frame time and cold entry against baseline; preserve 3–80% veil, floating rows and gold restraint.",
+      "dependencies": "#403, #394, #396, #397",
+      "status": "proposed_not_implemented"
+    },
+    {
+      "id": "INNOV-02",
+      "problem": "Optional precision controller and quick zoom",
+      "user_value": "One-handed map access",
+      "priority": "P2",
+      "effort": "M",
+      "evidence": "Library prototype static code: 112px/68px, 85ms lock, pointer capture; alternate pill buttons only faded, not disabled in visible source",
+      "acceptance": "Prototype behind opt-in; 10px dead zone, neutral hold no action, tap center recenter, lock until release/cancel, disable alternate controls, capped progressive pan/zoom outside bounds, spring return pill, +/- and keyboard alternatives, handedness; 20 trials per mode per hand on Android/iOS, zero stuck gestures, target >=95% intended mode, optional single haptic on lock; compare standard controls.",
+      "dependencies": "INNOV-01; physical devices; existing map gesture ownership",
+      "status": "proposed_not_implemented"
+    },
+    {
+      "id": "INNOV-03",
+      "problem": "Contextual discovery cards",
+      "user_value": "Relevant discovery without attention capture",
+      "priority": "P2",
+      "effort": "M",
+      "evidence": "Existing news/nearby #275 and feed #351; extend rather than duplicate",
+      "acceptance": "One card at a time, Explore max 2 per 10 min, map max 1 per 10 min, no cards during gestures/forms/modal or within 5s after; map card <=8% viewport and no control/pin overlap; dismiss/snooze, preferences, quiet hours, reduced motion, keyboard and polite announcements; measure interruptions per completed task and target no >5% task-time regression.",
+      "dependencies": "INNOV-01; existing feed and nearby ranking",
+      "status": "proposed_not_implemented"
+    },
+    {
+      "id": "INNOV-04",
+      "problem": "Imminent event relevance",
+      "user_value": "Timely feasible participation",
+      "priority": "P2",
+      "effort": "M",
+      "evidence": "Proposal only; event dates #397 and location truth #393",
+      "acceptance": "Opt-in location or selected city; verified start time and venue, 5–30 min window only if plausible travel, expire at start or cancellation, no countdown pressure; no repeat after dismissal, no background location; synthetic timezone and stale-data tests; distinguish informational, devotional, discovery and time-sensitive cards.",
+      "dependencies": "INNOV-03; date/location retest",
+      "status": "proposed_not_implemented"
+    },
+    {
+      "id": "INNOV-05",
+      "problem": "Tenant style guide with live preview",
+      "user_value": "Tenant flexibility without fragmentation",
+      "priority": "P3",
+      "effort": "L",
+      "evidence": "Composition plan #390 already covers fixed catalogue; extend its scope rather than create a parallel builder",
+      "acceptance": "Responsive preview 320/390/768/1440, scoped tokens for surfaces/type/spacing/accent, contrast validation, reset/undo, no cross-tenant changes, preserve navigation and accessible defaults; preview only until authorized save in isolated tenant.",
+      "dependencies": "#390 composition C4; tenant authorization and staging",
+      "status": "proposed_not_implemented"
+    }
+  ],
+  "phase_status": [
+    "partial",
+    "historical_only",
+    "blocked",
+    "not_run",
+    "not_run",
+    "partial"
+  ],
+  "android": "Unverified",
+  "email": "pending",
+  "storage": "review branch; not merged"
+}
